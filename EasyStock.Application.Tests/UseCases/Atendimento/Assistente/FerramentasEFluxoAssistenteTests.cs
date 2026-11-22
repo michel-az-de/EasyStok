@@ -78,7 +78,7 @@ public class FerramentasEFluxoAssistenteTests
     {
         _configuracao.DefinirFerramentasDesligadas(FerramentasDaLoja.Serializar(["consultar_pedido"]));
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var fluxo = await new ObterFluxoAssistenteUseCase(_configuracoes, llm, _ferramentas).ExecuteAsync(_empresaId);
 

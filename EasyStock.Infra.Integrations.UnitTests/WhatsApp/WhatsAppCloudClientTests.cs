@@ -209,6 +209,45 @@ public class WhatsAppCloudClientTests
         handler.UltimoCorpo.Should().Contain("\"body\":\"Oi!\"");
     }
 
+    /// <summary>#2833: reação na Cloud API é mensagem <c>type: reaction</c>; emoji vazio retira.</summary>
+    [Fact]
+    public async Task ReacaoSaiComoMensagemDoTipoReaction()
+    {
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        await client.ReagirAsync("5511999998888", "wamid.ORIGINAL", "👍");
+
+        using var corpo = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!);
+        corpo.RootElement.GetProperty("type").GetString().Should().Be("reaction");
+        corpo.RootElement.GetProperty("to").GetString().Should().Be("5511999998888");
+        var reacao = corpo.RootElement.GetProperty("reaction");
+        reacao.GetProperty("message_id").GetString().Should().Be("wamid.ORIGINAL");
+        reacao.GetProperty("emoji").GetString().Should().Be("👍");
+    }
+
+    [Fact]
+    public async Task ReacaoVaziaRetiraComEmojiEmBranco()
+    {
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        await client.ReagirAsync("5511999998888", "wamid.ORIGINAL", null);
+
+        using var corpo = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!);
+        corpo.RootElement.GetProperty("reaction").GetProperty("emoji").GetString().Should().BeEmpty();
+    }
+
+    /// <summary>#2833: a Cloud API não revoga mensagem; o cliente diz isso sem chamar a rede.</summary>
+    [Fact]
+    public async Task ApagarParaTodosNaoESuportadoNaMeta()
+    {
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var act = () => client.ApagarParaTodosAsync("5511999998888", "wamid.ORIGINAL");
+
+        await act.Should().ThrowAsync<AcaoNaoSuportadaWhatsAppException>();
+        handler.UltimoCorpo.Should().BeNull();
+    }
+
     [Fact]
     public async Task BotoesValidaLimites()
     {

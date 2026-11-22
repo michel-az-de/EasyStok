@@ -20,6 +20,10 @@ public interface IPedidoImpressoQueries
 /// <param name="Entrega">Parada da viagem mais recente do pedido (S44); nulo sem viagem.</param>
 /// <param name="TempoPreparoPadraoMinutos"><c>ConfiguracaoAtendimento.TempoPreparoPadraoMinutos</c> (padrão 60).</param>
 /// <param name="NumeroDoDia"><c>Pedido.NumeroDoDia</c> (S53); nulo antes de o pedido entrar na fila.</param>
+/// <param name="AReceber">
+/// Falta receber pela regra do domínio (<c>Pedido.AReceberPelosPagamentos</c>, #2813): o quitado do histórico é zero
+/// mesmo sem pagamento. Nulo: o impresso calcula pelos <c>Pagamentos</c>.
+/// </param>
 public sealed record PedidoImpressoLeitura(
     Guid Id,
     DateTime CriadoEm,
@@ -35,7 +39,8 @@ public sealed record PedidoImpressoLeitura(
     PedidoImpressoEntregaLeitura? Entrega,
     int TempoPreparoPadraoMinutos,
     IReadOnlyList<PedidoImpressoItemLeitura> Itens,
-    int? NumeroDoDia = null);
+    int? NumeroDoDia = null,
+    decimal? AReceber = null);
 
 public sealed record PedidoImpressoJanelaLeitura(DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

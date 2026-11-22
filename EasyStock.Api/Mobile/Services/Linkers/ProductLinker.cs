@@ -21,7 +21,9 @@ public sealed class ProductLinker(
     ILogger<ProductLinker> log,
     IProdutoRepository produtoRepository)
 {
-    public async Task ExecuteAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
+    // #2813: erpNames traz o nome que o produto tera no ERP, por id do app, quando difere do nome do app (primeira carga: nome +
+    // embalagem). Ausente, vale o nome do app, como no sync normal.
+    public async Task ExecuteAsync(IEnumerable<string> mobileProductIds, Guid? empresaId, IReadOnlyDictionary<string, string>? erpNames = null)
     {
         var idsList = mobileProductIds as ICollection<string> ?? mobileProductIds.ToList();
         if (!empresaId.HasValue)
@@ -83,8 +85,9 @@ public sealed class ProductLinker(
             // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
             // que vazaria em PDF/etiqueta/exportacao). Em background nao da pra rejeitar:
             // sanitiza-e-loga.
-            var nomeLimpo = UseCaseGuards.RemoverTagsHtml(mobileP.Name) ?? string.Empty;
-            if (!string.Equals(nomeLimpo, mobileP.Name, StringComparison.Ordinal))
+            var nomeDoApp = erpNames is not null && erpNames.TryGetValue(pid, out var nomeNoErp) ? nomeNoErp : mobileP.Name;
+            var nomeLimpo = UseCaseGuards.RemoverTagsHtml(nomeDoApp) ?? string.Empty;
+            if (!string.Equals(nomeLimpo, nomeDoApp, StringComparison.Ordinal))
                 log.LogWarning("AutoLink Produto: nome do mobile continha tags HTML e foi sanitizado. mobile={MobileId} empresaId={EmpresaId}", pid, empresaId);
 
             // #2911: o inativo de mesmo nome também casa (sem reativar). Antes o linker tentava criar outro
@@ -140,6 +143,10 @@ public sealed class ProductLinker(
                 return;
             }
 
+            // #2813 B8: o console lê a produção pelo produto do prato. Prato avulso (sem produto) com o nome do
+            // produto do app nasce ligado ao Produto novo, em vez de o Produto ficar órfão.
+            var pratoAvulso = await PratoAvulsoPorNomeAsync(nomeLimpo, empresaId.Value, pid);
+
             cachedCategoriaId ??= await CategoriaDefaultHelper.GetOrCreateAsync(db, log, empresaId.Value);
 
             var novoProd = new Produto
@@ -159,6 +166,11 @@ public sealed class ProductLinker(
                 AlteradoEm = DateTime.UtcNow
             };
             await produtoRepository.InsertAsync(novoProd);
+            if (pratoAvulso != null)
+            {
+                pratoAvulso.VincularProduto(novoProd.Id);
+                log.LogInformation("AutoLink Produto: prato avulso {PratoId} ligado ao produto novo erp={ErpId}", pratoAvulso.Id, novoProd.Id);
+            }
             mobileP.ErpProductId = novoProd.Id;
             cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
             db.Add(new ProdutoAlteracao
@@ -214,6 +226,39 @@ public sealed class ProductLinker(
                 "AutoLink Produto: nome do mobile casa pratos de produtos diferentes; nao vincula a nenhum. mobile={MobileId} empresaId={EmpresaId}",
                 mobileId, empresaId);
         return null;
+    }
+
+    /// <summary>
+    /// #2813 B8: o console lê a produção pelo produto do prato (<c>CardapioItem.ProdutoId</c>). Prato avulso (sem produto)
+    /// com o nome do produto do app, que não casou com Produto nem com prato já ligado, é ligado ao Produto novo, em vez de
+    /// o Produto nascer órfão. Mesma regra de nome de <see cref="ProdutoDoPratoAsync"/>. Só liga quando é o ÚNICO prato não
+    /// arquivado da empresa com esse nome e ele não tem produto: dois ou mais pratos de mesmo nome não liga, e prato que
+    /// já tem produto nunca é trocado.
+    /// </summary>
+    private async Task<CardapioItem?> PratoAvulsoPorNomeAsync(string nome, Guid empresaId, string mobileId)
+    {
+        var nomeAparado = nome.Trim();
+        if (nomeAparado.Length == 0) return null;
+        var padrao = PadraoILike.Literal(nomeAparado);
+
+        var pratos = await (
+                from prato in db.Set<CardapioItem>().IgnoreQueryFilters()
+                join loja in db.Set<Storefront>().IgnoreQueryFilters() on prato.StorefrontId equals loja.Id
+                where loja.EmpresaId == empresaId
+                      && prato.ArquivadoEm == null
+                      && prato.NomePublico != null
+                      && EF.Functions.ILike(prato.NomePublico.Trim(), padrao, PadraoILike.Escape)
+                select prato)
+            .Take(2)
+            .ToListAsync();
+
+        if (pratos.Count > 1)
+            log.LogWarning(
+                "AutoLink Produto: nome do mobile casa mais de um prato; nao liga o prato avulso. mobile={MobileId} empresaId={EmpresaId}",
+                mobileId, empresaId);
+
+        // Prato ligado neste mesmo lote (ainda sem SaveChanges) volta rastreado com o ProdutoId novo: não é mais avulso.
+        return pratos.Count == 1 && pratos[0].ProdutoId is null ? pratos[0] : null;
     }
 
     /// <summary>

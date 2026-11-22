@@ -23,7 +23,7 @@ public class AtendimentoProducaoPesquisaControllerTests
     public AtendimentoProducaoPesquisaControllerTests()
     {
         _usuario.TemPermissao(Permissao.GerenciarEstoque).Returns(true);
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _pesquisa.BuscarReceitasAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<FonteProducaoWeb>>(
             [new("Livro de receitas/Bolo", "https://pt.wikibooks.org/wiki/Livro_de_receitas/Bolo", "Farinha", DateTimeOffset.UtcNow)]));
     }

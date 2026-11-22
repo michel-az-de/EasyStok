@@ -208,7 +208,7 @@ public sealed class WebhookWhatsAppIntegrationTests : IAsyncLifetime
         if (_pg is null) throw new InvalidOperationException("Postgres test container indisponível.");
 
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(false);
+        llm.Disponivel.Returns(false); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         var cloud = Substitute.For<IWhatsAppCloudClient>();
         var fila = Substitute.For<IQueueService>();
 

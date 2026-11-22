@@ -42,7 +42,7 @@ public sealed class AssistenteDoCardapioUseCase(IAcervoRepository repo, IAgenteL
         var item = await repo.ItemAsync(Empresa(empresa), itemId, ct) ?? throw new KeyNotFoundException("Item não encontrado.");
         var pendencias = item.PendenciasDeApresentacao();
         var estatica = new DicaDoPrato(item.Id, pendencias, DicaEstatica(pendencias), false);
-        if (!llm.Disponivel) return estatica;
+        if (!await llm.DisponivelAsync(empresa, ct)) return estatica;
         var dados = JsonSerializer.Serialize(new
         {
             prato = item.NomeEfetivo(), categoria = item.CategoriaEfetiva(), descricao = item.DescricaoPublica,
@@ -69,7 +69,7 @@ public sealed class AssistenteDoCardapioUseCase(IAcervoRepository repo, IAgenteL
         if (imagens.Count == 0 || pratos.Count == 0) return new([], false);
         var vinculos = imagens.Values.ToDictionary(i => i.Id, Vinculos);
 
-        if (llm.Disponivel)
+        if (await llm.DisponivelAsync(empresa, ct))
         {
             var dados = JsonSerializer.Serialize(new
             {

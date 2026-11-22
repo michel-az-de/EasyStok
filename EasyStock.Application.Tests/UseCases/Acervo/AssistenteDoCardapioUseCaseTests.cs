@@ -46,7 +46,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Dica_sem_ia_e_a_estatica_com_as_pendencias()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var dica = await Sut().DicaAsync(Empresa, _lasanha.Id, default);
 
@@ -59,7 +59,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Dica_com_ia_usa_o_texto_do_llm_e_manda_o_prato_como_dado()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         ResponderFerramenta("dar_dica", """{"texto":"Fotografe a lasanha cortada e cite o ragu na descrição."}""");
 
         var dica = await Sut().DicaAsync(Empresa, _lasanha.Id, default);
@@ -73,7 +73,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Dica_com_resposta_invalida_ou_falha_cai_na_estatica()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         ResponderFerramenta("dar_dica", """{"texto":""}""");
         (await Sut().DicaAsync(Empresa, _lasanha.Id, default)).PorIa.Should().BeFalse();
 
@@ -94,7 +94,7 @@ public class AssistenteDoCardapioUseCaseTests
     [InlineData("42")]
     public async Task Ferramenta_com_entrada_que_nao_e_objeto_usa_alternativa_estatica(string json)
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         ResponderFerramenta("dar_dica", json);
         (await Sut().DicaAsync(Empresa, _lasanha.Id, default)).PorIa.Should().BeFalse();
         ResponderFerramenta("sugerir_associacoes", json);
@@ -104,7 +104,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sugestao_sem_ia_casa_pelo_nome_so_imagens_aprovadas_de_produto()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var resultado = await Sut().SugerirAssociacoesAsync(Empresa, default);
 
@@ -119,7 +119,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sugestao_sem_ia_ignora_o_peso_no_nome_do_prato()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         var pesado = CardapioItem.CriarAvulso(Guid.NewGuid(), "Nhoque artesanal 500 g", 30m, "massas");
         _repo.ItensAsync(Empresa, Arg.Any<CancellationToken>()).Returns([pesado]);
         _repo.MapaImagensAsync(Empresa, Arg.Any<CancellationToken>()).Returns([Imagem("Nhoque no prato fundo")]);
@@ -131,7 +131,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sugestao_nao_repete_imagem_ja_vinculada_ao_prato()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         var jaLigada = Imagem("Lasanha bolonhesa", itens: _lasanha.Id);
         _repo.MapaImagensAsync(Empresa, Arg.Any<CancellationToken>()).Returns([jaLigada]);
 
@@ -141,7 +141,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sugestao_com_ia_descarta_ids_inventados_e_imagens_nao_aprovadas()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         ResponderFerramenta("sugerir_associacoes", JsonSerializer.Serialize(new
         {
             associacoes = new object[]
@@ -165,7 +165,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sugestao_com_falha_da_ia_cai_no_casamento_por_nome()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns<RespostaLlm>(_ => throw new HttpRequestException("fora"));
 
         var resultado = await Sut().SugerirAssociacoesAsync(Empresa, default);
@@ -177,7 +177,7 @@ public class AssistenteDoCardapioUseCaseTests
     [Fact]
     public async Task Sem_imagem_aprovada_nao_chama_a_ia()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _repo.MapaImagensAsync(Empresa, Arg.Any<CancellationToken>()).Returns([_naoAprovada]);
 
         (await Sut().SugerirAssociacoesAsync(Empresa, default)).Sugestoes.Should().BeEmpty();

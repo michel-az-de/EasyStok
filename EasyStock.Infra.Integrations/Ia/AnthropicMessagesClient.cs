@@ -35,7 +35,7 @@ public sealed class AnthropicMessagesClient(
     {
         ArgumentNullException.ThrowIfNull(requisicao);
         if (!Disponivel)
-            throw new InvalidOperationException("Agente de atendimento desligado (Anthropic:Enabled/ApiKey).");
+            throw new ProvedorIaIndisponivelException("Agente de atendimento desligado (Anthropic:Enabled/ApiKey).");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
         if (_opcoes.AutenticacaoBearer)
@@ -55,8 +55,8 @@ public sealed class AnthropicMessagesClient(
         }
         catch (BrokenCircuitException ex)
         {
-            throw new HttpRequestException(HttpRequestError.ConnectionError,
-                "Anthropic temporariamente indisponível; o agente não foi chamado.", ex);
+            // #3064 (A1): não saiu, então o registro de uso não grava Erro.
+            throw new ProvedorIaIndisponivelException("Anthropic temporariamente indisponível; o agente não foi chamado.", ex);
         }
         using var response = enviada;
         var corpo = await response.Content.ReadAsStringAsync(ct);
@@ -69,21 +69,25 @@ public sealed class AnthropicMessagesClient(
             throw new HttpRequestException($"Anthropic respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
-        var resposta = LerResposta(corpo, requisicao.Modelo);
+        var resposta = LerResposta(corpo, ModeloDe(requisicao.Modelo));
         // #2862: prova do cache em produção. Só números e o modelo; nunca texto de mensagem.
         logger.LogInformation("Anthropic uso: modelo={Modelo} entrada={Entrada} saida={Saida} cache_escrito={CacheEscrito} cache_lido={CacheLido}",
             resposta.Modelo, resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheEscrito, resposta.TokensCacheLido);
         return resposta;
     }
 
-    internal byte[] MontarCorpo(RequisicaoLlm requisicao)
+    internal byte[] MontarCorpo(RequisicaoLlm requisicao) =>
+        MontarCorpo(requisicao, ModeloDe(requisicao.Modelo), _opcoes.MaxTokensAgente);
+
+    /// <summary>#3064: o mesmo corpo para o cliente do <c>.env</c> e para o provedor da loja.</summary>
+    internal static byte[] MontarCorpo(RequisicaoLlm requisicao, string modelo, int maxTokens)
     {
         using var buffer = new MemoryStream();
         using (var w = new Utf8JsonWriter(buffer))
         {
             w.WriteStartObject();
-            w.WriteString("model", ModeloDe(requisicao.Modelo));
-            w.WriteNumber("max_tokens", _opcoes.MaxTokensAgente);
+            w.WriteString("model", modelo);
+            w.WriteNumber("max_tokens", maxTokens);
             if (string.IsNullOrEmpty(requisicao.SystemVolatil))
             {
                 w.WriteString("system", requisicao.System);
@@ -179,7 +183,7 @@ public sealed class AnthropicMessagesClient(
     /// <summary>S68 (#2597): o modelo pedido pelo turno (já na lista aprovada) ou o configurado.</summary>
     private string ModeloDe(string? pedido) => string.IsNullOrWhiteSpace(pedido) ? _opcoes.ModeloAgente : pedido;
 
-    private RespostaLlm LerResposta(string corpo, string? modeloPedido)
+    internal static RespostaLlm LerResposta(string corpo, string modeloPedido)
     {
         using var doc = JsonDocument.Parse(corpo);
         var raiz = doc.RootElement;
@@ -215,7 +219,7 @@ public sealed class AnthropicMessagesClient(
         // S67 (#2534): o modelo que respondeu (versão datada); sem ele, o configurado.
         var modelo = raiz.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(m.GetString())
             ? m.GetString()
-            : ModeloDe(modeloPedido);
+            : modeloPedido;
 
         return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo, cacheEscrito);
     }

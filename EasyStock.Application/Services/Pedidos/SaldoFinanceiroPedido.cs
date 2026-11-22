@@ -32,7 +32,9 @@ public sealed class SaldoFinanceiroPedido(IPedidoRepository pedidos, IEstornoOnl
     /// "Tem pagamento" não é "pago": o sinal de R$ 25 num pedido de R$ 50 deixa R$ 25 para a porta.
     /// </summary>
     public Task<decimal> AReceberAsync(Pedido pedido, CancellationToken ct) =>
-        AReceberAsync(pedido.EmpresaId, pedido.Id, pedido.Total.Valor, pedido.TotalPago, ct);
+        pedido.QuitadoHistorico
+            ? Task.FromResult(0m) // #2813: quitado pelo import do histórico, sem pagamento: nada a receber.
+            : AReceberAsync(pedido.EmpresaId, pedido.Id, pedido.Total.Valor, pedido.TotalPago, ct);
 
     public async Task<decimal> AReceberAsync(Guid empresaId, Guid pedidoId, decimal total, decimal totalPago, CancellationToken ct) =>
         total <= 0m ? 0m : (await ConsultarAsync(empresaId, pedidoId, totalPago, ct)).AReceber(total);

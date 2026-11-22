@@ -54,6 +54,8 @@ public sealed class CashEntryLinker(
                 if (mobileCE == null) { idempotentSkip++; continue; }
                 // #1520: lancamento excluido no PWA antes de ser promovido nao entra no caixa do ERP.
                 if (mobileCE.DeletedAt != null) { idempotentSkip++; continue; }
+                // #2813: o arquivo do histórico importado (marca NaoPromoverEm) nunca vira movimento do caixa do ERP.
+                if (mobileCE.NaoPromoverEm != null) { idempotentSkip++; continue; }
                 if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) { idempotentSkip++; continue; }
 
                 var referencia = ReferenciaDe(mobileCE);

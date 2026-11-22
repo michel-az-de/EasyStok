@@ -114,6 +114,17 @@ export const casosApi = {
       }
     }),
 
+  // #2833: a mensagem já enviada volta com a reação ou apagada. A tradução omite o que é nulo, então a reação
+  // retirada só some se a mensagem velha não emprestar a dela.
+  [acao.ATUALIZAR_MENSAGEM_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
+    ...c,
+    mensagens: c.mensagens.map((m) => {
+      if (m.id !== mensagem.id) return m
+      const { reacao: _reacao, apagadaEm: _apagadaEm, ...resto } = m
+      return { ...resto, ...mensagem }
+    }),
+  })),
+
   [acao.RECEBER_MODELO_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
     ...c, mensagens: [...c.mensagens.filter(m => m.id !== mensagem.id), { ...mensagem, aguardandoSync: true }],
   })),
@@ -149,13 +160,18 @@ export const casosApi = {
   [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
     ...estado,
     catalogo: {
-      ...estado.catalogo, cardapio, adicionais: {},
+      ...estado.catalogo, cardapio, adicionais: {}, cardapioLido: true, cardapioFalha: null,
       galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
         id: `${item.sku}-foto-${indice}`, nome: item.nome,
         descricao: `${item.porcao} · Foto ${indice + 1}`, legenda: legendaDoItem(item), foto, doCardapio: true,
         cardapioItemId: item.sku, indice,
       }))),
     },
+  }),
+
+  // #3076: recusa da leitura guarda o motivo; o cardápio que já estava na tela fica.
+  [acao.CARDAPIO_INDISPONIVEL]: (estado, { mensagem }) => ({
+    ...estado, catalogo: { ...estado.catalogo, cardapioFalha: mensagem },
   }),
 
   // F03: pedido que a API acabou de criar ou trocar de forma, sem esperar o próximo ciclo.

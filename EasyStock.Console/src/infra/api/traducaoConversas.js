@@ -11,6 +11,9 @@ import { relacionamentoDaApi } from '../../dominio/vinculoCliente'
 // #2005 (console-09): a leitura da conversa traz até 100 mensagens (as mais recentes); página cheia sugere que há mais.
 export const MENSAGENS_POR_LEITURA = 100
 
+// #2833: o mesmo id que o WppConnectClient lê para reagir e apagar (contato @c.us ou @lid; grupo fica de fora).
+const ID_DA_PONTE = /^wpp:[^:]+:(true|false)_[^_]+@(c\.us|lid)_.+/
+
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
@@ -90,6 +93,12 @@ export function mensagemDaApi(m, conversaId = null) {
     // #1398: texto do áudio transcrito, mostrado abaixo do player.
     ...(m.transcricao ? { transcricao: m.transcricao } : {}),
     ...(m.assunto ? { assunto: m.assunto } : {}), // #1432: assunto do e-mail recebido
+    // #2833: reação da loja e apagada para todos. O id externo diz se a mensagem existe no WhatsApp.
+    ...(m.externoId ? { noCanal: true } : {}),
+    // Id da conexão por QR (`wpp:{sessao}:{deMim}_{conversa}_{id}`, WppConnectClient): só ela apaga para todos.
+    ...(ID_DA_PONTE.test(m.externoId ?? '') ? { pelaPonte: true } : {}),
+    ...(m.reacao ? { reacao: m.reacao } : {}),
+    ...(m.apagadaEm ? { apagadaEm: instante(m.apagadaEm) } : {}),
     ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
     // #1397: o EasyStok desistiu de baixar o anexo depois das tentativas; o balão avisa em vez de ficar parado.
     ...(!m.midiaChave && m.midiaFalhou ? { midia: { falhou: true, erro: m.erroMidia ?? null } } : {}),

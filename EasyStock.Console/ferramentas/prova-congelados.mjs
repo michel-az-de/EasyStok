@@ -108,7 +108,7 @@ confere('(b) cada tela congelada existe no catálogo, some do menu e da busca, e
 })
 
 confere('Financeiro descongelado: o gerencial volta no modo API e a demonstração fica só com o Caixa', () => {
-  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo', 'fechamentos-legados'])
   assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: false }).map((t) => t.id), ['caixa'])
   assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa')
   assert.equal(rotaDaHash('#/m/financeiro/pagar', { fonteApi: true }).aba, 'financeiro-pagar')

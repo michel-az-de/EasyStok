@@ -32,7 +32,8 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
 
         var c = p.Cliente;
         var recebido = p.Pagamentos.Sum(g => g.Valor);
-        var pago = recebido >= p.Total;
+        // #2813: o quitado do histórico não tem pagamento; a leitura traz o que falta receber, pela regra do domínio.
+        var pago = p.AReceber is { } aReceber ? aReceber <= 0m : recebido >= p.Total;
         var ultimoPagamento = p.Pagamentos.OrderBy(g => g.PagoEm).LastOrDefault();
 
         return new PedidoImpressoDto(

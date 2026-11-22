@@ -67,13 +67,15 @@ function PostIt({ nota }) {
 
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [], visivel = true,
-  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, numeroComanda = null,
+  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, numeroComanda = null, aoReagir, aoApagar,
 }) {
   const fim = useRef(null)
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
+  const reagir = useChamadaEstavel(aoReagir)
+  const apagar = useChamadaEstavel(aoApagar)
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
   // #2232 (A5): `visivel` é o painel aberto na aba; ao abrir, o fio vai para a última mensagem.
@@ -138,6 +140,9 @@ export function Thread({
         aoReenviar={aoReenviar ? reenviar : undefined}
         // #1761: só onde o compositor já oferece Modelos aprovados.
         aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
+        // #2833: reagir e apagar para todos só com a API.
+        aoReagir={aoReagir ? reagir : undefined}
+        aoApagar={aoApagar ? apagar : undefined}
       />
     )
   }

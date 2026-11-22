@@ -82,6 +82,7 @@ export function useSincronizacaoApi({
         if (!vivo) return
         avisouCardapio = true
         despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
+        despachar({ tipo: acao.CARDAPIO_INDISPONIVEL, mensagem: avisoDoCardapio(erro) })
       }
       if (!comDesacertosRef.current) return
       const alertas = await lerAlertasDeEstoque()

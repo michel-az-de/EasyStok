@@ -3,6 +3,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -24,6 +25,16 @@ public class SyncReversePullService(
     private readonly EasyStockDbContext _db = db;
     private readonly IConfiguration _config = config;
     private readonly ILogger<SyncReversePullService> _log = log;
+
+    /// <summary>
+    /// #2813 (B5): janela, em dias, do histórico que desce na PRIMEIRA carga do aparelho (pull sem cursor).
+    /// Ponto de partida, fácil de mudar: o aparelho tem cota pequena de localStorage e não precisa do
+    /// histórico inteiro. O histórico completo continua no ERP e no Console; o filtro só restringe o que
+    /// este pull devolve, não apaga nada do servidor nem do aparelho. O pull incremental (cursor maior
+    /// que zero) não usa a janela. O pedido entregue conta a janela da data da entrega (EntreguEm, ou CriadoEm
+    /// quando nula) e, enquanto tiver saldo a receber, desce de qualquer idade: dinheiro a receber não some da tela.
+    /// </summary>
+    public const int JanelaPrimeiraCargaDias = 30;
 
     /// <summary>
     /// #1469: o grid de producao do PWA so desenha massa/molho/extra. Traduz a Categoria ERP
@@ -121,6 +132,13 @@ public class SyncReversePullService(
     public async Task AppendAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // #2813 (B5): primeira carga = aparelho sem cursor (o SyncController entrega UnixEpoch quando since é 0).
+        // Só nela o pull deixa o histórico no ERP. Com cursor o aparelho pode ter o registro e precisa saber do
+        // cancelamento e do estorno, então o incremental segue devolvendo tudo o que mudou. Cliente e produto
+        // não são filtrados. O filtro só tira linhas da resposta: não existe caminho novo de delete.
+        var primeiraCarga = sinceDate <= DateTime.UnixEpoch;
+        var inicioDaJanela = DateTime.UtcNow.AddDays(-JanelaPrimeiraCargaDias);
 
         // Produtos web sem mobile_product correspondente (Erp link).
         var mobileLinkedProdutos = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
@@ -285,9 +303,18 @@ public class SyncReversePullService(
             .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
                 && (p.MobileOrderId == null || p.MobileOrderId == ""));
         if (lojaId.HasValue) pedidosQ = pedidosQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
+        // #2813 (B5): na primeira carga o cancelado não desce. O entregue só desce dentro da janela, contada da
+        // entrega (EntreguEm, ou CriadoEm quando nula), ou enquanto tiver saldo a receber, de qualquer idade: dinheiro
+        // a receber não some da tela. O pedido em aberto (aguardando, preparando, pronto...) desce de qualquer data.
+        if (primeiraCarga) pedidosQ = pedidosQ.Where(p => p.Status != StatusPedidoMapper.Cancelado);
         var pedidos = await pedidosQ.ToListAsync();
         foreach (var p in pedidos)
         {
+            // Uma vez só: o saldo decide o corte da janela e segue no DTO.
+            var aReceber = await AReceberDoPedidoMobile.CalcularAsync(p, _saldos, CancellationToken.None);
+            if (primeiraCarga && p.Status == StatusPedidoMapper.Entregue
+                && (p.EntreguEm ?? p.CriadoEm) < inicioDaJanela && aReceber <= 0m)
+                continue;
             // #1474: a linha de frete não é produto a preparar; o nome segue o da vitrine.
             var items = p.Itens.Where(i => !i.EhLinhaDeFrete).Select(i => new OrderItemDto(
                 ProductId: i.ProdutoId?.ToString() ?? "",
@@ -312,7 +339,7 @@ public class SyncReversePullService(
                 ScheduledDeliveryAt: p.AgendadoParaEm.HasValue
                     ? new DateTimeOffset(p.AgendadoParaEm.Value).ToUnixTimeMilliseconds()
                     : null,
-                AReceber: await AReceberDoPedidoMobile.CalcularAsync(p, _saldos, CancellationToken.None),
+                AReceber: aReceber,
                 Channel: p.Canal);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "order.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
@@ -324,6 +351,10 @@ public class SyncReversePullService(
             .Where(l => l.EmpresaId == empresaId && l.AlteradoEm > sinceDate
                 && (l.MobileBatchId == null || l.MobileBatchId == ""));
         if (lojaId.HasValue) lotesQ = lotesQ.Where(l => l.LojaId == lojaId || l.LojaId == null);
+        // #2813 (B5): na primeira carga o lote finalizado ou expirado (Lote.EstaFinalizado) só desce dentro da
+        // janela (DataProducao, a data do CreatedAt do DTO); o lote em produção desce de qualquer data.
+        if (primeiraCarga)
+            lotesQ = lotesQ.Where(l => (l.Status != "finalizado" && l.Status != "expirado") || l.DataProducao >= inicioDaJanela);
         var lotes = await lotesQ.ToListAsync();
         // #2209: o lote web anterior ao #2199, sem número curto, ganha um aqui.
         var semNumero = lotes.Where(l => l.NumeroCurto is null).Select(l => l.Id).ToList();
@@ -363,6 +394,9 @@ public class SyncReversePullService(
                 && (((m.Referencia == null || !m.Referencia.StartsWith("mobile:")) && m.CriadoEm > sinceDate)
                     || m.EstornadoEm > sinceDate));
         if (lojaId.HasValue) movimentosQ = movimentosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
+        // #2813 (B5): na primeira carga só o lançamento dentro da janela (DataMovimento, a data do CreatedAt do
+        // DTO) desce, estornado ou não; o histórico do caixa fica no ERP.
+        if (primeiraCarga) movimentosQ = movimentosQ.Where(m => m.DataMovimento >= inicioDaJanela);
         var movimentos = await movimentosQ.ToListAsync();
         foreach (var m in movimentos.Where(m => m.Referencia != null && m.Referencia.StartsWith("mobile:")))
             EstornoDoLancamentoDoAparelho(mutations, m);
@@ -391,6 +425,8 @@ public class SyncReversePullService(
         var fechamentosQ = _db.Set<FechamentoCaixa>().IgnoreQueryFilters().AsNoTracking()
             .Where(f => f.EmpresaId == empresaId && f.FechadoEm > sinceDate);
         if (lojaId.HasValue) fechamentosQ = fechamentosQ.Where(f => f.LojaId == lojaId || f.LojaId == null);
+        // #2813 (B5): na primeira carga só o fechamento dentro da janela (FechadoEm) desce.
+        if (primeiraCarga) fechamentosQ = fechamentosQ.Where(f => f.FechadoEm >= inicioDaJanela);
         var fechamentos = await fechamentosQ.ToListAsync();
         foreach (var f in fechamentos)
         {

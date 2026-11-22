@@ -10,8 +10,8 @@ import { ligarVoltarDaJanela } from '../aplicacao/historicoDaJanela'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, avisoSemCelular, cadastrarCelularDaJanela, cadastrarEnderecoDaJanela, motivoDeBloqueio, textoDaFaixa, cardapioPronto, comandaDeFora, enderecoVigente, mostrarAvisoDePedidoEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela, somaEhDaJanela,
-  restaurarRascunho, somarNaJanela, textoDoErro,
+  ajustarNaJanela, avisoSemCelular, cadastrarCelularDaJanela, cadastrarEnderecoDaJanela, motivoDeBloqueio, textoDaFaixa, cardapioPronto, situacaoDoCardapio, comandaDeFora, enderecoQueChegou, enderecoVigente, mostrarAvisoDePedidoEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela, somaEhDaJanela,
+  restaurarRascunho, somarNaJanela, textoDoErro, erroDaSimulacaoNaEntrega,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
 import { SeletorJanelaApi } from '../features/ficha-cliente/SeletorJanelaApi'
@@ -48,7 +48,9 @@ export function NovoPedidoJanela() {
 function Montagem({ janela, conversa }) {
   const sessao = lerSessao()
   const acoes = useAcoes()
-  const { cardapio } = useCatalogo()
+  const catalogo = useCatalogo()
+  const { cardapio } = catalogo
+  const leitura = situacaoDoCardapio(catalogo)
   const pedido = conversa.pedido ?? { itens: [] }
   const [passo, setPasso] = useState('itens')
   const [busca, setBusca] = useState('')
@@ -110,6 +112,14 @@ function Montagem({ janela, conversa }) {
   const { simulacao, erro: erroSimulacao } = useSimulacaoDoPedidoComErro({
     conversaId: janela.conversaId, clienteId: janela.clienteId, endereco: enderecoCadastrado, pedido, ativo: passo !== 'itens',
   })
+  // #3076: o dossiê chega depois de abrir; o endereço Padrão do cadastro preenche o campo que ninguém digitou.
+  const enderecoDoCadastro = conversa.cliente?.endereco ?? null
+  const [enderecoVisto, setEnderecoVisto] = useState(enderecoDoCadastro)
+  if (enderecoDoCadastro !== enderecoVisto) {
+    setEnderecoVisto(enderecoDoCadastro)
+    const chegou = enderecoQueChegou(enderecoTexto, enderecoDoCadastro)
+    if (chegou) setEnderecoTexto(chegou)
+  }
   useEffect(() => {
     if (primeiroPasso.current) { primeiroPasso.current = false; return }
     tituloDoPasso.current?.focus()
@@ -167,7 +177,7 @@ function Montagem({ janela, conversa }) {
 
   // #2944 (E1-01): o motivo do bloqueio fica visível ao lado do botão. O texto "Pode continuar" nunca aparece (só com o
   // botão desabilitado); ele mantém o invólucro do Botao estável para o foco não se perder ao habilitar.
-  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao, enderecoValido })
+  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao, enderecoValido, calculando })
   const motivoRegistrando = 'Registrando o pedido'
   const rodape = <>
     <AvisoDaAcaoApi />
@@ -209,7 +219,7 @@ function Montagem({ janela, conversa }) {
         <div className={css.colunas}>
           <section aria-label="Cardápio do dia">
             <CampoTexto rotulo="Buscar no cardápio" value={busca} onChange={(e) => setBusca(e.target.value)} />
-            {!cardapioPronto(cardapio) ? <EsqueletoDeLista linhas={4}>Carregando o cardápio…</EsqueletoDeLista> : ativos.length === 0 ? <p className={css.vazio}>{busca ? `Nada no cardápio com "${busca}".` : 'Nada disponível no cardápio hoje.'}</p> : <ul className={css.lista}>
+            {leitura.tipo === 'carregando' ? <EsqueletoDeLista linhas={4}>Carregando o cardápio…</EsqueletoDeLista> : leitura.tipo === 'falhou' ? <output className={css.aviso}>{leitura.mensagem}</output> : ativos.length === 0 ? <p className={css.vazio}>{busca ? `Nada no cardápio com "${busca}".` : cardapioPronto(cardapio) ? 'Nada disponível no cardápio hoje.' : 'O cardápio está vazio. Cadastre os itens em Cardápio para montar pedidos.'}</p> : <ul className={css.lista}>
               {ativos.map((item) => {
                 const produto = doToque(item)
                 return <li key={item.sku}><span>{item.nome} {qtdDe(item.sku) > 0 && <strong className={css.selo} aria-label={`${qtdDe(item.sku)} no pedido`}>{qtdDe(item.sku)}</strong>} <small>{moeda(produto?.preco ?? item.preco)}</small></span>
@@ -227,9 +237,9 @@ function Montagem({ janela, conversa }) {
           <SeletorJanelaApi key={janela.conversaId} pedido={pedido} editavel aoLerJanelas={lerJanelas} aoEscolher={(j, avisar) => acoes.escolherJanela(janela.conversaId, j, avisar)} />
           <h3 className={css.subtitulo}>Endereço de entrega</h3>
           <CampoTexto rotulo="Endereço de entrega" value={enderecoTexto} erro={erroEndereco} onChange={(e) => { setEnderecoTexto(e.target.value); setErroEndereco(null) }} />
-          <Botao disabled={cadastrando || !enderecoTexto.trim()} motivo={cadastrando ? 'Cadastrando…' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
-          {enderecoVigente(enderecoCadastrado, enderecoTexto) && !faltaEndereco(erroSimulacao) && <p className={css.aviso} role="status">Endereço cadastrado: {enderecoVigente(enderecoCadastrado, enderecoTexto)}</p>}
-          {erroSimulacao && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao)}</p>}
+          <Botao disabled={cadastrando || !enderecoTexto.trim() || enderecoValido} motivo={cadastrando ? 'Cadastrando…' : enderecoValido ? 'Este já é o endereço do cadastro' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
+          {enderecoValido && <p className={css.aviso} role="status">Entrega no endereço do cadastro: {enderecoDoPedido}</p>}
+          {erroDaSimulacaoNaEntrega(erroSimulacao, erroEndereco) && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao, { noPassoDaEntrega: true })}</p>}
           {/* #2974: fora da área o frete é combinado com a cliente, como na comanda do Atendimento (#2219). */}
           {(simulacao?.freteACombinar || pedido.freteCombinado !== undefined) && (
             <CampoReais

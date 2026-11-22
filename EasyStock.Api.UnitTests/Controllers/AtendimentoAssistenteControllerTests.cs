@@ -48,7 +48,7 @@ public class AtendimentoAssistenteControllerTests
     public async Task ComConversa_DevolveAcoesPropostasSemEnviar()
     {
         // #1445: "manda o cardápio" volta como ação proposta; o envio é do clique no console.
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var conversa = Conversa.Abrir(_empresaId, "5511999998888", DateTime.UtcNow, "Maria");
         _conversas.ObterComMensagensAsync(_empresaId, conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new ConversaComMensagens(conversa, []));
@@ -82,7 +82,7 @@ public class AtendimentoAssistenteControllerTests
     [Fact]
     public async Task SemChave_Devolve503ComMensagemClara()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var result = await Criar().Perguntar(new PerguntarAssistenteBody("Posso cobrar taxa de entrega?", null));
 
@@ -95,7 +95,7 @@ public class AtendimentoAssistenteControllerTests
     [Fact]
     public async Task PerguntaVazia_Devolve400()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var result = await Criar().Perguntar(new PerguntarAssistenteBody("  ", null));
 

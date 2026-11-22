@@ -59,7 +59,7 @@ public sealed class SugerirRespostaAgenteUseCase(
     public async Task<SugestaoAgenteResult> ExecuteAsync(SugerirRespostaAgenteCommand command, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (!llm.Disponivel)
+        if (!await llm.DisponivelAsync(command.EmpresaId, ct))
             throw new AgenteIndisponivelException(AgenteIndisponivelException.MensagemDesligado);
 
         var agora = relogio.GetUtcNow().UtcDateTime;

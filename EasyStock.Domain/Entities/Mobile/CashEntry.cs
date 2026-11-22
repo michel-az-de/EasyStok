@@ -73,4 +73,23 @@ public class CashEntry
 
     [Column("deleted_by"), MaxLength(64)]
     public string? DeletedBy { get; set; }
+
+    /// <summary>
+    /// #2813: marca do import do histórico. O lançamento fica só como arquivo e não vira movimento do ERP. Só o import
+    /// grava (setter privado); quem promove lançamentos ao ERP deve ignorar a linha marcada. NULL = lançamento comum.
+    /// </summary>
+    [Column("nao_promover_em")]
+    public DateTime? NaoPromoverEm { get; private set; }
+
+    /// <summary>
+    /// #2813: o import do histórico guarda o lançamento manual só como arquivo, com a data ORIGINAL do lançamento (nunca a
+    /// de hoje). Só o <c>LegacySnapshotImportService</c> chama (teste de arquitetura). Recusa o lançamento que já tem
+    /// movimento no caixa: a marca não esconde um movimento que existe.
+    /// </summary>
+    public void MarcarNaoPromover(DateTime em)
+    {
+        if (ErpMovimentoCaixaId.HasValue)
+            throw new InvalidOperationException("Lançamento já promovido ao caixa não vira arquivo do histórico.");
+        NaoPromoverEm = em;
+    }
 }

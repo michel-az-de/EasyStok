@@ -76,11 +76,17 @@ public sealed record MensagemAtendimentoResult(
     public string? Assunto { get; init; }
     public string? ChaveEnvio { get; init; }
 
+    /// <summary>#2833: emoji com que a loja reagiu; nulo sem reação.</summary>
+    public string? Reacao { get; init; }
+
+    /// <summary>#2833: a loja apagou para todos. O texto segue no registro, como auditoria.</summary>
+    public DateTime? ApagadaEm { get; init; }
+
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
         m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId, m.AguardaClienteDesde, m.ReservaSmsEm,
         m.ErroMidia, m.MidiaFalhou, m.Transcricao, m.Programada, m.Modelo)
-    { Assunto = m.Assunto, ChaveEnvio = m.ChaveEnvio };
+    { Assunto = m.Assunto, ChaveEnvio = m.ChaveEnvio, Reacao = m.Reacao, ApagadaEm = m.ApagadaEm };
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>

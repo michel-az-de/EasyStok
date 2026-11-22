@@ -278,6 +278,8 @@ export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 export const ANTERIORES_CARREGADAS = 'anteriores-carregadas'
 export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
 export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
+// #2833: reação ou apagar para todos; a mensagem que a API devolveu troca a da conversa.
+export const ATUALIZAR_MENSAGEM_API = 'atualizar-mensagem-api'
 export const RECEBER_MODELO_API = 'receber-modelo-api'
 export const FALHAR_ENVIO_API = 'falhar-envio-api'
 export const AVISO_API = 'aviso-api'
@@ -285,6 +287,8 @@ export const AVISO_API = 'aviso-api'
 export const SINCRONIZAR_EXPEDIENTE = 'sincronizar-expediente'
 // F03: cardápio da vitrine da empresa e o pedido da conversa (S10/S11) como a API devolveu.
 export const SINCRONIZAR_CARDAPIO = 'sincronizar-cardapio'
+// #3076: a leitura do cardápio foi recusada (vitrine desligada, falha); o Novo pedido diz o motivo em vez de esperar.
+export const CARDAPIO_INDISPONIVEL = 'cardapio-indisponivel'
 export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 // F06 (#1236): o aviso de ação fica na faixa até a dona fechar; a sincronização não o apaga.
 export const FECHAR_AVISO_API = 'fechar-aviso-api'

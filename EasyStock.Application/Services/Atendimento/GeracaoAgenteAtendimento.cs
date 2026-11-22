@@ -195,7 +195,9 @@ public static class GeracaoAgenteAtendimento
         {
             return await llm.EnviarAsync(requisicao, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        // #3064: o que nem saiu (disjuntor aberto, cota estourada, sem chave) não se repete: daria outra linha de cota_estourada.
+        catch (Exception ex) when (ex is not ProvedorIaIndisponivelException
+                                   && (ex is not OperationCanceledException || !ct.IsCancellationRequested))
         {
             logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);
             await Task.Delay(EsperaAntesDaNovaTentativa, ct);
@@ -243,7 +245,8 @@ public static class GeracaoAgenteAtendimento
     {
         var resultado = new List<MensagemLlm>();
         var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
-        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && !FalhouDeVez(m)))
+        // #2833: a apagada para todos sai junto: o cliente não a vê mais, e o agente não pode se apoiar nela.
+        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && !FalhouDeVez(m) && m.ApagadaEm is null))
         {
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch

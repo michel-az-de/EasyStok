@@ -32,7 +32,7 @@ public class ChecarAssistenteConversaUseCaseTests
 
     public ChecarAssistenteConversaUseCaseTests()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
         _configuracao.Ativo = true;
         _configuracoes.GetByEmpresaIdAsync(_empresaId).Returns(_configuracao);

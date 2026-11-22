@@ -118,6 +118,9 @@ export const MODULOS = [
       { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true, acao: 'verContas' },
       { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras' },
       { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto' },
+      // #2813: fechamentos de caixa do aparelho antigo, só leitura (arquivo histórico; o aparelho nunca mais envia fechamento, #2030).
+      // A API é da policy Gerente: o Operador abre o Financeiro pelo Caixa do dia e levaria 403, então a tela pede a ação.
+      { id: 'fechamentos-legados', rotulo: 'Fechamentos do aparelho', tipo: TELA_AJUSTE, aba: 'fechamentos-legados', soApi: true, acao: 'verFechamentosLegados' },
     ],
   },
   {
@@ -174,6 +177,9 @@ const PODE_NA_TELA = {
   // O GET de categorias e de centros exige visualizar contas (a pagar ou a receber); só gerenciar não lista (#2105, achado 8).
   verCategoriasFinanceiras: verContas,
   verCentrosCusto: verContas,
+  // #2813: `GET api/mobile/legacy-import/fechamentos` é da policy Gerente e não tem módulo (ModulosConvention). Até o servidor
+  // mandar `verFechamentosLegados`, vale a gerência da loja (`controlarLoja`, mesmo nível Gerente), como em `podeEditarAutomacoes`.
+  verFechamentosLegados: (acoes) => (acoes?.verFechamentosLegados ?? acoes?.controlarLoja) === true,
 }
 const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
