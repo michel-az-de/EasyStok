@@ -54,8 +54,13 @@ public sealed class PublicadorAvisoEquipe(INotificadorService notificador)
     /// #3002: quanto falta receber do pedido que entrou na fila sem pagar. Sem valor, a chave não vai no payload e o
     /// template diz "pago"; nula viraria texto vazio, que o Scriban lê como verdadeiro.
     /// </param>
+    /// <param name="pagoDepois">
+    /// #3168: o pedido já tinha canhoto (entrou na fila a receber) e foi quitado agora. Chave própria, porque a do
+    /// canhoto já foi gasta pelo aviso "a receber" e o outbox descartaria este como repetido.
+    /// </param>
     public Task PedidoComCanhotoAsync(
-        Guid empresaId, Guid pedidoId, string? cliente, decimal total, CancellationToken ct = default, decimal aReceber = 0m)
+        Guid empresaId, Guid pedidoId, string? cliente, decimal total, CancellationToken ct = default, decimal aReceber = 0m,
+        bool pagoDepois = false)
     {
         var payload = new Dictionary<string, string?>
         {
@@ -66,7 +71,7 @@ public sealed class PublicadorAvisoEquipe(INotificadorService notificador)
         };
         if (aReceber > 0m) payload["aReceber"] = aReceber.ToString("C", PtBr);
         return EnfileirarAsync(AvisosDaEquipe.PedidoComCanhoto, empresaId, pedidoId, payload,
-            chave: $"aviso-equipe-canhoto:{pedidoId:N}", ct);
+            chave: $"aviso-equipe-canhoto{(pagoDepois ? "-pago" : "")}:{pedidoId:N}", ct);
     }
 
     /// <param name="chave">Identidade do problema (pagamento e desfecho): webhook repetido não repete o aviso.</param>
