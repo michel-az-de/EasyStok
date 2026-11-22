@@ -115,7 +115,7 @@ export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !
 // meta.lojaDisponivel=false, que `lerDaLoja` (infra/api/cliente) transforma no mesmo erro.
 export const lojaDesligada = (erro) => erro?.codigo === 'VITRINE_DESLIGADA'
 // #3154: diz quem liga (o suporte do EasyStok, como Cardápio e Produção já dizem), sem o termo interno "vitrine", e
-// cabe na faixa fixa do rodapé no tamanho do texto antigo. O Novo pedido compara com esta constante, nunca com o texto da API.
+// cabe na faixa fixa do rodapé na altura do texto antigo.
 export const AVISO_LOJA_DESLIGADA = 'Loja online desligada: sem cardápio. Peça ao suporte do EasyStok para ligar.'
 
 export function avisoDoCardapio(erro) {

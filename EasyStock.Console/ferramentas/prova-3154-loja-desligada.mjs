@@ -10,15 +10,14 @@ const { avisoDoCardapio } = await import('../src/aplicacao/planoDeSincronizacao.
 const { motivoDeBloqueio, motivoDoNovoPedido } = await import('../src/aplicacao/janelaDoPedido.js')
 const { buscarDestinosDoConsole, modulosDoHall } = await import('../src/dominio/modulos.js')
 
-// 1. O aviso diz quem liga, sem o termo interno "vitrine", e cabe na faixa do rodapé como o texto antigo (74).
+// 1. O aviso diz quem liga, sem o termo interno "vitrine". Antigo: 73 caracteres; novo: 76 (a prova de navegador mede a altura da faixa).
 const aviso = avisoDoCardapio({ status: 200, codigo: 'VITRINE_DESLIGADA', message: 'A empresa não tem vitrine ativa.' })
 assert.match(aviso, /suporte do EasyStok/, 'diz quem liga a loja')
-assert.ok(aviso.length <= 76, `faixa não cresce: ${aviso.length} caracteres`)
 assert.doesNotMatch(aviso, /vitrine/i, 'sem o termo interno')
 assert.equal(avisoDoCardapio({ status: 500, message: 'Fora' }), 'Cardápio: Fora', 'outra falha segue como antes')
 
 // 2. Sem itens e com o cardápio recusado, o Continuar diz o motivo real, curto (a frase inteira fica no corpo da etapa).
-assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [], cardapio: { tipo: 'falhou', mensagem: aviso } }), 'Loja online desligada')
+assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [], cardapio: { tipo: 'falhou', mensagem: aviso, lojaDesligada: true } }), 'Loja online desligada')
 assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [], cardapio: { tipo: 'falhou', mensagem: 'Cardápio: Fora' } }), 'O cardápio não carregou')
 assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [], cardapio: { tipo: 'carregando' } }), 'Carregando o cardápio…')
 assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [], cardapio: { tipo: 'pronto' } }), 'Some ao menos um item')
@@ -27,10 +26,22 @@ assert.equal(motivoDeBloqueio({ passo: 'itens', itens: [{ sku: 'a', qtd: 1 }], c
   'itens já na tela valem mesmo com falha depois')
 
 // 3. O botão Novo pedido diz antes de abrir a janela, só com a loja desligada.
-assert.equal(motivoDoNovoPedido({ cardapio: [], cardapioLido: true, cardapioFalha: aviso }), aviso)
+assert.equal(motivoDoNovoPedido({ cardapio: [], cardapioLido: true, cardapioFalha: aviso, cardapioLojaDesligada: true }), aviso)
+assert.equal(motivoDoNovoPedido({ cardapio: [], cardapioLido: true, cardapioFalha: aviso }), null, 'decide pelo código, não pelo texto')
 assert.equal(motivoDoNovoPedido({ cardapio: [], cardapioLido: true, cardapioFalha: 'Cardápio: Fora' }), null, 'falha passageira não trava')
-assert.equal(motivoDoNovoPedido({ cardapio: [{ sku: 'a' }], cardapioLido: true, cardapioFalha: aviso }), null, 'itens na tela valem')
+assert.equal(motivoDoNovoPedido({ cardapio: [{ sku: 'a' }], cardapioLido: true, cardapioFalha: aviso, cardapioLojaDesligada: true }), null, 'itens na tela valem')
 assert.equal(motivoDoNovoPedido({ cardapio: [], galeria: [] }), null, 'carregando não trava')
+
+// 3b. O código do erro chega ao catálogo pela sincronização e sai quando o cardápio volta.
+const acao = await import('../src/aplicacao/acoes.js')
+const { casosApi } = await import('../src/aplicacao/casos/api.js')
+const { lojaDesligada } = await import('../src/aplicacao/planoDeSincronizacao.js')
+const erroLoja = { status: 200, codigo: 'VITRINE_DESLIGADA', message: 'A empresa não tem vitrine ativa.' }
+const recusado = casosApi[acao.CARDAPIO_INDISPONIVEL]({ catalogo: { cardapio: [] } }, { mensagem: avisoDoCardapio(erroLoja), lojaDesligada: lojaDesligada(erroLoja) })
+assert.equal(motivoDoNovoPedido(recusado.catalogo), aviso)
+const voltou = casosApi[acao.SINCRONIZAR_CARDAPIO](recusado, { cardapio: [{ sku: 'a', nome: 'A', preco: 1 }] })
+assert.equal(voltou.catalogo.cardapioLojaDesligada, false)
+assert.equal(motivoDoNovoPedido(voltou.catalogo), null)
 
 // 4. A Busca na Casa acha "loja online" e "vitrine" e leva às telas do Cardápio, que dizem quem liga.
 const modulos = modulosDoHall({ fonteApi: true, acoes: {} })

@@ -4,7 +4,6 @@ import { erroDoCelular } from '../dominio/celularDoPedido'
 import { identidadeDaEdicao } from '../dominio/identidadeDaEdicao'
 import { pedidoEncerrado } from '../dominio/pedido'
 import { temRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
-import { AVISO_LOJA_DESLIGADA } from './planoDeSincronizacao'
 
 // #2921: regras puras da janela "Novo pedido" na tela. A montagem mora em `conversas[].pedido` do Provider (o mesmo
 // lugar da comanda do Balcão), na conversa da janela: o "+" soma sempre nela, qualquer que seja a `selecionada`.
@@ -63,19 +62,21 @@ export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.
 // (vitrine desligada, falha) diz o motivo em vez de esperar para sempre. Itens já na tela valem mesmo com falha depois.
 export function situacaoDoCardapio(catalogo) {
   if (cardapioPronto(catalogo?.cardapio)) return { tipo: 'pronto' }
-  if (catalogo?.cardapioFalha) return { tipo: 'falhou', mensagem: catalogo.cardapioFalha }
+  if (catalogo?.cardapioFalha) {
+    return catalogo.cardapioLojaDesligada ? { tipo: 'falhou', mensagem: catalogo.cardapioFalha, lojaDesligada: true } : { tipo: 'falhou', mensagem: catalogo.cardapioFalha }
+  }
   return catalogo?.cardapioLido ? { tipo: 'pronto' } : { tipo: 'carregando' }
 }
 // #3154: com a loja online desligada não há item para montar; o botão Novo pedido diz antes de abrir a janela.
 export const motivoDoNovoPedido = (catalogo) => {
   const leitura = situacaoDoCardapio(catalogo)
-  return leitura.tipo === 'falhou' && leitura.mensagem === AVISO_LOJA_DESLIGADA ? AVISO_LOJA_DESLIGADA : null
+  return leitura.tipo === 'falhou' && leitura.lojaDesligada ? leitura.mensagem : null
 }
 // #3154: sem item, o motivo curto é o do cardápio quando ele não veio; "Some ao menos um item" só com o cardápio na tela.
 // A frase inteira fica no corpo da etapa Itens: o motivo aparece de novo no rodapé da janela.
 function motivoSemItens(cardapio) {
   if (cardapio?.tipo === 'carregando') return 'Carregando o cardápio…'
-  if (cardapio?.tipo === 'falhou') return cardapio.mensagem === AVISO_LOJA_DESLIGADA ? 'Loja online desligada' : 'O cardápio não carregou'
+  if (cardapio?.tipo === 'falhou') return cardapio.lojaDesligada ? 'Loja online desligada' : 'O cardápio não carregou'
   return 'Some ao menos um item'
 }
 
