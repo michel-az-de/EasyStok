@@ -37,20 +37,23 @@ export function usePainelAssistente() {
   return { carregando, uso: leitura.uso, fluxo: leitura.fluxo, erro: carregando ? null : leitura.erro, gravacao, salvar, recarregar }
 }
 
-// Histórico de turnos, página a página; só lê quando a aba aparece.
-export function useHistoricoAssistente(ativo) {
-  const [pagina, setPagina] = useState(1)
+// Histórico de turnos, página a página; só lê quando a aba aparece. `conversaId` (#3175) restringe aos turnos de
+// uma conversa; ao mudá-lo a página volta a 1.
+export function useHistoricoAssistente(ativo, conversaId = null) {
+  const [{ pagina, filtro }, setPaginacao] = useState({ pagina: 1, filtro: conversaId })
+  const setPagina = (nova) => setPaginacao({ pagina: nova, filtro: conversaId })
+  if (filtro !== conversaId) setPaginacao({ pagina: 1, filtro: conversaId })
   const [estado, setEstado] = useState({ chave: null, dados: null, erro: null })
-  const chave = ativo ? `p${pagina}` : null
+  const chave = ativo ? `${conversaId ?? 'todas'}:p${pagina}` : null
 
   useEffect(() => {
     if (!chave) return undefined
     const controle = new AbortController()
-    listarHistoricoAssistente({ pagina, tamanhoPagina: 20 }, controle.signal)
+    listarHistoricoAssistente({ pagina, tamanhoPagina: 20, conversaId }, controle.signal)
       .then((dados) => { if (!controle.signal.aborted) setEstado({ chave, dados, erro: null }) })
       .catch((erro) => { if (!controle.signal.aborted) setEstado((atual) => ({ ...atual, chave, erro: erro.message })) })
     return () => controle.abort()
-  }, [chave, pagina])
+  }, [chave, pagina, conversaId])
 
   return { carregando: Boolean(chave) && estado.chave !== chave, dados: estado.dados, erro: estado.erro, pagina, setPagina }
 }

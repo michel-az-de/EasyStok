@@ -133,7 +133,7 @@ export function ModalAssistente({ conversa, aoFechar }) {
       )}
     >
       {renderizarPainel
-        ? renderizarPainel({ podeEditar: acoes?.editarAtendimento === true, sinalRecarregar, abaAntes: { id: 'conversa', rotulo: 'Esta conversa', conteudo: daConversa } })
+        ? renderizarPainel({ conversaId: conversa.id, podeEditar: acoes?.editarAtendimento === true, sinalRecarregar, abaAntes: { id: 'conversa', rotulo: 'Esta conversa', conteudo: daConversa } })
         : daConversa}
       {desligando && (
         <ModalConfirmar titulo="Desligar o Assistente?" descricao={PERGUNTA_AO_DESLIGAR} rotuloConfirmar="Desligar o Assistente"
