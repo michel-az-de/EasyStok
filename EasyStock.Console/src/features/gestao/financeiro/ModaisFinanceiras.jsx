@@ -61,7 +61,15 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   const [nomeNovaCategoria, setNomeNovaCategoria] = useState('')
   const criacao = useOperacaoFinanceira()
   const campoNovaCategoria = useRef(null)
-  useEffect(() => { if (criandoCategoria) campoNovaCategoria.current?.focus() }, [criandoCategoria])
+  // #3159: fechado o bloco, o foco não cai no body: Criar leva ao campo Categoria (com a nova escolhida), Cancelar volta ao
+  // "+ Nova categoria" que o abriu. O alvo só monta depois do commit, por isso o efeito.
+  const campoCategoria = useRef(null)
+  const botaoNovaCategoria = useRef(null)
+  const voltarPara = useRef(null)
+  useEffect(() => {
+    if (criandoCategoria) { campoNovaCategoria.current?.focus(); return }
+    voltarPara.current?.current?.focus(); voltarPara.current = null
+  }, [criandoCategoria])
   const todasCategorias = [...cadastros.categorias, ...criadas.filter((nova) => !cadastros.categorias.some((item) => item.id === nova.id))]
   const categorias = todasCategorias.filter((item) => (item.ativa && [tipo, 'Ambas'].includes(item.tipo)) || item.id === categoria)
   const criarCategoria = async () => {
@@ -73,9 +81,10 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
       nova = resposta?.id ? resposta : (await listarCategoriasFinanceiras()).find((item) => item.nome === corpo.nome && item.tipo === corpo.tipo)
       if (!nova) throw new Error('A categoria foi criada, mas não apareceu na lista. Feche e abra a conta de novo.')
     })
-    if (!ok) return
+    // Na falha o botão estava desligado e o foco pode ter caído no body: volta ao nome, onde o erro aparece.
+    if (!ok) { campoNovaCategoria.current?.focus(); return }
     setCriadas((atual) => [...atual, { ativa: true, ...corpo, ...nova }])
-    setCategoria(nova.id); setNomeNovaCategoria(''); setCriandoCategoria(false)
+    setCategoria(nova.id); setNomeNovaCategoria(''); voltarPara.current = campoCategoria; setCriandoCategoria(false)
     aoCriarCategoria?.()
   }
   const parcelas = parcelasFinanceiras(centavos, quantidade, vencimento)
@@ -116,15 +125,15 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
     <CampoTexto rotulo="Descrição" obrigatorio required limite={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
     <div className={css.grade}>
       <div className={css.categoria}>
-        <CampoSelecao rotulo="Categoria financeira" obrigatorio required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
-        {podeCriarCategoria && !criandoCategoria && <Botao variante="texto" onClick={() => setCriandoCategoria(true)}>+ Nova categoria</Botao>}
+        <CampoSelecao ref={campoCategoria} rotulo="Categoria financeira" obrigatorio required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
+        {podeCriarCategoria && !criandoCategoria && <Botao ref={botaoNovaCategoria} variante="texto" onClick={() => setCriandoCategoria(true)}>+ Nova categoria</Botao>}
       </div>
       <CampoSelecao rotulo="Centro de custo" value={centro} onChange={(e) => setCentro(e.target.value)} opcoes={[...(!conta?.centroCustoId ? [{ valor: '', rotulo: 'Sem centro de custo' }] : []), ...cadastros.centros.filter((item) => item.ativo || item.id === centro).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
     </div>
     {podeCriarCategoria && criandoCategoria && <fieldset className={css.novaCategoria}><legend className="sr">Nova categoria</legend>
       <CampoTexto ref={campoNovaCategoria} rotulo={`Nome da nova categoria de ${tipo.toLowerCase()}`} limite={100} erro={criacao.erro ? mensagemFinanceira(criacao.erro) : null} value={nomeNovaCategoria} onChange={(e) => setNomeNovaCategoria(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarCategoria() } }} />
       <Botao variante="primario" disabled={Boolean(motivoDaNovaCategoria(nomeNovaCategoria)) || algumPassaDoLimite([nomeNovaCategoria, 100]) || criacao.ocupado} onClick={criarCategoria}>{criacao.ocupado ? 'Criando…' : 'Criar categoria'}</Botao>
-      <Botao variante="texto" disabled={criacao.ocupado} onClick={() => { setCriandoCategoria(false); setNomeNovaCategoria('') }}>Cancelar</Botao>
+      <Botao variante="texto" disabled={criacao.ocupado} onClick={() => { voltarPara.current = botaoNovaCategoria; setCriandoCategoria(false); setNomeNovaCategoria('') }}>Cancelar</Botao>
     </fieldset>}
     {!categorias.length && !criandoCategoria && <p className={css.aviso}>{podeCriarCategoria ? `Ainda não há categoria de ${tipo.toLowerCase()}. Use "+ Nova categoria" para criar a primeira.` : `Ainda não há categoria de ${tipo.toLowerCase()}. Peça a quem administra a loja para cadastrar uma.`}</p>}
     {!conta && <>
