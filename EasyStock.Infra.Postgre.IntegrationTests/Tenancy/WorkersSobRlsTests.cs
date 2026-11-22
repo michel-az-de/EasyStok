@@ -99,6 +99,37 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
             .Should().Be(0, "a retenção atravessa empresas; sem bypass apagaria zero linhas e pararia em silêncio");
     }
 
+    /// <summary>
+    /// #3138 (h): a marca de entrega da ponte WPPConnect vence em 7 dias. Os outros provedores de
+    /// <c>webhook_recebidos</c> são idempotência de processamento e não podem sair, por mais antigos que sejam.
+    /// </summary>
+    [SkippableFact]
+    public async Task Expurgo_apaga_so_a_marca_de_entrega_wppconnect_vencida()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        await PrepararAsync();
+        const string marca = EasyStock.Application.UseCases.Atendimento.Webhook.ProcessarWebhookWppConnectUseCase.ProvedorEntrega;
+        WebhookRecebido Registro(string provedor, int diasAtras)
+        {
+            var r = WebhookRecebido.Criar(provedor, $"expurgo-3138:{Guid.NewGuid():N}", "hash");
+            r.RecebidoEm = DateTime.UtcNow.AddDays(-diasAtras);
+            return r;
+        }
+        var vencida = Registro(marca, 8);
+        var recente = Registro(marca, 6);
+        var idempotenciaAntiga = Registro("meta_whatsapp", 400);
+        await SemearAsync(db => db.Set<WebhookRecebido>().AddRange(vencida, recente, idempotenciaAntiga));
+
+        await using var provider = BuildProvider();
+        await new MarcaEntregaWppConnectRetentionService(provider, TimeProvider.System,
+            NullLogger<MarcaEntregaWppConnectRetentionService>.Instance).RodadaAsync(CancellationToken.None);
+
+        await using var leitura = fixture.CreateDbContext();
+        var restantes = await leitura.Set<WebhookRecebido>().AsNoTracking()
+            .Where(w => w.EventIdExterno.StartsWith("expurgo-3138:")).Select(w => w.Id).ToListAsync();
+        restantes.Should().BeEquivalentTo([recente.Id, idempotenciaAntiga.Id]);
+    }
+
     [SkippableFact]
     public async Task Relatorios_o_runner_escolhe_e_inicia_runs_de_qualquer_empresa()
     {
