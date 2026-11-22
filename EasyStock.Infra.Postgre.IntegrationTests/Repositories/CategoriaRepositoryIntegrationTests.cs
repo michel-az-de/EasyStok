@@ -2,9 +2,11 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarCategoria;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
@@ -118,5 +120,58 @@ public sealed class CategoriaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             db.SetMobileTenantContext(empresaId);
             (await db.Categorias.AnyAsync(c => c.Id == subLivreId)).Should().BeFalse();
         }
+    }
+
+    [SkippableTheory]
+    [InlineData("bebidas")]
+    [InlineData("BEBIDAS")]
+    [InlineData("  Bebidas ")]
+    public async Task ExisteNomeAsync_acha_o_nome_sem_diferenciar_caixa_nem_espacos_nas_pontas(string nome)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, _, _, _) = await SemearHierarquiaAsync();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+
+        (await new CategoriaRepository(db).ExisteNomeAsync(empresaId, nome)).Should().BeTrue();
+    }
+
+    [SkippableFact]
+    public async Task ExisteNomeAsync_ignora_a_propria_categoria_e_a_de_outra_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, raizId, _, _) = await SemearHierarquiaAsync();
+        var (outraEmpresaId, _, _, _) = await SemearHierarquiaAsync();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        var repo = new CategoriaRepository(db);
+
+        (await repo.ExisteNomeAsync(empresaId, "Bebidas", raizId)).Should().BeFalse("a própria categoria não conta como duplicada");
+        (await repo.ExisteNomeAsync(empresaId, "Bebidas", Guid.NewGuid())).Should().BeTrue();
+        (await repo.ExisteNomeAsync(empresaId, "Bebida")).Should().BeFalse("a comparação é por igualdade, não por prefixo");
+        (await repo.ExisteNomeAsync(outraEmpresaId, "Bebidas")).Should().BeFalse("o contexto é de outra empresa");
+    }
+
+    // #3101: lower("Nome") na consulta não casa com o índice único (EmpresaId, nome_lower);
+    // o nome vira filtro linha a linha. A consulta precisa comparar a coluna gerada.
+    [SkippableFact]
+    public async Task ExisteNomeAsync_compara_a_coluna_gerada_do_indice_unico()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, _, _, _) = await SemearHierarquiaAsync();
+        var comandos = new List<string>();
+
+        await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .LogTo(comandos.Add, [RelationalEventId.CommandExecuted])
+            .Options);
+        db.SetMobileTenantContext(empresaId);
+
+        (await new CategoriaRepository(db).ExisteNomeAsync(empresaId, "bebidas")).Should().BeTrue();
+
+        comandos.Should().Contain(sql => sql.Contains("nome_lower"));
+        comandos.Should().NotContain(sql => sql.Contains("lower(c.\"Nome\")"));
     }
 }
