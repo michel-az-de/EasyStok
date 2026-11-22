@@ -10,6 +10,7 @@ namespace EasyStock.Application.Services.Atendimento;
 public sealed class MemoriaVigiaPonteWppConnect
 {
     private const int Teto = 5_000;
+    public const int ObservacoesParaQueda = 2;
     private readonly ConcurrentDictionary<string, byte> _descartadas = new(StringComparer.Ordinal);
 
     private readonly ConcurrentDictionary<string, (DateTimeOffset Desde, bool AposQueda)> _conectada = new(StringComparer.Ordinal);
@@ -22,14 +23,14 @@ public sealed class MemoriaVigiaPonteWppConnect
     /// </summary>
     public (DateTimeOffset Desde, bool AposQueda) ObservarConectada(string sessao, DateTimeOffset agora)
     {
-        var caiu = _desconectada.TryRemove(sessao, out _);
+        // Uma leitura desconectada só é oscilação do check-connection: não vira queda nem apaga o que já se sabia.
+        var caiu = _desconectada.TryRemove(sessao, out var fora) && fora.Observacoes >= ObservacoesParaQueda;
         return caiu ? _conectada[sessao] = (agora, true) : _conectada.GetOrAdd(sessao, (agora, false));
     }
 
     /// <summary>#3138: desde quando, e por quantas observações seguidas, este processo vê a sessão desconectada ou sem resposta.</summary>
     public (DateTimeOffset Desde, int Observacoes) ObservarDesconectada(string sessao, DateTimeOffset agora)
     {
-        _conectada.TryRemove(sessao, out _);
         return _desconectada.AddOrUpdate(sessao, (agora, 1), (_, a) => (a.Desde, a.Observacoes + 1));
     }
 

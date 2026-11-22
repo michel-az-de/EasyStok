@@ -34,11 +34,13 @@ Limites conhecidos:
 - Mensagem que a ponte entregou e a API recusou (400 do parser, 503 do telefone do LID) NÃO é ponte muda: o webhook
   grava a marca de entrega (`webhook_recebidos`, provedor `wppconnect_entrega`) antes do parser.
 - Loja que desliga o módulo ou perde a credencial tem o estado apagado e o incidente fechado. Ponte desconectada ou
-  fora do ar numa rodada não muda o estado. Desconectada ou sem resposta por 30 minutos seguidos (seis rodadas) sai do
+  fora do ar numa rodada não muda o estado. Desconectada ou sem resposta por 30 minutos, em pelo menos seis leituras seguidas, sai do
   vigia: o estado é apagado, o incidente fecha e o deploy para de dizer "muda". A desconexão aparece na tela de
   integração (#3138).
 - Mensagem sem registro só conta como ponte muda se nada foi entregue depois dela e se o Worker já via a ponte
-  conectada quando ela chegou (#3138). Depois de reiniciar a ponte, o que ficou da parada não segura o incidente.
+  conectada quando ela chegou (#3138). Reconexão só conta depois de duas leituras desconectadas seguidas (uma só é
+  oscilação); o que ficou de antes dela não segura o incidente. Ponte que perde parte das mensagens e entrega o
+  resto NÃO é detectada: a entrega posterior esconde a perda.
   Depois de reiniciar o Worker (todo deploy), a suspeita anterior deixa a rodada sem conclusão: o incidente aberto
   não fecha sozinho e um novo só abre com mensagem nova.
 - Queda e volta da ponte entre duas rodadas (5 min) não é vista: a mensagem sincronizada nesse intervalo conta como

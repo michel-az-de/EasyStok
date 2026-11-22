@@ -3,6 +3,7 @@ using NSubstitute.ExceptionExtensions;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -23,11 +24,12 @@ public class VigiaPonteWppConnectTests
     private readonly IWebhookRecebidoRepository _recebidos = Substitute.For<IWebhookRecebidoRepository>();
     private readonly MemoriaVigiaPonteWppConnect _memoria = new();
     private readonly FakeTimeProvider _relogio = new(Agora);
+    private readonly ILogger<VigiaPonteWppConnect> _logger = Substitute.For<ILogger<VigiaPonteWppConnect>>();
     private readonly VigiaPonteWppConnect _vigia;
 
     public VigiaPonteWppConnectTests()
     {
-        _vigia = new VigiaPonteWppConnect(_cliente, _recebidos, _memoria, _relogio);
+        _vigia = new VigiaPonteWppConnect(_cliente, _recebidos, _memoria, _relogio, _logger);
         // O caso comum: a ponte já estava conectada muito antes das mensagens em jogo.
         _memoria.ObservarConectada(Sessao.Sessao, Agora.AddHours(-12));
         _cliente.ObterEstadoAsync(default!, default).ReturnsForAnyArgs(new EstadoWppConnect(true, true, true, "CONNECTED"));
@@ -158,7 +160,7 @@ public class VigiaPonteWppConnectTests
     }
 
     private VigiaPonteWppConnect VigiaRecemIniciado() =>
-        new(_cliente, _recebidos, new MemoriaVigiaPonteWppConnect(), _relogio);
+        new(_cliente, _recebidos, new MemoriaVigiaPonteWppConnect(), _relogio, _logger);
 
     private void Ponte(bool conectada) => _cliente.ObterEstadoAsync(default!, default)
         .ReturnsForAnyArgs(new EstadoWppConnect(true, true, conectada, conectada ? "CONNECTED" : "CLOSED"));
@@ -269,14 +271,41 @@ public class VigiaPonteWppConnectTests
         // #3138 (b): entrou no aparelho com a ponte desconectada e foi sincronizada sem onmessage. Depois de reiniciar uma
         // ponte muda, é também o que sobra da parada: não pode segurar o incidente aberto.
         Ponte(conectada: false);
-        await _vigia.AvaliarAsync(Sessao);
-        _relogio.Advance(TimeSpan.FromMinutes(10));
+        await ObservarAsync(2, TimeSpan.FromMinutes(5));
+        _relogio.Advance(TimeSpan.FromMinutes(5));
         Ponte(conectada: true);
         PonteEnxerga(TimeSpan.FromMinutes(6));
 
         (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Entregando);
         (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Entregando);
         await _cliente.ReceivedWithAnyArgs(1).ListarMensagensRecentesAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Uma_leitura_desconectada_nao_e_queda_e_nao_apaga_a_suspeita()
+    {
+        // Revisão da #3161: o check-connection oscila. Um timeout no meio de uma parada real não pode descartar a
+        // mensagem que prova a ponte muda, senão o incidente fecha com a ponte ainda muda.
+        Ponte(conectada: false);
+        await _vigia.AvaliarAsync(Sessao);
+        _relogio.Advance(TimeSpan.FromMinutes(5));
+        Ponte(conectada: true);
+        PonteEnxerga(TimeSpan.FromMinutes(11));
+
+        (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Muda);
+    }
+
+    [Fact]
+    public async Task Ponte_sem_resposta_deixa_o_tipo_do_erro_em_log()
+    {
+        // Revisão da #3161: token errado ou endereço errado no Worker não pode sumir do log e virar "desconectada".
+        _cliente.ObterEstadoAsync(default!, default).ThrowsAsyncForAnyArgs(new HttpRequestException("http://ponte:21465 recusou"));
+
+        await _vigia.AvaliarAsync(Sessao);
+
+        var aviso = _logger.ReceivedCalls().Should().ContainSingle().Subject;
+        aviso.GetArguments()[0].Should().Be(LogLevel.Warning);
+        aviso.GetArguments()[2]!.ToString().Should().Contain("HttpRequestException").And.NotContain("21465");
     }
 
     [Fact]

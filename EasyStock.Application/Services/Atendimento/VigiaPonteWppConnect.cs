@@ -29,20 +29,23 @@ public enum SinalPonteWppConnect
 /// <para>
 /// Uma mensagem sem registro só prova ponte muda se nada foi entregue depois dela e se este processo já via a ponte
 /// conectada quando ela chegou (#3138). Entrega posterior mostra um buraco antigo (a API reiniciando num deploy, por
-/// exemplo); mensagem anterior a uma reconexão observada foi sincronizada sem <c>onmessage</c>; e, logo depois de um
+/// exemplo); mensagem anterior a uma reconexão observada (duas leituras desconectadas seguidas: uma só é oscilação do
+/// <c>check-connection</c>) foi sincronizada sem <c>onmessage</c>; e, logo depois de um
 /// reinício do processo, a suspeita anterior deixa a rodada sem conclusão, para um incidente aberto não fechar sozinho.
 /// </para>
 /// <para>
 /// Limites conhecidos: queda e volta da ponte entre duas rodadas não é observada, e a mensagem sincronizada nesse
 /// intervalo conta como muda até a primeira entrega seguinte. A suspeita só é vista enquanto a conversa está entre as
-/// <see cref="MaximoDeConversas"/> mais recentes. As contagens vivem na memória do processo. se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e nada é
+/// <see cref="MaximoDeConversas"/> mais recentes. Ponte que perde parte das mensagens e entrega o resto não é vista: a
+/// entrega posterior esconde a perda. As contagens vivem na memória do processo. Se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e nada é
 /// detectado. Mensagem que a ponte entregou e a API recusou (400, telefone sem resolver) não é ponte muda: o webhook
 /// grava a marca de entrega antes do parser. Telefone e texto passam por aqui só para a comparação; nada disso sai em
 /// log nem no retorno.
 /// </para>
 /// </summary>
 public sealed class VigiaPonteWppConnect(
-    IWppConnectSessaoClient cliente, IWebhookRecebidoRepository recebidos, MemoriaVigiaPonteWppConnect memoria, TimeProvider relogio)
+    IWppConnectSessaoClient cliente, IWebhookRecebidoRepository recebidos, MemoriaVigiaPonteWppConnect memoria, TimeProvider relogio,
+    ILogger<VigiaPonteWppConnect> logger)
 {
     public static readonly TimeSpan Carencia = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan Janela = TimeSpan.FromHours(6);
@@ -54,6 +57,8 @@ public sealed class VigiaPonteWppConnect(
     /// <summary>Os tipos que a ponte entrega pelo <c>onmessage</c> e o parser do webhook reconhece.</summary>
     private static readonly HashSet<string> TiposEntregues = new(StringComparer.Ordinal)
         { "chat", "ptt", "image", "audio", "video", "document", "sticker", "location" };
+
+    private readonly ILogger<VigiaPonteWppConnect> _logger = logger;
 
     public async Task<SinalPonteWppConnect> AvaliarAsync(CredencialWppConnect sessao, CancellationToken ct = default)
     {
@@ -143,8 +148,10 @@ public sealed class VigiaPonteWppConnect(
         {
             return (await cliente.ObterEstadoAsync(sessao, ct)).Conectado;
         }
-        catch (Exception) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            // Só o tipo: a mensagem da exceção pode trazer endereço ou resposta da ponte.
+            _logger.LogWarning("Ponte WPPConnect sem resposta para a sessão {Sessao}: {TipoErro}.", sessao.Sessao, ex.GetType().Name);
             return false;
         }
     }
