@@ -32,6 +32,15 @@ public sealed class ProcessarTurnoAgenteUseCase(
         ArgumentNullException.ThrowIfNull(job);
         tenantContext.SetCurrentTenant(job.EmpresaId);
 
+        // #3121: o turno roda fora de requisição e não herda o X-Correlation-Id. O escopo junta as linhas do turno,
+        // da geração e da falha. Só ids: texto, nome e telefone não entram no log.
+        using var escopo = logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["ConversaId"] = job.ConversaId,
+            ["EmpresaId"] = job.EmpresaId,
+            ["TurnoCorrelacao"] = Guid.NewGuid(),
+        });
+
         try
         {
             return await agente.ProcessarTurnoAsync(job.EmpresaId, job.ConversaId, DateTime.UtcNow, ct, job.Retomada);
