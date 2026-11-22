@@ -68,3 +68,10 @@
 /* FaixaApi é irmã da moldura dentro deste contêiner, não mais de #root. */
 .conteudo:has(> :global([data-conteudo-console])) { display: flex; flex-direction: column; }
 .conteudo > :global([data-conteudo-console]) { flex: 1; min-height: 0; height: auto; }
+
+/* #3156: a 390 só uma faixa fixa por vez. Com a faixa do modo API (loja desligada, falha, integração parada) à vista,
+   a de som e notificações cede; ao fechar o aviso, ela volta. */
+@media (max-width: 767px) {
+  .quadro:has([data-faixa-api]) > .aparelho,
+  .quadro:has([data-faixa-api]) > .aparelhoPassoTexto { display: none; }
+}

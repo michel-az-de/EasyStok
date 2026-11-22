@@ -1,8 +1,9 @@
 import { hashDoModulo } from '../dominio/modulos'
 import { useIntegracoesApi } from '../aplicacao/useIntegracoesApi'
 import { textoDaFaixa } from '../dominio/chavesIntegracao'
-import { useEffect, useRef } from 'react'
-import { useAcoes, useAtendimento } from '../aplicacao/contextos'
+import { useEffect, useRef, useState } from 'react'
+import { useAcoes, useAtendimento, useCatalogoOpcional } from '../aplicacao/contextos'
+import { gravarDispensaDaLoja, lerDispensaDaLoja } from '../aplicacao/dispensaDaLoja'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { podeVerIntegracoes } from '../dominio/acessoModulos'
 import { avisoDeVencimento } from '../dominio/sessao'
@@ -53,6 +54,13 @@ export function FaixaApi() {
   const { acoes: acoesDoPerfil } = useAcessoModulos()
   const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi && podeVerIntegracoes(acoesDoPerfil), intervaloMs: 60_000 })
   const integracaoParada = textoDaFaixa(integracoes)
+  // #3156: o aviso persistente fechado fica fechado neste aparelho até o texto mudar; o cardápio lido apaga a dispensa.
+  const catalogo = useCatalogoOpcional()
+  const [dispensado, definirDispensado] = useState(() => lerDispensaDaLoja())
+  const cardapioNormal = Boolean(catalogo?.cardapioLido && !catalogo.cardapioFalha)
+  useEffect(() => {
+    if (cardapioNormal && dispensado) { gravarDispensaDaLoja(''); definirDispensado('') }
+  }, [cardapioNormal, dispensado])
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
   const vencimento = !sessao?.persistente && avisoDeVencimento(sessao?.venceEm ?? (sessao?.expiraEm ? sessao.expiraEm + 60000 : null), agora)
@@ -60,17 +68,21 @@ export function FaixaApi() {
   const carregando = sincronizacao?.estado === 'carregando'
   // O aviso de ação vem na frente; fechado ele, aparece o persistente, que só sai pelo botão.
   const avisoDeAcao = sincronizacao?.aviso ?? null
-  const aviso = !carregando && !falhou ? avisoDeAcao ?? sincronizacao?.avisoFixo ?? null : null
+  const avisoFixo = sincronizacao?.avisoFixo && sincronizacao.avisoFixo !== dispensado ? sincronizacao.avisoFixo : null
+  const aviso = !carregando && !falhou ? avisoDeAcao ?? avisoFixo : null
   if (!falhou && !aviso && !integracaoParada && !vencimento) return null
   const texto = falhou
     ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} Tento de novo em instantes.`
     : aviso
   return (
-    <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
+    <output data-faixa-api className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
       {(falhou || aviso) && <span className={css.texto}>
         {texto}
         {aviso && (
-          <button type="button" className={css.sair} onClick={() => fecharAvisoApi({ fixo: !avisoDeAcao })}>Fechar aviso</button>
+          <button type="button" className={css.sair} onClick={() => {
+            if (!avisoDeAcao) { gravarDispensaDaLoja(aviso); definirDispensado(aviso) }
+            fecharAvisoApi({ fixo: !avisoDeAcao })
+          }}>Fechar aviso</button>
         )}
       </span>}
       {integracaoParada && <span className={css.texto}>{integracaoParada} <a href={hashDoModulo('configuracoes', 'integracoes')}>Ver integrações</a></span>}

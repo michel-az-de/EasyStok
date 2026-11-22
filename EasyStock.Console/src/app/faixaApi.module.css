@@ -53,6 +53,8 @@
   position: relative;
   transition: color var(--dur-micro) var(--ease-padrao);
 }
+/* #3156: o alvo real do Fechar aviso da faixa mede 44x44 (era 83x21). O aviso da janela (.avisoModal) não muda. */
+.faixa .sair { min-width: 44px; min-height: 44px; padding: 0 var(--e-2); }
 /* #2762: a área de toque cresce sem engordar a faixa (o link tem altura de texto, abaixo de --toque). */
 .sair::after { content: ''; position: absolute; inset: calc(-1 * var(--e-3)) calc(-1 * var(--e-2)); }
 .sair:hover { color: var(--marca); text-decoration-thickness: var(--b-2); }
