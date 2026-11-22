@@ -98,9 +98,62 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
         }
     }
 
-    private static Produto NovoProduto(Guid id, Guid empresaId, Guid categoriaId, string nome, DateTime criadoEm) => new()
+    // Revisão da #3135: o nome que sobra é o do produto ATIVO, mesmo sendo o mais novo. Renomear o ativo
+    // poria "(dup ...)" no cardápio e no PDV, e o Down não restaura.
+    [SkippableFact]
+    public async Task ComTresDuplicatas_OAtivoMantemONome_MesmoSendoMaisNovoQueOInativo()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await fixture.ResetDatabaseAsync();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var inativoAntigoId = Guid.NewGuid();
+        var ativoId = Guid.NewGuid();
+        var ativoNovoId = Guid.NewGuid();
+        var antes = DateTime.UtcNow.AddDays(-5);
+        var longo = new string('n', 175);
+        var longoAntigoId = Guid.NewGuid();
+        var longoNovoId = Guid.NewGuid();
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            var migracoes = db.Database.GetMigrations().ToList();
+            var alvo = migracoes.Single(m => m.EndsWith("_" + Migracao, StringComparison.Ordinal));
+            var migrator = db.GetService<IMigrator>();
+            await migrator.MigrateAsync(migracoes[migracoes.IndexOf(alvo) - 1]);
+
+            db.SetMobileTenantContext(empresaId);
+            db.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Tres", Documento = empresaId.ToString("N")[..14], CriadoEm = antes, AlteradoEm = antes });
+            db.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Doces", CriadoEm = antes, AlteradoEm = antes });
+            db.Produtos.Add(NovoProduto(inativoAntigoId, empresaId, categoriaId, "Bolo", antes, StatusProduto.Inativo));
+            db.Produtos.Add(NovoProduto(ativoId, empresaId, categoriaId, "bolo", antes.AddDays(1)));
+            db.Produtos.Add(NovoProduto(ativoNovoId, empresaId, categoriaId, "BOLO", antes.AddDays(2)));
+            db.Produtos.Add(NovoProduto(longoAntigoId, empresaId, categoriaId, longo, antes));
+            db.Produtos.Add(NovoProduto(longoNovoId, empresaId, categoriaId, longo.ToUpperInvariant(), antes.AddDays(1)));
+            await db.SaveChangesAsync();
+
+            await migrator.MigrateAsync(alvo);
+        }
+
+        await using (var leitura = fixture.CreateDbContext())
+        {
+            leitura.SetMobileTenantContext(empresaId);
+            var nomes = await leitura.Produtos.AsNoTracking().Where(p => p.EmpresaId == empresaId)
+                .ToDictionaryAsync(p => p.Id, p => p.Nome);
+
+            nomes.Should().HaveCount(5);
+            nomes[ativoId].Should().Be("bolo", "entre os ativos, o mais antigo mantém o nome");
+            nomes[inativoAntigoId].Should().Be($"Bolo (dup {inativoAntigoId.ToString()[..8]})", "o inativo cede o nome ao ativo");
+            nomes[ativoNovoId].Should().Be($"BOLO (dup {ativoNovoId.ToString()[..8]})");
+            nomes[longoAntigoId].Should().Be(longo);
+            nomes[longoNovoId].Should().Be($"{new string('N', 160)} (dup {longoNovoId.ToString()[..8]})", "o nome é cortado para caber em 180");
+            await leitura.Database.MigrateAsync();
+        }
+    }
+
+    private static Produto NovoProduto(Guid id, Guid empresaId, Guid categoriaId, string nome, DateTime criadoEm, StatusProduto status = StatusProduto.Ativo) => new()
     {
         Id = id, EmpresaId = empresaId, CategoriaId = categoriaId, Nome = nome,
-        Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = criadoEm, AlteradoEm = criadoEm
+        Tipo = TipoProduto.Fisico, Status = status, CriadoEm = criadoEm, AlteradoEm = criadoEm
     };
 }

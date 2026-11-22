@@ -19,8 +19,10 @@ namespace EasyStock.Infra.Postgre.Migrations
             // repositorio ja emite lower("Nome") e casa com ele, sem FromSql e sem reescrever a
             // tabela. Fica fora do modelo EF (o snapshot nao muda).
             //
-            // Deduplica ANTES do indice, senao a migration trava o deploy. Mantem o mais antigo
-            // (CriadoEm, Id) e renomeia os demais com sufixo dos 8 primeiros caracteres do Id
+            // Deduplica ANTES do indice, senao a migration trava o deploy. Mantem o ATIVO antes do
+            // inativo (o nome dele aparece no cardapio e no PDV, e o Down nao restaura; o
+            // ProductLinker tambem prioriza o ativo) e, no empate, o mais antigo (CriadoEm, Id).
+            // Renomeia os demais com sufixo dos 8 primeiros caracteres do Id
             // (Guid v4: nova colisao e improvavel, nao impossivel; se ocorrer, o indice falha e a
             // transacao desfaz tudo). Nada e apagado. left(...,160) + 15 de sufixo cabe no
             // varchar(180). AlteradoEm avanca para o pull do mobile (AlteradoEm > since) levar o
@@ -36,7 +38,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                     "AlteradoEm" = now()
                 FROM (
                     SELECT "Id", row_number() OVER (
-                        PARTITION BY "EmpresaId", lower("Nome") ORDER BY "CriadoEm", "Id"
+                        PARTITION BY "EmpresaId", lower("Nome")
+                        ORDER BY ("Status" = 'Ativo') DESC, "CriadoEm", "Id"
                     ) AS rn
                     FROM "produtos"
                 ) r
