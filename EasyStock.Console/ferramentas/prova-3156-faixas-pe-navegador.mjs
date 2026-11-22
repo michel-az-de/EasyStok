@@ -21,15 +21,16 @@ const AVISO=busca.get('aviso')??'A loja online está desligada. Ligue a loja em 
 function Cena(){
   const [avisoFixo,definir]=useState(busca.get('aviso')==='nenhum'?null:AVISO);
   const acoes={fecharAvisoApi:({fixo}={})=>{if(fixo)definir(null)}};
-  const estado={fonteApi:true,sessao:{persistente:true},agora:Date.now(),sincronizacao:{estado:'ok',avisoFixo},som:false,audioBloqueado:false,permissaoNotificacao:'denied'};
+  const estado={fonteApi:true,sessao:{persistente:true,empresa:{id:busca.get('empresa')??'A'}},agora:Date.now(),sincronizacao:{estado:'ok',avisoFixo},som:false,audioBloqueado:false,permissaoNotificacao:'denied'};
   const catalogo=busca.get('cardapio')==='lido'?{cardapioLido:true,cardapioFalha:null}:{cardapioLido:false};
-  return <ContextoAcessoModulos.Provider value={{acoes:{},permite:()=>false}}><ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={catalogo}>
+  return <ContextoAcessoModulos.Provider value={{acoes:busca.get('integracao')?{editarAtendimento:true}:{},permite:()=>false}}><ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={catalogo}>
     <AvisosDoDispositivo><div data-conteudo-console style={{height:'100%'}}>tela<FaixaApi/></div></AvisosDoDispositivo>
   </ContextoCatalogo.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>
 }
 createRoot(document.getElementById('root')).render(<Cena/>);
 `)
 const erros = []
+const document_focoNoConteudo = (pagina) => pagina.evaluate(() => document.activeElement?.getAttribute('tabindex') === '-1' && document.activeElement.contains(document.querySelector('[data-conteudo-console]')))
 const browser = await chromium.launch({ headless: true })
 const base = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/3156/faixas-pe/index.html`
 const medidas = {}
@@ -70,11 +71,17 @@ try {
     medidas[largura].alvo44 = alvo.every(Boolean)
     await fechar.click()
     await faixaDaLoja.waitFor({ state: 'detached' })
+    // Fechado o aviso, a faixa de notificações volta na mesma visita, sem recarregar.
+    await aparelho.waitFor()
+    assert.equal(await document_focoNoConteudo(pagina), true, 'Fechado o aviso, o foco volta ao conteúdo')
     // Recarregar: o aviso da mesma loja desligada não volta; a faixa de notificações aparece no lugar.
     await pagina.goto(base)
     await aparelho.waitFor()
     assert.equal(await faixaDaLoja.count(), 0, 'Fechado, o aviso não volta ao recarregar')
     if (largura === 390) medidas[largura].depoisDeFechar = await altura(aparelho.locator('xpath=..'))
+    // Outra empresa no mesmo aparelho: a dispensa da A não esconde o aviso da B.
+    await pagina.goto(`${base}?empresa=B`)
+    await faixaDaLoja.waitFor()
     // O estado da loja mudou (outro texto): o aviso novo aparece.
     await pagina.goto(`${base}?aviso=${encodeURIComponent('Cardápio: não carregou.')}`)
     await pagina.locator('output', { hasText: 'Cardápio: não carregou.' }).waitFor()
@@ -83,6 +90,22 @@ try {
     await aparelho.waitFor()
     await pagina.goto(base)
     await faixaDaLoja.waitFor()
+    if (largura === 390) {
+      // Integração parada (sem botão de fechar) ao lado do aviso da loja: a de notificações cede só ao aviso fechável.
+      // O cliente da API só chama com sessão guardada: uma sessão temporária de teste basta, a resposta é simulada.
+      await pagina.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 't', expiraEm: Date.now() + 3_600_000, empresa: { id: 'C' } })))
+      await pagina.route('**/api/integracoes', (rota) => rota.fulfill({ json: { data: [{ provider: 'pix', nome: 'Pix', alerta: 'parada' }] } }))
+      await pagina.goto(`${base}?empresa=C&integracao=1`)
+      await faixaDaLoja.waitFor()
+      await pagina.getByText('Integração parada: Pix').waitFor()
+      assert.equal(await altura(aparelho.locator('xpath=..')), 0, 'Com o aviso fechável da loja à vista, as notificações cedem')
+      await pagina.getByRole('button', { name: 'Fechar aviso', exact: true }).click()
+      await faixaDaLoja.waitFor({ state: 'detached' })
+      await pagina.getByText('Integração parada: Pix').waitFor()
+      await aparelho.waitFor()
+      assert.ok(await altura(aparelho.locator('xpath=..')) > 0, 'Fechado o aviso, a integração parada não esconde as notificações (sem recarregar)')
+      medidas[largura].integracaoParada = 'notificacoes voltam ao fechar o aviso'
+    }
     await contexto.close()
   }
   assert.deepEqual(erros, [], 'Sem erro de página')

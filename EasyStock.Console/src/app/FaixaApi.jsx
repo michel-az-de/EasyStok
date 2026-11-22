@@ -56,11 +56,12 @@ export function FaixaApi() {
   const integracaoParada = textoDaFaixa(integracoes)
   // #3156: o aviso persistente fechado fica fechado neste aparelho até o texto mudar; o cardápio lido apaga a dispensa.
   const catalogo = useCatalogoOpcional()
-  const [dispensado, definirDispensado] = useState(() => lerDispensaDaLoja())
+  const empresa = sessao?.empresa?.id
+  const [dispensado, definirDispensado] = useState(() => lerDispensaDaLoja(empresa))
   const cardapioNormal = Boolean(catalogo?.cardapioLido && !catalogo.cardapioFalha)
   useEffect(() => {
-    if (cardapioNormal && dispensado) { gravarDispensaDaLoja(''); definirDispensado('') }
-  }, [cardapioNormal, dispensado])
+    if (cardapioNormal && dispensado) { gravarDispensaDaLoja(empresa, ''); definirDispensado('') }
+  }, [cardapioNormal, dispensado, empresa])
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
   const vencimento = !sessao?.persistente && avisoDeVencimento(sessao?.venceEm ?? (sessao?.expiraEm ? sessao.expiraEm + 60000 : null), agora)
@@ -75,12 +76,14 @@ export function FaixaApi() {
     ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} Tento de novo em instantes.`
     : aviso
   return (
-    <output data-faixa-api className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
+    <output data-faixa-api data-aviso-fechavel={aviso ? '' : undefined} className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
       {(falhou || aviso) && <span className={css.texto}>
         {texto}
         {aviso && (
-          <button type="button" className={css.sair} onClick={() => {
-            if (!avisoDeAcao) { gravarDispensaDaLoja(aviso); definirDispensado(aviso) }
+          <button type="button" className={css.sair} onClick={(evento) => {
+            // O aviso some e o foco iria ao body: devolve ao conteúdo, como o Dispensar das notificações.
+            evento.currentTarget.closest('[tabindex="-1"]')?.focus()
+            if (!avisoDeAcao) { gravarDispensaDaLoja(empresa, aviso); definirDispensado(aviso) }
             fecharAvisoApi({ fixo: !avisoDeAcao })
           }}>Fechar aviso</button>
         )}

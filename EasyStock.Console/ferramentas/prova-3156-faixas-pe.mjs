@@ -12,17 +12,20 @@ const guardado = new Map()
 const armazenamento = { getItem: (k) => guardado.get(k) ?? null, setItem: (k, v) => guardado.set(k, v), removeItem: (k) => guardado.delete(k) }
 const AVISO = 'A loja online está desligada.'
 
-gravarDispensaDaLoja(AVISO, armazenamento)
-assert.equal(lerDispensaDaLoja(armazenamento), AVISO, 'a dispensa guarda o texto do aviso fechado')
+gravarDispensaDaLoja('A', AVISO, armazenamento)
+assert.equal(lerDispensaDaLoja('A', armazenamento), AVISO, 'a dispensa guarda o texto do aviso fechado')
 assert.equal(guardado.size, 1, 'uma chave só no aparelho')
-gravarDispensaDaLoja('', armazenamento)
-assert.equal(lerDispensaDaLoja(armazenamento), '', 'vazio apaga a dispensa')
+// A dispensa é da empresa: fechar o aviso na empresa A não esconde o da empresa B no mesmo aparelho.
+assert.equal(lerDispensaDaLoja('B', armazenamento), '', 'a dispensa da empresa A não vale para a B')
+gravarDispensaDaLoja('A', '', armazenamento)
+assert.equal(lerDispensaDaLoja('A', armazenamento), '', 'vazio apaga a dispensa')
 assert.equal(guardado.size, 0, 'a chave sai do armazenamento')
 
 // Sem armazenamento (modo privado, cota cheia): a dispensa vale na visita e a tela segue de pé.
 const quebrado = { getItem() { throw new Error('bloqueado') }, setItem() { throw new Error('cota') }, removeItem() { throw new Error('bloqueado') } }
-gravarDispensaDaLoja(AVISO, quebrado)
-assert.equal(lerDispensaDaLoja(quebrado), AVISO, 'sem armazenamento a dispensa vale na visita')
-gravarDispensaDaLoja('', quebrado)
-assert.equal(lerDispensaDaLoja(quebrado), '')
+gravarDispensaDaLoja('A', AVISO, quebrado)
+assert.equal(lerDispensaDaLoja('A', quebrado), AVISO, 'sem armazenamento a dispensa vale na visita')
+assert.equal(lerDispensaDaLoja('B', quebrado), '', 'sem armazenamento a dispensa da A também não vale para a B')
+gravarDispensaDaLoja('A', '', quebrado)
+assert.equal(lerDispensaDaLoja('A', quebrado), '')
 console.log('prova-3156-faixas-pe: ok')
