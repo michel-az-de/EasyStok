@@ -50,12 +50,19 @@ public partial class AgenteAtendimentoServiceTests
     [InlineData("Vou pedir para a dona verificar isso com você.")]
     [InlineData("Veja em https://exemplo.com/x")]
     [InlineData("   ")]
+    [InlineData("Vou chamar escalar_para_dona agora.")]
+    [InlineData("Seu pedido já está registrado.")]
+    [InlineData("Sem problema, o frete é grátis para você.")]
     public void Rastro_MotivoFixoDaGuardaTemCategoriaPropria(string resposta)
     {
         var motivo = GuardaRespostaAgente.Avaliar(resposta, [], ["escalar_para_dona"]);
 
         LogsDoAssistente.CategoriaDaGuarda(motivo!).Should().Be(motivo, "se o texto da guarda mudar, a lista do log acompanha");
     }
+
+    [Fact]
+    public void Rastro_FerramentaQueFalhouTemCategoriaPropria() =>
+        LogsDoAssistente.CategoriaDaGuarda("ferramenta falhou no turno").Should().Be("ferramenta falhou no turno");
 
     [Fact]
     public void Rastro_MotivoDesconhecidoNaoVaiAoLog() =>
@@ -80,7 +87,8 @@ public partial class AgenteAtendimentoServiceTests
 
         Avisos.Should().Contain(LogsDoAssistente.EventoGuardaBarrou);
         _log.Linhas.Should().Contain(l => l.Contains("valor sem origem em ferramenta"));
-        _log.Linhas.Should().NotContain(l => l.Contains("59"), "o log não leva trecho da resposta");
+        // As linhas guardam também os ids do turno em hexadecimal: procurar "59" quebraria por acaso num Guid.
+        _log.Linhas.Should().NotContain(l => l.Contains("R$") || l.Contains("lasanha"), "o log não leva trecho da resposta");
     }
 
     [Fact]

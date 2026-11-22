@@ -39,7 +39,7 @@ public static partial class LogsDoAssistente
     public static partial void RetomadaDispensada(ILogger logger, Guid conversaId, string portao);
 
     [LoggerMessage(EventoGuardaBarrou, LogLevel.Warning,
-        "Assistente: resposta barrada na conversa {ConversaId} ({Categoria}); conversa devolvida à equipe.")]
+        "Assistente: resposta barrada na conversa {ConversaId} ({Categoria}).")]
     public static partial void GuardaBarrou(ILogger logger, Guid conversaId, string categoria);
 
     [LoggerMessage(EventoTurnoInterrompido, LogLevel.Warning,
