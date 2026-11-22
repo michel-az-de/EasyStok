@@ -264,8 +264,10 @@ public class IdempotencyMiddlewareTests
     {
         // #3094: a chave e escopada por empresa+recurso; sem o usuario, B receberia o replay da resposta de A.
         var empresaId = Guid.NewGuid();
-        var (mwA, ctxA, repoA, _) = Setup(empresaId: empresaId, usuarioId: Guid.NewGuid());
-        var (mwB, ctxB, repoB, _) = Setup(empresaId: empresaId, usuarioId: Guid.NewGuid());
+        var usuarioA = Guid.NewGuid();
+        var usuarioB = Guid.NewGuid();
+        var (mwA, ctxA, repoA, _) = Setup(empresaId: empresaId, usuarioId: usuarioA);
+        var (mwB, ctxB, repoB, _) = Setup(empresaId: empresaId, usuarioId: usuarioB);
         string? escopoA = null, escopoB = null;
         repoA.TryBeginAsync(DefaultKey, empresaId, Arg.Do<string>(m => escopoA = m), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
             .Returns(c => (IdempotencyKey.CriarPendente(DefaultKey, empresaId, c.ArgAt<string>(2), null, TimeSpan.FromHours(24)), true));
@@ -275,9 +277,22 @@ public class IdempotencyMiddlewareTests
         await mwA.InvokeAsync(ctxA);
         await mwB.InvokeAsync(ctxB);
 
-        escopoA.Should().NotBeNull();
-        escopoB.Should().NotBeNull();
-        escopoA.Should().NotBe(escopoB);
+        escopoA.Should().Be($"POST {DefaultPath} u:{usuarioA:N}");
+        escopoB.Should().Be($"POST {DefaultPath} u:{usuarioB:N}");
+    }
+
+    [Fact]
+    public async Task Anonimo_mantem_o_escopo_sem_usuario()
+    {
+        var empresaId = Guid.NewGuid();
+        var (mw, ctx, repo, _) = Setup(empresaId: empresaId, usuarioId: Guid.Empty);
+        string? escopo = null;
+        repo.TryBeginAsync(DefaultKey, empresaId, Arg.Do<string>(m => escopo = m), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(c => (IdempotencyKey.CriarPendente(DefaultKey, empresaId, c.ArgAt<string>(2), null, TimeSpan.FromHours(24)), true));
+
+        await mw.InvokeAsync(ctx);
+
+        escopo.Should().Be($"POST {DefaultPath}");
     }
 
     [Fact]
