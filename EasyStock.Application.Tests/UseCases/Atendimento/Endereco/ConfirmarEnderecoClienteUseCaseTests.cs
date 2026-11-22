@@ -135,6 +135,37 @@ public class ConfirmarEnderecoClienteUseCaseTests
     }
 
     [Fact]
+    public async Task AdicionarEnderecoIgualReaproveitaSemRepetir()
+    {
+        // #3186: mudar só o complemento em Cadastros criava outro endereço com o mesmo CEP, rua e número.
+        var antigo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "01001000", Logradouro = "Rua X", Numero = "1", Complemento = "apto 1", Padrao = true };
+        var cliente = ClienteCom(antigo);
+        var adicionar = new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance);
+
+        var id = await adicionar.ExecuteAsync(new AdicionarClienteEnderecoCommand(_empresaId, cliente.Id,
+            Logradouro: " rua x ", Numero: "1", Complemento: "apto 3", Cep: "01001-000", Padrao: true));
+
+        id.Should().Be(antigo.Id);
+        antigo.Complemento.Should().Be("apto 3");
+        antigo.Padrao.Should().BeTrue();
+        await _clientes.DidNotReceive().AddEnderecoAsync(Arg.Any<ClienteEndereco>());
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task AdicionarSemLogradouroNaoFundeComOutroVazio()
+    {
+        var vazio = new ClienteEndereco { Id = Guid.NewGuid(), Referencia = "portaria" };
+        var cliente = ClienteCom(vazio);
+        var adicionar = new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance);
+
+        var id = await adicionar.ExecuteAsync(new AdicionarClienteEnderecoCommand(_empresaId, cliente.Id, Referencia: "fundos"));
+
+        id.Should().NotBe(vazio.Id);
+        await _clientes.Received(1).AddEnderecoAsync(Arg.Any<ClienteEndereco>());
+    }
+
+    [Fact]
     public async Task AdicionarSemPadraoMantemOAtual()
     {
         var antigo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "01000000", Logradouro = "Rua X", Numero = "1", Padrao = true };
