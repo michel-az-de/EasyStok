@@ -105,7 +105,11 @@ cat > .fake-docker <<'EOF'
 echo "docker $*" >> "$STATE/calls"
 case "$1" in
   build) exit "${FAKE_BUILD_FAIL:-0}" ;;
-  exec) echo DUMP ;;
+  # #3117: o psql le o sinal de ponte muda; FAKE_PONTE_MUDA = lojas com incidente aberto, FAKE_PSQL_FAIL=1 = banco nao responde.
+  exec) case "$*" in
+          *psql*) [ "${FAKE_PSQL_FAIL:-0}" = 1 ] && exit 1; echo "${FAKE_PONTE_MUDA:-0}" ;;
+          *) echo DUMP ;;
+        esac ;;
   image) grep -q "^$3 " "$STATE/tags" 2>/dev/null ;;
   tag) src=$(grep "^$2 " "$STATE/tags" | cut -d' ' -f2); sed -i "\#^$3 #d" "$STATE/tags"; echo "$3 ${src:-$2}" >> "$STATE/tags" ;;
   compose) : ;;
@@ -115,6 +119,8 @@ case "$1" in
   rmi) [ "${FAKE_FAXINA_FAIL:-0}" = 1 ] && exit 1; sed -i "\#^$2 #d" "$STATE/tags" ;;
   builder) exit "${FAKE_FAXINA_FAIL:-0}" ;;
   inspect)
+    # #3117: a ponte so existe quando o caso define FAKE_WPP ("<status> <health>").
+    if [ "$4" = wpp ]; then [ -n "${FAKE_WPP:-}" ] || exit 1; echo "$FAKE_WPP"; exit 0; fi
     atual=$(grep "^easystok-api:vps " "$STATE/tags" | cut -d' ' -f2)
     case "$3" in
       # #2372: o Worker tem health proprio (arquivo de vida); FAKE_WORKER_HEALTH=sem simula container sem healthcheck.
@@ -133,7 +139,7 @@ cat > .caso.sh <<'EOF'
 set -u
 export STATE=$(mktemp -d); : > "$STATE/calls"; export BUILD_ROOT=$(mktemp -d) BACKUP_DIR=$(mktemp -d) STACK_DIR=/tmp
 export SHA=novo0001 SHA_FULL=novo0001novo TS=T0 DB_CONTAINER=pg DB_NAME=db HEALTH_TIMEOUT=1 SERVICES="api worker web"
-export MODO=deploy QUEM="Teste <t@t> em t@maquina" MOTIVO=
+export MODO=deploy QUEM="Teste <t@t> em t@maquina" MOTIVO= WPP_CONTAINER=wpp
 mkdir -p /tmp/bin && cp /t/.fake-docker /tmp/bin/docker && chmod +x /tmp/bin/docker
 # E3: gancho do backup falso; grava os argumentos. FAKE_HOOK_RC simula o backup falhando.
 cat > /tmp/hook.sh <<'HOOK'
@@ -165,10 +171,14 @@ echo "prev_velha=$(grep -c '^easystok-web:vps-prev-2026110[123]T' $STATE/tags)"
 echo "prev_nova=$(grep -c '^easystok-web:vps-prev-\(T0\|2026110[45]T\)' $STATE/tags)"
 echo "shas=$(grep -c '^easystok-web:vps-[0-9a-f]\{8\} ' $STATE/tags)"
 echo "poda=$(grep -c 'builder prune' $STATE/calls)"
+echo "aviso_ponte=$(grep -c 'AVISO: ponte WPPConnect' /tmp/out)"
+echo "aviso_sinal=$(grep -c 'AVISO: sinal de ponte muda nao foi lido' /tmp/out)"
+echo "mexeu_ponte=$(grep -cE '^docker (restart|stop|start|kill|rm|pause) ' $STATE/calls)"
 sleep 1; echo "hook=$(cat $STATE/hook 2>/dev/null)"
 EOF
 
 run() { docker run --rm -e "$1" -v "$DIR_T:/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
+run2() { docker run --rm -e "$1" -e "$2" -v "$DIR_T:/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
 
 r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "$r"
                               confere "sucesso: promove vps-<sha>"       "imagem=easystok-api:vps-novo0001" "$r"
@@ -200,6 +210,23 @@ r=$(run FAKE_BAD=1);         confere "falha de health: exit 6"          "rc=6" "
                               confere "falha de health: nao remove imagem de rollback" "prev=6" "$r"
                               confere "falha de health: nao remove tag de sha" "shas=2" "$r"
                               confere "falha de health: nao poda o cache" "poda=0" "$r"
+# #3117: o deploy VERIFICA a ponte WPPConnect e avisa; nunca reinicia a ponte nem muda o exit code.
+r=$(run X=0);                confere "sem ponte na VPS: nao avisa"      "aviso_ponte=0" "$r"
+r=$(run "FAKE_WPP=running healthy"); confere "ponte saudavel: nao avisa" "aviso_ponte=0" "$r"
+                              confere "ponte saudavel: exit 0"           "rc=0" "$r"
+r=$(run "FAKE_WPP=running unhealthy"); confere "ponte unhealthy: avisa" "aviso_ponte=1" "$r"
+                              confere "ponte unhealthy: deploy segue exit 0" "rc=0" "$r"
+                              confere "ponte unhealthy: marca current"   "current=novo0001" "$r"
+                              confere "ponte unhealthy: nao mexe na ponte" "mexeu_ponte=0" "$r"
+r=$(run "FAKE_WPP=exited sem"); confere "ponte parada: avisa"           "aviso_ponte=1" "$r"
+                              confere "ponte parada: nao mexe na ponte"  "mexeu_ponte=0" "$r"
+r=$(run2 "FAKE_WPP=running healthy" FAKE_PONTE_MUDA=2); confere "ponte muda: avisa" "aviso_ponte=1" "$r"
+                              confere "ponte muda: deploy segue exit 0"  "rc=0" "$r"
+                              confere "ponte muda: nao mexe na ponte"    "mexeu_ponte=0" "$r"
+r=$(run2 "FAKE_WPP=running healthy" FAKE_PSQL_FAIL=1); confere "sinal ilegivel: diz que nao leu" "aviso_sinal=1" "$r"
+                              confere "sinal ilegivel: deploy segue exit 0" "rc=0" "$r"
+r=$(run2 "FAKE_WPP=running unhealthy" FAKE_BAD=1); confere "rollback: tambem verifica a ponte" "aviso_ponte=1" "$r"
+                              confere "rollback: exit 6 mantido"         "rc=6" "$r"
 r=$(run SEGURA_TRAVA=1);     confere "trava ocupada: exit 3"            "rc=3" "$r"
                               confere "trava ocupada: nao sobe nada"     "up=0" "$r"
                               confere "trava ocupada: historico rc=3"    "hist=.*rc=3" "$r"
