@@ -91,13 +91,33 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
             .Where(p => p.DataVencimento >= hoje && p.DataVencimento < fimJanela30)
             .Select(p => p.ContaReceberId).Distinct().CountAsync(ct);
 
+        // E4 L3 (#3076): pedidos operacionais sem conta a receber ativa e ainda nao pagos, sem limite inferior de entrega.
+        // Soma e contagem no banco; o dia da entrega (AgendadoParaEm ?? CriadoEm) vai ate a meia-noite de Brasilia de hoje+31.
+        var corteEntrega = HorarioBrasil.InicioRealDoDiaUtc(DateOnly.FromDateTime(fimJanela30));
+        var pedidosAReceber = db.Pedidos.AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId &&
+                        p.Status != "cancelado" && p.Status != "rascunho" &&
+                        p.Status != "aguardando_pagamento" && p.Status != "aguardando_aprovacao_baba" &&
+                        p.QuitadoHistoricoEm == null &&
+                        (decimal)p.Total - (p.Pagamentos.Sum(g => (decimal?)g.Valor) ?? 0m) > 0m &&
+                        !db.ContasReceber.Any(c => c.EmpresaId == empresaId &&
+                                                   c.Origem == OrigemContaFinanceira.Pedido &&
+                                                   c.OrigemRefId == p.Id &&
+                                                   c.Status != StatusContaFinanceira.Cancelada) &&
+                        (p.AgendadoParaEm ?? p.CriadoEm) < corteEntrega);
+        var totalPedidosAReceber = await pedidosAReceber
+            .SumAsync(p => (decimal?)((decimal)p.Total - (p.Pagamentos.Sum(g => (decimal?)g.Valor) ?? 0m)), ct) ?? 0m;
+        var qtdPedidosAReceber = await pedidosAReceber.CountAsync(ct);
+
         return new DashboardFinanceiroDto(
             aVencerPagar, aVencerReceber,
             vencidoPagar, vencidoReceber,
             pagoMes, recebidoMes,
             qtdCpAbertas, qtdCrAbertas,
             qtdParcelasVencidasHoje,
-            qtdCpAVencer30, qtdCrAVencer30);
+            qtdCpAVencer30, qtdCrAVencer30,
+            TotalPedidosAReceber: totalPedidosAReceber,
+            QtdPedidosAReceber: qtdPedidosAReceber);
     }
 
     public async Task<IReadOnlyList<FluxoBucketDto>> FluxoBucketsAsync(

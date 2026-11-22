@@ -52,7 +52,8 @@ namespace EasyStock.Infra.Postgre.Repositories
             Guid empresaId, int page, int pageSize,
             string? status = null, Guid? clienteId = null,
             DateTime? desde = null, DateTime? ate = null,
-            string? search = null, string? sort = "criadoem", string? order = "desc")
+            string? search = null, string? sort = "criadoem", string? order = "desc",
+            DateTime? entregaDesde = null, DateTime? entregaAte = null)
         {
             // issue 958 (BUG-003+002 do QA): sem este Include, Pedido.TotalPago (computed
             // property que soma a colecao Pagamentos em memoria) sempre le 0 aqui — a listagem
@@ -75,6 +76,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(p => p.ClienteId == clienteId);
             if (desde.HasValue) query = query.Where(p => p.CriadoEm >= desde.Value);
             if (ate.HasValue)   query = query.Where(p => p.CriadoEm <= ate.Value);
+            // E4 L2 (#3076): dia da entrega = AgendadoParaEm; sem ele (pedido para agora), CriadoEm.
+            if (entregaDesde.HasValue) query = query.Where(p => (p.AgendadoParaEm ?? p.CriadoEm) >= entregaDesde.Value);
+            if (entregaAte.HasValue)   query = query.Where(p => (p.AgendadoParaEm ?? p.CriadoEm) <= entregaAte.Value);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -104,6 +108,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 "urgencia" => PedidoOrdering.PorUrgencia(query, agora),
                 "total"   => desc ? query.OrderByDescending(p => p.Total)     : query.OrderBy(p => p.Total),
                 "status"  => desc ? query.OrderByDescending(p => p.Status)    : query.OrderBy(p => p.Status),
+                "entrega" => desc ? query.OrderByDescending(p => p.AgendadoParaEm ?? p.CriadoEm) : query.OrderBy(p => p.AgendadoParaEm ?? p.CriadoEm),
                 "cliente" => desc ? query.OrderByDescending(p => p.ClienteNome) : query.OrderBy(p => p.ClienteNome),
                 _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
             };

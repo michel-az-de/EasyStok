@@ -26,7 +26,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
             DateTime? ate = null,
             string? search = null,
             string? sort = "criadoem",
-            string? order = "desc");
+            string? order = "desc",
+            DateTime? entregaDesde = null,
+            DateTime? entregaAte = null);
 
         Task<IEnumerable<Pedido>> ListByClienteAsync(Guid empresaId, Guid clienteId, int max = 50);
 

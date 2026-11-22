@@ -226,5 +226,5 @@ public class CriarPedidoUseCase(
         p.Itens.Count,
         p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm,
         p.AgendadoParaEm, p.NumeroDoDia, p.DataNumero,
-        p.AReceberPelosPagamentos);
+        p.AReceberPelosPagamentos, p.EnderecoEntrega);
 }
