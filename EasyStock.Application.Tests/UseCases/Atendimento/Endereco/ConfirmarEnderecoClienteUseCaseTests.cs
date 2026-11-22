@@ -80,4 +80,69 @@ public class ConfirmarEnderecoClienteUseCaseTests
         var id = await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, Guid.NewGuid(), Endereco()));
         id.Should().BeNull();
     }
+
+    [Fact]
+    public async Task ComplementoConfirmadoApareceNoCadastro()
+    {
+        // #2776: Cadastros mostra Apt como "Complemento"; a conversa gravava só Cliente.Complemento.
+        var cliente = ClienteCom();
+        cliente.Apt = "casa 2";
+
+        await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, Endereco()));
+
+        cliente.Apt.Should().Be("apto 12");
+    }
+
+    [Fact]
+    public async Task ComplementoQueNaoCabeNoAptMantemODaLoja()
+    {
+        var cliente = ClienteCom();
+        cliente.Apt = "casa 2";
+        var longo = new string('x', 33);
+        var endereco = new EnderecoNormalizado("05500000", "Rua Alvarenga", "120", longo, "Butantã", "São Paulo", "SP", null);
+
+        await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, endereco));
+
+        cliente.Apt.Should().Be("casa 2");
+        cliente.Complemento.Should().Be(longo);
+    }
+
+    [Fact]
+    public async Task ConfirmarSemComplementoMantemOAptDaLoja()
+    {
+        var cliente = ClienteCom();
+        cliente.Apt = "casa 2";
+        var endereco = new EnderecoNormalizado("05500000", "Rua Alvarenga", "120", null, "Butantã", "São Paulo", "SP", null);
+
+        await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, endereco));
+
+        cliente.Apt.Should().Be("casa 2");
+    }
+
+    [Fact]
+    public async Task AdicionarPadraoDesmarcaOAnterior()
+    {
+        // #2776: o Padrão novo vindo de Cadastros deixava dois Padrões, e a Ficha seguia no antigo.
+        var antigo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "01000000", Logradouro = "Rua X", Numero = "1", Padrao = true };
+        var cliente = ClienteCom(antigo);
+        var adicionar = new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance);
+
+        await adicionar.ExecuteAsync(new AdicionarClienteEnderecoCommand(_empresaId, cliente.Id, Logradouro: "Rua Y", Numero: "2", Padrao: true));
+
+        antigo.Padrao.Should().BeFalse();
+        await _clientes.Received(1).AddEnderecoAsync(Arg.Is<ClienteEndereco>(e => e.Padrao && e.Logradouro == "Rua Y"));
+        await _clientes.Received().GetByIdWithDetailsAsync(_empresaId, cliente.Id);
+    }
+
+    [Fact]
+    public async Task AdicionarSemPadraoMantemOAtual()
+    {
+        var antigo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "01000000", Logradouro = "Rua X", Numero = "1", Padrao = true };
+        var cliente = ClienteCom(antigo);
+        var adicionar = new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance);
+
+        await adicionar.ExecuteAsync(new AdicionarClienteEnderecoCommand(_empresaId, cliente.Id, Logradouro: "Rua Y", Numero: "2"));
+
+        antigo.Padrao.Should().BeTrue();
+    }
 }

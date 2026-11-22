@@ -25,8 +25,12 @@ public class AdicionarClienteEnderecoUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.ClienteId, "ClienteId");
 
-        var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
+        var cliente = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.ClienteId);
         if (cliente == null) return null;
+
+        // #2776: um Padrão só; o novo tira o antigo, como a confirmação na conversa já fazia.
+        if (cmd.Padrao)
+            foreach (var outro in cliente.Enderecos.Where(e => e.Padrao)) outro.Padrao = false;
 
         var agora = DateTime.UtcNow;
         var endereco = new ClienteEndereco
