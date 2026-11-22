@@ -12,7 +12,7 @@ for (const lado of ['pagar', 'receber']) {
   const { emitir: texto, emitirDica } = palavrasDoLado(lado)
   assert.equal(texto, 'Lançar a conta ao salvar', `${lado}: texto de loja que mantém o sentido de Emitir`)
   assert.doesNotMatch(texto, /emitir|aberta/i, 'sem o jargão e sem contradizer "Já foi paga"')
-  assert.equal(emitirDica, `Desmarcado, ela fica como rascunho e não entra nas contas a ${lado}.`, `${lado}: o apoio diz o que o desmarcado faz`)
+  assert.equal(emitirDica, `Desmarcado, ela fica como rascunho e só aparece em Todas.`, `${lado}: o apoio diz o que o desmarcado faz`)
 }
 
 const lead = situacaoDaLinha('clientes', { orderCount: 0, ativo: true }, false)

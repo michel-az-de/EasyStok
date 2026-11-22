@@ -61,7 +61,7 @@ for (const largura of [1440, 390]) {
     await janela.getByRole('button', { name: 'Criar categoria', exact: true }).waitFor()
     assert.equal(await janela.getByRole('button', { name: 'Cancelar', exact: true }).count(), 1, 'botões Cancelar na janela')
     assert.equal(await janela.getByText('Lançar a conta ao salvar', { exact: true }).count(), 1, 'I2: texto que mantém o sentido de Emitir')
-    assert.equal(await janela.getByText('Desmarcado, ela fica como rascunho e não entra nas contas a pagar.', { exact: true }).count(), 1, 'I2: apoio diz o que o desmarcado faz')
+    assert.equal(await janela.getByText('Desmarcado, ela fica como rascunho e só aparece em Todas.', { exact: true }).count(), 1, 'I2: apoio diz o que o desmarcado faz')
     assert.equal(await janela.getByText(/Deixar a conta aberta|Emitir a conta/).count(), 0, 'I2: sem o texto que contradiz Já foi paga')
     await page.screenshot({ path: `${pasta}/categoria-${largura}.png` })
     await contexto.close()

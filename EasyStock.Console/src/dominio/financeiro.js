@@ -14,8 +14,8 @@ export const nomeStatusPagamento = (status) => ({ Confirmado: 'Registrado', Esto
 // com ele marcado; desmarcado, fica Rascunho. O texto não pode dizer "aberta": a conta que já foi paga sai Paga.
 const EMITIR = 'Lançar a conta ao salvar'
 export const palavrasDoLado = (lado) => lado === 'receber'
-  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e não entra nas contas a receber.' }
-  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e não entra nas contas a pagar.' }
+  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e só aparece em Todas.' }
+  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e só aparece em Todas.' }
 
 export function diaFinanceiro(instante = Date.now()) {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instante))
