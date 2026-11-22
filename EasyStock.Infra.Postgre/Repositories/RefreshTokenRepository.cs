@@ -90,12 +90,21 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Revogado, true).SetProperty(r => r.RevogadoEm, agora));
     }
 
-    public Task<bool> DispositivoRevogadoAsync(string dispositivoId) =>
-        _context.Set<EasyStock.Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+    // Roda antes do tenant (hook do JWT, filtro da API key, refresh). Sem o bypass, a RLS de mobile_devices
+    // (#2180) esconde o aparelho e a revogação deixaria de valer em silêncio.
+    public async Task<bool> DispositivoRevogadoAsync(string dispositivoId)
+    {
+        await using var rls = await _context.UseRowLevelSecurityBypassAsync();
+        return await _context.Set<EasyStock.Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
             .AnyAsync(d => d.Id == dispositivoId && d.Revoked);
+    }
 
-    public async Task TravarDispositivoAsync(string dispositivoId) =>
+    // O login nativo trava o aparelho antes de saber a empresa: sem o bypass o FOR UPDATE não acha a linha (#2180).
+    public async Task TravarDispositivoAsync(string dispositivoId)
+    {
+        await using var rls = await _context.UseRowLevelSecurityBypassAsync();
         await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM mobile_devices WHERE \"Id\" = {dispositivoId} FOR UPDATE");
+    }
 
     public async Task SalvarReciboRenovacaoAsync(Guid sessaoId, Guid? requisicaoId, Guid? refreshAnteriorId, string? sucessorProtegido)
     {

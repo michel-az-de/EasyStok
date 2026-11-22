@@ -147,6 +147,7 @@ public class MobileImpressaoE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var config = ConfiguracaoLoja.CriarPadrao(lojaId);
         config.ImpressaoJson = regra;
         config.ImpressaoVersao = versao;
@@ -161,6 +162,7 @@ public class MobileImpressaoE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var loja = new Loja
         {
             Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Loja 2", Ativa = true,
@@ -175,6 +177,7 @@ public class MobileImpressaoE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var device = db.Set<EasyStock.Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters().Single(d => d.Id == deviceId);
         device.LojaId = lojaId;
         await db.SaveChangesAsync();

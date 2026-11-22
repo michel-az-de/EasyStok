@@ -555,6 +555,40 @@ public sealed class SessoesNativasConcorrenciaTests(PostgreSqlDatabaseFixture fi
         Assert.Contains("DISPOSITIVO_REVOGADO", System.Text.Json.JsonSerializer.Serialize(revogado.Value));
     }
 
+    /// <summary>
+    /// #2180: sob o papel da API (NOBYPASSRLS, tenant do JWT) o pair-session pareia o aparelho da própria
+    /// empresa e reconhece o aparelho já vinculado a outra, em vez de tentar um INSERT que a PK recusa.
+    /// </summary>
+    [SkippableFact]
+    public async Task PairSessionSobRlsPareiaOAparelhoERecusaODeOutraEmpresa()
+    {
+        var dados = await Semear();
+        await using (var api = ComoApi(dados.Empresa))
+            Assert.IsType<OkObjectResult>(await Parear(api, dados));
+
+        var outra = Empresa.Criar("Outra empresa 2180", null);
+        await using (var suporte = fixture.CreateDbContext())
+        {
+            suporte.Add(outra);
+            await suporte.SaveChangesAsync();
+            await suporte.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE mobile_devices SET empresa_id = {outra.Id}, sessao_nativa_id = NULL WHERE \"Id\" = {dados.Sessao.DispositivoId}");
+        }
+
+        await using var deNovo = ComoApi(dados.Empresa);
+        Assert.IsType<ConflictObjectResult>(await Parear(deNovo, dados));
+    }
+
+    /// <summary>Contexto como a API: papel NOBYPASSRLS, interceptor e tenant fixado, sem bypass.</summary>
+    private EasyStockDbContext ComoApi(Guid empresa)
+    {
+        var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseNpgsql(fixture.RlsClientConnectionString)
+            .AddInterceptors(new EasyStock.Infra.Postgre.Data.Interceptors.SetTenantOnConnectionInterceptor()).Options);
+        db.SetMobileTenantContext(empresa);
+        return db;
+    }
+
     private static Task<IActionResult> Parear(EasyStockDbContext db, Dados dados, Guid? loja = null, string? chave = null)
         => Pareador(db, dados, chave).PairSession(new(dados.Sessao.DispositivoId, loja), new RefreshTokenRepository(db), db, CancellationToken.None);
 

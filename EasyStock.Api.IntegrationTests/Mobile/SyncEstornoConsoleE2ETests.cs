@@ -36,6 +36,7 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
         using (var scope = fixture.Factory!.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
             db.Add(movimento);
             await db.SaveChangesAsync();
         }
@@ -81,11 +82,15 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
 
         // B edita o lançamento depois do cursor: o pull de mobile_cash_entries leva o mesmo id para A.
         using (var scope = fixture.Factory!.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Set<CashEntry>().IgnoreQueryFilters()
+        {
+            var edicao = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRlsEdicao = edicao.UseRowLevelSecurityBypass(); // teste edita direto no banco
+            await edicao.Set<CashEntry>().IgnoreQueryFilters()
                 .Where(c => c.Id == lancamento)
                 .ExecuteUpdateAsync(u => u.SetProperty(c => c.Description, "Gás de cozinha")
                     .SetProperty(c => c.LastDeviceId, b.DeviceId)
                     .SetProperty(c => c.ServerUpdatedAt, DateTime.UtcNow));
+        }
 
         await EstornarNoConsoleAsync(empresaId, movimentoId);
 
@@ -146,6 +151,7 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
         var ontem = DateTime.UtcNow.AddDays(-1);
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         await db.Set<MovimentoCaixa>().IgnoreQueryFilters().Where(m => m.Id == movimentoId)
             .ExecuteUpdateAsync(u => u.SetProperty(m => m.CriadoEm, ontem));
         if (lancamentoDoAparelho is not null)
@@ -178,7 +184,9 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
     private async Task<T> LerAsync<T>(Func<EasyStockDbContext, Task<T>> consulta)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
-        return await consulta(scope.ServiceProvider.GetRequiredService<EasyStockDbContext>());
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê entre empresas
+        return await consulta(db);
     }
 
     private static long Ms(DateTime utc) => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();

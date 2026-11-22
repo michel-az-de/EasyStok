@@ -116,6 +116,7 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Massas" };
         var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, CategoriaId = categoria.Id, Nome = nome, Status = status };
         db.Add(categoria);
@@ -129,6 +130,7 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         db.Set<Client>().Add(new Client { Id = cliente, Name = "Thatiane", Phone = "11988887777", EmpresaId = empresaId, LastDeviceId = deviceId });
         foreach (var (id, status) in new[] { (pedido, "preparando"), (cancelado, "cancelado") })
             db.Set<Order>().Add(new Order
@@ -182,7 +184,9 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
     private async Task<T> LerAsync<T>(Func<EasyStockDbContext, Task<T>> consulta)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
-        return await consulta(scope.ServiceProvider.GetRequiredService<EasyStockDbContext>());
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê entre empresas
+        return await consulta(db);
     }
 
     private Task<Guid?> ErpDoProdutoAsync(string id) => LerAsync(db =>

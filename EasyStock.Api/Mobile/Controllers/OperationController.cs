@@ -59,6 +59,8 @@ public class OperationController(
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
+        // #2180: a RLS das mobile_* segue o tenant da conexão; o SuperAdmin em outra empresa lia vazio.
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) _db.SetMobileTenantContext(empresaId);
 
         var now = DateTime.UtcNow;
         var (todayStart, _) = HorarioBrasil.JanelaDiaUtc();
@@ -219,6 +221,8 @@ public class OperationController(
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
+        // #2180: a RLS das mobile_* segue o tenant da conexão; o SuperAdmin em outra empresa lia vazio.
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) _db.SetMobileTenantContext(empresaId);
 
         var devices = await _db.Set<MobileDevice>().AsNoTracking()
             .Where(d => d.EmpresaId == empresaId)
@@ -368,16 +372,14 @@ public class OperationController(
                 return;
             }
             var deviceId = identidadeSse.Value.DeviceId;
-            device = await _db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+            device = await BuscarDeviceSemTenantAsync(d => d.Id == deviceId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(apiKey))
         {
             // Caminho legado — APKs antigos ainda mandam apiKey na URL.
             // Hash antes do lookup pra bater com o que está persistido.
             var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
-            device = await _db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash, ct);
+            device = await BuscarDeviceSemTenantAsync(d => d.ApiKeyHash == apiKeyHash, ct);
         }
         else
         {
@@ -398,6 +400,9 @@ public class OperationController(
         }
         if (device.SessaoNativaId is { } sessaoId)
         {
+            // Stream anônimo: sem o tenant do aparelho, a RLS de mobile_devices (#2180) zera a revalidação
+            // abaixo e todo SSE de sessão nativa cairia em 401.
+            _db.SetMobileTenantContext(device.EmpresaId);
             var validador = HttpContext.RequestServices.GetRequiredService<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
             async Task<bool> AindaValida(CancellationToken cancelamento) =>
                 await validador.ValidarNativaAsync(sessaoId, device.Id, device.EmpresaId)
@@ -469,6 +474,17 @@ public class OperationController(
         var sub = User.FindFirstValue("sub")
                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(sub, out var g) ? g : null;
+    }
+
+    /// <summary>
+    /// Anônimo (token ou apiKey na URL): sem tenant até achar o device. Bypass de RLS (#2180) só neste
+    /// lookup; o stream em si não lê o banco.
+    /// </summary>
+    private async Task<MobileDevice?> BuscarDeviceSemTenantAsync(
+        System.Linq.Expressions.Expression<Func<MobileDevice, bool>> filtro, CancellationToken ct)
+    {
+        using (_db.UseRowLevelSecurityBypass())
+            return await _db.Set<MobileDevice>().AsNoTracking().FirstOrDefaultAsync(filtro, ct);
     }
 
     /// <summary>

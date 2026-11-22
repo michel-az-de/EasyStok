@@ -1,3 +1,5 @@
+using EasyStock.Infra.Postgre.Data;
+
 namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>
@@ -34,6 +36,9 @@ public abstract class MobileManagementControllerBase(ICurrentUserAccessor curren
                 error = BadRequest(new { error = "empresaId obrigatório (SuperAdmin)" });
                 return false;
             }
+            // #2180: a RLS das mobile_* segue o tenant da conexão; sem isto o SuperAdmin em outra
+            // empresa lia vazio. O DbContext é o mesmo do escopo da requisição.
+            HttpContext?.RequestServices?.GetService<EasyStockDbContext>()?.SetMobileTenantContext(empresaId);
             return true;
         }
 

@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace EasyStock.Infra.Postgre.IntegrationTests.Tenancy;
 
 /// <summary>
-/// Guarda da camada 2 do ADR-0010 (#1238): toda tabela com coluna <c>EmpresaId</c> sai das migrations
+/// Guarda da camada 2 do ADR-0010 (#1238): toda tabela com coluna <c>EmpresaId</c> (ou <c>empresa_id</c>,
+/// convenção das <c>mobile_*</c>, #2180) sai das migrations
 /// com RLS ligado e forçado e com a policy <c>tenant_isolation</c>. A <c>ocorrencias</c> nasceu sem o
 /// bloco <c>DO $rls$</c> e ninguém viu; este teste pega a próxima tabela que esquecer.
 /// </summary>
@@ -12,8 +13,8 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Tenancy;
 public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
 {
     /// <summary>
-    /// Isentas por desenho, as mesmas da migration AddRowLevelSecurity: <c>skip_tables</c> e o prefixo
-    /// <c>mobile_</c> (isolamento por loja, não por empresa).
+    /// Isentas por desenho, as mesmas de <c>skip_tables</c> na migration AddRowLevelSecurity. O prefixo
+    /// <c>mobile_</c> saiu daqui no #2180: as tabelas Mobile com empresa têm RLS como o núcleo.
     /// </summary>
     private static readonly string[] IsentasPorDesenho = ["admin_impersonation_logs", "TenantFeatureFlags", "fatura_contador"];
 
@@ -28,6 +29,14 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
         "preferencias_menu_usuario",
     ];
 
+    /// <summary>
+    /// Tabelas não-Mobile com <c>empresa_id</c> em snake_case que a guarda passou a enxergar no #2180 (antes
+    /// ela só procurava <c>EmpresaId</c>). <c>report_runs</c> tem empresa nula de propósito (AdminSaaS);
+    /// <c>outbox_evento_integracao</c> é lida pelo worker de todas as empresas. Cada uma pede avaliação
+    /// própria; remova daqui ao corrigir e nunca acrescente tabela nova.
+    /// </summary>
+    private static readonly string[] SnakeCaseSemRlsAntesDe2180 = ["outbox_evento_integracao", "report_runs"];
+
     [SkippableFact]
     public async Task TodaTabelaComEmpresaIdTemRlsForcadoETenantIsolation()
     {
@@ -35,11 +44,12 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
         await using var db = fixture.CreateDbContext();
 
         var semRls = await db.Database.SqlQueryRaw<string>("""
-            SELECT c.relname AS "Value"
+            SELECT DISTINCT c.relname AS "Value"
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
             JOIN information_schema.columns col
-              ON col.table_schema = n.nspname AND col.table_name = c.relname AND col.column_name = 'EmpresaId'
+              ON col.table_schema = n.nspname AND col.table_name = c.relname
+             AND col.column_name IN ('EmpresaId', 'empresa_id')
             WHERE n.nspname = current_schema()
               AND c.relkind = 'r'
               AND (NOT c.relrowsecurity
@@ -51,11 +61,44 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
             """).ToListAsync();
 
         var faltando = semRls
-            .Where(t => !t.StartsWith("mobile_", StringComparison.Ordinal))
             .Except(IsentasPorDesenho)
             .Except(SemRlsAntesDe1238)
+            .Except(SnakeCaseSemRlsAntesDe2180)
             .ToList();
         faltando.Should().BeEmpty(
             $"tabela com EmpresaId sem RLS vaza entre empresas se o filtro do EF falhar; sem RLS: {string.Join(", ", faltando)}");
+    }
+
+    /// <summary>
+    /// Tabelas <c>mobile_*</c> sem coluna de empresa e sem policy (#2180). Só as <c>mobile_push_*</c>:
+    /// avisos pré-pareamento por instalação (chave pública, token e recibo assinado), sem dado de loja.
+    /// As filhas <c>mobile_order_items</c> e <c>mobile_batch_items</c> guardam dado de loja e recebem a
+    /// policy pela tabela mãe. Tabela Mobile nova sem policy precisa entrar aqui de propósito.
+    /// </summary>
+    private static readonly string[] MobileGlobaisSemPolicy =
+        ["mobile_push_installations", "mobile_push_messages", "mobile_push_provider_events", "mobile_push_receipts"];
+
+    [SkippableFact]
+    public async Task TabelaMobileSemPolicyEstaNaListaExplicita()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var semPolicy = await db.Database.SqlQueryRaw<string>("""
+            SELECT c.relname AS "Value"
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = current_schema()
+              AND c.relkind = 'r'
+              AND c.relname LIKE 'mobile\_%'
+              AND NOT (c.relrowsecurity AND c.relforcerowsecurity
+                       AND EXISTS (SELECT 1 FROM pg_policies p
+                                   WHERE p.schemaname = n.nspname AND p.tablename = c.relname
+                                     AND p.policyname = 'tenant_isolation'))
+            ORDER BY c.relname
+            """).ToListAsync();
+
+        semPolicy.Should().BeSubsetOf(MobileGlobaisSemPolicy,
+            "tabela mobile_ sem RLS forçada e tenant_isolation precisa ser decisão explícita");
     }
 }

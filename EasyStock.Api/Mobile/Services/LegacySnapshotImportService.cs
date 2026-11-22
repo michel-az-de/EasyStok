@@ -7,6 +7,7 @@ using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 using MobileOrder = EasyStock.Domain.Entities.Mobile.Order;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -75,7 +76,15 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             var lockKey = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes($"legacy:{device.EmpresaId}:{device.LojaId}")), 0);
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
             var key = ReceiptKey(request.ImportId);
-            var previous = await db.MobileProcessedMutations.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.MutationId == key, ct);
+            // MutationId é global (índice único): sob a RLS (#2180) o recibo ou a fila de outra empresa
+            // ficaria invisível e o 409 viraria 23505. Bypass só nestas duas leituras.
+            MobileProcessedMutation? previous;
+            bool filaJaProcessada;
+            await using (await db.UseRowLevelSecurityBypassAsync(ct))
+            {
+                previous = await db.MobileProcessedMutations.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.MutationId == key, ct);
+                filaJaProcessada = await db.MobileProcessedMutations.IgnoreQueryFilters().AnyAsync(x => originIds.Contains(x.MutationId), ct);
+            }
             if (previous is not null)
             {
                 if (previous.Outcome != "accepted:legacy" || string.IsNullOrWhiteSpace(previous.ResponseMeta))
@@ -91,7 +100,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
                 .Where(x => x.EmpresaId == device.EmpresaId && x.Outcome == "accepted:legacy").Select(x => x.ResponseMeta).ToListAsync(ct);
             if (earlier.Any(x => JsonSerializer.Deserialize<LegacySnapshotResponse>(x!, Json)!.LojaId == device.LojaId))
                 throw Conflict("Esta loja ja recebeu uma primeira carga. Um novo arquivo exige reconciliacao, nao outra abertura de saldo.");
-            if (await db.MobileProcessedMutations.IgnoreQueryFilters().AnyAsync(x => originIds.Contains(x.MutationId), ct))
+            if (filaJaProcessada)
                 throw Conflict("Parte da fila ja foi processada. A origem nao pode ser tratada como nunca sincronizada.");
             await RequireAbsentAsync<Product>(rows["products"], ct);
             await RequireAbsentAsync<Client>(rows["clients"], ct);
@@ -333,6 +342,9 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     private async Task RequireAbsentAsync<T>(List<JsonElement> rows, CancellationToken ct) where T : class
     {
         var ids = rows.Select(Id).ToList();
+        // Id global: a RLS (#2180) esconderia o id de outra empresa e a carga cairia na guarda do sync
+        // com outro erro. Bypass só nesta checagem de existência, dentro da transação já aberta.
+        await using var rls = await db.UseRowLevelSecurityBypassAsync(ct);
         if (await db.Set<T>().IgnoreQueryFilters().AnyAsync(x => ids.Contains(EF.Property<string>(x, "Id")), ct))
             throw Conflict("Um ou mais IDs do arquivo ja existem no servidor. Nada foi substituido.");
     }

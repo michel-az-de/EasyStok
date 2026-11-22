@@ -42,11 +42,12 @@ public class MobileVersionController(
             ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
             ?? "unknown";
 
-        // Tenta confirmar DB respondendo (CountAsync é leve em PG)
+        // Tenta confirmar DB respondendo. SELECT 1 em vez de contar mobile_products: anônimo, a
+        // RLS (#2180) zeraria a contagem sem provar nada.
         var dbOk = false;
         try
         {
-            _ = await _db.Set<Product>().AsNoTracking().CountAsync(ct);
+            _ = await _db.Database.SqlQueryRaw<int>("SELECT 1 AS \"Value\"").FirstAsync(ct);
             dbOk = true;
         }
         catch
@@ -114,11 +115,15 @@ public class MobileVersionController(
             var deviceId = deviceIdHeader.ToString();
             if (!string.IsNullOrWhiteSpace(deviceId) && deviceId.Length <= 64)
             {
-                isCanaryDevice = await _db.Set<MobileDevice>()
-                    .AsNoTracking()
-                    .Where(d => d.Id == deviceId && !d.Revoked)
-                    .Select(d => d.IsCanary)
-                    .FirstOrDefaultAsync(ct);
+                // Anônimo: bypass de RLS (#2180) só para ler a flag de canário do device.
+                using (_db.UseRowLevelSecurityBypass())
+                {
+                    isCanaryDevice = await _db.Set<MobileDevice>()
+                        .AsNoTracking()
+                        .Where(d => d.Id == deviceId && !d.Revoked)
+                        .Select(d => d.IsCanary)
+                        .FirstOrDefaultAsync(ct);
+                }
             }
         }
 

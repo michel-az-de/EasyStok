@@ -90,6 +90,15 @@ public class RlsBypassAllowlistTests
         // #2184: após autorização de SuperAdmin, revoga só famílias do aparelho+empresa alvo.
         "EasyStock.Api/Mobile/Controllers/DevicePairingController.cs",
         "EasyStock.Infra.Postgre/DependencyInjection/ServiceCollectionExtensions.cs",
+        // #2180: id de cadastro do aparelho é global; o sync só pergunta se ele já existe em outra empresa
+        // para recusar a mutação (#2440) em vez de bater na PK. Nenhum dado de outra empresa sai da checagem.
+        "EasyStock.Api/Mobile/Services/SyncMutationDispatcher.cs",
+        // #2180: a primeira carga legada exige id inédito no servidor inteiro; só a existência é consultada.
+        "EasyStock.Api/Mobile/Services/LegacySnapshotImportService.cs",
+        // #2180: MutationId é global (índice único); o sync só confere se ele já foi processado em qualquer empresa.
+        "EasyStock.Api/Mobile/Controllers/SyncController.cs",
+        // #2180: SuperAdmin já autorizado descobre a empresa do aparelho; o resto da requisição segue isolado nela.
+        "EasyStock.Api/Mobile/Security/EmpresaDoSuperAdmin.cs",
 
         // #2184: login Google nativo, renovação e logout são pré-auth; o tenant vem da identidade/segredo
         // validado. O escopo cobre a transação e o INSERT diferido da família, nunca uma requisição tenant genérica.
@@ -116,6 +125,10 @@ public class RlsBypassAllowlistTests
         // N12, #1344: o coletor de rotinas agendadas lista as rotinas ativas de todas as empresas numa leitura curta sob
         // bypass (cross-tenant por natureza); cada empresa gera o evento num escopo proprio com o tenant ligado.
         "EasyStock.Infra.Postgre/Notifications/Collectors/ColetorRotinasAgendadas.cs",
+
+        // #2180: os lembretes de pedido agendado listam candidatos de todas as empresas numa leitura curta sob bypass
+        // (mobile_orders ganhou RLS); cada lembrete grava num escopo proprio com o tenant do pedido ligado.
+        "EasyStock.Infra.Postgre/Notifications/Agendamento/LembretesPedidoAgendadoTick.cs",
 
         // N1, #1344: o health de backlog mede o outbox e os eventos de todas as empresas com consultas agregadas.
         "EasyStock.Infra.Postgre/Notifications/Backlog/BacklogNotificacoesQuery.cs",

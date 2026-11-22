@@ -65,6 +65,8 @@ public sealed class MobileAlertService : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // Job de todas as empresas: sem bypass a RLS de mobile_devices (#2180) devolveria 0 devices.
+        using var _ = db.UseRowLevelSecurityBypass();
 
         var now = DateTime.UtcNow;
         var staleAfter = now - StaleThreshold;

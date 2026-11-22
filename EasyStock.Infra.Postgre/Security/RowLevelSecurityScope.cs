@@ -11,6 +11,8 @@ public static class RowLevelSecurityScope
 {
     public static async ValueTask<IAsyncDisposable> UseRowLevelSecurityBypassAsync(this EasyStockDbContext db, CancellationToken ct = default)
     {
+        // Provider sem conexão (InMemory dos testes de unidade) não tem RLS: só a flag, sem set_config.
+        if (!db.Database.IsRelational()) return new SemConexao(db.UseRowLevelSecurityBypass());
         var connection = db.Database.GetDbConnection();
         var opened = connection.State != ConnectionState.Open;
         var flag = db.UseRowLevelSecurityBypass();
@@ -59,6 +61,11 @@ public static class RowLevelSecurityScope
         parameter.Value = value;
         command.Parameters.Add(parameter);
         await command.ExecuteNonQueryAsync(ct);
+    }
+
+    private sealed class SemConexao(IDisposable flag) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() { flag.Dispose(); return ValueTask.CompletedTask; }
     }
 
     private sealed class Scope(EasyStockDbContext db, IDisposable flag, bool opened, string? previous) : IAsyncDisposable

@@ -55,6 +55,7 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
         (await NumeroNoBancoAsync(loteA)).Should().NotBe(await NumeroNoBancoAsync(loteB));
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var codigos = await db.Set<Lote>().IgnoreQueryFilters().AsNoTracking()
             .Where(l => l.EmpresaId == a.EmpresaId && (l.MobileBatchId == loteA || l.MobileBatchId == loteB))
             .Select(l => l.Codigo).ToListAsync();
@@ -283,6 +284,7 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var loteId = await db.Set<Batch>().IgnoreQueryFilters().AsNoTracking()
             .Where(b => b.Id == batchId).Select(b => b.ErpLoteId).SingleAsync();
         loteId.Should().NotBeNull("o push promove o lote do aparelho a lote do ERP");
@@ -294,6 +296,7 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var loja = new Loja
         {
             Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Loja 2", Ativa = true,
@@ -308,6 +311,7 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         (await db.Database.ExecuteSqlInterpolatedAsync(
             $"""UPDATE lotes SET "NumeroCurto" = NULL WHERE "MobileBatchId" = {batchId}""")).Should().Be(1);
     }

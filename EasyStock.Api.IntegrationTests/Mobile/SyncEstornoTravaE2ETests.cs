@@ -117,7 +117,10 @@ public sealed class SyncEstornoTravaE2ETests(MobileE2EFixture fixture)
     private EasyStockDbContext NovoContexto()
     {
         var conexao = fixture.Factory!.Services.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
-        return new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(conexao).Options);
+        var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(conexao)
+            .AddInterceptors(new EasyStock.Infra.Postgre.Data.Interceptors.SetTenantOnConnectionInterceptor()).Options);
+        db.UseRowLevelSecurityBypass(); // a API roda sem BYPASSRLS (#2180); o teste confere entre empresas
+        return db;
     }
 
     private static Task TravarAsync(EasyStockDbContext db, Guid empresaId, Guid? lojaId)

@@ -82,6 +82,15 @@ public class SyncMobileMigrationsTests(PostgreSqlDatabaseFixture fixture) : ICla
         await migrator.MigrateAsync(antesDasDuas);
         (await EscalarAsync<long>(db, $"SELECT count(*) FROM mobile_batches WHERE \"Id\" LIKE '%{sufixo}'")).Should().Be(2);
         (await ColunaExisteAsync(db, "mobile_batches", "server_updated_at")).Should().BeFalse();
+        // As linhas deste teste não têm empresa, e a migração da RLS do Mobile (#2180) recusa subir com órfã.
+        string doTeste = "%" + sufixo;
+        await db.Database.ExecuteSqlAsync($"""
+            DELETE FROM mobile_products WHERE "Id" LIKE {doTeste};
+            DELETE FROM mobile_clients WHERE "Id" LIKE {doTeste};
+            DELETE FROM mobile_orders WHERE "Id" LIKE {doTeste};
+            DELETE FROM mobile_batches WHERE "Id" LIKE {doTeste};
+            DELETE FROM mobile_cash_entries WHERE "Id" LIKE {doTeste};
+            """);
         await db.Database.MigrateAsync();
         (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
     }
