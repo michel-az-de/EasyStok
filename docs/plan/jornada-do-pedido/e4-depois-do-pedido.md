@@ -69,7 +69,7 @@ Mudam: `PedidosController.cs:45-63`, `ListarPedidosQuery` (`ListarPedidosUseCase
 1. Status fora de `cancelado` e fora do pré-operacional (`rascunho`, `aguardando_pagamento`, `aguardando_aprovacao_baba`). É a regra do cockpit (`pedidos-cockpit.js:92`) e do detalhe (`pedidosCadastro.js:148-159`).
 2. Saldo maior que zero, com saldo = `Total` menos a soma dos `Pagamentos` (`Pedido.TotalPago`, `Pedido.cs:428-436`). Pago, pago a mais e total zero ficam fora. Estorno e cupom não entram na v1 (`SaldoFinanceiroPedido.cs:9,34-35` os considera; fica como limite declarado).
 3. Sem `ContaReceber` de origem Pedido com `OrigemRefId` igual ao pedido e status diferente de `Cancelada`. Conta cancelada não está no card, então o pedido volta a contar.
-4. Dia da entrega (definição da L2) antes de hoje mais 31 dias. `AgendadoParaEm` é um instante UTC: converte-se para o dia civil de Brasília (`HorarioBrasil`) ANTES de comparar com o corte do card (`FluxoCaixaQueries.cs:21`). <!-- L3-LIMITE-INFERIOR: aguarda decisão do Felipe --> Sem limite inferior: pedido já entregue e não pago segue a receber, e pedido não tem "Vencidas". Entregue e não pago conta, como no cockpit.
+4. Dia da entrega (definição da L2) antes de hoje mais 31 dias. `AgendadoParaEm` é um instante UTC: converte-se para o dia civil de Brasília (`HorarioBrasil`) ANTES de comparar com o corte do card (`FluxoCaixaQueries.cs:21`). Sem limite inferior, **decidido pelo Felipe em 2026-11-21, 23:29**, literal: "Sim, continua". Pedido já entregue e não pago segue a receber, mesmo entregue há mais de 30 dias, e pedido não tem "Vencidas". Entregue e não pago conta, como no cockpit.
 
 **Contrato.** Sai pelo `GET /api/financeiro/dashboard` (`FinanceiroController.cs:18-25`). `DashboardFinanceiroDto` ganha dois campos opcionais com padrão, como `QtdContasReceberAVencer30d` (`IFluxoCaixaQueries.cs:33-49`):
 
@@ -103,7 +103,7 @@ O cálculo entra em `FluxoCaixaQueries.KpisDashboardAsync` (`FluxoCaixaQueries.c
 - [ ] L3, mesma loja com a flag ligada ANTES da entrega e o pedido já entregue: ele ganha a conta de R$ 132,30. O card passa a R$ 252,30 (conta com vencimento em 7 dias, dentro dos 30) e o pedido NÃO aparece na linha, que some por zerar.
 - [ ] L3, exclusões: pedido cancelado, pré-operacional, pago, com entrega além de 31 dias ou com conta ativa não entra na linha. Pagamento parcial entra só com o saldo. Pedido com conta cancelada volta à linha.
 - [ ] L3, borda de fuso: pedido agendado às 21h de Brasília do 30º dia (já é o dia seguinte em UTC) conta como 30º dia e ENTRA na linha; às 21h do 31º dia NÃO entra.
-- [ ] RASCUNHO, aguarda decisão do Felipe: pedido entregue há mais de 30 dias e ainda não pago: [comportamento conforme a decisão].
+- [ ] L3, pedido antigo (decisão do Felipe, 2026-11-21): pedido operacional sem conta, entregue há 45 dias, total R$ 80,00, sem pagamento, ENTRA na linha com R$ 80,00; o card das contas não muda.
 - [ ] `GET /api/financeiro/dashboard` sem os campos novos (API antiga) não quebra o Console: a linha não aparece.
 - [ ] Prova Red→Green por lacuna e roteiro de navegador com as 4 tarefas, antes e depois.
 - [ ] `npm run qualidade` verde; CI verde; `/code-review` sem Critical.
