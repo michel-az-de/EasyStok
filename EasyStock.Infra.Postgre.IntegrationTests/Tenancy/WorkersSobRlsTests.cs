@@ -32,7 +32,7 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     public async Task Outbox_despacha_os_eventos_de_duas_empresas_com_o_tenant_de_cada_evento()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
-        await LigarPolicyAsync();
+        await PrepararAsync();
         var (a, b) = await SemearEmpresasAsync();
         // Intercalados: o lote divide o DbContext e o tenant do evento anterior não pode sobrar para o seguinte.
         var eventos = new[] { Evento(a, 0), Evento(b, 1), Evento(a, 2) };
@@ -47,8 +47,8 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         }
 
         var vistos = provider.GetRequiredService<TenantsVistos>();
-        vistos.Should().Equal(eventos.Select(e => (e.EmpresaId, e.EmpresaId)),
-            "cada handler roda com o tenant do próprio evento");
+        vistos.Should().Equal(eventos.Select(e => (e.EmpresaId, e.EmpresaId, "false")),
+            "cada handler roda com o tenant do próprio evento e sem o bypass da leitura do lote");
         await using var leitura = fixture.CreateDbContext();
         var status = await leitura.Set<OutboxEventoIntegracao>().IgnoreQueryFilters().AsNoTracking()
             .Where(e => e.TipoEvento == Tipo).Select(e => e.Status).ToListAsync();
@@ -59,7 +59,7 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     public async Task Outbox_reclama_o_evento_preso_em_envio_de_qualquer_empresa()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
-        await LigarPolicyAsync();
+        await PrepararAsync();
         var (a, _) = await SemearEmpresasAsync();
         var preso = Evento(a, 0);
         preso.Status = StatusOutboxIntegracao.EmEnvio;
@@ -80,7 +80,7 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     public async Task Retencao_apaga_a_auditoria_antiga_de_todas_as_empresas()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
-        await LigarPolicyAsync();
+        await PrepararAsync();
         var (a, b) = await SemearEmpresasAsync();
         var antigas = new[] { a, b }.Select(empresa => new EntityAlteracao
         {
@@ -103,7 +103,7 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     public async Task Relatorios_o_runner_escolhe_e_inicia_runs_de_qualquer_empresa()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
-        await LigarPolicyAsync();
+        await PrepararAsync();
         var runs = new[] { Run(), Run() };
         await SemearAsync(db => db.ReportRuns.AddRange(runs));
 
@@ -114,13 +114,14 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
             escolhidas.Should().Contain(runs.Select(r => r.Id));
         }
 
-        using (var scope = provider.CreateScope())
+        // Contexto sem retry, como os outros testes de relatório: com EnableRetryOnFailure a transação
+        // manual da reserva lança antes de chegar à RLS (#3141).
+        await using (var db = ContextoSemRetry())
         {
-            var iniciada = await Repo(scope).TryStartAsync(runs[0].Id, TimeSpan.FromMinutes(5), CancellationToken.None);
+            var iniciada = await new ReportRunRepository(db).TryStartAsync(runs[0].Id, TimeSpan.FromMinutes(5), CancellationToken.None);
             iniciada.Should().NotBeNull("o start é a reserva da run, antes de existir o tenant da execução");
             iniciada!.Status.Should().Be(ReportStatus.Running);
-            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().BypassRowLevelSecurity
-                .Should().BeFalse("o bypass acaba junto com a reserva");
+            db.BypassRowLevelSecurity.Should().BeFalse("o bypass acaba junto com a reserva");
         }
 
         await using var leitura = fixture.CreateDbContext();
@@ -131,7 +132,7 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     public async Task Relatorios_o_watchdog_recicla_runs_de_qualquer_empresa()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
-        await LigarPolicyAsync();
+        await PrepararAsync();
         var vencida = Run();
         vencida.TryStart(TimeSpan.FromMinutes(5));
         await SemearAsync(db => db.ReportRuns.Add(vencida));
@@ -146,6 +147,11 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         await using var leitura = fixture.CreateDbContext();
         (await leitura.ReportRuns.AsNoTracking().SingleAsync(r => r.Id == vencida.Id)).Status.Should().Be(ReportStatus.Pending);
     }
+
+    private EasyStockDbContext ContextoSemRetry() => new(
+        new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(fixture.RlsClientConnectionString)
+            .AddInterceptors(new EasyStock.Infra.Postgre.Data.Interceptors.SetTenantOnConnectionInterceptor()).Options,
+        Substitute.For<ICurrentUserAccessor>());
 
     private static ReportRunRepository Repo(IServiceScope scope) =>
         new(scope.ServiceProvider.GetRequiredService<EasyStockDbContext>());
@@ -182,8 +188,9 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
     /// A policy que a migração da #3108 liga nestas três tabelas. Idempotente; o FORCE fica fora porque só
     /// obriga o dono e o <c>rls_test_client</c> não é dono.
     /// </summary>
-    private async Task LigarPolicyAsync()
+    private async Task PrepararAsync()
     {
+        await fixture.ResetDatabaseAsync(); // cada teste parte do banco limpo: o lote do outbox é global
         await using var db = fixture.CreateDbContext();
         await db.Database.ExecuteSqlRawAsync("""
             DO $rls$
@@ -221,17 +228,19 @@ public sealed class WorkersSobRlsTests(PostgreSqlDatabaseFixture fixture) : ICla
         return services.BuildServiceProvider();
     }
 
-    private sealed class TenantsVistos : List<(Guid Evento, Guid Tenant)>;
+    private sealed class TenantsVistos : List<(Guid Evento, Guid Tenant, string Bypass)>;
 
     /// <summary>Handler que não fixa tenant, como os de log: herda o que o dispatcher deixou no escopo.</summary>
     private sealed class HandlerQueAnotaOTenant(EasyStockDbContext db, TenantsVistos vistos) : IIntegrationEventHandler
     {
         public string TipoEvento => Tipo;
 
-        public Task HandleAsync(OutboxEventoIntegracao evento, CancellationToken ct)
+        public async Task HandleAsync(OutboxEventoIntegracao evento, CancellationToken ct)
         {
-            vistos.Add((evento.EmpresaId, db.CurrentTenantId));
-            return Task.CompletedTask;
+            // O que a sessão do banco enxerga, não só a flag do contexto.
+            var bypass = await db.Database
+                .SqlQueryRaw<string>("SELECT current_setting('app.bypass_rls', true) AS \"Value\"").FirstAsync(ct);
+            vistos.Add((evento.EmpresaId, db.CurrentTenantId, bypass));
         }
     }
 }

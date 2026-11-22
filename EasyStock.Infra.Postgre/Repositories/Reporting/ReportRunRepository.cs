@@ -194,21 +194,21 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         // depois, com a empresa da run). Bypass ligado antes de abrir a transação e só durante ela.
         await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
 
-        // Sem retry: o DbContext do Worker usa EnableRetryOnFailure, que recusa transação aberta à mão
-        // (BeginTransactionAsync direto lançava InvalidOperationException na primeira consulta).
-        return await db.ExecuteInTransactionSemRetryAsync<ReportRun?>(async token =>
-        {
-            if (!await TryAcquireLockAsync(runId, token)) return null;
+        // Transação aberta como sempre foi no runner. Com EnableRetryOnFailure ela lança na primeira consulta
+        // (#3141); o conserto religa o runner e fica para lá, junto com o FecharAsync.
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
 
-            var run = await GetByIdAsync(runId, token);
-            if (run is null || !run.TryStart(leaseDuration)) return null;
+        if (!await TryAcquireLockAsync(runId, ct)) return null;
 
-            // GetByIdAsync le sem tracking: sem marcar Modified o TryStart nao era gravado,
-            // a run seguia Pending, voltava no proximo polling e rodava em duplicata (#1507).
-            db.Entry(run).State = EntityState.Modified;
-            await db.SaveChangesAsync(token);
-            return run;
-        }, ct);
+        var run = await GetByIdAsync(runId, ct);
+        if (run is null || !run.TryStart(leaseDuration)) return null;
+
+        // GetByIdAsync le sem tracking: sem marcar Modified o TryStart nao era gravado,
+        // a run seguia Pending, voltava no proximo polling e rodava em duplicata (#1507).
+        db.Entry(run).State = EntityState.Modified;
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return run;
     }
 
     /// <summary>
