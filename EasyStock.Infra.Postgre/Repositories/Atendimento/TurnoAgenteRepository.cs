@@ -36,7 +36,7 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
         return new PaginaTurnosAgente(
             linhas.Select(l => new TurnoAgenteLido(l.Turno.Id, l.Turno.ConversaId, l.Turno.CriadoEm, l.Turno.Modelo,
                 l.Turno.TokensEntrada, l.Turno.TokensSaida, l.Turno.TokensCacheLido, l.Turno.CustoEstimado, l.Turno.Ferramentas,
-                l.Turno.Passos, l.Turno.Desfecho, l.Turno.DuracaoMs, l.Pergunta, l.Resposta)).ToList(),
+                l.Turno.Passos, l.Turno.Desfecho, l.Turno.DuracaoMs, l.Pergunta, l.Resposta, l.Turno.Motivo)).ToList(),
             total);
     }
 

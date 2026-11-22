@@ -64,6 +64,31 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Historico_grava_e_le_o_motivo_do_turno()
+    {
+        // #3175: coluna nova, anulavel: o turno que respondeu normalmente fica sem motivo.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var conversa = Guid.NewGuid();
+        var barrado = TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0,
+            DesfechoTurnoAgente.Escalou, 0, agora.AddMinutes(1), "portao:limite");
+        var normal = Turno(empresa, conversa, agora, 10, 0, 0, null, DesfechoTurnoAgente.Respondeu);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.TurnosAgente.AddRange(barrado, normal);
+            await db.SaveChangesAsync();
+        }
+
+        await using var leitura = fixture.CreateDbContext(); leitura.SetMobileTenantContext(empresa);
+        var pagina = await new TurnoAgenteRepository(leitura).ListarAsync(empresa, new FiltroTurnosAgente(conversa, null, 1, 10));
+
+        pagina.Itens.Select(t => t.Motivo).Should().Equal("portao:limite", null);
+    }
+
+    [SkippableFact]
     public async Task Historico_traz_pergunta_e_resposta_do_mais_novo_ao_mais_velho_com_filtros()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");

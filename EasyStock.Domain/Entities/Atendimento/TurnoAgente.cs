@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Domain.Entities.Atendimento;
@@ -14,6 +15,9 @@ public sealed record FerramentaDoTurno(string Nome, bool Ok);
 public sealed class TurnoAgente
 {
     public const int ModeloTamanhoMaximo = 100;
+    public const int MotivoTamanhoMaximo = 48;
+
+    private static readonly Regex FormaDoMotivo = new(@"^[a-z_:]+\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -37,6 +41,10 @@ public sealed class TurnoAgente
     public int Passos { get; private set; }
 
     public DesfechoTurnoAgente Desfecho { get; private set; }
+
+    /// <summary>#3175: por que o turno terminou assim, em código curto e estável (<c>portao:limite</c>); nulo na resposta normal.</summary>
+    public string? Motivo { get; private set; }
+
     public int DuracaoMs { get; private set; }
     public DateTime CriadoEm { get; private set; }
 
@@ -61,7 +69,8 @@ public sealed class TurnoAgente
         int passos,
         DesfechoTurnoAgente desfecho,
         int duracaoMs,
-        DateTime agora)
+        DateTime agora,
+        string? motivo = null)
     {
         if (empresaId == Guid.Empty || conversaId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Empresa e conversa são obrigatórias no registro do turno.");
@@ -69,6 +78,8 @@ public sealed class TurnoAgente
             throw new RegraDeDominioVioladaException("Tokens, passos e duração do turno não podem ser negativos.");
         if (!Enum.IsDefined(desfecho))
             throw new RegraDeDominioVioladaException("Desfecho do turno inválido.");
+        if (motivo is not null && (motivo.Length > MotivoTamanhoMaximo || !FormaDoMotivo.IsMatch(motivo)))
+            throw new RegraDeDominioVioladaException("Motivo do turno deve ser um código de até 48 letras minúsculas, \"_\" ou \":\".");
 
         var nomeModelo = string.IsNullOrWhiteSpace(modelo) ? "desconhecido" : modelo.Trim();
         if (nomeModelo.Length > ModeloTamanhoMaximo) nomeModelo = nomeModelo[..ModeloTamanhoMaximo];
@@ -88,6 +99,7 @@ public sealed class TurnoAgente
             FerramentasJson = JsonSerializer.Serialize(ferramentas.ToList(), Json),
             Passos = passos,
             Desfecho = desfecho,
+            Motivo = motivo,
             DuracaoMs = duracaoMs,
             CriadoEm = Datas.Utc(agora),
         };

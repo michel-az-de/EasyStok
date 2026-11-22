@@ -1,0 +1,29 @@
+// #3175: por que o turno terminou assim. A API grava um código curto (MotivoDoTurno.cs); a tela diz em português.
+// Código que a tela ainda não conhece aparece como veio.
+const MOTIVOS = Object.freeze({
+  'portao:chave': 'Assistente desligado na loja',
+  'portao:modelo': 'modelo de IA desligado ou sem chave',
+  'portao:canal': 'canal que o Assistente não atende',
+  'portao:equipe': 'contato da equipe',
+  'portao:bloqueado': 'cliente bloqueado',
+  'portao:pausado': 'cliente encaminhado à responsável',
+  'portao:limite': 'limite de respostas na última hora',
+  'portao:cota': 'cota do mês esgotada',
+  'guarda:valor': 'resposta com valor que nenhuma consulta confirmou',
+  'guarda:outro': 'resposta barrada na conferência',
+  'guarda:sem_resposta': 'o Assistente não produziu resposta',
+  'guarda:texto_de_ferramenta': 'resposta com chamada de ferramenta no lugar do texto',
+  'guarda:promete_encaminhar': 'prometeu encaminhar sem acionar a equipe',
+  'guarda:situacao_pedido': 'afirmou situação do pedido sem confirmar',
+  'guarda:pagamento_devolucao': 'afirmou pagamento ou devolução sem confirmar',
+  'guarda:frete_desconto': 'prometeu frete grátis ou desconto',
+  'guarda:frete_combinado': 'afirmou frete combinado sem confirmar',
+  'guarda:link_sem_origem': 'resposta com link que nenhuma consulta trouxe',
+  'guarda:ferramenta_falhou': 'uma consulta falhou no turno',
+  iteracoes: 'limite de passos do turno',
+  menu: 'o menu não chegou ao cliente',
+  falha_llm: 'falha no modelo de IA',
+  escalada_modelo: 'o Assistente pediu a equipe',
+  interrompido: 'turno interrompido',
+})
+export const motivoDoTurno = (codigo) => (codigo ? MOTIVOS[codigo] ?? codigo : null)

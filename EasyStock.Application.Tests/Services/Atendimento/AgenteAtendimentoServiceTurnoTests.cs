@@ -8,7 +8,7 @@ namespace EasyStock.Application.Tests.Services.Atendimento;
 
 /// <summary>
 /// S67 (#2534): cada turno que chama o modelo grava um <see cref="TurnoAgente"/> com os números que o cliente LLM
-/// devolveu, as ferramentas pedidas, o desfecho e os ids das mensagens. Turno que nem chama o modelo não grava.
+/// devolveu, as ferramentas pedidas, o desfecho e os ids das mensagens. Portão silencioso (janela, situação) não grava.
 /// </summary>
 public partial class AgenteAtendimentoServiceTests
 {
@@ -125,11 +125,10 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
-    public async Task TurnoQueNaoChamaOModeloNaoGrava()
+    public async Task PortaoSilenciosoNaoGravaTurno()
     {
-        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
-
-        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        // #3175: os portoes que escalam gravam turno (motivo portao:*); a janela de 24 h barra calada e nao grava.
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora.AddHours(25));
 
         await _turnos.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
     }

@@ -20,10 +20,15 @@ public class TurnoAgenteConfiguration : IEntityTypeConfiguration<TurnoAgente>
         builder.Property(t => t.CustoEstimado).HasPrecision(18, 8);
         builder.Property(t => t.FerramentasJson).HasColumnName("Ferramentas").HasColumnType("jsonb").IsRequired();
         builder.Property(t => t.Desfecho).HasConversion<int>().IsRequired();
+        builder.Property(t => t.Motivo).HasMaxLength(TurnoAgente.MotivoTamanhoMaximo);
         builder.Property(t => t.CriadoEm).IsRequired();
 
         // Histórico e consumo do mês leem por empresa e data.
         builder.HasIndex(t => new { t.EmpresaId, t.CriadoEm })
             .HasDatabaseName("ix_atendimento_turnos_agente_empresa_criado");
+
+        // #3175: o historico de uma conversa le por empresa, conversa e data.
+        builder.HasIndex(t => new { t.EmpresaId, t.ConversaId, t.CriadoEm })
+            .HasDatabaseName("ix_atendimento_turnos_agente_empresa_conversa_criado");
     }
 }

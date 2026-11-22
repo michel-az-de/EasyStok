@@ -49,7 +49,7 @@ await contexto.route(url => url.pathname.startsWith('/api/'), async route => {
     const daConversa = u.searchParams.has('conversaId')
     if (daConversa && conversaSemTurnos) return route.fulfill({ json: { data: { itens: [], total: 0 } } })
     const pergunta = daConversa ? 'Pergunta desta conversa' : 'Pergunta de qualquer conversa'
-    return route.fulfill({ json: { data: { itens: [turno('t1', daConversa ? 'c5' : 'c9', pergunta)], total: 25 } } })
+    return route.fulfill({ json: { data: { itens: [{ ...turno('t1', daConversa ? 'c5' : 'c9', pergunta), ...(daConversa ? { desfecho: 'Escalou', motivo: 'portao:limite' } : {}) }], total: 25 } } })
   }
   return fora()
 })
@@ -65,6 +65,7 @@ try {
   const modal = pagina.getByRole('dialog', { name: 'Assistente nesta conversa' })
   await modal.getByRole('tab', { name: 'Histórico' }).click()
   await modal.getByText('Pergunta desta conversa').waitFor()
+  await modal.getByText('Motivo: limite de respostas na última hora').waitFor()
   assert.equal(urls.length, 1)
   assert.equal(ultima().get('conversaId'), 'c5', 'GET do histórico leva conversaId')
   assert.equal(ultima().get('pagina'), '1')

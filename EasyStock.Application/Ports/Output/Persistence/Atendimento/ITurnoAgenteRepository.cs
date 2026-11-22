@@ -32,7 +32,8 @@ public sealed record TurnoAgenteLido(
     DesfechoTurnoAgente Desfecho,
     int DuracaoMs,
     string? PerguntaCliente,
-    string? Resposta);
+    string? Resposta,
+    string? Motivo = null);
 
 public sealed record PaginaTurnosAgente(IReadOnlyList<TurnoAgenteLido> Itens, int Total);
 
