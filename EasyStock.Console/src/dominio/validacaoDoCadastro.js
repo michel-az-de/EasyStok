@@ -67,3 +67,26 @@ export function validarCadastro({ campos = ORDEM, ...valores }) {
   }
   return { erros, primeiro: ORDEM.find((campo) => campo in erros) ?? null }
 }
+
+// #3157: e-mail do cadastro com texto no campo (o balão do navegador some sozinho). Vazio é permitido; pede algo@domínio.tld.
+const EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/
+export function erroDoEmailDoCadastro(email) {
+  const texto = String(email ?? '').trim()
+  return !texto || EMAIL.test(texto) ? null : 'Informe um e-mail completo, como nome@exemplo.com.'
+}
+
+// #3192: documento do cliente é CPF (11 dígitos) ou CNPJ (14) com os dois dígitos verificadores conferidos. Vazio é permitido.
+const digitoVerificador = (base, pesos) => { const resto = base.reduce((soma, d, i) => soma + d * pesos[i], 0) % 11; return resto < 2 ? 0 : 11 - resto }
+const PESOS_CNPJ = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+function documentoValido(numeros) {
+  if (/^(\d)\1+$/.test(numeros.join(''))) return false
+  const n = numeros.length
+  const pesos = n === 11 ? [11, 10, 9, 8, 7, 6, 5, 4, 3, 2] : PESOS_CNPJ
+  return digitoVerificador(numeros.slice(0, n - 2), pesos.slice(1)) === numeros[n - 2] && digitoVerificador(numeros.slice(0, n - 1), pesos) === numeros[n - 1]
+}
+export function erroDoDocumentoDoCadastro(documento) {
+  const texto = String(documento ?? '').trim()
+  if (!texto) return null
+  const numeros = digitos(texto).split('').map(Number)
+  return (numeros.length === 11 || numeros.length === 14) && documentoValido(numeros) ? null : 'Informe um CPF ou CNPJ válido, só com números ou com a máscara.'
+}
