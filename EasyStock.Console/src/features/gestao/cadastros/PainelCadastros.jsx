@@ -32,7 +32,7 @@ import { MetodosCadastro } from './MetodosCadastro'
 import css from './cadastros.module.css'
 
 const FILTROS = [{ valor: '', rotulo: 'Todas' }, { valor: 'ativos', rotulo: 'Ativos' }, { valor: 'inativos', rotulo: 'Inativos' }]
-const ABAS_DE_PESSOAS = [['todos', 'Todos'], ['lead', 'Leads'], ['cliente', 'Clientes'], ['recompra', 'Recompra'], ['sem-cadastro', 'Sem cadastro']].map(([id, rotulo]) => ({ id, rotulo, nome: rotulo }))
+const ABAS_DE_PESSOAS = [['todos', 'Todos'], ['lead', 'Sem pedido'], ['cliente', 'Clientes'], ['recompra', 'Recompra'], ['sem-cadastro', 'Sem cadastro']].map(([id, rotulo]) => ({ id, rotulo, nome: rotulo }))
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
 const CHAVE_LEITURA = { produtos: 'verCadastrosProdutos', categorias: 'verCadastrosProdutos', fornecedores: 'verCadastrosFornecedores', bancos: 'verCadastrosFinanceiros', pagamentos: 'verCadastrosFinanceiros' }
 const CHAVE_EDICAO = { produtos: 'editarCadastrosProdutos', fornecedores: 'editarCadastrosFornecedores', bancos: 'gerenciarCadastrosFinanceiros' }
@@ -40,6 +40,7 @@ const nome = (c) => nomeExibido({ nome: c.nome || c.contatoInformado?.nome, tele
 // #2457 (U2): telefone na máscara da tela, não no E.164 que a API grava.
 const telefone = (item) => telefoneNaTela(telefoneCadastro(item))
 const SEM_RESTRICOES = []
+const ID_MOTIVO_NOVO_PEDIDO = 'cadastros-motivo-novo-pedido'
 
 export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa }) {
   const { selecionada, conversas } = useAtendimento()
@@ -203,6 +204,8 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {/* #2792: abas de verdade (tablist, aria-selected e setas), como em Modelos. */}
       {tela === 'clientes' && <BarraDeAbas rotulo="Tipos de cadastro" abas={abas} ativa={tipo} aoTrocar={valor => definir({ tipo: valor, pagina: 1, filtro: '', posicao: 0 })} idPainel="cadastros-painel" prefixoId="cadastros-aba" />}
       <div id="cadastros-painel" role={tela === 'clientes' ? 'tabpanel' : undefined} aria-labelledby={tela === 'clientes' ? `cadastros-aba-${tipo}` : undefined}>
+      {/* #3193: loja desligada, o motivo aparece uma vez aqui e cada "Novo pedido" da lista aponta para ele. */}
+      {podeNovoPedido && novoPedido.motivo && lista.length > 0 && <p id={ID_MOTIVO_NOVO_PEDIDO} className={css.contexto} role="status">{novoPedido.motivo}</p>}
       <div className={!soLeads && !emRecompra && ORDENS_CADASTRO[tela] ? `${css.filtros} ${css.comOrdem}` : tela === 'bancos' ? `${css.filtros} ${css.soBusca}` : css.filtros}>
         {soLeads ? <CampoTexto rotulo="Buscar" placeholder="Nome ou telefone" value={busca} onChange={e => definir({ busca: e.target.value, pagina: 1, posicao: 0 })} /> : <BuscaComSugestoes placeholder={TEXTOS_CADASTRO[tela].busca} valor={busca} aoMudar={valor => definir({ busca: valor, pagina: 1, posicao: 0 })} carregando={consulta.carregando}
           opcoes={consulta.busca === busca ? lista.slice(0, 6).map(item => ({ id: item.id ?? item.produtoId, rotulo: nome(item), descricao: telefone(item) || emailCadastro(item) || item.marca || item.instituicao, item })) : []} aoEscolher={editar} />}
@@ -223,8 +226,8 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
           return <tr key={id} className={soLeads ? undefined : css.clicavel} onClick={soLeads ? undefined : e => { if (!e.target.closest('button, a')) editar(item) }}>
             <td><div className={css.identidade}><span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span><div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : emRecompra ? resumoDaRecompra(item.orderCount, item.lastOrderAt) : item.nomeFantasia || item.marca || item.contato || item.titular || (item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao}</small></div></div></td>
             <td>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : tela === 'bancos' ? item.instituicao || 'Não informada' : <><span>{telefone(item) || emailCadastro(item) || 'Contato não informado'}</span>{telefone(item) && <small>{emailCadastro(item)}</small>}</>}</td>
-            <td>{situacao.tom ? <Pilula tom={situacao.tom}>{situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</td>
-            <td><div className={css.acoes}>{emRecompra && (link ? <a className={css.chamar} href={link} target="_blank" rel="noopener noreferrer" aria-label={`Chamar ${nome(item)} no WhatsApp`} onClick={() => recompra.convidar(id, nome(item))} onAuxClick={e => e.button === 1 && recompra.convidar(id, nome(item))}>Chamar no WhatsApp</a> : <span className={css.situacao}>Sem telefone</span>)}{!soLeads && <Botao disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`${tela === 'clientes' ? 'Abrir ficha de' : podeEditar ? 'Editar' : 'Ver'} ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : tela === 'clientes' ? 'Abrir ficha' : podeEditar ? 'Editar' : 'Ver'}</Botao>}{podeNovoPedido && emAtividadeCadastro(item) && <Botao disabled={Boolean(novoPedido.abrindo)} onClick={() => (telefoneCadastro(item) ? novoPedido.iniciar(id) : pedirCelular({ id, nome: nome(item) }))} aria-label={`Novo pedido de ${nome(item)}`}>{novoPedido.abrindo === id ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}{c && <Botao variante="texto" onClick={() => abrirConversa(c.id)}>Conversa</Botao>}</div></td>
+            <td>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</td>
+            <td><div className={css.acoes}>{emRecompra && (link ? <a className={css.chamar} href={link} target="_blank" rel="noopener noreferrer" aria-label={`Chamar ${nome(item)} no WhatsApp`} onClick={() => recompra.convidar(id, nome(item))} onAuxClick={e => e.button === 1 && recompra.convidar(id, nome(item))}>Chamar no WhatsApp</a> : <span className={css.situacao}>Sem telefone</span>)}{!soLeads && <Botao disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`${tela === 'clientes' ? 'Abrir ficha de' : podeEditar ? 'Editar' : 'Ver'} ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : tela === 'clientes' ? 'Abrir ficha' : podeEditar ? 'Editar' : 'Ver'}</Botao>}{podeNovoPedido && emAtividadeCadastro(item) && <Botao disabled={Boolean(novoPedido.abrindo || novoPedido.motivo)} title={novoPedido.motivo ?? undefined} aria-describedby={novoPedido.motivo ? ID_MOTIVO_NOVO_PEDIDO : undefined} onClick={() => (telefoneCadastro(item) ? novoPedido.iniciar(id) : pedirCelular({ id, nome: nome(item) }))} aria-label={`Novo pedido de ${nome(item)}`}>{novoPedido.abrindo === id ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}{c && <Botao variante="texto" onClick={() => abrirConversa(c.id)}>Conversa</Botao>}</div></td>
           </tr>
         })}</tbody></table>
       </div>}

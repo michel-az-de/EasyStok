@@ -383,7 +383,7 @@ try {
   const menu = page.getByRole('dialog', { name: 'Menu de Financeiro', exact: true })
   await menu.getByRole('link', { name: 'Contas a receber', exact: true }).click()
   await menu.waitFor({ state: 'hidden' })
-  await page.getByRole('heading', { name: 'Contas a receber', exact: true }).waitFor()
+  await page.getByRole('heading', { level: 2, name: 'Contas a receber', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Nova conta a receber', exact: true }).click()
   await page.getByRole('dialog', { name: 'Nova conta a receber', exact: true }).waitFor()
   await page.screenshot({ path: join(evidencias, 'financeiro-modal-celular.png') })

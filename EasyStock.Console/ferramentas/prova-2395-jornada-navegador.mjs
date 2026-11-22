@@ -208,7 +208,7 @@ try {
   await page.getByRole('tab', { name: 'Clientes', exact: true }).click()
   const linhaComprador = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'Abrir ficha de Ana Pereira', exact: true }) })
   await linhaComprador.getByText('Cliente', { exact: true }).waitFor()
-  await respostaDaAcao('/api/clientes', 'GET', () => page.getByRole('tab', { name: 'Leads', exact: true }).click())
+  await respostaDaAcao('/api/clientes', 'GET', () => page.getByRole('tab', { name: 'Sem pedido', exact: true }).click())
   await page.getByRole('button', { name: 'Abrir ficha de Ana Pereira', exact: true }).waitFor({ state: 'hidden' })
   registrar('Após reload, comprador aparece em Clientes e deixa a lista de Leads')
   assert.deepEqual(erros, [])

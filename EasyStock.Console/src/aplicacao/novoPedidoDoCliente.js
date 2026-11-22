@@ -32,7 +32,7 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   }, [erro])
   // #2930: `celular` vem do campo da escolha do cliente quando o cadastro está sem telefone.
   const iniciar = async (clienteId, { celular, nome } = {}) => {
-    if (!disponivel || !clienteId || emVoo.current) return false
+    if (!disponivel || motivo || !clienteId || emVoo.current) return false
     emVoo.current = true
     marcarAbrindo(clienteId); falhar(null)
     try {

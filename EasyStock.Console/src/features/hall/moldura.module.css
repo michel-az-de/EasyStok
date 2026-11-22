@@ -31,6 +31,8 @@
 .ajuste { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; padding: 0 var(--e-3) var(--e-3); }
 .folha { min-height: 100%; padding: var(--e-4); border: 0; border-radius: var(--r-2); box-shadow: none; background: var(--papel); }
 .titulo { display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-4); font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto); }
+.tituloGrande { font-size: var(--t-display); line-height: 1.15; }
+@media (max-width: 700px) { .tituloGrande { font-size: var(--t-valor); } }
 .conteudo { min-width: 0; }
 /* #2762 (B11): a troca de tela e de módulo entra com um esmaecer curto, sem deslocamento (a chave da tela remonta o bloco). */
 .conteudo, .operacao { animation: global(esmaecer) var(--dur-media) var(--ease-saida) backwards; }

@@ -47,6 +47,10 @@ function voltarAoBalcao(fonteApi) {
   setTimeout(() => { if (document.hasFocus()) window.close() }, 250)
 }
 
+// #3193: o título visível do Financeiro é h2 (o h1 fica só para leitor de tela) e tem o nível e o tamanho do de Cadastros e
+// Pedidos (--t-display; --t-valor no celular).
+const MODULOS_COM_TITULO_GRANDE = new Set(['financeiro'])
+
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes, busca, acoes, conta } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
@@ -131,10 +135,15 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <div className={css.folha}>
               {tela ? (
                 <>
-                  <h1 className={tituloVisivel ? css.titulo : 'sr'}>
-                    <IconeDoModulo modulo={modulo} telaId={tela.id} />
-                    {tela.rotulo}
-                  </h1>
+                  {tituloVisivel && MODULOS_COM_TITULO_GRANDE.has(moduloId)
+                    ? <>
+                      <h1 className="sr">{tela.rotulo}</h1>
+                      <h2 className={`${css.titulo} ${css.tituloGrande}`}><IconeDoModulo modulo={modulo} telaId={tela.id} />{tela.rotulo}</h2>
+                    </>
+                    : <h1 className={tituloVisivel ? css.titulo : 'sr'}>
+                      <IconeDoModulo modulo={modulo} telaId={tela.id} />
+                      {tela.rotulo}
+                    </h1>}
                   <div className={css.conteudo} key={tela.id}><LimiteDeErro parte={tela.rotulo}>{children}</LimiteDeErro></div>
                 </>
               ) : (
