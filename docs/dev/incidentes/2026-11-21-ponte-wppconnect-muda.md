@@ -29,7 +29,11 @@ rodadas boas.
 Limites conhecidos:
 
 - Se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e o vigia não vê nada.
-- O aviso vai para a empresa padrão (dono da plataforma), não para o dono da loja.
+- O aviso vai para a empresa padrão (dono da plataforma), não para o dono da loja, e é um por rodada: não diz
+  qual loja. A loja está no log `Ponte WPPConnect muda` e em `endpoint_health_state`.
+- Mensagem que a ponte entregou e a API recusou com 400 (telefone sem resolver) também abre o incidente: a recusa
+  não deixa registro de entrega. O passo 2 abaixo separa os dois casos.
+- Loja que desconecta, desliga o módulo ou perde a credencial tem o estado apagado e o incidente fechado.
 - Nada aqui recupera as mensagens da parada: isso está em issue própria.
 
 ## Ligar o vigia (nasce DESLIGADO)

@@ -22,12 +22,14 @@ public enum SinalPonteWppConnect
 /// <see cref="MaximoDeConsultas"/> leituras de mensagens (para saber a data e o tipo, que a listagem não traz).
 /// </para>
 /// <para>
-/// Limite conhecido: se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e nada é
-/// detectado. Telefone e texto passam por aqui só para a comparação; nada disso sai em log nem no retorno.
+/// Limites conhecidos: se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e nada é
+/// detectado; e mensagem que a ponte entregou mas a API recusou (400, telefone sem resolver) também conta como não
+/// entregue, porque a recusa não deixa registro. Telefone e texto passam por aqui só para a comparação; nada disso sai
+/// em log nem no retorno.
 /// </para>
 /// </summary>
 public sealed class VigiaPonteWppConnect(
-    IWppConnectSessaoClient cliente, IWebhookRecebidoRepository recebidos, TimeProvider relogio)
+    IWppConnectSessaoClient cliente, IWebhookRecebidoRepository recebidos, MemoriaVigiaPonteWppConnect memoria, TimeProvider relogio)
 {
     public static readonly TimeSpan Carencia = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan Janela = TimeSpan.FromHours(6);
@@ -51,16 +53,24 @@ public sealed class VigiaPonteWppConnect(
         var consultas = 0;
         foreach (var ultima in await cliente.ListarUltimasRecebidasAsync(sessao, MaximoDeConversas, ct))
         {
-            if (await recebidos.ObterAsync(ProcessarEventoWhatsAppUseCase.Provedor, sessao.IdExterno(ultima.MensagemId), ct) is not null)
-                continue;
+            var idExterno = sessao.IdExterno(ultima.MensagemId);
+            if (memoria.JaDescartada(idExterno)) continue;
+            if (await recebidos.ObterAsync(ProcessarEventoWhatsAppUseCase.Provedor, idExterno, ct) is not null) continue;
             if (++consultas > MaximoDeConsultas) break;
 
             var mensagem = (await cliente.ListarMensagensRecentesAsync(sessao, ultima.Chat, ct))
                 .FirstOrDefault(m => m.Id == ultima.MensagemId);
-            if (mensagem is null || mensagem.DeMim || mensagem.Tipo is null || !TiposEntregues.Contains(mensagem.Tipo)) continue;
+            if (mensagem is null) continue;
 
             var quando = DateTimeOffset.FromUnixTimeSeconds(mensagem.Quando);
-            if (quando >= desde && quando <= ate) return SinalPonteWppConnect.Muda;
+            // Nunca vai contar: lembra, para não gastar a consulta da próxima rodada com a mesma mensagem.
+            if (mensagem.DeMim || mensagem.Tipo is null || !TiposEntregues.Contains(mensagem.Tipo) || quando < desde)
+            {
+                memoria.Descartar(idExterno);
+                continue;
+            }
+
+            if (quando <= ate) return SinalPonteWppConnect.Muda;
         }
 
         return SinalPonteWppConnect.Entregando;

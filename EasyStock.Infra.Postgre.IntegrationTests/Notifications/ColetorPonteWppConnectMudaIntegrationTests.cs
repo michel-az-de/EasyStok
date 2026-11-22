@@ -119,6 +119,63 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
         estado.LastFailureMessage.Should().Be("PONTE_MUDA");
     }
 
+    /// <summary>Revisão da #3132: o aviso tem a mesma chave de dedupe para toda loja; a segunda não pode derrubar a rodada.</summary>
+    [SkippableFact]
+    public async Task DuasLojasMudasNaMesmaRodadaGravamOsDoisEstadosEUmAviso()
+    {
+        var (padrao, loja) = await PrepararAsync();
+        var outra = Empresa.Criar("Casa da Baba Outra", "33444555000163");
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            db.Empresas.Add(outra);
+            await db.SaveChangesAsync();
+            db.Set<CredencialIntegracao>().Add(CredencialIntegracao.Criar(outra.Id, CategoriaIntegracao.Mensageria,
+                CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production, [1], "kek-teste", new byte[12], new byte[16],
+                await db.Set<Usuario>().Select(u => u.Id).FirstAsync()));
+            db.TenantFeatureFlags.Add(TenantFeatureFlag.Criar(outra.Id, FeatureCatalogo.ModuloAtendimento, true, "teste@example.com"));
+            await db.SaveChangesAsync();
+        }
+        var sessao = new CredencialWppConnect(CredencialWppConnect.NomeSessao(outra.Id), "t", DateTimeOffset.UtcNow.AddDays(-30));
+        _credenciais.ObterAsync<CredencialWppConnect>(outra.Id, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production,
+            Arg.Any<CancellationToken>()).Returns(sessao);
+        _ponte.ObterEstadoAsync(sessao, Arg.Any<CancellationToken>()).Returns(new EstadoWppConnect(true, true, true, "CONNECTED"));
+        _ponte.ListarUltimasRecebidasAsync(sessao, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([new UltimaRecebidaWppConnect(Chat, Id)]);
+        _ponte.ListarMensagensRecentesAsync(sessao, Chat, Arg.Any<CancellationToken>()).Returns(
+            [new MensagemRecenteWppConnect(Id, DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds(), false, "chat", "SENTINELA")]);
+        await using var provider = Provider();
+
+        await ColetarAsync(provider);
+
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
+        (await EstadoAsync(outra.Id))!.LastAlertedAt.Should().NotBeNull();
+        (await _s.LerEventosDaEmpresaAsync(padrao)).Should().ContainSingle();
+    }
+
+    /// <summary>Revisão da #3132: loja que sai do escopo (desconectou, desligou o módulo) não deixa incidente aberto para sempre.</summary>
+    [SkippableFact]
+    public async Task IncidenteAbertoFechaQuandoALojaSaiDoEscopoENaoQuandoAPonteFalha()
+    {
+        var (padrao, loja) = await PrepararAsync();
+        await using var provider = Provider();
+        await ColetarAsync(provider);
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
+
+        // Ponte fora do ar: não se conclui nada, o incidente segue aberto.
+        _ponte.ObterEstadoAsync(default!, default).ThrowsAsyncForAnyArgs(new HttpRequestException("recusou"));
+        await ColetarAsync(provider);
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
+
+        // Loja sem credencial resolvida (desconectou pela tela): não há mais o que vigiar.
+        _credenciais.ObterAsync<CredencialWppConnect>(loja, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production,
+            Arg.Any<CancellationToken>()).Returns((CredencialWppConnect?)null);
+        await ColetarAsync(provider);
+
+        (await EstadoAsync(loja)).Should().BeNull();
+        (await _s.LerEventosDaEmpresaAsync(padrao)).Should().HaveCount(2);
+    }
+
     [SkippableFact]
     public async Task MensagemQueChegouAoWebhookNaoAbre()
     {

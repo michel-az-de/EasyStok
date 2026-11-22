@@ -25,10 +25,18 @@ namespace EasyStock.Infra.Postgre.Notifications.Collectors;
 /// precisa ser conferido em produção antes de ligar (runbook em <c>docs/dev/incidentes/</c>). Desligado, não consulta a ponte.
 /// </para>
 /// <para>
-/// A listagem das empresas é a única leitura entre tenants e roda sob <see cref="IRowLevelSecurityBypass"/>. Depois cada
-/// empresa abre um escopo próprio com o tenant ligado; erro numa empresa, ou a ponte fora do ar, não derruba as outras nem
-/// muda o estado (ponte que não responde não é "muda"). O estado vive em <c>endpoint_health_state</c> com o nome
-/// <c>wppconnect/{empresa}</c>. Nada de telefone ou texto sai daqui: o aviso só leva enums (ADR-0057).
+/// A listagem das empresas é a única leitura de dado de loja entre tenants e pede o <see cref="IRowLevelSecurityBypass"/>
+/// por conta própria (o orquestrador já roda cada coletor sob bypass; o estado e o aviso, que não são dado de loja, também
+/// rodam sob ele). A avaliação de cada empresa abre um escopo próprio com o tenant ligado; erro numa empresa, ou a ponte
+/// fora do ar, não derruba as outras nem muda o estado (ponte que não responde não é "muda"). O estado vive em
+/// <c>endpoint_health_state</c> com o nome <c>wppconnect/{empresa}</c>. Nada de telefone ou texto sai daqui: o aviso só
+/// leva enums (ADR-0057).
+/// </para>
+/// <para>
+/// O aviso é um por rodada, não um por loja: a chave de dedupe do publicador é por componente, e lojas costumam ficar
+/// mudas juntas. Abre se alguma loja abriu ou segue muda; normaliza só quando nenhuma loja tem incidente aberto. Loja que
+/// sai do escopo (desconectou, desligou o módulo, perdeu a credencial) tem o estado apagado, para o incidente não ficar
+/// aberto para sempre.
 /// </para>
 /// </summary>
 public sealed class ColetorPonteWppConnectMuda(
@@ -44,7 +52,9 @@ public sealed class ColetorPonteWppConnectMuda(
 
     private static readonly LimiaresIncidente Limiares = new(FalhasParaAbrir: 1, BoasParaResolver: 2);
 
-    public static string NomeDoEstado(Guid empresaId) => $"wppconnect/{empresaId:N}";
+    private const string PrefixoDoEstado = "wppconnect/";
+
+    public static string NomeDoEstado(Guid empresaId) => $"{PrefixoDoEstado}{empresaId:N}";
 
     public async Task ColetarAsync(CancellationToken ct = default)
     {
@@ -56,16 +66,71 @@ public sealed class ColetorPonteWppConnectMuda(
                 .Where(c => c.ProviderKey == CredencialWppConnect.ProviderKey && c.Ativo)
                 .Select(c => c.EmpresaId).Distinct().ToListAsync(ct);
 
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var estados = await db.EndpointHealthStates.Where(s => s.EndpointName.StartsWith(PrefixoDoEstado)).ToListAsync(ct);
+        var mantidos = new HashSet<string>(StringComparer.Ordinal);
+        DateTime? problemaDesde = null, normalizadoDesde = null;
+
         foreach (var empresaId in empresas)
         {
             ct.ThrowIfCancellationRequested();
             var sinal = await AvaliarAsync(empresaId, ct);
-            if (sinal != SinalPonteWppConnect.NaoAvaliada)
-                await RegistrarAsync(empresaId, sinal == SinalPonteWppConnect.Muda, ct);
+            if (sinal is null) { mantidos.Add(NomeDoEstado(empresaId)); continue; } // não avaliou: o estado fica como está
+            if (sinal == SinalPonteWppConnect.NaoAvaliada) continue;                  // fora do escopo: fecha abaixo
+
+            var nome = NomeDoEstado(empresaId);
+            mantidos.Add(nome);
+            var estado = estados.FirstOrDefault(s => s.EndpointName == nome);
+            if (estado is null)
+            {
+                estado = new EndpointHealthState { EndpointName = nome };
+                db.EndpointHealthStates.Add(estado);
+                estados.Add(estado);
+            }
+
+            var muda = sinal == SinalPonteWppConnect.Muda;
+            var avaliacao = AvaliadorIncidente.Avaliar(estado, saudavel: !muda, agora, Limiares);
+            if (muda) estado.LastFailureMessage = "PONTE_MUDA";
+
+            switch (avaliacao.Decisao)
+            {
+                case DecisaoIncidente.Abrir:
+                case DecisaoIncidente.Reavisar:
+                    logger.LogWarning(
+                        "Ponte WPPConnect muda: a empresa {EmpresaId} está conectada e tem mensagem recebida que não chegou ao webhook.",
+                        empresaId);
+                    problemaDesde = MaisAntigo(problemaDesde, avaliacao.DesdeUtc ?? agora);
+                    break;
+                case DecisaoIncidente.Resolver:
+                    logger.LogInformation("Ponte WPPConnect voltou a entregar para a empresa {EmpresaId}.", empresaId);
+                    normalizadoDesde = MaisAntigo(normalizadoDesde, avaliacao.DesdeUtc ?? agora);
+                    break;
+            }
         }
+
+        foreach (var orfao in estados.Where(s => !mantidos.Contains(s.EndpointName)).ToList())
+        {
+            if (orfao.LastAlertedAt is { } desde) normalizadoDesde = MaisAntigo(normalizadoDesde, desde);
+            db.EndpointHealthStates.Remove(orfao);
+            estados.Remove(orfao);
+        }
+
+        // O estado é gravado antes do aviso: o publicador commita a mesma unidade de trabalho e, na dedupe, deixa o evento
+        // recusado pendente; nada mais é gravado aqui depois dele.
+        await db.SaveChangesAsync(ct);
+
+        if (problemaDesde is { } aberto)
+            await publicador.PublicarAsync(ComponenteIncidente.Integracao, EstadoIncidente.ComProblema,
+                SeveridadeIncidente.Alta, aberto, ct);
+        else if (normalizadoDesde is { } fechado && estados.TrueForAll(s => s.LastAlertedAt is null))
+            await publicador.PublicarAsync(ComponenteIncidente.Integracao, EstadoIncidente.Normalizado,
+                SeveridadeIncidente.Media, fechado, ct);
     }
 
-    private async Task<SinalPonteWppConnect> AvaliarAsync(Guid empresaId, CancellationToken ct)
+    private static DateTime MaisAntigo(DateTime? atual, DateTime novo) => atual is { } a && a < novo ? a : novo;
+
+    /// <summary><c>null</c>: não deu para avaliar (erro, ponte fora do ar). <c>NaoAvaliada</c>: não há o que vigiar nesta empresa.</summary>
+    private async Task<SinalPonteWppConnect?> AvaliarAsync(Guid empresaId, CancellationToken ct)
     {
         try
         {
@@ -93,42 +158,7 @@ public sealed class ColetorPonteWppConnectMuda(
         {
             // Só o tipo: a mensagem da exceção pode trazer endereço ou resposta da ponte.
             logger.LogWarning("Vigia da ponte WPPConnect não avaliou a empresa {EmpresaId}: {TipoErro}.", empresaId, ex.GetType().Name);
-            return SinalPonteWppConnect.NaoAvaliada;
+            return null;
         }
-    }
-
-    private async Task RegistrarAsync(Guid empresaId, bool muda, CancellationToken ct)
-    {
-        var agora = relogio.GetUtcNow().UtcDateTime;
-        var nome = NomeDoEstado(empresaId);
-        var estado = await db.EndpointHealthStates.FirstOrDefaultAsync(s => s.EndpointName == nome, ct);
-        if (estado is null)
-        {
-            estado = new EndpointHealthState { EndpointName = nome };
-            db.EndpointHealthStates.Add(estado);
-        }
-
-        var avaliacao = AvaliadorIncidente.Avaliar(estado, saudavel: !muda, agora, Limiares);
-        if (muda) estado.LastFailureMessage = "PONTE_MUDA";
-
-        switch (avaliacao.Decisao)
-        {
-            case DecisaoIncidente.Abrir:
-            case DecisaoIncidente.Reavisar:
-                logger.LogWarning(
-                    "Ponte WPPConnect muda: a empresa {EmpresaId} está conectada e tem mensagem recebida que não chegou ao webhook.",
-                    empresaId);
-                await publicador.PublicarAsync(ComponenteIncidente.Integracao, EstadoIncidente.ComProblema,
-                    SeveridadeIncidente.Alta, avaliacao.DesdeUtc ?? agora, ct);
-                break;
-            case DecisaoIncidente.Resolver:
-                logger.LogInformation("Ponte WPPConnect voltou a entregar para a empresa {EmpresaId}.", empresaId);
-                await publicador.PublicarAsync(ComponenteIncidente.Integracao, EstadoIncidente.Normalizado,
-                    SeveridadeIncidente.Media, avaliacao.DesdeUtc ?? agora, ct);
-                break;
-        }
-
-        // O publicador commita a mesma unidade de trabalho; sem publicação ou sem decisão, o estado ainda precisa ser gravado.
-        await db.SaveChangesAsync(ct);
     }
 }

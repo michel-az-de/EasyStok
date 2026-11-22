@@ -24,7 +24,7 @@ public class VigiaPonteWppConnectTests
 
     public VigiaPonteWppConnectTests()
     {
-        _vigia = new VigiaPonteWppConnect(_cliente, _recebidos, new FakeTimeProvider(Agora));
+        _vigia = new VigiaPonteWppConnect(_cliente, _recebidos, new MemoriaVigiaPonteWppConnect(), new FakeTimeProvider(Agora));
         _cliente.ObterEstadoAsync(default!, default).ReturnsForAnyArgs(new EstadoWppConnect(true, true, true, "CONNECTED"));
         _recebidos.ObterAsync(default!, default!, default).ReturnsForAnyArgs((WebhookRecebido?)null);
     }
@@ -109,6 +109,24 @@ public class VigiaPonteWppConnectTests
 
         (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.NaoAvaliada);
         await _cliente.DidNotReceiveWithAnyArgs().ListarUltimasRecebidasAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task Conversa_ja_descartada_nao_gasta_consulta_na_rodada_seguinte()
+    {
+        // Revisão da #3132: três conversas no topo com última recebida fora da janela (cliente antigo para quem a
+        // loja escreveu) gastavam as três consultas em toda rodada e escondiam a conversa realmente muda.
+        var antigas = Enumerable.Range(0, 3).Select(i => new UltimaRecebidaWppConnect($"55119999900{i:00}@c.us", $"antiga-{i}")).ToList();
+        _cliente.ListarUltimasRecebidasAsync(default!, default, default)
+            .ReturnsForAnyArgs([.. antigas, new UltimaRecebidaWppConnect(Chat, Id)]);
+        foreach (var antiga in antigas)
+            _cliente.ListarMensagensRecentesAsync(Sessao, antiga.Chat, Arg.Any<CancellationToken>()).Returns(
+                [new MensagemRecenteWppConnect(antiga.MensagemId, Agora.AddDays(-3).ToUnixTimeSeconds(), false, "chat", "antiga")]);
+        _cliente.ListarMensagensRecentesAsync(Sessao, Chat, Arg.Any<CancellationToken>()).Returns(
+            [new MensagemRecenteWppConnect(Id, Agora.AddMinutes(-6).ToUnixTimeSeconds(), false, "chat", "texto do cliente")]);
+
+        (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Entregando);
+        (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Muda);
     }
 
     [Fact]

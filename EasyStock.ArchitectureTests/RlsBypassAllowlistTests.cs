@@ -128,7 +128,7 @@ public class RlsBypassAllowlistTests
 
         // #3117: o vigia da ponte WPPConnect muda lista, numa leitura curta sob bypass, as empresas com credencial ativa
         // da ponte (cross-tenant por natureza: so o id da empresa sai dali); cada empresa e avaliada num escopo proprio
-        // com o tenant ligado.
+        // com o tenant ligado. O estado (endpoint_health_state, fora da RLS) e o aviso rodam sob o bypass do orquestrador.
         "EasyStock.Infra.Postgre/Notifications/Collectors/ColetorPonteWppConnectMuda.cs",
 
         // #2180: os lembretes de pedido agendado listam candidatos de todas as empresas numa leitura curta sob bypass

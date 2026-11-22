@@ -185,16 +185,16 @@ faxina() {
 
 # #3117: em 21/11/2026 a ponte WPPConnect ficou conectada sem entregar mensagem por cinco horas. O deploy so
 # VERIFICA e avisa: nao reinicia a ponte (reiniciar sessao de WhatsApp arrisca QR e bloqueio do numero) e nao
-# muda o codigo de saida. Le o estado do container e o sinal do vigia (endpoint_health_state, wppconnect/<loja>
+# muda o codigo de saida (cada leitura tem teto de 10 s). Le o estado do container e o sinal do vigia (endpoint_health_state, wppconnect/<loja>
 # com incidente aberto). Sem a ponte na VPS, sai calado. O que fazer: docs/dev/incidentes/2026-11-21-ponte-wppconnect-muda.md
 verifica_ponte() {
   local c="${WPP_CONTAINER:-easystok-wppconnect-1}" estado mudas
-  estado=$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}sem{{end}}' "$c" 2>/dev/null) || return 0
+  estado=$(timeout 10 docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}sem{{end}}' "$c" 2>/dev/null) || return 0
   case "$estado" in
     "running healthy"|"running sem") ;;
     *) echo "AVISO: ponte WPPConnect ($c) esta '$estado'. O deploy NAO reinicia a ponte; veja docs/dev/incidentes/2026-11-21-ponte-wppconnect-muda.md" >&2 ;;
   esac
-  mudas=$(docker exec "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" -Atc \
+  mudas=$(timeout 10 docker exec "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" -Atc \
     "select count(*) from endpoint_health_state where endpoint_name like 'wppconnect/%' and last_alerted_at is not null" 2>/dev/null) || mudas=
   case "$mudas" in
     0) ;;
