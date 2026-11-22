@@ -1,3 +1,4 @@
+using FluentAssertions;
 using System.Text.Encodings.Web;
 using EasyStock.Api.Authentication;
 using EasyStock.Api.Middleware;
@@ -17,7 +18,7 @@ namespace EasyStock.Api.UnitTests.Middleware;
 /// #3096 (ADR-0013): a sessão do storefront roda em toda requisição. A leitura herda o cancelamento do
 /// cliente; a renovação pós-resposta não pode ser cancelada por ele.
 /// </summary>
-public class ClienteSessionCancelamentoTests
+public class ClienteSessionCancelamentoTests : IDisposable
 {
     private readonly IClienteSessionRepository _repo = Substitute.For<IClienteSessionRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -30,6 +31,8 @@ public class ClienteSessionCancelamentoTests
             .AddSingleton(_repo).AddSingleton(_uow).AddSingleton(_time).BuildServiceProvider();
         return new DefaultHttpContext { RequestServices = services, RequestAborted = _cts.Token };
     }
+
+    public void Dispose() => _cts.Dispose();
 
     private ClienteSession Sessao() => ClienteSession.Criar(Guid.NewGuid(), Guid.NewGuid(), _time);
 
@@ -45,7 +48,7 @@ public class ClienteSessionCancelamentoTests
         await new ClienteSessionMiddleware(_ => Task.CompletedTask).InvokeAsync(ctx);
 
         await _repo.Received(1).GetByIdAsync(sessao.Id, _cts.Token);
-        await _repo.Received(1).UpdateAsync(sessao, CancellationToken.None);
+        await _repo.Received(1).UpdateAsync(sessao, Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
     }
 
@@ -65,5 +68,43 @@ public class ClienteSessionCancelamentoTests
         await handler.AuthenticateAsync();
 
         await _repo.Received(1).GetByIdAsync(sessao.Id, _cts.Token);
+    }
+
+    [Fact]
+    public async Task Middleware_com_pedido_cancelado_propaga_o_cancelamento_e_nao_grava()
+    {
+        var sessao = Sessao();
+        _cts.Cancel();
+        _repo.GetByIdAsync(sessao.Id, _cts.Token).Returns<ClienteSession?>(_ => throw new OperationCanceledException(_cts.Token));
+        var ctx = Ctx();
+        ctx.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            [new System.Security.Claims.Claim("sid", sessao.Id.ToString())], ClienteSessionAuthenticationHandler.SchemeName));
+
+        var acao = () => new ClienteSessionMiddleware(_ => Task.CompletedTask).InvokeAsync(ctx);
+
+        await acao.Should().ThrowAsync<OperationCanceledException>();
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Handler_com_pedido_cancelado_propaga_o_cancelamento_e_nao_autentica()
+    {
+        var sessao = Sessao();
+        _cts.Cancel();
+        _repo.GetByIdAsync(sessao.Id, _cts.Token).Returns<ClienteSession?>(_ => throw new OperationCanceledException(_cts.Token));
+        var ctx = Ctx();
+        ctx.Request.Headers.Cookie = $"{ClienteSessionAuthenticationHandler.CookieName}={sessao.Id}";
+        var options = Substitute.For<IOptionsMonitor<AuthenticationSchemeOptions>>();
+        options.Get(Arg.Any<string>()).Returns(new AuthenticationSchemeOptions());
+        var handler = new ClienteSessionAuthenticationHandler(options, NullLoggerFactory.Instance, UrlEncoder.Default);
+        await handler.InitializeAsync(
+            new AuthenticationScheme(ClienteSessionAuthenticationHandler.SchemeName, null, typeof(ClienteSessionAuthenticationHandler)), ctx);
+
+        AuthenticateResult? resultado = null;
+        var acao = async () => resultado = await handler.AuthenticateAsync();
+
+        await acao.Should().ThrowAsync<OperationCanceledException>();
+        resultado.Should().BeNull("o cancelamento não pode virar Success");
     }
 }
