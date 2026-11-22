@@ -102,7 +102,20 @@ public sealed class QuitacaoPedido(
                 cobranca.Provedor, cobranca.PagamentoExternoId!, cobranca.MetodoPagamento!, cobranca.ValorPago!.Value,
                 pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
         return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
-            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
+            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await CanhotoDaQuitacaoAsync(pedido, agora, ct));
+    }
+
+    /// <summary>
+    /// #3168: o pedido que já tem canhoto (entrou na fila a receber ou foi reimpresso) não ganha outro na quitação; a equipe ainda
+    /// precisa saber que ele foi pago. Só os caminhos de quitação passam aqui, depois do saldo e do marco (#3002).
+    /// </summary>
+    private async Task<ImpressaoPendenteOperacao?> CanhotoDaQuitacaoAsync(Pedido pedido, DateTime agora, CancellationToken ct)
+    {
+        var impressao = await PrepararCanhotoAsync(pedido, agora, ct);
+        if (impressao is null && notificador is not null)
+            await new PublicadorAvisoEquipe(notificador).PedidoComCanhotoAsync(
+                pedido.EmpresaId, pedido.Id, pedido.ClienteNome, pedido.Total.Valor, ct, pagoDepois: true);
+        return impressao;
     }
 
     /// <param name="aReceber">#3002: quanto falta receber quando o pedido entra na fila sem pagar; zero é quitado.</param>
@@ -129,7 +142,7 @@ public sealed class QuitacaoPedido(
             new PedidoPagoEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, pedido.ClienteId, conversaId, Guid.Empty,
                 "credito_cliente", "cupom", "cupom", 0m, pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
         return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
-            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
+            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await CanhotoDaQuitacaoAsync(pedido, agora, ct));
     }
 
     /// <summary>

@@ -104,6 +104,28 @@ public class TrocarFormaPagamentoPixDiretoTests
     }
 
     [Fact]
+    public async Task PagoDepoisDeEntrarNaFila_AvisaAEquipeQueFoiPago_SoNaQuitacao()
+    {
+        // #3168: o canhoto já existia desde a fila, e a quitação saía sem avisar a equipe.
+        var f = Cenario();
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+        f.ImpressaoRepo.ExisteCanhotoAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(true);
+        // #3002: antes de pagar, nenhum aviso sem "aReceber" (o template leria como "pago").
+        await f.Notificador.DidNotReceive().EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, f.EmpresaId,
+            Arg.Is<string>(p => !p.Contains("aReceber")), Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>());
+
+        await f.RegistrarManual().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", 25m,
+            RegistradoPorUserId: Usuario, RegistradoPorNome: "Operadora"));
+
+        await f.Notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, f.EmpresaId,
+            Arg.Is<string>(p => !p.Contains("aReceber")), f.Pedido.Id, Arg.Any<CancellationToken>(),
+            $"aviso-equipe-canhoto-pago:{f.Pedido.Id:N}");
+        await f.Notificador.Received(2).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, f.EmpresaId,
+            Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>());
+        await f.ImpressaoRepo.Received(1).AddAsync(Arg.Any<EasyStock.Domain.Entities.Operacao.ImpressaoPendente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task MesmaFormaPendente_Reutiliza()
     {
         var f = Cenario();
