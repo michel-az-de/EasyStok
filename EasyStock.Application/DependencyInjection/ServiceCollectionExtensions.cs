@@ -38,7 +38,8 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockFinanceiroUseCases()
             .AddEasyStockStorefrontUseCases()
             .AddEasyStockAdminStorefrontUseCases()
-            .AddEasyStockIntegracoesUseCases();
+            .AddEasyStockIntegracoesUseCases()
+            .AddEasyStockPrimeirosPassosUseCases();
 
         return services;
     }

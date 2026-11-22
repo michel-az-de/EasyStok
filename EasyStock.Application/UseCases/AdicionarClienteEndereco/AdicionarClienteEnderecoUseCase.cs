@@ -1,3 +1,5 @@
+using EasyStock.Domain.ValueObjects;
+
 namespace EasyStock.Application.UseCases.AdicionarClienteEndereco;
 
 public sealed record AdicionarClienteEnderecoCommand(
@@ -33,6 +35,26 @@ public class AdicionarClienteEnderecoUseCase(
             foreach (var outro in cliente.Enderecos.Where(e => e.Padrao)) outro.Padrao = false;
 
         var agora = DateTime.UtcNow;
+        // #3186: o mesmo CEP (com ou sem máscara), rua e número é o mesmo endereço; sem repetir na lista. O complemento
+        // vem como chegou (pode ser apagado); o resto nulo preserva o salvo. Sem logradouro não há o que comparar.
+        var igual = string.IsNullOrWhiteSpace(cmd.Logradouro) ? null : cliente.Enderecos.FirstOrDefault(e =>
+            EnderecoBr.NormalizarCep(e.Cep) == EnderecoBr.NormalizarCep(cmd.Cep)
+            && Igual(e.Logradouro, cmd.Logradouro) && Igual(e.Numero, cmd.Numero));
+        if (igual is not null)
+        {
+            igual.Complemento = cmd.Complemento;
+            igual.Bairro = cmd.Bairro ?? igual.Bairro;
+            igual.Cidade = cmd.Cidade ?? igual.Cidade;
+            igual.Estado = cmd.Estado ?? igual.Estado;
+            igual.Referencia = cmd.Referencia ?? igual.Referencia;
+            igual.Padrao = igual.Padrao || cmd.Padrao;
+            igual.AlteradoEm = agora;
+            cliente.AlteradoEm = agora;
+            await repo.UpdateAsync(cliente);
+            await uow.CommitAsync();
+            return igual.Id;
+        }
+
         var endereco = new ClienteEndereco
         {
             Id = Guid.NewGuid(),
@@ -60,4 +82,7 @@ public class AdicionarClienteEnderecoUseCase(
         logger.LogInformation("Endereco {Id} adicionado ao cliente {ClienteId}.", endereco.Id, cliente.Id);
         return endereco.Id;
     }
+
+    private static bool Igual(string? a, string? b) =>
+        string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 }
