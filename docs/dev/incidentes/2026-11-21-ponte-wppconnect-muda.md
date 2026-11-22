@@ -21,7 +21,7 @@ A ligação com o deploy das 20:13 é só de horário: a parada começou antes e
 | Incidente `Integracao` (`PONTE_MUDA`) | Worker, coletor `ColetorPonteWppConnectMuda` | a ponte enxerga mensagem recebida que o webhook não recebeu |
 | `AVISO: ponte WPPConnect ...` | fim do `vps-deploy.sh` | contêiner fora de `running healthy` ou loja com incidente aberto |
 
-O vigia compara a última mensagem recebida de cada conversa individual (na ponte) com `webhooks_recebidos`.
+O vigia compara a última mensagem recebida de cada conversa individual (na ponte) com `webhook_recebidos`.
 Não mede silêncio: madrugada sem tráfego não abre incidente. Estado em `endpoint_health_state`, nome
 `wppconnect/<empresa>`. Abre na primeira rodada muda (até 10 min depois da mensagem) e resolve depois de duas
 rodadas boas.
@@ -32,9 +32,20 @@ Limites conhecidos:
 - O aviso vai para a empresa padrão (dono da plataforma), não para o dono da loja, e é um por rodada: não diz
   qual loja. A loja está no log `Ponte WPPConnect muda` e em `endpoint_health_state`.
 - Mensagem que a ponte entregou e a API recusou (400 do parser, 503 do telefone do LID) NÃO é ponte muda: o webhook
-  grava a marca de entrega (`webhooks_recebidos`, provedor `wppconnect_entrega`) antes do parser.
+  grava a marca de entrega (`webhook_recebidos`, provedor `wppconnect_entrega`) antes do parser.
 - Loja que desliga o módulo ou perde a credencial tem o estado apagado e o incidente fechado. Ponte desconectada ou
-  fora do ar numa rodada não muda o estado.
+  fora do ar numa rodada não muda o estado. Desconectada ou sem resposta por 30 minutos, em pelo menos seis leituras seguidas, sai do
+  vigia: o estado é apagado, o incidente fecha e o deploy para de dizer "muda". A desconexão aparece na tela de
+  integração (#3138).
+- Mensagem sem registro só conta como ponte muda se nada foi entregue depois dela e se o Worker já via a ponte
+  conectada quando ela chegou (#3138). Reconexão só conta depois de duas leituras desconectadas seguidas (uma só é
+  oscilação); o que ficou de antes dela não segura o incidente. Ponte que perde parte das mensagens e entrega o
+  resto NÃO é detectada: a entrega posterior esconde a perda.
+  Depois de reiniciar o Worker (todo deploy), a suspeita anterior deixa a rodada sem conclusão: o incidente aberto
+  não fecha sozinho e um novo só abre com mensagem nova.
+- Queda e volta da ponte entre duas rodadas (5 min) não é vista: a mensagem sincronizada nesse intervalo conta como
+  muda até a próxima entrega. A suspeita só é vista enquanto a conversa está entre as 20 mais recentes. As contagens
+  vivem na memória do Worker.
 - Desligar a flag com incidente aberto deixa o estado `wppconnect/<empresa>` parado e o deploy segue avisando: antes
   de desligar, espere normalizar ou apague essas linhas (mudança de produção: com GO).
 - Nada aqui recupera as mensagens da parada: isso está em issue própria.
