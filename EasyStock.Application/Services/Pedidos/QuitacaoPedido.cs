@@ -106,7 +106,7 @@ public sealed class QuitacaoPedido(
     }
 
     /// <summary>
-    /// #3168: o pedido que entrou na fila a receber já tem canhoto, então a quitação não cria outro; a equipe ainda
+    /// #3168: o pedido que já tem canhoto (entrou na fila a receber ou foi reimpresso) não ganha outro na quitação; a equipe ainda
     /// precisa saber que ele foi pago. Só os caminhos de quitação passam aqui, depois do saldo e do marco (#3002).
     /// </summary>
     private async Task<ImpressaoPendenteOperacao?> CanhotoDaQuitacaoAsync(Pedido pedido, DateTime agora, CancellationToken ct)
