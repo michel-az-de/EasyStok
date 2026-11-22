@@ -412,7 +412,7 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
-    public async Task Retomada_FreteACombinarESaudacao_OrientaANaoAfirmarFreteERespondeSemEscalar()
+    public async Task Retomada_FreteACombinarESaudacao_OrientaANaoAfirmarFrete()
     {
         FreteCombinadoPelaEquipeESaudacaoHa(AlemDoPrazo);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("Boa noite! Em que posso ajudar?"));
@@ -421,9 +421,12 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: true, Escalou: false));
         await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
-        var orientacao = _requisicoes.Should().ContainSingle().Subject.SystemVolatil!;
-        orientacao = orientacao[orientacao.IndexOf(RetomadaDoAssistente.MarcaNoPrompt, StringComparison.Ordinal)..];
-        orientacao.Should().Contain("frete").And.Contain("Sem uma ferramenta deste turno mostrar, não diga que frete")
+        var volatil = _requisicoes.Should().ContainSingle().Subject.SystemVolatil!;
+        var marca = volatil.IndexOf(RetomadaDoAssistente.MarcaNoPrompt, StringComparison.Ordinal);
+        volatil[..marca].Should().Contain("R$ 8,00", "o dossiê do incidente leva o frete combinado ao modelo");
+        var orientacao = volatil[marca..];
+        orientacao.Should().Contain("Sem uma ferramenta deste turno mostrar, não afirme nada como combinado ou acertado sobre frete")
+            .And.Contain("Se for só um cumprimento", "a frase sobre a equipe fica para a mensagem com pedido")
             .And.Contain("mensagens automáticas", "o frete combinado do dossiê não se repete ao cliente")
             .And.Contain("pergunte em que pode ajudar", "saudação não reabre o assunto que estava com a equipe");
     }
