@@ -15,7 +15,9 @@ services:
     entrypoint: ['flock', '-n', '/usr/src/wpp-server/userDataDir/.easystok.lock', 'node', '--require', './easystok.cjs', 'dist/server.js']
     environment:
       SECRET_KEY: '${WPP_SECRET_KEY:?Informe WPP_SECRET_KEY}'
-      WEBHOOK_URL: 'http://api:8080/api/webhooks/wppconnect?token=${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
+      WEBHOOK_URL: http://api:8080/api/webhooks/wppconnect
+      # #3097: assina o corpo do callback (X-Webhook-Hmac) no preload; o segredo não vai na URL.
+      WPP_WEBHOOK_TOKEN: '${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
       WEBHOOK_RETRY_ATTEMPTS: '5'
       WEBHOOK_RETRY_DELAY: '5000'
       MANAGER_ENABLED: 'false'

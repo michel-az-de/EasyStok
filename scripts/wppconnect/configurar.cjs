@@ -28,6 +28,22 @@ config.createOptions.browserArgs = ['--no-sandbox', '--disable-dev-shm-usage']
 // A versão fixada só repete falhas de rede. Repetir também recusas temporárias
 // da nossa API; a idempotência do webhook impede duplicar mensagens já gravadas.
 const http = require('axios')
+// #3097: o segredo não vai mais na URL do callback (ela aparece em log de erro do servidor). O corpo
+// sai assinado com HMAC sha512 em X-Webhook-Hmac, como no WAHA. Serializamos aqui e desligamos a
+// transformação do axios para que o byte assinado seja o byte enviado. Sem chave, não sobe: sem
+// assinatura a API recusa com 401, que não é repetido, e as mensagens se perderiam caladas.
+const chaveWebhook = process.env.WPP_WEBHOOK_TOKEN
+if (!chaveWebhook || chaveWebhook.length < 16) throw new Error('Informe WPP_WEBHOOK_TOKEN com 16 caracteres ou mais')
+const crypto = require('node:crypto')
+http.interceptors.request.use(requisicao => {
+  if (requisicao.url !== config.webhook.url) return requisicao
+  const corpo = typeof requisicao.data === 'string' ? requisicao.data : JSON.stringify(requisicao.data)
+  requisicao.data = corpo
+  requisicao.transformRequest = [dado => dado]
+  requisicao.headers['Content-Type'] = 'application/json'
+  requisicao.headers['X-Webhook-Hmac'] = crypto.createHmac('sha512', chaveWebhook).update(corpo, 'utf8').digest('hex')
+  return requisicao
+})
 http.interceptors.response.use(undefined, async erro => {
   const requisicao = erro.config
   const status = erro.response?.status
