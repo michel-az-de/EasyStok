@@ -39,7 +39,14 @@ public sealed class ProcessarWebhookWppConnectUseCase(
         var contato = WppConnectWebhookParser.Texto(root, evento == "onselfmessage" ? "to" : "from");
         if (contato?.EndsWith("@lid", StringComparison.Ordinal) == true)
             telefone = await cliente.ResolverTelefoneAsync(sessao, contato, ct);
-        rawBody = await IdAusenteWppConnect.CompletarAsync(rawBody, sessao, cliente, ct);
+        var completo = await IdAusenteWppConnect.CompletarAsync(rawBody, sessao, cliente, ct);
+        // #3138: o evento chegou sem id e só agora tem o que marcar.
+        if (!ReferenceEquals(completo, rawBody))
+        {
+            using var comId = JsonDocument.Parse(completo);
+            await MarcarEntregaAsync(comId.RootElement, nome, ct);
+            rawBody = completo;
+        }
         var normalizado = WppConnectWebhookParser.Parse(rawBody, telefone, sessao.InicioDaCaptura);
         // #3117: aceito e sem o que gravar. Responde 200 como antes, mas agora diz por quê.
         if (normalizado.Descarte is { } motivo)

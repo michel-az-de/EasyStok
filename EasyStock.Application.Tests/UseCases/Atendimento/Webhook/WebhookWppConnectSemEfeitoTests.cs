@@ -44,6 +44,7 @@ public class WebhookWppConnectSemEfeitoTests
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly LoggerCapturado<ProcessarWebhookWppConnectUseCase> _logPonte = new();
     private readonly LoggerCapturado<ProcessarEventoWhatsAppUseCase> _logEvento = new();
+    private readonly IWppConnectSessaoClient _ponte = Substitute.For<IWppConnectSessaoClient>();
     private readonly ProcessarWebhookWppConnectUseCase _useCase;
 
     private string Sessao => CredencialWppConnect.NomeSessao(_empresaId);
@@ -63,7 +64,7 @@ public class WebhookWppConnectSemEfeitoTests
         var evento = new ProcessarEventoWhatsAppUseCase(_empresas, _flags, null!, _conversas, _recebidos, null!, null!, null!,
             tenant, _unitOfWork, null!, null!, null!, null!, null!, null!, TimeProvider.System, _logEvento,
             metricas: _metricas);
-        _useCase = new ProcessarWebhookWppConnectUseCase(_credenciais, tenant, Substitute.For<IWppConnectSessaoClient>(),
+        _useCase = new ProcessarWebhookWppConnectUseCase(_credenciais, tenant, _ponte,
             evento, logger: _logPonte, metricas: _metricas, recebidos: _recebidos);
     }
 
@@ -80,6 +81,49 @@ public class WebhookWppConnectSemEfeitoTests
         await agir.Should().ThrowAsync<FormatException>();
         await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
             $"wpp:{Sessao}:false_123456789012345@lid_ABC", Arg.Is<string>(h => h.Length == 64), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>#3138 (d): a ponte entregou; o 503 do telefone do LID é recusa da API, não ponte muda.</summary>
+    [Fact]
+    public async Task Telefone_do_lid_sem_resposta_ja_deixou_a_marca_de_entrega()
+    {
+        _ponte.ResolverTelefoneAsync(default!, default!, default).ThrowsAsyncForAnyArgs(new HttpRequestException("503"));
+
+        var agir = () => _useCase.ExecuteAsync(Mensagem("onmessage", "123456789012345@lid", 1793000100));
+
+        await agir.Should().ThrowAsync<HttpRequestException>();
+        await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            $"wpp:{Sessao}:false_123456789012345@lid_ABC", Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// #3138 (d): o evento chega sem id e só o ganha depois de consultar a conversa. Sem a marca depois disso, o vigia
+    /// veria como muda uma ponte que entregou.
+    /// </summary>
+    [Fact]
+    public async Task Evento_sem_id_recebe_a_marca_de_entrega_depois_de_completado()
+    {
+        _flags.ListarAtivasAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(Array.Empty<string>());
+        const string id = "false_5511999999999@c.us_XYZ";
+        _ponte.ListarMensagensRecentesAsync(default!, default!, default).ReturnsForAnyArgs(
+            [new MensagemRecenteWppConnect(id, 1793000100, false, "chat", Texto)]);
+        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"{{{Telefone}}}@c.us","to":"{{{Telefone}}}@c.us","fromMe":false,"type":"chat","body":"{{{Texto}}}","t":1793000100}""";
+
+        await _useCase.ExecuteAsync(raw);
+
+        await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            $"wpp:{Sessao}:{id}", Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Mensagem_com_id_grava_a_marca_de_entrega_uma_vez_so()
+    {
+        _flags.ListarAtivasAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(Array.Empty<string>());
+
+        await _useCase.ExecuteAsync(Mensagem("onmessage", $"{Telefone}@c.us", 1793000100));
+
+        await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
