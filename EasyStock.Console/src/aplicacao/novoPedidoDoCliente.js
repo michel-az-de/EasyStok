@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { useAcoes, useAtendimento, useCatalogo } from './contextos'
+import { useContext, useRef, useState } from 'react'
+import { ContextoCatalogo, useAcoes, useAtendimento } from './contextos'
 import { lerSessao } from '../infra/api/sessao'
 import { useAcessoModulos } from './acessoModulos'
 import { motivoDoNovoPedido, novoPedidoDisponivel, rotuloDoNovoPedido } from './janelaDoPedido'
@@ -16,8 +16,9 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   // Ler a janela refaz o render ao abrir e ao fechar (Registrar e Descartar também fecham): o rótulo acompanha o rascunho.
   useAtendimento()
   const disponivel = Boolean(abrirJanelaDoPedido) && novoPedidoDisponivel({ abrirConversaDoCliente, permite, acoes })
-  // #3154: loja online desligada; quem mostra o botão pode desligá-lo com este motivo.
-  const motivo = motivoDoNovoPedido(useCatalogo())
+  // #3154: loja online desligada; quem mostra o botão pode desligá-lo com este motivo. O catálogo é opcional: telas montadas
+  // só com estado e ações (provas de Cadastros) seguem sem motivo.
+  const motivo = motivoDoNovoPedido(useContext(ContextoCatalogo))
   const [abrindo, marcarAbrindo] = useState(null)
   const [erro, falhar] = useState(null)
   const emVoo = useRef(false)
