@@ -22,7 +22,7 @@ const ate = async (condicao, msg) => {
 
 const base = (i, extra) => ({
   id: extra.id, numeroDoDia: i, clienteId: extra.clienteId ?? `cli-${i}`, clienteNome: extra.nome, clienteTelefone: '11999990000',
-  status: extra.status, total: extra.total ?? 80, totalPago: 0, aReceber: extra.aReceber ?? 80, origem: 'whatsapp',
+  status: extra.status, total: extra.total ?? 80, totalPago: extra.totalPago ?? 0, aReceber: extra.aReceber ?? 80, origem: 'whatsapp',
   criadoEm: new Date(agora.getTime() - i * 60000).toISOString(), agendadoParaEm: extra.agendadoParaEm ?? null,
   enderecoEntrega: extra.enderecoEntrega ?? null,
 })
@@ -31,7 +31,8 @@ const modelo = () => [
   base(2, { id: 'p-rascunho', nome: 'Bruno Lima', status: 'rascunho' }),
   base(3, { id: 'p-baba', nome: 'Carla Souza', status: 'aguardando_aprovacao_baba' }),
   base(4, { id: 'p-aguardando', nome: 'Diego Alves', status: 'aguardando_pagamento' }),
-  base(5, { id: 'p-cancelado', nome: 'Elisa Prado', status: 'cancelado', aReceber: 0 }),
+  // Cancelado com R$ 50,00 recebido e a API ainda dizendo aReceber: o detalhe não mostra saldo (revisão da #3144).
+  base(5, { id: 'p-cancelado', nome: 'Elisa Prado', status: 'cancelado', total: 132.3, totalPago: 50, aReceber: 132.3 }),
   base(6, { id: 'p-bia', nome: 'Bia Rocha', status: 'pronto', clienteId: 'cli-bia' }),
 ]
 const detalheDe = (p) => ({
@@ -148,6 +149,9 @@ const abrirDe = (painel, numero) => painel.getByRole('button', { name: new RegEx
   const cancelado = page.getByRole('dialog', { name: /^Pedido Nº 005 de/ })
   await cancelado.waitFor()
   assert.equal(await cancelado.getByRole('button', { name: 'Registrar pagamento' }).count(), 0, 'cancelado sem botão')
+  const textoCancelado = norm(await cancelado.innerText())
+  assert.doesNotMatch(textoCancelado, /Falta receber/, 'cancelado sem saldo a receber, nunca R$ 132,30')
+  assert.match(textoCancelado, /R\$ 50,00/, 'cancelado mostra o que foi recebido')
   await page.keyboard.press('Escape'); await cancelado.waitFor({ state: 'hidden' })
   await abrirDe(painel, 6).click()
   const bia = page.getByRole('dialog', { name: /^Pedido Nº 006 de/ })

@@ -238,7 +238,9 @@ export function pagamentoNoDetalhe(pedido) {
   const falta = typeof pedido.aReceber === 'number' ? Math.max(pedido.aReceber, 0) : (situacaoDoPagamento(pedido)?.falta ?? 0)
   if (centavos(falta) === 0) {
     const pago = centavos(pedido.totalPago), total = centavos(pedido.total)
-    return { texto: total > 0 && pago < total ? 'Quitado' : pago > total ? `Recebido ${moeda((pago - total) / 100)} a mais` : 'Pago', falta: 0, botao: null }
+    // Saldo zero sem nenhum pagamento é o quitado do histórico; com pagamento menor que o total, o cupom ou o estorno
+    // fecharam a conta: "Pago" (revisão da #3144).
+    return { texto: total > 0 && pago === 0 ? 'Quitado' : pago > total ? `Recebido ${moeda((pago - total) / 100)} a mais` : 'Pago', falta: 0, botao: null }
   }
   const motivo = MOTIVOS_SEM_BAIXA_NO_DETALHE[pedido.status]
   return { texto: `Falta receber ${moeda(falta)}`, falta, botao: motivo ? { ligado: false, motivo } : { ligado: true, valor: falta } }
