@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Integration;
@@ -49,14 +50,17 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
     private readonly IOutboxEventoIntegracaoRepository _repo;
     private readonly IUnitOfWork _uow;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ITenantContextAccessor _tenant;
     private readonly ILogger<IntegrationEventDispatcher> _logger;
 
     public IntegrationEventDispatcher(
         IOutboxEventoIntegracaoRepository repo,
         IUnitOfWork uow,
         IServiceProvider serviceProvider,
+        ITenantContextAccessor tenant,
         ILogger<IntegrationEventDispatcher> logger)
     {
+        _tenant = tenant;
         _repo = repo;
         _uow = uow;
         _serviceProvider = serviceProvider;
@@ -99,6 +103,10 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
 
         try
         {
+            // #3108: o lote é lido sob bypass e o Worker não tem tenant. Cada evento roda com o tenant dele: a
+            // policy de outbox_evento_integracao só aceita o UPDATE de estado assim, e o handler que não fixa
+            // tenant deixa de herdar o do evento anterior do lote.
+            _tenant.SetCurrentTenant(evt.EmpresaId);
             evt.MarcarEmEnvio();
             await _repo.UpdateAsync(evt, ct);
             await _uow.CommitAsync();
@@ -155,6 +163,8 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
         {
             try
             {
+                // O estado final é gravado no tenant do evento, não no que o handler deixou no escopo.
+                _tenant.SetCurrentTenant(evt.EmpresaId);
                 await _repo.UpdateAsync(evt, ct);
                 await _uow.CommitAsync();
             }

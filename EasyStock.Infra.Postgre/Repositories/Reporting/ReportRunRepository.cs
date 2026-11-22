@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 
 namespace EasyStock.Infra.Postgre.Repositories.Reporting;
 
@@ -131,9 +132,9 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         //      o LIMIT externo vai DENTRO do SQL e a coluna é aliased "Value" (convenção
         //      do EF para SqlQuery escalar).
         //
-        // report_runs usa coluna snake_case (empresa_id) → fora da policy RLS (que só
-        // pega colunas "EmpresaId" PascalCase), então o picker enxerga runs de todos os
-        // tenants sem precisar de bypass. É o comportamento cross-tenant desejado.
+        // #3108: report_runs tem a policy tenant_isolation. O picker atravessa empresas por
+        // natureza (o Worker não tem tenant), então lê sob bypass; só devolve ids.
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
         const string sql = """
             SELECT id AS "Value"
               FROM (
@@ -187,6 +188,29 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         return result;
     }
 
+    public async Task<ReportRun?> TryStartAsync(Guid runId, TimeSpan leaseDuration, CancellationToken ct)
+    {
+        // #3108: a reserva acontece antes de existir o tenant da execução (IReportExecutionScope.Begin vem
+        // depois, com a empresa da run). Bypass ligado antes de abrir a transação e só durante ela.
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
+
+        // Transação aberta como sempre foi no runner. Com EnableRetryOnFailure ela lança na primeira consulta
+        // (#3141); o conserto religa o runner e fica para lá, junto com o FecharAsync.
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+
+        if (!await TryAcquireLockAsync(runId, ct)) return null;
+
+        var run = await GetByIdAsync(runId, ct);
+        if (run is null || !run.TryStart(leaseDuration)) return null;
+
+        // GetByIdAsync le sem tracking: sem marcar Modified o TryStart nao era gravado,
+        // a run seguia Pending, voltava no proximo polling e rodava em duplicata (#1507).
+        db.Entry(run).State = EntityState.Modified;
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return run;
+    }
+
     /// <summary>
     /// Heartbeat: estende o lease somente se ainda sou o dono (B-03 fix).
     /// </summary>
@@ -216,6 +240,9 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
     /// </summary>
     public async Task<ReportRunReciclagem> ReclaimExpiredLeasesAsync(CancellationToken ct)
     {
+        // #3108: o watchdog recicla runs de todas as empresas; sem bypass os UPDATEs afetam zero linhas, sem erro.
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
+
         // G-15: apenas 1 worker executa o watchdog por vez.
         var gotLock = await db.Database
             .SqlQueryRaw<bool>(
@@ -290,6 +317,8 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         // watchdog fazia uma SEGUNDA query Take(batchSize) sem OrderBy para obter as storage
         // keys, e o Postgres não garante o mesmo conjunto entre dois Take(N) quando há mais
         // elegíveis que batchSize — arquivos deletados divergiam das linhas zeradas no DB.
+        // #3108: GC de todas as empresas, sob bypass (cobre a leitura e o SaveChanges).
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
         var expiredRuns = await db.ReportRuns
             .Where(r =>
                 r.Status == ReportStatus.Succeeded &&

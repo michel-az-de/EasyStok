@@ -1,9 +1,15 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
+/// <summary>
+/// As leituras do Worker (lote de pendentes e reclamação de presos) atravessam empresas por natureza e rodam
+/// sob bypass de RLS (#3108): a tabela tem a policy <c>tenant_isolation</c> e o Worker não tem tenant. O
+/// processamento de cada evento segue com o tenant do evento, fixado pelo dispatcher.
+/// </summary>
 public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IOutboxEventoIntegracaoRepository
 {
     public Task AddAsync(OutboxEventoIntegracao evento, CancellationToken ct = default)
@@ -27,6 +33,7 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
         CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
         return await db.Set<OutboxEventoIntegracao>()
             .IgnoreQueryFilters()
             .Where(e => e.ShardKey == shardKey
@@ -42,6 +49,7 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
         CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
         return await db.Set<OutboxEventoIntegracao>()
             .IgnoreQueryFilters()
             .Where(e => e.Status == StatusOutboxIntegracao.Pendente
@@ -77,6 +85,7 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
     public async Task<int> ReclamarEmEnvioExpiradosAsync(int max, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
         var presos = await db.Set<OutboxEventoIntegracao>()
             .IgnoreQueryFilters()
             .Where(e => e.Status == StatusOutboxIntegracao.EmEnvio

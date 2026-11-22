@@ -1,5 +1,6 @@
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -79,6 +80,9 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // #3108: a retenção apaga auditoria vencida de todas as empresas. entity_alteracoes tem a policy
+        // tenant_isolation; sem bypass o DELETE apagaria zero linhas e a retenção pararia sem erro.
+        await using var bypass = await db.UseRowLevelSecurityBypassAsync(ct);
 
         var now = DateTime.UtcNow;
         var totalDeleted = 0;

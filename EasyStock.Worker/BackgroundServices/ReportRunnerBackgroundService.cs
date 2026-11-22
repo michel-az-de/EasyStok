@@ -8,7 +8,6 @@ using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Async.Reporting;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -147,32 +146,14 @@ public sealed class ReportRunnerBackgroundService(
         // Transação de start: advisory lock + TryStart + commit.
         using (var startScope = serviceProvider.CreateScope())
         {
-            var db   = startScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var repo = startScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
 
-            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-
-            bool locked = await repo.TryAcquireLockAsync(runId, ct);
-            if (!locked)
+            run = await repo.TryStartAsync(runId, leaseDuration, ct);
+            if (run is null)
             {
-                logger.LogDebug("ReportRunner: advisory lock falhou para run {RunId} — outra instância pegou.", runId);
-                await tx.RollbackAsync(ct);
+                logger.LogDebug("ReportRunner: run {RunId} já foi pega por outra instância ou saiu de Pending.", runId);
                 return;
             }
-
-            run = await repo.GetByIdAsync(runId, ct);
-            if (run is null || !run.TryStart(leaseDuration))
-            {
-                logger.LogDebug("ReportRunner: run {RunId} já foi processada ou está em estado inválido.", runId);
-                await tx.RollbackAsync(ct);
-                return;
-            }
-
-            // GetByIdAsync le sem tracking: sem marcar Modified o TryStart nao era gravado,
-            // a run seguia Pending, voltava no proximo polling e rodava em duplicata (#1507).
-            db.Entry(run).State = EntityState.Modified;
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
         }
 
         // Métricas de início.
