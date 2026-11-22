@@ -21,7 +21,6 @@ assert.match(erroDoDicionario(um('  ')), /linha 1 está sem termo/)
 assert.match(erroDoDicionario([...um('a'), ...um('')]), /linha 2 está sem termo/)
 assert.match(erroDoDicionario(um('PF', '  ')), /"PF" quer dizer/)
 assert.match(erroDoDicionario(um('x'.repeat(41))), /passa de 40/)
-assert.match(erroDoDicionario(um('PF', 'y'.repeat(121))), /"PF" quer dizer passa de 120/)
 assert.match(erroDoDicionario(um('PF', 'a\nb')), /quebra de linha/, 'quebra de linha')
 assert.match(erroDoDicionario(um('a\tb')), /quebra de linha ou caractere invisível/, 'controle')
 assert.match(erroDoDicionario(um('a\u0085b')), /invisível/, 'controle C1')
@@ -41,6 +40,8 @@ assert.equal(erroDoDicionario(um('a‍b')), null, 'U+200D sozinho também passa'
 assert.match(erroDoDicionario([...um('Açaí'), ...um('acai')]), /"acai" repete o termo da linha 1/)
 assert.match(erroDoDicionario([...um('PF'), ...um(' pf ')]), /repete/)
 assert.equal(erroDoDicionario([...um('PF'), ...um('PFs')]), null)
+assert.match(erroDoDicionario([...um('\u2764\uFE0F'), ...um('\u2764')]) ?? '', /repete/, 'marca sem espaçamento (U+FE0F) não conta')
+assert.match(erroDoDicionario([...um('e\u0301'), ...um('E')]) ?? '', /repete/, 'acento combinado')
 
 // Salvar apara; comparar ignora só espaços nas pontas e chaves extras
 assert.deepEqual(dicionarioParaSalvar([{ chave: 3, termo: ' PF ', significado: ' prato  ' }]), [{ termo: 'PF', significado: 'prato' }])

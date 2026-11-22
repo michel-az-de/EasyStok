@@ -72,5 +72,7 @@ export function useDicionarioDaLoja(ativo) {
   }, [ativo, versao])
 
   const recarregar = useCallback(() => setVersao((v) => v + 1), [])
-  return { carregando: ativo && estado.versaoLida !== versao, dicionario: estado.dicionario, leitura: estado.leitura, erro: estado.versaoLida === versao ? estado.erro : null, recarregar }
+  // `definir`: o que o PUT acabou de gravar vira o valor salvo, sem outra leitura.
+  const definir = useCallback((dicionario) => setEstado((a) => ({ ...a, dicionario })), [])
+  return { carregando: ativo && estado.versaoLida !== versao, dicionario: estado.dicionario, leitura: estado.leitura, erro: estado.versaoLida === versao ? estado.erro : null, recarregar, definir }
 }

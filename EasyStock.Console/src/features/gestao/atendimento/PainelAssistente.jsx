@@ -47,7 +47,7 @@ export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar 
         </div>
       )}
       <BarraDeAbas rolavel className={css.abas} abas={abas} ativa={aba} aoTrocar={trocarAba} idPainel="painel-assistente-conteudo" prefixoId="painel-assistente" rotulo="Partes do painel do Assistente" />
-      <div id="painel-assistente-conteudo" role="tabpanel" aria-labelledby={`painel-assistente-${aba}`} className={css.conteudo} aria-busy={painel.carregando}>
+      <div id="painel-assistente-conteudo" role="tabpanel" aria-labelledby={`painel-assistente-${aba}`} className={css.conteudo} aria-busy={painel.carregando || (aba === 'dicionario' && dicionarioDaLoja.carregando)}>
         {painel.erro && aba !== abaAntes?.id && aba !== 'dicionario' && <p role="alert" className={css.erro}>Não consegui ler o Assistente agora: {painel.erro}</p>}
         {!painel.uso && painel.carregando && aba !== abaAntes?.id && aba !== 'dicionario' && <output className={css.nota}>Carregando…</output>}
         {abaAntes && aba === abaAntes.id && abaAntes.conteudo}
