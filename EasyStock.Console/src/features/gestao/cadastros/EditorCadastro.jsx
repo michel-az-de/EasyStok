@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro, erroDoTelefoneExtra, gravaEnderecoDoCadastro } from '../../../dominio/fichaCliente'
-import { avisoDeCelularBr, erroDoDocumentoDoCadastro, erroDoEmailDoCadastro } from '../../../dominio/validacaoDoCadastro'
+import { avisoDeCelularBr, avisoDoDocumentoDoCadastro, erroDoDocumentoDoCadastro, erroDoEmailDoCadastro } from '../../../dominio/validacaoDoCadastro'
 import { adicionarEnderecoCliente, alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
@@ -63,6 +63,9 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const buscaDuplicado = useRef(null)
   const termoBuscado = useRef(null)
   const [avisoDoTelefoneLiberado, liberarAvisoDoTelefone] = useState(false)
+  // #3192: o erro de e-mail e de documento fica escondido só enquanto a pessoa está no campo; valor que entra sem digitação
+  // (rascunho, "Usar este dado", autopreenchimento) mostra o erro na hora, e o Salvar só liga/desliga junto com ele.
+  const [campoEmFoco, focarCampo] = useState(null)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort(); buscaDuplicado.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
     aoMudar({ ...editor, dados: mudarDadosCadastro(tela, dados, campo, valor) })
@@ -87,7 +90,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const limites = errosDoFormularioCadastro(tela, { ...dados, nome: dados.nome || '-', categoriaId: dados.categoriaId || '-' })
   const obrigatorio = (chave) => (OBRIGATORIOS_CADASTRO[tela] ?? []).includes(chave)
   const erroDo = (chave) => erros[chave] ?? limites[chave]
-  const campo = (chave, rotulo, extras = {}) => <CampoTexto key={chave} rotulo={rotulo} obrigatorio={obrigatorio(chave)} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} onBlur={chave === 'email' && erroDoEmailNovo ? () => definirErros(a => ({ ...a, email: erroDoEmailNovo })) : undefined} erro={erroDo(chave)} {...extras} />
+  const campo = (chave, rotulo, extras = {}) => <CampoTexto key={chave} rotulo={rotulo} obrigatorio={obrigatorio(chave)} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} onFocus={chave === 'email' ? () => focarCampo('email') : undefined} onBlur={chave === 'email' ? () => focarCampo(null) : undefined} erro={erroDo(chave) ?? (chave === 'email' ? erroDoEmailNaTela : undefined)} {...extras} />
   // #2457 (U2): o conflito mostra o telefone como a pessoa digitou, não o E.164 gravado.
   // Voltar ao mesmo número não conta como alteração nem entra no conflito (revisão da #2460).
   const mesmoTelefone = (valor) => telefoneNaTela(valor) === telefoneNaTela(inicial.telefone)
@@ -101,9 +104,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   // #3157 e #3192: e-mail e documento que mudaram ganham o erro no campo (como o Financeiro) e o motivo no Salvar; o gravado não trava outro campo.
   const erroDoEmailNovo = tela === 'clientes' && dados.email !== inicial.email ? erroDoEmailDoCadastro(dados.email) : null
   const erroDoDocumentoNovo = tela === 'clientes' && dados.documento !== inicial.documento ? erroDoDocumentoDoCadastro(dados.documento) : null
+  const erroDoEmailNaTela = campoEmFoco === 'email' ? null : erroDoEmailNovo
+  const erroDoDocumentoNaTela = campoEmFoco === 'documento' ? null : erroDoDocumentoNovo
+  // "123" e afins não parecem documento, mas o servidor os aceita: avisa, não desliga o Salvar.
+  const avisoDoDocumento = tela === 'clientes' && !erroDoDocumentoNaTela && campoEmFoco !== 'documento' && dados.documento !== inicial.documento ? avisoDoDocumentoDoCadastro(dados.documento) : null
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
   const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => { const v = mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value; mudar('telefone', v); conferirDuplicado('telefone', v) }} onBlur={() => { conferirDuplicado('telefone'); liberarAvisoDoTelefone(true); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
-  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => { const v = mesmoDocumento(e.target.value) ? inicial.documento : e.target.value; mudar('documento', v); conferirDuplicado('documento', v) }} onBlur={() => { conferirDuplicado('documento'); if (erroDoDocumentoNovo) definirErros(a => ({ ...a, documento: erroDoDocumentoNovo })) }} erro={erroDo('documento')} />
+  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => { const v = mesmoDocumento(e.target.value) ? inicial.documento : e.target.value; mudar('documento', v); conferirDuplicado('documento', v) }} onFocus={() => focarCampo('documento')} onBlur={() => { conferirDuplicado('documento'); focarCampo(null) }} erro={erroDo('documento') ?? erroDoDocumentoNaTela} aviso={avisoDoDocumento ?? undefined} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
   const subcategorias = tela === 'produtos' ? subcategoriasDe(categorias, dados.categoriaId) : []
@@ -200,7 +207,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {/* #2871: o pedido que o cliente fez pelo WhatsApp pessoal da dona nasce na conversa dele, no Atendimento. */}
     {novoPedido && id && emAtividadeCadastro(dados) && <Botao icone="mais" disabled={salvando || alterado || Boolean(novoPedido.abrindo)} motivo="Salve ou descarte as alterações antes de registrar um pedido." onClick={() => novoPedido.iniciar(id)}>{novoPedido.abrindo ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}
     <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar && formularioAberto ? 'Cancelar' : 'Fechar'}</Botao>
-    {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado || Boolean(erroDoEmailNovo || erroDoDocumentoNovo)} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : erroDoEmailNovo ? 'Corrija o e-mail para salvar.' : erroDoDocumentoNovo ? 'Corrija o documento para salvar.' : !alterado ? id ? 'Nada mudou para salvar.' : motivoDoCadastroVazio(tela) : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
+    {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado || Boolean(erroDoEmailNaTela || erroDoDocumentoNaTela)} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : erroDoEmailNaTela ? 'Corrija o e-mail para salvar.' : erroDoDocumentoNaTela ? 'Corrija o documento para salvar.' : !alterado ? id ? 'Nada mudou para salvar.' : motivoDoCadastroVazio(tela) : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
     {erro && <p className={css.erro} role="alert">{erro}</p>}
     {novoPedido?.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.erro} role="alert">{novoPedido.erro}</p>}
@@ -229,7 +236,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       {sugestao.erro && <p className={css.erro} role="alert">{sugestao.erro}</p>}
       {sugestao.campos.map(c => <div className={css.sugestao} key={c.campo}><span><strong>{({ nome: 'Nome', telefone: 'Telefone', email: 'E-mail' })[c.campo]}: {c.valor}</strong><q>{c.evidencia}</q></span><Botao disabled={salvando} onClick={() => sugestao.aplicar(c.campo)}>Usar este dado</Botao></div>)}
     </section>}
-    <form id={idForm} ref={formRef} onSubmit={salvar} hidden={!formularioAberto}>
+    <form id={idForm} ref={formRef} onSubmit={salvar} noValidate hidden={!formularioAberto}>
       {podeEditar && <p className={css.legenda}>Campos com * são obrigatórios.</p>}
       <fieldset disabled={salvando || !podeEditar} className={css.formulario}>
         {campo('nome', tela === 'bancos' ? 'Nome da conta' : 'Nome', { required: true, 'data-foco-inicial': true })}

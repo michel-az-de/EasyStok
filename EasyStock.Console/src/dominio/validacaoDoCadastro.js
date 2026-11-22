@@ -75,7 +75,7 @@ export function erroDoEmailDoCadastro(email) {
   return !texto || EMAIL.test(texto) ? null : 'Informe um e-mail completo, como nome@exemplo.com.'
 }
 
-// #3192: documento do cliente é CPF (11 dígitos) ou CNPJ (14) com os dois dígitos verificadores conferidos. Vazio é permitido.
+// #3192: CPF (11 dígitos) e CNPJ (14) com os dois dígitos verificadores conferidos. Vazio é permitido.
 const digitoVerificador = (base, pesos) => { const resto = base.reduce((soma, d, i) => soma + d * pesos[i], 0) % 11; return resto < 2 ? 0 : 11 - resto }
 const PESOS_CNPJ = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
 function documentoValido(numeros) {
@@ -84,9 +84,16 @@ function documentoValido(numeros) {
   const pesos = n === 11 ? [11, 10, 9, 8, 7, 6, 5, 4, 3, 2] : PESOS_CNPJ
   return digitoVerificador(numeros.slice(0, n - 2), pesos.slice(1)) === numeros[n - 2] && digitoVerificador(numeros.slice(0, n - 1), pesos) === numeros[n - 1]
 }
+// Como o servidor (DocumentoValidator, política "tem forma"): erro só para 11 dígitos (CPF) ou 14 (CNPJ) com dígito verificador
+// errado. Qualquer outro formato (RG, passaporte, CNPJ alfanumérico, dado legado) salva.
 export function erroDoDocumentoDoCadastro(documento) {
+  const numeros = digitos(documento).split('').map(Number)
+  return (numeros.length === 11 || numeros.length === 14) && !documentoValido(numeros) ? 'Informe um CPF ou CNPJ válido: o dígito verificador não confere.' : null
+}
+
+export const AVISO_DOCUMENTO_CURTO = 'Confira o documento: CPF tem 11 dígitos e CNPJ 14.'
+// Valor curto, só com números e máscara: não parece documento nenhum (o servidor aceita), então avisa sem bloquear.
+export function avisoDoDocumentoDoCadastro(documento) {
   const texto = String(documento ?? '').trim()
-  if (!texto) return null
-  const numeros = digitos(texto).split('').map(Number)
-  return (numeros.length === 11 || numeros.length === 14) && documentoValido(numeros) ? null : 'Informe um CPF ou CNPJ válido, só com números ou com a máscara.'
+  return texto && !/[a-z]/i.test(texto) && digitos(texto).length < 8 ? AVISO_DOCUMENTO_CURTO : null
 }

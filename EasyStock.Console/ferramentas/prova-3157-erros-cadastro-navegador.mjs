@@ -23,6 +23,7 @@ createRoot(document.getElementById('root')).render(<Cena/>);
 `)
 const M = '5b2c8d1e-6a47-4d09-9b6e-1c2d3e4f5a6b'
 const clientes = new Map([
+  ['7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', { id: '7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', revisao: 1, nome: 'Paulo Antigo Teste', telefone: '+5521912345678', email: 'antigo@', documento: '123', tipoPessoa: 'fisica', ativo: true }],
   [M, { id: M, revisao: 1, nome: 'Mariana Lopes Teste', telefone: '+5511987654321', email: '', documento: '', tipoPessoa: 'fisica', ativo: true }],
 ])
 const digitos = (v) => String(v ?? '').replace(/\D/g, '')
@@ -70,6 +71,19 @@ try {
     await pagina.setViewportSize({ width: largura, height: largura === 390 ? 844 : 1200 })
     await pagina.goto(base)
     await pagina.getByText('Mariana Lopes Teste').first().waitFor()
+    // 0. #3192 (revisão da #3198): o gravado fora da regra não trava outro campo. Muda só o nome e salva.
+    await pagina.getByText('Paulo Antigo Teste').first().click()
+    const ficha = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await ficha.waitFor()
+    await ficha.getByRole('button', { name: 'Editar dados' }).click()
+    await ficha.getByRole('textbox', { name: 'Nome', exact: true }).fill('Paulo Antigo Renomeado')
+    assert.equal(await salvar(ficha).isEnabled(), true, 'Documento e e-mail antigos não travam o Salvar')
+    assert.equal(await ficha.getByRole('textbox', { name: 'E-mail', exact: true }).getAttribute('aria-invalid'), null, 'O e-mail gravado não vira erro')
+    await salvar(ficha).click()
+    for (let i = 0; i < 50 && !escritas.length; i++) await pagina.waitForTimeout(100)
+    assert.equal(escritas.length, 1, 'Mudar só o nome grava mesmo com documento e e-mail antigos')
+    escritas.length = 0
+    await pagina.goto(base)
+    await pagina.getByText('Mariana Lopes Teste').first().waitFor()
     const editor = await novoCliente()
     await editor.getByRole('textbox', { name: 'Nome', exact: true }).fill('Teste Campos')
     assert.equal(await salvar(editor).isEnabled(), true, 'Com o nome, o Salvar liga')
@@ -86,18 +100,38 @@ try {
     assert.equal(await editor.getByRole('alert').filter({ hasText: /e-mail/i }).count(), 0, 'Corrigir tira o texto')
     assert.equal(await salvar(editor).isEnabled(), true, 'Corrigido, o Salvar volta')
 
-    // 2. Documento "123": erro no campo e Salvar desligado; CPF válido passa; vazio é permitido.
+    // 1b. Valor que entra sem digitação (rascunho, "Usar este dado", autopreenchimento): erro no campo sem evento de saída.
+    const semDigitar = (campo, valor) => campo.evaluate((el, v) => {
+      el.blur(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true }))
+    }, valor)
+    await semDigitar(email, 'xyz@')
+    await erroNoCampo(editor, email, /e-mail/i)
+    assert.equal(await salvar(editor).isDisabled(), true, 'Entrou inválido: Salvar desligado')
+    await editor.getByText('Corrija o e-mail para salvar.', { exact: true }).waitFor()
+    await email.fill('ana@exemplo.com'); await email.blur()
+
+    // 2. Documento: CPF com dígito errado barra; "123" só avisa; passaporte e CNPJ alfanumérico salvam.
     const documento = editor.getByRole('textbox', { name: 'CPF ou documento', exact: true })
-    await documento.fill('123'); await documento.blur()
-    await erroNoCampo(editor, documento, /CPF ou CNPJ/)
-    assert.equal(await salvar(editor).isDisabled(), true, 'Documento inválido desliga o Salvar')
+    await documento.fill('529.982.247-26'); await documento.blur()
+    await erroNoCampo(editor, documento, /CPF/)
+    assert.equal(await salvar(editor).isDisabled(), true, 'CPF com dígito errado desliga o Salvar')
     await editor.getByText('Corrija o documento para salvar.', { exact: true }).waitFor()
     await pagina.screenshot({ path: resolve(pasta, `documento-${largura}.png`), fullPage: true })
-    await documento.fill('529.982.247-26'); await documento.blur()
-    await erroNoCampo(editor, documento, /CPF ou CNPJ/)
     await documento.fill('529.982.247-25'); await documento.blur()
     assert.equal(await documento.getAttribute('aria-invalid'), null, 'CPF válido passa')
     assert.equal(await salvar(editor).isEnabled(), true, 'CPF válido liga o Salvar')
+    await documento.fill('123'); await documento.blur()
+    await editor.getByRole('status').filter({ hasText: 'Confira o documento: CPF tem 11 dígitos e CNPJ 14.' }).waitFor()
+    assert.equal(await documento.getAttribute('aria-invalid'), null, '"123" avisa, não marca erro')
+    assert.equal(await salvar(editor).isEnabled(), true, '"123" não desliga o Salvar')
+    for (const outro of ['AB1234567', '12.ABC.345/01DE-35']) {
+      await documento.fill(outro); await documento.blur()
+      assert.equal(await documento.getAttribute('aria-invalid'), null, `${outro} não é erro`)
+      assert.equal(await salvar(editor).isEnabled(), true, `${outro} salva`)
+    }
+    await semDigitar(documento, '529.982.247-26')
+    await erroNoCampo(editor, documento, /CPF/)
+    assert.equal(await salvar(editor).isDisabled(), true, 'Documento que entrou inválido desliga o Salvar')
     await documento.fill(''); await documento.blur()
     assert.equal(await documento.getAttribute('aria-invalid'), null, 'Vazio é permitido')
     assert.deepEqual(escritas, [], 'Nada inválido chega à API')
