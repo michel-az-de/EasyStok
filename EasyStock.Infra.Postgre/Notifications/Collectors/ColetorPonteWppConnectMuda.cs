@@ -115,8 +115,8 @@ public sealed class ColetorPonteWppConnectMuda(
             estados.Remove(orfao);
         }
 
-        // O estado é gravado antes do aviso: o publicador commita a mesma unidade de trabalho e, na dedupe, deixa o evento
-        // recusado pendente; nada mais é gravado aqui depois dele.
+        // O estado é gravado antes do aviso: o publicador commita a mesma unidade de trabalho e, na dedupe, descarta o que
+        // estiver pendente nela.
         await db.SaveChangesAsync(ct);
 
         if (problemaDesde is { } aberto)
