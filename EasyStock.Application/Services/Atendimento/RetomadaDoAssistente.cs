@@ -102,13 +102,17 @@ public static class RetomadaDoAssistente
 
     /// <summary>
     /// Orientação do turno retomado. Sem futuro sobre a equipe ("a equipe vai..."): a guarda da resposta barra promessa de
-    /// encaminhamento que nenhuma ferramenta do turno sustenta, e a escalada já aconteceu antes.
+    /// encaminhamento que nenhuma ferramenta do turno sustenta, e a escalada já aconteceu antes. #3111: o mesmo vale para
+    /// frete a combinar, que a guarda barra quando o modelo afirma acordo.
     /// </summary>
     public static string Orientacao(TimeSpan prazo) =>
         $"\n\n{MarcaNoPrompt}: a conversa estava com a equipe, que não respondeu em {prazo.TotalSeconds:0} segundos, e voltou para você. "
         + "O cliente continua esperando. Responda agora à última mensagem dele: diga em uma frase que a equipe já foi avisada e que "
         + "você segue com ele por aqui, resolva o que as ferramentas permitirem e peça só o dado que falta. "
         + "Não use escalar_para_dona nem encaminhar_para_responsavel de novo pelo mesmo motivo, e não diga que a equipe vai responder, "
-        + "ligar ou resolver, nem dê prazo. Se o assunto depender só da equipe (dinheiro, cancelamento, reclamação), acolha, anote o "
-        + "que o cliente quer com registrar_nota quando a ferramenta existir e continue disponível.";
+        + "ligar, combinar, confirmar, verificar ou resolver, nem dê prazo. Se o assunto depender só da equipe (dinheiro, "
+        + "cancelamento, reclamação, entrega ou frete a combinar), acolha, anote o que o cliente quer com registrar_nota quando a "
+        + "ferramenta existir e continue disponível. Entrega ou frete a combinar segue pendente: não diga que o frete ou a taxa "
+        + "foi, está ou será combinado ou acertado, nem valor, prazo ou gratuidade; se o cliente perguntar, diga só que o frete "
+        + "ainda não foi definido. Se a mensagem dele for só uma saudação, cumprimente e pergunte em que pode ajudar.";
 }

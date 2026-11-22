@@ -104,6 +104,40 @@ public partial class AgenteAtendimentoServiceTests
             .And.Contain("escalar_para_dona");
     }
 
+    // #3111: em produção a retomada de "frete a combinar" afirmou frete, a guarda barrou e a conversa voltou à equipe.
+    [Fact]
+    public async Task Retomada_FreteACombinarESaudacao_OrientaSemAfirmarFreteERespondeSemEscalar()
+    {
+        const string resposta = "Boa tarde! A equipe já foi avisada e eu sigo com você por aqui. "
+            + "O frete ainda não foi definido. Em que posso ajudar?";
+        _historico.Clear();
+        _conversa.Escalar(Agora.AddMinutes(-5), "Entrega e frete a combinar. Confira o endereço e a seleção da comanda.");
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Texto,
+            "boa tarde", "wamid.in17"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto(resposta));
+
+        var resultado = await Retomar();
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: true, Escalou: false));
+        _conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        _requisicoes.Should().ContainSingle().Which.SystemVolatil.Should()
+            .Contain("o frete ainda não foi definido").And.Contain("combinado ou acertado").And.Contain("saudação");
+    }
+
+    [Fact]
+    public void Orientacao_FrasesQueElaEnsinaPassamNaGuardaEAsQueElaProibeSeguemBarradas()
+    {
+        var orientacao = RetomadaDoAssistente.Orientacao(TimeSpan.FromSeconds(60));
+        string? Guarda(string texto) => GuardaRespostaAgente.Avaliar(texto, [], ["escalar_para_dona"]);
+
+        orientacao.Should().Contain("o frete ainda não foi definido").And.Contain("a equipe já foi avisada");
+        Guarda("Oi! A equipe já foi avisada e eu sigo com você por aqui. O frete ainda não foi definido.").Should().BeNull();
+        Guarda("A equipe vai combinar o frete com você.").Should().NotBeNull();
+        Guarda("O frete será combinado com a equipe.").Should().NotBeNull();
+        Guarda("O frete já está acertado.").Should().NotBeNull();
+    }
+
     [Fact]
     public async Task Retomada_ReacaoPendenteDepoisDaPergunta_APerguntaVoltaComoEntradaNova()
     {
