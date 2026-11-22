@@ -88,9 +88,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var perfis = new Dictionary<(Guid EmpresaId, string Nome), Perfil>();
         var identidades = new[]
         {
-            new IdentidadeR4(UsuarioId, EmpresaId, "Dona R4", "dona.r4@fixture.test", "R4-Dona-2026!", "Dona"),
+            new IdentidadeR4(UsuarioId, EmpresaId, "Dona R4", "dona.r4@fixture.test", "R4-Dona-2026!", PerfisCasaDaBaba.Administracao),
             new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Atendimento R4", "atendimento.r4@fixture.test", "R4-Atende-2026!", "Atendimento"),
-            new IdentidadeR4(Guid.NewGuid(), outraEmpresa, "Dona de outra empresa", "outra.r4@fixture.test", "R4-Outra-2026!", "Dona"),
+            new IdentidadeR4(Guid.NewGuid(), outraEmpresa, "Dona de outra empresa", "outra.r4@fixture.test", "R4-Outra-2026!", PerfisCasaDaBaba.Administracao),
             new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Cozinha R4", "cozinha.r4@fixture.test", "R4-Cozinha-2026!", "Cozinha"),
             new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Consulta R4", "consulta.r4@fixture.test", "R4-Consulta-2026!", "Consulta R4"),
             new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Entrega R4", "entrega.r4@fixture.test", "R4-Entrega-2026!", "Entrega R4"),

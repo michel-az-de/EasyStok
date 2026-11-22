@@ -131,4 +131,13 @@ public class CriarTenantPorAdminUseCaseTests
         });
         await _unitOfWork.Received(1).CommitAsync();
     }
+
+    [Fact]
+    public async Task PrimeiroAdminDoTenantNovoNasceDona()
+    {
+        // #2070: a empresa nova já começa com a dona ativa que a hierarquia exige; o suporte não precisa marcar.
+        await CriarUseCase().ExecuteAsync(Comando());
+
+        await _usuarioEmpresaRepository.Received(1).AddAsync(Arg.Is<UsuarioEmpresa>(v => v.EhDona && v.Ativo));
+    }
 }

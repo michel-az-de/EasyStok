@@ -3,6 +3,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public interface IUsuarioRepository
     {
         Task<Usuario?> GetByIdAsync(Guid id);
+
+        /// <summary>
+        /// #2070: a mesma leitura do <see cref="GetByIdAsync"/> (todas as empresas e perfis, sem tenant), em lote. A lista de
+        /// usuários lê a conta inteira de cada linha: nome, e-mail e convite valem em toda empresa da pessoa.
+        /// </summary>
+        Task<IReadOnlyList<Usuario>> GetByIdsAsync(IReadOnlyCollection<Guid> ids);
         Task<Usuario?> GetByEmailAsync(string email);
 
         /// <summary>#1324: usuários com e-mail <c>{parteLocal}+…@gmail.com</c>, carregados como no login.</summary>

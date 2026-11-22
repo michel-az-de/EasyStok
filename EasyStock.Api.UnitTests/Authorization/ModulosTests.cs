@@ -105,7 +105,9 @@ public class ModulosTests
     }
 
     [Theory]
-    [InlineData("Dona", Modulo.Caixa, true)]
+    [InlineData("Administração", Modulo.Caixa, true)]
+    [InlineData("Gerência", Modulo.Caixa, true)]
+    [InlineData("Gerência", Modulo.Configuracoes, false)]
     [InlineData("Atendimento", Modulo.Caixa, true)]
     [InlineData("Atendimento", Modulo.Configuracoes, false)]
     [InlineData("Cozinha", Modulo.Caixa, false)]

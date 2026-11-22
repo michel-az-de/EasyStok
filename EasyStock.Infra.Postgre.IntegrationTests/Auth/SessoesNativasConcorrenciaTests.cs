@@ -185,6 +185,13 @@ public sealed class SessoesNativasConcorrenciaTests(PostgreSqlDatabaseFixture fi
             .UseNpgsql(fixture.ConnectionString).Options, current);
         var operador = new Perfil { Id = Guid.NewGuid(), EmpresaId = dados.Empresa, Nome = "Operador", Nivel = NivelAcesso.Operador };
         admin.Add(operador);
+        // #2070: a hierarquia lê o ator do banco; quem troca o perfil ou desativa é uma Administração da empresa.
+        var administracao = new Perfil { Id = Guid.NewGuid(), EmpresaId = dados.Empresa, Nome = "Administração", Nivel = NivelAcesso.Admin };
+        var gestora = Usuario.Criar("Gestora", $"gestora-{Guid.NewGuid():N}@exemplo.test", "hash");
+        admin.AddRange(administracao, gestora,
+            new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = gestora.Id, EmpresaId = dados.Empresa, Ativo = true, CriadoEm = DateTime.UtcNow },
+            new UsuarioPerfil { Id = Guid.NewGuid(), UsuarioId = gestora.Id, EmpresaId = dados.Empresa, PerfilId = administracao.Id, AtribuidoEm = DateTime.UtcNow });
+        current.UsuarioId.Returns(gestora.Id);
         await admin.SaveChangesAsync();
         var corteExecutado = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var liberarCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -201,12 +208,14 @@ public sealed class SessoesNativasConcorrenciaTests(PostgreSqlDatabaseFixture fi
         if (corteJaAtual)
             await usuarios.AtualizarSessoesValidasDesdeAsync(dados.Usuario, new DateTime(agora.Ticks - agora.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc));
         var revogador = new RevogadorSessoes(usuarios, new RefreshTokenRepository(admin), cache, new RelogioDoCorte2184(agora), NullLogger<RevogadorSessoes>.Instance);
-        var atribuir = new AtribuirPerfilUsuarioUseCase(usuarios, new UsuarioPerfilRepository(admin), new PerfilRepository(admin), new LojaRepository(admin), revogador,
-            current, new AuditLogRepository(admin), admin, NullLogger<AtribuirPerfilUsuarioUseCase>.Instance);
+        var vinculos = new UsuarioEmpresaRepository(admin);
+        var hierarquia = new HierarquiaDeUsuarios(usuarios, vinculos, current, new AuditLogRepository(admin), admin, NullLogger<HierarquiaDeUsuarios>.Instance);
+        var atribuir = new AtribuirPerfilUsuarioUseCase(usuarios, new UsuarioPerfilRepository(admin), vinculos, new PerfilRepository(admin), new LojaRepository(admin), revogador,
+            hierarquia, current, new AuditLogRepository(admin), admin, NullLogger<AtribuirPerfilUsuarioUseCase>.Instance);
         var convites = new ConvitesDeAcesso(new ResetTokenRepository(admin), null!, null!, null!, new ConfigurationBuilder().Build(),
             TimeProvider.System, NullLogger<ConvitesDeAcesso>.Instance);
-        var desativarCaso = new DesativarUsuarioUseCase(usuarios, new UsuarioEmpresaRepository(admin), revogador, convites,
-            current, new AuditLogRepository(admin), admin, NullLogger<DesativarUsuarioUseCase>.Instance);
+        var desativarCaso = new DesativarUsuarioUseCase(usuarios, vinculos, revogador, convites,
+            hierarquia, current, new AuditLogRepository(admin), admin, NullLogger<DesativarUsuarioUseCase>.Instance);
         var troca = desativar ? desativarCaso.ExecuteAsync(new(dados.Usuario, dados.Empresa))
             : atribuir.ExecuteAsync(new(dados.Usuario, dados.Empresa, operador.Id, null));
         var etapa = await Task.WhenAny(corteExecutado.Task, troca).WaitAsync(TimeSpan.FromSeconds(10));

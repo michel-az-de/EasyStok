@@ -21,6 +21,11 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
             .OrderByDescending(rt => rt.CriadoEm)
             .FirstOrDefaultAsync();
 
+    public Task<bool> TemConviteAbertoAsync(Guid usuarioId, DateTime agora) =>
+        _context.ResetTokens.AsNoTracking()
+            .AnyAsync(rt => rt.UsuarioId == usuarioId && rt.Finalidade == FinalidadeResetToken.Convite
+                            && !rt.Usado && rt.ExpiraEm > agora);
+
     public async Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId) =>
         await _context.ResetTokens.Where(rt => rt.UsuarioId == usuarioId).ToListAsync();
 

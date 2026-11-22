@@ -274,8 +274,13 @@ public class ChaveDeAcessoUseCaseTests
         var emitida = await Emitir(usuario);
         var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
         vinculos.GetByUsuarioEEmpresaAsync(usuario.Id, _empresaId).Returns(usuario.Empresas.Single());
+        // #2070: a hierarquia lê do banco quem pede; aqui, uma Administração da empresa.
+        var gestora = Usuario.Criar("Gestora", "gestora@exemplo.test", "$2a$11$hash");
+        CenarioDeAcesso.DarPerfil(gestora, _empresaId, NivelAcesso.Admin);
+        _c.Usuarios.GetByIdAsync(gestora.Id).Returns(gestora);
+        _atual.UsuarioId.Returns(gestora.Id);
 
-        await new DesativarUsuarioUseCase(_c.Usuarios, vinculos, _c.Revogador(), _c.Convites(), _atual, _c.Auditoria,
+        await new DesativarUsuarioUseCase(_c.Usuarios, vinculos, _c.Revogador(), _c.Convites(), _c.Hierarquia(_atual, vinculos), _atual, _c.Auditoria,
                 _c.UnitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(usuario.Id, _empresaId));
         usuario.Empresas.Single().Ativo = true; // reativada depois

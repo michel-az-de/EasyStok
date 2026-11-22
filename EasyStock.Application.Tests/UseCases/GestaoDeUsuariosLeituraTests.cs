@@ -1,5 +1,9 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.TestHelpers;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
 
@@ -10,6 +14,10 @@ public class GestaoDeUsuariosLeituraTests
     private readonly IPerfilRepository _perfis = Substitute.For<IPerfilRepository>();
     private readonly IAuditLogRepository _auditoria = Substitute.For<IAuditLogRepository>();
     private readonly Guid _empresaId = Guid.NewGuid();
+
+    // Sem ninguém autenticado a política não libera ação nenhuma: estes testes leem só os dados da linha.
+    private HierarquiaDeUsuarios Hierarquia() => new(_usuarios, Substitute.For<IUsuarioEmpresaRepository>(),
+        Substitute.For<ICurrentUserAccessor>(), _auditoria, new FakeUnitOfWork(), Substitute.For<ILogger<HierarquiaDeUsuarios>>());
 
     private Usuario Usuario(string nome, bool vinculoAtivo, Perfil? perfil = null)
     {
@@ -28,7 +36,7 @@ public class GestaoDeUsuariosLeituraTests
         var semPerfil = Usuario("Bia", vinculoAtivo: true);
         _usuarios.GetByEmpresaAsync(_empresaId, 1, 20).Returns((new[] { desativada, semPerfil }.AsEnumerable(), 2));
 
-        var (lista, _) = await new ListarUsuariosUseCase(_usuarios).ExecuteAsync(new ListarUsuariosQuery(_empresaId));
+        var (lista, _) = await new ListarUsuariosUseCase(_usuarios, Hierarquia()).ExecuteAsync(new ListarUsuariosQuery(_empresaId));
         var linhas = lista.ToList();
 
         linhas[0].Ativo.Should().BeFalse("desativar desliga o vínculo, e é ele que a lista mostra");
@@ -48,7 +56,7 @@ public class GestaoDeUsuariosLeituraTests
             new Perfil { Id = Guid.NewGuid(), Nome = "Dona", Nivel = NivelAcesso.Admin, EmpresaId = _empresaId },
         });
 
-        var perfis = await new ListarPerfisAtribuiveisUseCase(_perfis).ExecuteAsync(_empresaId);
+        var perfis = await new ListarPerfisAtribuiveisUseCase(_perfis, Hierarquia()).ExecuteAsync(_empresaId);
 
         perfis.Select(p => p.Nome).Should().Equal("Dona", "Cozinha");
     }

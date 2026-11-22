@@ -1,7 +1,11 @@
 using System.Text.Json;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.ListarUsuarios;
 using EasyStock.Domain.ValueObjects;
+using EasyStock.TestHelpers;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
 
@@ -15,7 +19,10 @@ public class ListarUsuariosUseCaseTests
     private async Task<List<UsuarioResult>> Listar(params Usuario[] usuarios)
     {
         _usuarios.GetByEmpresaAsync(_empresaId, 1, 20).Returns((usuarios.AsEnumerable(), usuarios.Length));
-        var (lista, _) = await new ListarUsuariosUseCase(_usuarios).ExecuteAsync(new ListarUsuariosQuery(_empresaId));
+        var hierarquia = new HierarquiaDeUsuarios(_usuarios, Substitute.For<IUsuarioEmpresaRepository>(),
+            Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), new FakeUnitOfWork(),
+            Substitute.For<ILogger<HierarquiaDeUsuarios>>());
+        var (lista, _) = await new ListarUsuariosUseCase(_usuarios, hierarquia).ExecuteAsync(new ListarUsuariosQuery(_empresaId));
         return lista.ToList();
     }
 
