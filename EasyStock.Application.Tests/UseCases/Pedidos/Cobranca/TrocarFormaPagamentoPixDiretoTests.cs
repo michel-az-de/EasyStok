@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects.Pix;
@@ -87,6 +88,19 @@ public class TrocarFormaPagamentoPixDiretoTests
         var evento = f.Eventos.Should().ContainSingle(e => e.Tipo == "forma_pagamento_trocada").Subject;
         evento.Detalhes.Should().Be("nenhuma -> pix_direto");
         evento.UsuarioId.Should().Be(Usuario);
+    }
+
+    [Fact]
+    public async Task EntrouNaFilaSemPagar_AvisoDaEquipeLevaOQueFaltaReceber()
+    {
+        // #3002: o aviso dizia "pago" para o pedido que só entrou na fila.
+        var f = Cenario();
+
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+
+        await f.Notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, f.EmpresaId,
+            Arg.Is<string>(p => p.Contains("\"aReceber\":\"R$") && p.Contains("25,00\"")), f.Pedido.Id,
+            Arg.Any<CancellationToken>(), Arg.Any<string?>());
     }
 
     [Fact]

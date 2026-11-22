@@ -1033,13 +1033,14 @@ public static class NotificacoesGlobaisSeed
 
         yield return TemplateNotificacao.Criar(
             codigo: AvisosDaEquipe.PedidoComCanhoto.TemplateCodigo,
-            nome: "Pedido Pago com o Canhoto · WhatsApp",
+            nome: "Pedido com o Canhoto · WhatsApp",
             canal: CanalNotificacao.WhatsApp,
             tipoEvento: AvisosDaEquipe.PedidoComCanhoto.Tipo,
             assuntoTemplate: "",
-            corpoTemplate: "Pedido {{ numero }} pago: {{ cliente ?? \"cliente\" }}, {{ total }}. O canhoto segue na imagem.")
+            corpoTemplate: "Pedido {{ numero }} {{ if aReceber }}na fila, a receber {{ aReceber }}{{ else }}pago{{ end }}: {{ cliente ?? \"cliente\" }}, {{ total }}. O canhoto segue na imagem.")
             .ComMetadados(
-                """{"template":"aviso_equipe_pedido","idioma":"pt_BR","param1":"{{ numero }}","param2":"{{ cliente ?? \"cliente\" }}","param3":"{{ total }}","anexo":"canhoto","anexoFormato":"png"}""");
+                """{"template":"{{ aReceber ? \"aviso_equipe_pedido_a_receber\" : \"aviso_equipe_pedido\" }}","idioma":"pt_BR","param1":"{{ numero }}","param2":"{{ cliente ?? \"cliente\" }}","param3":"{{ aReceber ?? total }}","anexo":"canhoto","anexoFormato":"png"}""")
+            .ComVersao(2); // #3002: só diz "pago" quando nada falta receber; a receber usa outro modelo da Meta.
 
         yield return TemplateNotificacao.Criar(
             codigo: AvisosDaEquipe.ProblemaNoPagamento.TemplateCodigo,

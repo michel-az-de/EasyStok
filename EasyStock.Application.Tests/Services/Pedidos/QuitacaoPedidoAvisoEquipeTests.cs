@@ -16,7 +16,8 @@ public class QuitacaoPedidoAvisoEquipeTests
         (await quitacao.PrepararCanhotoAsync(f.Pedido, CobrancaPedidoFixture.Agora, default)).Should().NotBeNull();
 
         await f.Notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, f.EmpresaId,
-            Arg.Is<string>(p => p.Contains(f.Pedido.Id.ToString())), f.Pedido.Id, Arg.Any<CancellationToken>(),
+            Arg.Is<string>(p => p.Contains(f.Pedido.Id.ToString()) && !p.Contains("aReceber")), f.Pedido.Id,
+            Arg.Any<CancellationToken>(),
             $"aviso-equipe-canhoto:{f.Pedido.Id:N}");
     }
 

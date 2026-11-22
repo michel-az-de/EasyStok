@@ -230,7 +230,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
                 : PixDireto(input, pedido, valor, recebedor, agora, conversaId, textoPix);
             await cobrancaRepository.AddAsync(manual, ct);
             mudanca = await ColocarNaFilaAsync(pedido, input, agora, ct);
-            if (mudanca is not null) impressao = await quitacao.PrepararCanhotoAsync(pedido, agora, ct);
+            if (mudanca is not null) impressao = await quitacao.PrepararCanhotoAsync(pedido, agora, ct, aReceber: valor);
             nova = CobrancaPedidoResult.De(manual);
         }
 

@@ -21,7 +21,7 @@ public static class AvisosDaEquipe
         "aviso_equipe_atencao_atendimento_global", "aviso_equipe_atencao_atendimento_whatsapp_v1");
 
     public static readonly AvisoDaEquipe PedidoComCanhoto = new(
-        CodigosAviso.EquipePedido, "Pedido pago com o canhoto", TipoEventoNotificacao.AvisoEquipePedidoComCanhoto,
+        CodigosAviso.EquipePedido, "Pedido com o canhoto", TipoEventoNotificacao.AvisoEquipePedidoComCanhoto,
         "aviso_equipe_pedido_canhoto_global", "aviso_equipe_pedido_canhoto_whatsapp_v1");
 
     public static readonly AvisoDaEquipe ProblemaNoPagamento = new(
@@ -50,15 +50,24 @@ public sealed class PublicadorAvisoEquipe(INotificadorService notificador)
             ["motivo"] = SemPontoFinal(motivo),
         }, chave: null, ct);
 
+    /// <param name="aReceber">
+    /// #3002: quanto falta receber do pedido que entrou na fila sem pagar. Sem valor, a chave não vai no payload e o
+    /// template diz "pago"; nula viraria texto vazio, que o Scriban lê como verdadeiro.
+    /// </param>
     public Task PedidoComCanhotoAsync(
-        Guid empresaId, Guid pedidoId, string? cliente, decimal total, CancellationToken ct = default) =>
-        EnfileirarAsync(AvisosDaEquipe.PedidoComCanhoto, empresaId, pedidoId, new Dictionary<string, string?>
+        Guid empresaId, Guid pedidoId, string? cliente, decimal total, CancellationToken ct = default, decimal aReceber = 0m)
+    {
+        var payload = new Dictionary<string, string?>
         {
             ["pedidoId"] = pedidoId.ToString(),
             ["numero"] = CodigoCurto.De(pedidoId),
             ["cliente"] = cliente,
             ["total"] = total.ToString("C", PtBr),
-        }, chave: $"aviso-equipe-canhoto:{pedidoId:N}", ct);
+        };
+        if (aReceber > 0m) payload["aReceber"] = aReceber.ToString("C", PtBr);
+        return EnfileirarAsync(AvisosDaEquipe.PedidoComCanhoto, empresaId, pedidoId, payload,
+            chave: $"aviso-equipe-canhoto:{pedidoId:N}", ct);
+    }
 
     /// <param name="chave">Identidade do problema (pagamento e desfecho): webhook repetido não repete o aviso.</param>
     public Task ProblemaNoPagamentoAsync(
