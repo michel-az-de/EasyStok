@@ -85,7 +85,7 @@ public class WebhookGatewayController(
         // EventId estavel: alguns provedores enviam ID no payload (Stripe).
         // Para Efi (que nao envia), usamos o hash do body como fallback —
         // retries com mesmo payload dao mesmo hash → idempotente.
-        var eventIdExterno = ExtrairEventIdExterno(rawBody, validator.Provedor) ?? bodyHash;
+        var eventIdExterno = ExtrairEventIdExterno(rawBody, validator.Provedor, headers) ?? bodyHash;
 
         var registro = await webhookRepo.TryRegistrarAsync(validator.Provedor, eventIdExterno, bodyHash, ct);
         if (registro is null)
@@ -148,16 +148,23 @@ public class WebhookGatewayController(
 
     /// <summary>
     /// Tenta extrair um event ID estavel do payload conforme o provedor.
-    /// Stripe e Mercado Pago tem <c>id</c> no root (no Mercado Pago o id da notificacao e numerico, S32);
+    /// Stripe tem <c>id</c> no root; o Mercado Pago usa so campos assinados (data.id, ts, x-request-id; #3095);
     /// Efi nao envia, fica null e o caller usa hash do body como fallback.
     /// </summary>
-    private static string? ExtrairEventIdExterno(string rawBody, string provedor)
+    private static string? ExtrairEventIdExterno(string rawBody, string provedor, IDictionary<string, string?> headers)
     {
         if (string.IsNullOrWhiteSpace(rawBody)) return null;
         try
         {
             using var doc = System.Text.Json.JsonDocument.Parse(rawBody);
             var root = doc.RootElement;
+
+            // #3095: a assinatura do Mercado Pago cobre so data.id, x-request-id e ts; o id da raiz nao e assinado
+            // e um replay com outro id passaria pelo dedup. A chave usa apenas o assinado: cada notificacao
+            // legitima (created, updated) traz ts e request-id novos, o replay traz os mesmos.
+            if (string.Equals(provedor, "MercadoPago", StringComparison.OrdinalIgnoreCase)
+                && ChaveMercadoPagoAssinada(root, headers) is { } chaveMp)
+                return chaveMp;
 
             // Padrao 1: {"id": "evt_..."} (Stripe) ou {"id": 123456789} (Mercado Pago) no root
             if (root.ValueKind == System.Text.Json.JsonValueKind.Object
@@ -174,5 +181,23 @@ public class WebhookGatewayController(
         }
         catch { /* JSON invalido — o processor vai descartar */ }
         return null;
+    }
+
+    private static string? ChaveMercadoPagoAssinada(System.Text.Json.JsonElement root, IDictionary<string, string?> headers)
+    {
+        if (root.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !root.TryGetProperty("data", out var data) || data.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !data.TryGetProperty("id", out var idEl)) return null;
+        var dataId = idEl.ValueKind == System.Text.Json.JsonValueKind.String ? idEl.GetString() : idEl.ToString();
+        headers.TryGetValue("x-request-id", out var requestId);
+        headers.TryGetValue("x-signature", out var assinatura);
+        var ts = assinatura?.Split(',')
+            .Select(p => p.Split('=', 2))
+            .FirstOrDefault(p => p.Length == 2 && p[0].Trim() == "ts")?[1].Trim();
+        if (string.IsNullOrWhiteSpace(dataId) || string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(ts)) return null;
+
+        // request-id vem de header sem teto proprio; o hash mantem a chave dentro dos 200 caracteres da coluna.
+        var selo = ComputeSha256($"{requestId};{ts}")[..16];
+        return $"MercadoPago:{dataId.ToLowerInvariant()}:{selo}";
     }
 }
