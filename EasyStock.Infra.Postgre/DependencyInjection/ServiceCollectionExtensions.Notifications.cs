@@ -67,6 +67,9 @@ public static partial class ServiceCollectionExtensionsNotifications
             services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorProdutosVencendo>());
         // N10: pico de 5xx. Só lê o COUNT de system_error_logs (fora da RLS) e avisa pelo publicador de incidente.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorPicoDeErros5xx>());
+        // #3117: ponte WPPConnect conectada que não entrega. Sai sem consultar a ponte enquanto
+        // Atendimento:WppConnect:VigiaPonteMuda:Habilitado não for true.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IColetorEventoNotificacao, ColetorPonteWppConnectMuda>());
 
         return services;
     }

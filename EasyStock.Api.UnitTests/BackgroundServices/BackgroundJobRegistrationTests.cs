@@ -196,6 +196,8 @@ public class BackgroundJobRegistrationTests
 
         ColetoresRegistrados(desligado).Should().NotContain(typeof(ColetorProdutosVencendo));
         ColetoresRegistrados(desligado).Should().Contain(typeof(ColetorRotinasAgendadas));
+        // #3117: fica registrado e decide na rodada pela configuração; desligado, nem consulta a ponte.
+        ColetoresRegistrados(desligado).Should().Contain(typeof(ColetorPonteWppConnectMuda));
         ColetoresRegistrados(ligado).Should().Contain(typeof(ColetorProdutosVencendo));
     }
 

@@ -165,6 +165,32 @@ public class WppConnectClientTests
         _http.UltimaChamada!.Uri.Query.Should().Be("?count=30");
     }
 
+    [Fact]
+    public async Task Lista_a_ultima_recebida_de_cada_conversa_individual()
+    {
+        // #3117: grupo, transmissão, conversa sem chave e última recebida da própria loja ficam de fora.
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/list-chats")
+            .Responde(HttpStatusCode.OK, """[{"id":{"_serialized":"5511999999999@c.us"},"t":1793000000,"lastReceivedKey":{"fromMe":false,"remote":"5511999999999@c.us","id":"ABC","_serialized":"false_5511999999999@c.us_ABC"}},{"id":"123@lid","lastReceivedKey":{"fromMe":false,"_serialized":"false_123@lid_DEF"}},{"id":{"_serialized":"120363000000000000@g.us"},"lastReceivedKey":{"fromMe":false,"_serialized":"false_120363000000000000@g.us_G"}},{"id":{"_serialized":"status@broadcast"},"lastReceivedKey":{"fromMe":false,"_serialized":"false_status@broadcast_S"}},{"id":{"_serialized":"5511888888888@c.us"}},{"id":{"_serialized":"5511777777777@c.us"},"lastReceivedKey":{"fromMe":true,"_serialized":"true_5511777777777@c.us_X"}},"lixo"]""");
+
+        var ultimas = await Client.ListarUltimasRecebidasAsync(_sessao, 20);
+
+        ultimas.Should().Equal(
+            new UltimaRecebidaWppConnect("5511999999999@c.us", "false_5511999999999@c.us_ABC"),
+            new UltimaRecebidaWppConnect("123@lid", "false_123@lid_DEF"));
+        _http.UltimaChamada!.Cabecalho("Authorization").Should().Be("Bearer token-da-sessao");
+    }
+
+    [Theory]
+    [InlineData("""{"status":"success","response":[{"id":"5511999999999@c.us","lastReceivedKey":{"_serialized":"false_5511999999999@c.us_ABC"}}]}""", 1)]
+    [InlineData("""{"status":"error","message":"Error on get all chats"}""", 0)]
+    [InlineData("\"texto\"", 0)]
+    public async Task Lista_de_conversas_em_formato_inesperado_nao_inventa_mensagem(string corpo, int esperadas)
+    {
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/list-chats").Responde(HttpStatusCode.OK, corpo);
+
+        (await Client.ListarUltimasRecebidasAsync(_sessao, 20)).Should().HaveCount(esperadas);
+    }
+
     /// <summary>#2833: a reação vai pelo id serializado da mensagem; reação vazia sai como <c>false</c>, que retira.</summary>
     [Fact]
     public async Task Reacao_vai_pelo_id_da_mensagem_e_vazia_retira()
