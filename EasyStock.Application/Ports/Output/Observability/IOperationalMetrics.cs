@@ -19,4 +19,10 @@ public interface IOperationalMetrics
     /// (ex.: <c>INTERNAL_ERROR</c>, <c>NOT_SUPPORTED</c> — domínio fechado para 5xx).
     /// </summary>
     void IncrementFalhasOperacao(string code);
+
+    /// <summary>
+    /// #3117: webhook respondido com 200 que não gravou nada, rotulado pelo motivo (domínio fechado em
+    /// <c>WebhookSemEfeito</c>: evento ignorado, grupo, anterior à captura, duplicata, eco...).
+    /// </summary>
+    void IncrementWebhookSemEfeito(string motivo);
 }

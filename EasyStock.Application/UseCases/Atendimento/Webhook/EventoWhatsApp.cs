@@ -1,7 +1,8 @@
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
 /// <summary>Payload do webhook da Meta já normalizado — um <see cref="EntradaWhatsApp"/> por <c>entry[].changes[].value</c>.</summary>
-public sealed record EventoWhatsApp(IReadOnlyList<EntradaWhatsApp> Entradas);
+/// <param name="Descarte">#3117: motivo (<see cref="WebhookSemEfeito"/>) quando o evento foi aceito e não tem o que gravar.</param>
+public sealed record EventoWhatsApp(IReadOnlyList<EntradaWhatsApp> Entradas, string? Descarte = null);
 
 public sealed record EntradaWhatsApp(
     string PhoneNumberId,

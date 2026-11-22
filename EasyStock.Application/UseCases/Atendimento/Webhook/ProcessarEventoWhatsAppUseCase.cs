@@ -50,7 +50,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IRegraAutomaticaRepository? regrasAutomaticas = null,
     PerfilClienteWhatsApp? perfilCliente = null,
     RespostaSemIa? respostaSemIa = null,
-    INotificadorService? notificador = null)
+    INotificadorService? notificador = null,
+    Ports.Output.Observability.IOperationalMetrics? metricas = null)
 {
     public const string Provedor = "meta_whatsapp";
 
@@ -109,6 +110,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         var flagsAtivas = await featureFlagRepository.ListarAtivasAsync(empresa.Id, ct);
         if (!flagsAtivas.Contains(FeatureCatalogo.ModuloAtendimento, StringComparer.OrdinalIgnoreCase))
         {
+            WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.ModuloDesligado, null, entrada.PhoneNumberId);
             await RegistrarFalhaDeEntradaAsync(entrada, "modulo_desligado", ct);
             return true;
         }
@@ -142,7 +144,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         }
 
         if (await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, eco.Wamid, ct) is not null)
+        {
+            WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.Eco, null, entrada.PhoneNumberId);
             return true;
+        }
 
         var enviadaEm = eco.Timestamp.UtcDateTime;
         Conversa conversa;
@@ -175,7 +180,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             logger.LogError(ex, "Webhook WhatsApp: falha gravando o eco do app wamid={Wamid}.", eco.Wamid);
             unitOfWork.DescartarAlteracoesPendentes();
             // Mesmo critério das mensagens: regra de domínio não passa num reenvio; concorrência e banco passam.
-            return ex is RegraDeDominioVioladaException;
+            if (ex is not RegraDeDominioVioladaException) return false;
+            WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.ErroDominio, null, entrada.PhoneNumberId);
+            return true;
         }
 
         try
@@ -227,7 +234,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var existente = await webhookRecebidoRepository.ObterAsync(Provedor, msg.Wamid, ct);
             if (existente is { Sucesso: true })
             {
-                logger.LogInformation("Webhook WhatsApp: wamid {Wamid} já processado, ignorando duplicata.", msg.Wamid);
+                // #3117: sem o wamid, que na ponte WPPConnect carrega o telefone do cliente (#2590).
+                WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.Duplicata, null, entrada.PhoneNumberId);
                 return true;
             }
             registro = existente;
@@ -239,6 +247,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             if (registro is not null)
                 await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: true, ct: ct);
+            WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.Duplicata, null, entrada.PhoneNumberId);
             return true;
         }
 
@@ -269,7 +278,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
             // Regra de domínio (ex.: wa_id inválido) não passa num reenvio: pedir retry travaria o
             // payload por dias. O resto (concorrência, banco) passa.
-            return ex is RegraDeDominioVioladaException;
+            if (ex is not RegraDeDominioVioladaException) return false;
+            WebhookSemEfeito.Registrar(logger, metricas, WebhookSemEfeito.ErroDominio, null, entrada.PhoneNumberId);
+            return true;
         }
 
         await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, CancellationToken.None);

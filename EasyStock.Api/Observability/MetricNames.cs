@@ -16,4 +16,7 @@ public static class MetricNames
 
     /// <summary>Contador de falhas de operação (respostas 5xx tratadas pelo GlobalExceptionHandler).</summary>
     public const string FalhasOperacaoTotal = "falhas_operacao_total";
+
+    /// <summary>#3117: webhooks aceitos (200) que não gravaram nada, por motivo.</summary>
+    public const string WebhookSemEfeitoTotal = "webhook_sem_efeito_total";
 }

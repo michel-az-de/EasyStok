@@ -92,7 +92,12 @@ public sealed class IdempotencyMiddleware(
             return;
         }
 
-        var metodoRecurso = $"{context.Request.Method} {NormalizePath(path)}";
+        // #3094: o usuario entra no escopo unico (Key+Empresa+MetodoRecurso), sem migracao: dois usuarios da mesma
+        // empresa com a mesma chave nao compartilham a resposta cacheada. Anonimo (sem UsuarioId) segue como antes.
+        var usuarioId = currentUser.UsuarioId;
+        var metodoRecurso = usuarioId == Guid.Empty
+            ? $"{context.Request.Method} {NormalizePath(path)}"
+            : $"{context.Request.Method} {NormalizePath(path)} u:{usuarioId:N}";
         var repo = context.RequestServices.GetRequiredService<IIdempotencyKeyRepository>();
 
         var payloadHash = await ComputePayloadHashAsync(context.Request, context.RequestAborted);
@@ -112,7 +117,8 @@ public sealed class IdempotencyMiddleware(
                     // issue 917: chave Concluido com corpo DIFERENTE do que a gerou seria
                     // replay silencioso de uma resposta de OUTRA operacao — classe de bug
                     // pior que a duplicata original. So faz replay se o payload bater.
-                    if (payloadHash is not null && !string.Equals(entrada.PayloadHash, payloadHash, StringComparison.Ordinal))
+                    // #3094: corpo acima de MaxPayloadHashBytes nao tem hash; sem como provar que e o mesmo corpo, recusa.
+                    if (payloadHash is null || !string.Equals(entrada.PayloadHash, payloadHash, StringComparison.Ordinal))
                     {
                         await WriteMismatchAsync(context, key);
                         return;

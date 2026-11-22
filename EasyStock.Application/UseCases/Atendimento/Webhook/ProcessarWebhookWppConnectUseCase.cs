@@ -1,13 +1,16 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
+using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Domain.Integration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
 public sealed class ProcessarWebhookWppConnectUseCase(
     IIntegrationCredentialResolver credenciais, ITenantContextAccessor tenant,
-    IWppConnectSessaoClient cliente, ProcessarEventoWhatsAppUseCase processar, IMenusNumeradosWppConnect? menus = null)
+    IWppConnectSessaoClient cliente, ProcessarEventoWhatsAppUseCase processar, IMenusNumeradosWppConnect? menus = null,
+    ILogger<ProcessarWebhookWppConnectUseCase>? logger = null, IOperationalMetrics? metricas = null)
 {
     public async Task<bool?> ExecuteAsync(string rawBody, CancellationToken ct = default)
     {
@@ -27,6 +30,9 @@ public sealed class ProcessarWebhookWppConnectUseCase(
             telefone = await cliente.ResolverTelefoneAsync(sessao, contato, ct);
         rawBody = await IdAusenteWppConnect.CompletarAsync(rawBody, sessao, cliente, ct);
         var normalizado = WppConnectWebhookParser.Parse(rawBody, telefone, sessao.InicioDaCaptura);
+        // #3117: aceito e sem o que gravar. Responde 200 como antes, mas agora diz por quê.
+        if (normalizado.Descarte is { } motivo)
+            WebhookSemEfeito.Registrar((ILogger?)logger ?? NullLogger.Instance, metricas, motivo, evento, nome);
         // #2515: o "2" que responde ao menu numerado volta como o toque no botão.
         if (menus is not null)
             normalizado = await EscolhaMenuWppConnect.TraduzirAsync(normalizado, sessao.Sessao, menus, ct);
