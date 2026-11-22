@@ -52,7 +52,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     RespostaSemIa? respostaSemIa = null,
     INotificadorService? notificador = null)
 {
-    private const string Provedor = "meta_whatsapp";
+    public const string Provedor = "meta_whatsapp";
 
     /// <summary>Tipos gravados para a dona ver, mas que não pedem resposta: o agente não responde a um emoji.</summary>
     private static readonly HashSet<string> TiposSemTurnoDoAgente = new(StringComparer.Ordinal) { "reaction", "unsupported", "system" };
