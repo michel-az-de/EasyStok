@@ -36,6 +36,24 @@ namespace EasyStock.Infra.Postgre.Repositories
             }
         }
 
+        public async Task<IReadOnlyList<Usuario>> GetByIdsAsync(IReadOnlyCollection<Guid> ids)
+        {
+            if (ids.Count == 0) return [];
+            // O mesmo bypass do GetByIdAsync: a conta inteira, com os vínculos e perfis de todas as empresas.
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await dbContext.Usuarios
+                    .AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Empresas)
+                    .Include(u => u.Perfis!)
+                    .ThenInclude(up => up.Perfil)
+                    .Where(u => ids.Contains(u.Id))
+                    .AsSplitQuery()
+                    .ToListAsync();
+            }
+        }
+
         public async Task<Usuario?> GetByEmailAsync(string email)
         {
             // Login precede o contexto de tenant: CurrentTenantId=Guid.Empty e

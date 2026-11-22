@@ -81,7 +81,7 @@ public class EscritaGestaoMobileAutorizacaoE2ETests(MobileE2EFixture fixture)
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var (empresa, _) = await fixture.SeedEmpresaELojaAsync();
-        using var cliente = await ClienteAsync(empresa, "Dona");
+        using var cliente = await ClienteAsync(empresa, PerfisCasaDaBaba.Administracao);
 
         var resposta = await PostAsync(cliente, rota);
 

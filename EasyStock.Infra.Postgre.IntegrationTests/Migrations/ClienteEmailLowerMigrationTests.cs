@@ -29,6 +29,8 @@ public class ClienteEmailLowerMigrationTests(PostgreSqlDatabaseFixture fixture)
 
         await migrator.MigrateAsync(alvo);
         (await Existe(db)).Should().Be((true, true), "o Up recria os dois");
+        // O banco é da coleção inteira: volta ao topo, não só até esta migração (#2096, #3163).
+        await migrator.MigrateAsync();
     }
 
     private static async Task<(bool Coluna, bool Indice)> Existe(DbContext db)

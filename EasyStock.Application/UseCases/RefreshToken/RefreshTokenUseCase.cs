@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.Services.Auth;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
 using UsuarioEntity = EasyStock.Domain.Entities.Usuario;
@@ -82,7 +83,8 @@ public sealed class RefreshTokenUseCase(
             novoTokenHash,
             expiraEm,
             null,
-            null);
+            null,
+            refreshToken.EmpresaDaSessaoId);
         novoRefreshToken.SessaoNativaId = sessao?.Id;
         await refreshTokenRepository.AddAsync(novoRefreshToken);
 
@@ -91,7 +93,7 @@ public sealed class RefreshTokenUseCase(
                 requisicaoId.HasValue ? refreshToken.Id : null,
                 requisicaoId.HasValue ? Protetor().Proteger(sessao.Id, novoRefreshTokenValue) : null);
 
-        var resultado = EmitirResultado(usuario, sessao, novoRefreshTokenValue);
+        var resultado = EmitirResultado(usuario, sessao, novoRefreshTokenValue, refreshToken.EmpresaDaSessaoId);
         await auditLogRepository.AddAsync(AuditLogEntity.Criar(usuario.Id, "refresh", true,
             "Token renovado com sucesso", null, null));
         await unitOfWork.CommitAsync();
@@ -112,9 +114,25 @@ public sealed class RefreshTokenUseCase(
         return usuario;
     }
 
-    private RefreshTokenResult EmitirResultado(UsuarioEntity usuario, SessaoNativa? sessao, string refreshTokenValue)
+    private RefreshTokenResult EmitirResultado(
+        UsuarioEntity usuario, SessaoNativa? sessao, string refreshTokenValue, Guid? empresaDaSessaoWeb = null)
     {
-        var empresaId = sessao?.EmpresaId ?? ResolveEmpresaIdPadrao(usuario);
+        // M3 (#2070): a sessão web renova pela regra do login, na empresa em que foi aberta; o suporte mantém nível e
+        // empresa. Token antigo (sem a coluna) segue a única empresa ativa. Sem vínculo ativo com a empresa da sessão o
+        // resolvedor recusa, e a transação desfaz o consumo do token. A sessão do aparelho segue a empresa gravada nela.
+        var autenticarResult = sessao is null
+            ? ResolvedorDeSessao.Resolver(
+                usuario, empresaDaSessaoWeb ?? ResolvedorDeSessao.EmpresaPadrao(usuario), empresaDoSuporte: empresaDaSessaoWeb)
+            : ResultadoDaSessaoNativa(usuario, sessao);
+        var accessToken = jwtTokenService.GerarToken(autenticarResult);
+
+        return new RefreshTokenResult(accessToken, refreshTokenValue, jwtTokenService.ExpiresInSeconds);
+    }
+
+    /// <summary>Sessão do aparelho: empresa, sessão e dispositivo vêm da sessão nativa, sempre persistente.</summary>
+    private static AutenticarUsuarioResult ResultadoDaSessaoNativa(UsuarioEntity usuario, SessaoNativa sessao)
+    {
+        Guid? empresaId = sessao.EmpresaId;
 
         var nivel = NivelAcesso.Visualizador;
         IReadOnlyCollection<Permissao> permissoes = [];
@@ -125,12 +143,13 @@ public sealed class RefreshTokenUseCase(
         if (empresaId.HasValue && usuario.Perfis is not null)
         {
             var perfil = usuario.Perfis
-                .Where(p => p.EmpresaId == empresaId.Value || sessao is not null && p.Perfil != null && p.Perfil.Nivel == NivelAcesso.SuperAdmin)
-                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
+                .Where(p => p.EmpresaId == empresaId.Value || p.Perfil is { EhSuporteGlobal: true })
+                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.NivelNaEmpresa : int.MaxValue)
                 .FirstOrDefault();
             if (perfil?.Perfil is not null)
             {
-                nivel = perfil.Perfil.Nivel;
+                // #3163: perfil de empresa nunca vira sessão de suporte, mesmo com nível SuperAdmin gravado.
+                nivel = perfil.Perfil.NivelNaEmpresa;
                 moduloInicial = perfil.Perfil.ModuloInicial;
                 permissoesExplicitas = perfil.Perfil.PermissoesExplicitas;
                 sessaoPersistente = Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfil.Perfil, empresaId.Value);
@@ -138,7 +157,7 @@ public sealed class RefreshTokenUseCase(
             }
         }
 
-        var autenticarResult = new AutenticarUsuarioResult(
+        return new AutenticarUsuarioResult(
             usuario.Id,
             empresaId,
             usuario.Nome,
@@ -147,22 +166,8 @@ public sealed class RefreshTokenUseCase(
             permissoes,
             moduloInicial,
             permissoesExplicitas,
-            sessao is not null || sessaoPersistente,
-            sessao?.Id,
-            sessao?.DispositivoId);
-        var accessToken = jwtTokenService.GerarToken(autenticarResult);
-
-        return new RefreshTokenResult(accessToken, refreshTokenValue, jwtTokenService.ExpiresInSeconds);
-    }
-
-    private static Guid? ResolveEmpresaIdPadrao(UsuarioEntity usuario)
-    {
-        var empresasAtivas = usuario.Empresas?
-            .Where(e => e.Ativo)
-            .Select(e => e.EmpresaId)
-            .Distinct()
-            .ToArray() ?? [];
-
-        return empresasAtivas.Length == 1 ? empresasAtivas[0] : null;
+            true,
+            sessao.Id,
+            sessao.DispositivoId);
     }
 }

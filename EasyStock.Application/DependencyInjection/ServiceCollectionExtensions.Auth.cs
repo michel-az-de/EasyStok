@@ -57,6 +57,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
         services.AddScoped<EasyStock.Application.UseCases.ChaveDeAcesso.EmitirChaveDeAcessoUseCase>(); // chave de uso único (#2201)
         services.AddScoped<EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase>();
+        services.AddScoped<HierarquiaDeUsuarios>();         // trava, releitura e politica de toda escrita de hierarquia (#2070)
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado

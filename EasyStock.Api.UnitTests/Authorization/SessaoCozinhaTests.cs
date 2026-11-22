@@ -21,7 +21,8 @@ public class SessaoCozinhaTests
 {
     [Theory]
     [InlineData("Cozinha", "normal", true)]
-    [InlineData("Dona", "normal", false)]
+    [InlineData("Administração", "normal", false)]
+    [InlineData("Gerência", "normal", false)]
     [InlineData("Atendimento", "normal", false)]
     [InlineData("Cozinha", "outra-empresa", false)]
     [InlineData("Cozinha", "global", false)]

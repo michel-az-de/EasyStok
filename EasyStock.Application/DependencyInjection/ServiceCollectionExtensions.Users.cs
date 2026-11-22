@@ -43,6 +43,7 @@ public static partial class ServiceCollectionExtensions
 
         // Perfis e permissões
         services.AddScoped<AtribuirPerfilUsuarioUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.MarcarDona.MarcarDonaUseCase>(); // marca de dona (#2070)
 
         // CRUD de lojas
         services.AddScoped<CriarLojaUseCase>();

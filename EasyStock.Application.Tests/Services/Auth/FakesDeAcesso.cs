@@ -32,6 +32,13 @@ internal sealed class FakeResetTokenRepository : IResetTokenRepository
                 .OrderByDescending(l => l.CriadoEm).FirstOrDefault());
     }
 
+    public Task<bool> TemConviteAbertoAsync(Guid usuarioId, DateTime agora)
+    {
+        lock (_trava)
+            return Task.FromResult(Linhas.Any(l => l.UsuarioId == usuarioId && l.Finalidade == FinalidadeResetToken.Convite
+                                                   && !l.Usado && l.ExpiraEm > agora));
+    }
+
     public Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId)
     {
         lock (_trava) return Task.FromResult<IEnumerable<ResetToken>>(Linhas.Where(l => l.UsuarioId == usuarioId).ToList());

@@ -41,6 +41,9 @@ internal sealed class CenarioDeAcesso
     public IEmpresaPadraoResolver EmpresaPadrao { get; } = Substitute.For<IEmpresaPadraoResolver>();
     public ITenantContextAccessor Tenant { get; } = Substitute.For<ITenantContextAccessor>();
     public IRefreshTokenRepository RefreshTokens { get; } = Substitute.For<IRefreshTokenRepository>();
+
+    /// <summary>Vínculos da hierarquia (#2070): a trava e a contagem de donas ativas; quem testa define a contagem.</summary>
+    public IUsuarioEmpresaRepository Vinculos { get; } = Substitute.For<IUsuarioEmpresaRepository>();
     public ICacheService CacheDoRevogador { get; } = Substitute.For<ICacheService>();
     public FakeUnitOfWork UnitOfWork { get; } = new();
     public FakeCacheComRelogio Cache { get; }
@@ -108,6 +111,27 @@ internal sealed class CenarioDeAcesso
             UsuarioId = usuario.Id,
             Perfil = new Perfil { Nome = "SuperAdmin", Nivel = NivelAcesso.SuperAdmin },
         });
+
+    /// <summary>A política de hierarquia (#2070) com os fakes do cenário: trava, releitura e auditoria da recusa.</summary>
+    public HierarquiaDeUsuarios Hierarquia(ICurrentUserAccessor atual, IUsuarioEmpresaRepository? vinculos = null) => new(
+        Usuarios, vinculos ?? Vinculos, atual, Auditoria, UnitOfWork, Substitute.For<ILogger<HierarquiaDeUsuarios>>());
+
+    /// <summary>Dá ao usuário um perfil de <paramref name="nivel"/> na empresa e, se pedido, a marca de dona do vínculo.</summary>
+    public static void DarPerfil(Usuario usuario, Guid empresaId, NivelAcesso nivel, bool dona = false)
+    {
+        var vinculo = usuario.Empresas.FirstOrDefault(e => e.EmpresaId == empresaId);
+        if (vinculo is null)
+        {
+            vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = usuario.Id, EmpresaId = empresaId, Ativo = true };
+            usuario.Empresas.Add(vinculo);
+        }
+        vinculo.EhDona = dona;
+        var perfil = new Perfil { Id = Guid.NewGuid(), Nome = nivel.ToString(), Nivel = nivel, EmpresaId = empresaId };
+        usuario.Perfis.Add(new UsuarioPerfil
+        {
+            Id = Guid.NewGuid(), UsuarioId = usuario.Id, EmpresaId = empresaId, PerfilId = perfil.Id, Perfil = perfil,
+        });
+    }
 
     public RevogadorSessoes Revogador() => new(
         Usuarios, RefreshTokens, CacheDoRevogador, Relogio, Substitute.For<ILogger<RevogadorSessoes>>());
