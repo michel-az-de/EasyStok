@@ -68,6 +68,26 @@ public class ObservabilityMetricsWiringTests
     }
 
     [Fact]
+    public void Counter_de_webhook_sem_efeito_exporta_rotulado_pelo_motivo()
+    {
+        // #3117: sem o contador exportado, o descarte calado do webhook só aparece lendo log.
+        using var sp = BuildProvider(out var exported, out var reader);
+        _ = sp.GetRequiredService<MeterProvider>();
+        var metrics = sp.GetRequiredService<IOperationalMetrics>();
+
+        metrics.IncrementWebhookSemEfeito("grupo");
+        reader.Collect(5000).Should().BeTrue();
+
+        var metric = exported.SingleOrDefault(m => m.Name == MetricNames.WebhookSemEfeitoTotal);
+        metric.Should().NotBeNull();
+        var motivos = new List<object?>();
+        foreach (ref readonly var point in metric!.GetMetricPoints())
+            foreach (var tag in point.Tags)
+                if (tag.Key == "motivo") motivos.Add(tag.Value);
+        motivos.Should().Equal("grupo");
+    }
+
+    [Fact]
     public void DI_resolve_IOperationalMetrics_nao_nulo()
     {
         // C7: injeção obrigatória só protege se o container de fato registrar a porta.
