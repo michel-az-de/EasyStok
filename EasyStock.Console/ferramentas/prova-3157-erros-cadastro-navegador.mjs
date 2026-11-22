@@ -18,12 +18,12 @@ import {PainelCadastros} from '../../../src/features/gestao/cadastros/PainelCada
 import '../../../src/estilos/base.css';
 document.body.style.cssText='margin:0;padding:16px;box-sizing:border-box;background:var(--fundo);font-family:var(--f-corpo);color:var(--tinta)';
 const acoes={abrirConversaDoCliente:async()=>{},abrirJanelaDoPedido:()=>{}};
-function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{editarCadastrosClientes:true,verCadastrosClientes:true,atenderConversas:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={acoes}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela="clientes"/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
+function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{editarCadastrosClientes:true,verCadastrosClientes:true,editarCadastrosFornecedores:true,verCadastrosFornecedores:true,atenderConversas:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={acoes}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela={new URLSearchParams(location.search).get('tela') ?? 'clientes'}/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
 createRoot(document.getElementById('root')).render(<Cena/>);
 `)
 const M = '5b2c8d1e-6a47-4d09-9b6e-1c2d3e4f5a6b'
 const clientes = new Map([
-  ['7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', { id: '7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', revisao: 1, nome: 'Paulo Antigo Teste', telefone: '+5521912345678', email: 'antigo@', documento: '123', tipoPessoa: 'fisica', ativo: true }],
+  ['7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', { id: '7d3f2a10-9c11-4b7e-8a55-0e6f1b2c3d4e', revisao: 1, nome: 'Paulo Antigo Teste', telefone: '+5521912345678', email: 'antigo@', documento: '529.982.247-26', tipoPessoa: 'fisica', ativo: true }],
   [M, { id: M, revisao: 1, nome: 'Mariana Lopes Teste', telefone: '+5511987654321', email: '', documento: '', tipoPessoa: 'fisica', ativo: true }],
 ])
 const digitos = (v) => String(v ?? '').replace(/\D/g, '')
@@ -36,6 +36,11 @@ await contexto.route('**/api/**', async route => {
   if (!path.startsWith('/api/')) return route.continue()
   const [, , recurso, id] = path.split('/')
   if (recurso === 'pedidos') return route.fulfill({ json: { data: [], meta: { totalCount: 0 } } })
+  if (recurso === 'fornecedores') {
+    if (req.method() === 'GET') return route.fulfill({ json: { data: [], meta: { total: 0 } } })
+    escritas.push({ metodo: req.method(), path, corpo: req.postDataJSON?.() ?? null })
+    return route.fulfill({ status: 500, json: { error: { message: 'Não grava nesta prova' } } })
+  }
   assert.equal(recurso, 'clientes', path)
   if (req.method() === 'GET') {
     if (id) return route.fulfill({ json: { data: { cliente: clientes.get(id), enderecos: [], telefones: [], documentos: [], alteracoes: [] } } })
@@ -78,6 +83,7 @@ try {
     await ficha.getByRole('textbox', { name: 'Nome', exact: true }).fill('Paulo Antigo Renomeado')
     assert.equal(await salvar(ficha).isEnabled(), true, 'Documento e e-mail antigos não travam o Salvar')
     assert.equal(await ficha.getByRole('textbox', { name: 'E-mail', exact: true }).getAttribute('aria-invalid'), null, 'O e-mail gravado não vira erro')
+    assert.equal(await ficha.getByRole('textbox', { name: 'CPF ou documento', exact: true }).getAttribute('aria-invalid'), null, 'O CPF gravado com dígito errado não vira erro')
     await salvar(ficha).click()
     for (let i = 0; i < 50 && !escritas.length; i++) await pagina.waitForTimeout(100)
     assert.equal(escritas.length, 1, 'Mudar só o nome grava mesmo com documento e e-mail antigos')
@@ -95,6 +101,11 @@ try {
     assert.equal(await salvar(editor).isDisabled(), true, 'E-mail inválido desliga o Salvar')
     await editor.getByText('Corrija o e-mail para salvar.', { exact: true }).waitFor()
     await pagina.screenshot({ path: resolve(pasta, `email-${largura}.png`), fullPage: true })
+    // 1a. #3192 (revisão): voltar o foco ao campo inválido não apaga o erro; só a primeira tecla apaga.
+    await email.focus()
+    await erroNoCampo(editor, email, /e-mail/i)
+    assert.equal(await salvar(editor).isDisabled(), true, 'Focar o e-mail inválido mantém o Salvar desligado')
+    await editor.getByText('Corrija o e-mail para salvar.', { exact: true }).waitFor()
     await email.fill('ana@exemplo.com'); await email.blur()
     assert.equal(await email.getAttribute('aria-invalid'), null, 'Corrigir tira o aria-invalid')
     assert.equal(await editor.getByRole('alert').filter({ hasText: /e-mail/i }).count(), 0, 'Corrigir tira o texto')
@@ -117,6 +128,9 @@ try {
     assert.equal(await salvar(editor).isDisabled(), true, 'CPF com dígito errado desliga o Salvar')
     await editor.getByText('Corrija o documento para salvar.', { exact: true }).waitFor()
     await pagina.screenshot({ path: resolve(pasta, `documento-${largura}.png`), fullPage: true })
+    await documento.focus()
+    await erroNoCampo(editor, documento, /CPF/)
+    assert.equal(await salvar(editor).isDisabled(), true, 'Focar o CPF inválido mantém o Salvar desligado')
     await documento.fill('529.982.247-25'); await documento.blur()
     assert.equal(await documento.getAttribute('aria-invalid'), null, 'CPF válido passa')
     assert.equal(await salvar(editor).isEnabled(), true, 'CPF válido liga o Salvar')
@@ -132,6 +146,22 @@ try {
     await semDigitar(documento, '529.982.247-26')
     await erroNoCampo(editor, documento, /CPF/)
     assert.equal(await salvar(editor).isDisabled(), true, 'Documento que entrou inválido desliga o Salvar')
+    // 2b. #3192 (revisão): tenta gravar o inválido por Enter e por clique no Salvar; nada sai e o foco vai ao campo marcado.
+    const semGravar = async (campo, texto, valor) => {
+      await campo.fill(valor)
+      assert.equal(await salvar(editor).isEnabled(), true, 'Digitando, o Salvar está ligado: o Enter chega ao salvar()')
+      await campo.press('Enter')
+      await erroNoCampo(editor, campo, texto)
+      assert.equal(await campo.evaluate(el => el === document.activeElement), true, 'O Enter leva o foco ao campo marcado')
+      await salvar(editor).click({ force: true })
+      await pagina.waitForTimeout(400)
+      assert.deepEqual(escritas, [], `Nada inválido chega à API (${valor})`)
+    }
+    await documento.fill(''); await documento.blur()
+    await semGravar(documento, /CPF/, '529.982.247-26')
+    await documento.fill(''); await documento.blur()
+    await semGravar(email, /e-mail/i, 'abc@')
+    await email.fill('ana@exemplo.com'); await email.blur()
     await documento.fill(''); await documento.blur()
     assert.equal(await documento.getAttribute('aria-invalid'), null, 'Vazio é permitido')
     assert.deepEqual(escritas, [], 'Nada inválido chega à API')
@@ -156,6 +186,18 @@ try {
       escritas.length = 0
     }
   }
+  // 4. #3192 (revisão): a validação nativa do prazo de entrega segue ligada no fornecedor; -3 não grava.
+  await pagina.setViewportSize({ width: 1440, height: 1200 })
+  await pagina.goto(`${base}?tela=fornecedores`)
+  await pagina.getByRole('button', { name: 'Novo fornecedor', exact: true }).click()
+  const fornecedor = pagina.getByRole('dialog', { name: 'Novo fornecedor', exact: true }); await fornecedor.waitFor()
+  await fornecedor.getByRole('textbox', { name: 'Nome', exact: true }).fill('Fornecedor Teste')
+  const prazo = fornecedor.getByRole('spinbutton', { name: 'Prazo de entrega (dias)', exact: true })
+  await prazo.fill('-3'); await prazo.press('Enter')
+  await salvar(fornecedor).click()
+  await pagina.waitForTimeout(500)
+  assert.equal(await prazo.evaluate(el => el.validity.rangeUnderflow), true, 'O -3 fica abaixo do mínimo')
+  assert.deepEqual(escritas, [], 'Prazo -3 do fornecedor não grava')
   assert.deepEqual(erros, [])
   console.log('#3157 e #3192 navegador: e-mail e documento com erro no campo e motivo no Salvar, somem ao corrigir; CPF válido passa; telefone repetido avisa com o nome sem bloquear; 1440 e 390.')
 } catch (erro) { await pagina.screenshot({ path: resolve(pasta, 'falha.png'), fullPage: true }); console.error(erros.join('\n')); throw erro }

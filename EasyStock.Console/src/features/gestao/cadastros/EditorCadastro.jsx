@@ -63,7 +63,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const buscaDuplicado = useRef(null)
   const termoBuscado = useRef(null)
   const [avisoDoTelefoneLiberado, liberarAvisoDoTelefone] = useState(false)
-  // #3192: o erro de e-mail e de documento fica escondido só enquanto a pessoa está no campo; valor que entra sem digitação
+  // #3192: o erro de e-mail e de documento fica escondido só enquanto a pessoa digita no campo (da primeira tecla até sair; focar sem digitar mantém o erro); valor que entra sem digitação
   // (rascunho, "Usar este dado", autopreenchimento) mostra o erro na hora, e o Salvar só liga/desliga junto com ele.
   const [campoEmFoco, focarCampo] = useState(null)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort(); buscaDuplicado.current?.abort() } }, [])
@@ -90,7 +90,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const limites = errosDoFormularioCadastro(tela, { ...dados, nome: dados.nome || '-', categoriaId: dados.categoriaId || '-' })
   const obrigatorio = (chave) => (OBRIGATORIOS_CADASTRO[tela] ?? []).includes(chave)
   const erroDo = (chave) => erros[chave] ?? limites[chave]
-  const campo = (chave, rotulo, extras = {}) => <CampoTexto key={chave} rotulo={rotulo} obrigatorio={obrigatorio(chave)} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} onFocus={chave === 'email' ? () => focarCampo('email') : undefined} onBlur={chave === 'email' ? () => focarCampo(null) : undefined} erro={erroDo(chave) ?? (chave === 'email' ? erroDoEmailNaTela : undefined)} {...extras} />
+  const campo = (chave, rotulo, extras = {}) => <CampoTexto key={chave} rotulo={rotulo} obrigatorio={obrigatorio(chave)} value={dados[chave] ?? ''} onChange={e => { mudar(chave, e.target.value); if (chave === 'email' && e.target === document.activeElement) focarCampo('email') }} onBlur={chave === 'email' ? () => focarCampo(null) : undefined} erro={erroDo(chave) ?? (chave === 'email' ? erroDoEmailNaTela : undefined)} {...extras} />
   // #2457 (U2): o conflito mostra o telefone como a pessoa digitou, não o E.164 gravado.
   // Voltar ao mesmo número não conta como alteração nem entra no conflito (revisão da #2460).
   const mesmoTelefone = (valor) => telefoneNaTela(valor) === telefoneNaTela(inicial.telefone)
@@ -110,7 +110,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const avisoDoDocumento = tela === 'clientes' && !erroDoDocumentoNaTela && campoEmFoco !== 'documento' && dados.documento !== inicial.documento ? avisoDoDocumentoDoCadastro(dados.documento) : null
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
   const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => { const v = mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value; mudar('telefone', v); conferirDuplicado('telefone', v) }} onBlur={() => { conferirDuplicado('telefone'); liberarAvisoDoTelefone(true); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
-  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => { const v = mesmoDocumento(e.target.value) ? inicial.documento : e.target.value; mudar('documento', v); conferirDuplicado('documento', v) }} onFocus={() => focarCampo('documento')} onBlur={() => { conferirDuplicado('documento'); focarCampo(null) }} erro={erroDo('documento') ?? erroDoDocumentoNaTela} aviso={avisoDoDocumento ?? undefined} />
+  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => { const v = mesmoDocumento(e.target.value) ? inicial.documento : e.target.value; mudar('documento', v); conferirDuplicado('documento', v); if (e.target === document.activeElement) focarCampo('documento') }} onBlur={() => { conferirDuplicado('documento'); focarCampo(null) }} erro={erroDo('documento') ?? erroDoDocumentoNaTela} aviso={avisoDoDocumento ?? undefined} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
   const subcategorias = tela === 'produtos' ? subcategoriasDe(categorias, dados.categoriaId) : []
@@ -236,7 +236,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       {sugestao.erro && <p className={css.erro} role="alert">{sugestao.erro}</p>}
       {sugestao.campos.map(c => <div className={css.sugestao} key={c.campo}><span><strong>{({ nome: 'Nome', telefone: 'Telefone', email: 'E-mail' })[c.campo]}: {c.valor}</strong><q>{c.evidencia}</q></span><Botao disabled={salvando} onClick={() => sugestao.aplicar(c.campo)}>Usar este dado</Botao></div>)}
     </section>}
-    <form id={idForm} ref={formRef} onSubmit={salvar} noValidate hidden={!formularioAberto}>
+    <form id={idForm} ref={formRef} onSubmit={salvar} noValidate={tela === 'clientes'} hidden={!formularioAberto}>
       {podeEditar && <p className={css.legenda}>Campos com * são obrigatórios.</p>}
       <fieldset disabled={salvando || !podeEditar} className={css.formulario}>
         {campo('nome', tela === 'bancos' ? 'Nome da conta' : 'Nome', { required: true, 'data-foco-inicial': true })}
