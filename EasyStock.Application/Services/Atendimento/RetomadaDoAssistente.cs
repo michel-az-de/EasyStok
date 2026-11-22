@@ -106,8 +106,14 @@ public static class RetomadaDoAssistente
     /// </summary>
     public static string Orientacao(TimeSpan prazo) =>
         $"\n\n{MarcaNoPrompt}: a conversa estava com a equipe, que não respondeu em {prazo.TotalSeconds:0} segundos, e voltou para você. "
-        + "O cliente continua esperando. Responda agora à última mensagem dele: diga em uma frase que a equipe já foi avisada e que "
-        + "você segue com ele por aqui, resolva o que as ferramentas permitirem e peça só o dado que falta. "
+        + "O cliente continua esperando. Responda agora à última mensagem dele. Se ela trouxer um pedido, uma dúvida ou a "
+        + "confirmação de algo que foi pedido a ele, diga em uma frase que a equipe já foi avisada e que você segue com ele por aqui, "
+        + "resolva o que as ferramentas permitirem e peça só o dado que falta. Se for só um cumprimento, responda com cordialidade em "
+        + "uma frase e pergunte em que pode ajudar, sem retomar por conta própria o assunto que estava com a equipe. "
+        // #3111: o motivo anterior e o aviso de frete do dossiê podem estar velhos, e a guarda barra o que não vem de ferramenta.
+        + "O motivo pelo qual a conversa estava com a equipe, as notas internas e as mensagens automáticas podem estar "
+        + "desatualizados: não repita nada deles ao cliente. Sem uma ferramenta deste turno mostrar, não afirme nada como combinado ou "
+        + "acertado sobre frete, taxa ou entrega, nem cite valor, prazo ou gratuidade de frete. "
         + "Não use escalar_para_dona nem encaminhar_para_responsavel de novo pelo mesmo motivo, e não diga que a equipe vai responder, "
         + "ligar ou resolver, nem dê prazo. Se o assunto depender só da equipe (dinheiro, cancelamento, reclamação), acolha, anote o "
         + "que o cliente quer com registrar_nota quando a ferramenta existir e continue disponível.";

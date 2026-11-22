@@ -394,4 +394,55 @@ public partial class AgenteAtendimentoServiceTests
         _unitOfWork.Received().DescartarAlteracoesPendentes();
         _requisicoes.Should().BeEmpty();
     }
+
+    /// <summary>
+    /// #3111: a conversa foi para a equipe por frete a combinar, a equipe combinou o frete (nota e aviso automático no
+    /// dossiê), o motivo ficou velho e o cliente voltou só com uma saudação.
+    /// </summary>
+    private void FreteCombinadoPelaEquipeESaudacaoHa(TimeSpan espera)
+    {
+        var combinou = Agora.AddHours(-3);
+        _historico.Clear();
+        _conversa.Escalar(combinou.AddMinutes(-5), "Entrega e frete a combinar. Confira o endereço e a seleção da comanda.");
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Sistema, combinou, TipoConteudoMensagem.Texto,
+            "Frete de R$ 8,00 combinado pela atendente. O cliente precisa conferir e confirmar o total na comanda."));
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Sistema, combinou, TipoConteudoMensagem.Texto,
+            "O frete combinado é R$ 8,00. Confira e confirme o total na comanda para enviar o pedido.", "wamid.out20"));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - espera, TipoConteudoMensagem.Texto, "boa noite", "wamid.in20"));
+    }
+
+    [Fact]
+    public async Task Retomada_FreteACombinarESaudacao_OrientaANaoAfirmarFrete()
+    {
+        FreteCombinadoPelaEquipeESaudacaoHa(AlemDoPrazo);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("Boa noite! Em que posso ajudar?"));
+
+        var resultado = await Retomar();
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: true, Escalou: false));
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        var volatil = _requisicoes.Should().ContainSingle().Subject.SystemVolatil!;
+        var marca = volatil.IndexOf(RetomadaDoAssistente.MarcaNoPrompt, StringComparison.Ordinal);
+        volatil[..marca].Should().Contain("R$ 8,00", "o dossiê do incidente leva o frete combinado ao modelo");
+        var orientacao = volatil[marca..];
+        orientacao.Should().Contain("Sem uma ferramenta deste turno mostrar, não afirme nada como combinado ou acertado sobre frete")
+            .And.Contain("Se for só um cumprimento", "a frase sobre a equipe fica para a mensagem com pedido")
+            .And.Contain("mensagens automáticas", "o frete combinado do dossiê não se repete ao cliente")
+            .And.Contain("pergunte em que pode ajudar", "saudação não reabre o assunto que estava com a equipe");
+    }
+
+    [Fact]
+    public async Task Retomada_ModeloAfirmaFreteCombinadoSemFerramenta_GuardaContinuaBarrando()
+    {
+        FreteCombinadoPelaEquipeESaudacaoHa(AlemDoPrazo);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(Texto("Boa noite! O frete combinado é R$ 8,00, é só confirmar na comanda."));
+
+        var resultado = await Retomar();
+
+        resultado.Escalou.Should().BeTrue();
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            Arg.Is<string>(m => m.Contains("afirma frete combinado")), Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(t => t.Contains("R$ 8,00")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
 }
