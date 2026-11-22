@@ -1,5 +1,5 @@
 // #3156: Chromium e componentes reais (FaixaApi + AvisosDoDispositivo). A 390 só uma faixa por vez (a da loja
-// desligada na frente; "Notificações bloqueadas" cede), "Fechar aviso" mede ao menos 44x44, e fechado ele não volta ao
+// desligada na frente; "Notificações bloqueadas" cede), "Fechar aviso" tem alvo de clique de 44x44 sem engordar a faixa (1440 <= 72 px; 390 <= 84 px), e fechado ele não volta ao
 // recarregar enquanto o estado da loja não muda. Alturas das faixas medidas a 1440 e a 390.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
@@ -54,8 +54,20 @@ try {
     else assert.ok(faixaH > 0 && aparelhoH > 0, 'No desktop as duas cabem e seguem à vista')
     const fechar = pagina.getByRole('button', { name: 'Fechar aviso', exact: true })
     const caixa = await fechar.boundingBox()
-    assert.ok(caixa.width >= 44 && caixa.height >= 44, `Fechar aviso mede ${Math.round(caixa.width)}x${Math.round(caixa.height)} px (mínimo 44x44)`)
+    // Alvo real: o retângulo de 44x44 centrado no botão; cada canto (1 px para dentro) cai no próprio botão.
+    const alvo = await fechar.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const l = Math.max(44, r.width), a = Math.max(44, r.height)
+      const x0 = r.left + r.width / 2 - l / 2, y0 = r.top + r.height / 2 - a / 2
+      const cantos = [[x0 + 1, y0 + 1], [x0 + l - 1, y0 + 1], [x0 + 1, y0 + a - 1], [x0 + l - 1, y0 + a - 1]]
+      return cantos.map(([x, y]) => document.elementFromPoint(x, y)?.closest('button') === el)
+    })
+    assert.deepEqual(alvo, [true, true, true, true], `A ${largura} os cantos do alvo 44x44 do Fechar aviso não caem no botão: ${alvo}`)
+    // Meta do #3156: menos espaço fixo no pé. 1440 soma <= 72 px; 390 a faixa da loja <= 84 px.
+    if (largura === 1440) assert.ok(faixaH + aparelhoH <= 72, `A 1440 o pé soma ${faixaH + aparelhoH} px (máximo 72)`)
+    else assert.ok(faixaH <= 84, `A 390 a faixa da loja mede ${faixaH} px (máximo 84)`)
     medidas[largura].fecharAviso = `${Math.round(caixa.width)}x${Math.round(caixa.height)}`
+    medidas[largura].alvo44 = alvo.every(Boolean)
     await fechar.click()
     await faixaDaLoja.waitFor({ state: 'detached' })
     // Recarregar: o aviso da mesma loja desligada não volta; a faixa de notificações aparece no lugar.
@@ -74,5 +86,6 @@ try {
     await contexto.close()
   }
   assert.deepEqual(erros, [], 'Sem erro de página')
+  writeFileSync(resolve(pasta, 'medidas.json'), JSON.stringify(medidas))
   console.log('prova-3156-faixas-pe-navegador: ok', JSON.stringify(medidas))
 } finally { await browser.close() }
