@@ -26,10 +26,11 @@ assert.equal(avisoDeCelularBr('(11) 98765-4321'), null)
 assert.equal(avisoDeCelularBr('5511987654321'), null, 'com o 55 na frente')
 assert.equal(avisoDeCelularBr('+55 11 98765-4321'), null, 'com +55')
 assert.equal(avisoDeCelularBr(''), null, 'vazio não avisa')
-assert.equal(avisoDeCelularBr('12'), null, 'inválido já tem o erro, sem aviso por cima')
+assert.ok(avisoDeCelularBr('12'), '"12" gravado antes da regra também não recebe Novo pedido (a tela só avisa sem erro por cima)')
 
 // 3. O celular do Novo pedido segue a mesma regra da API.
 assert.ok(erroDoCelular('(11) 91234-5678'), 'Novo pedido recusa antes de ir à API')
 assert.equal(erroDoCelular('(11) 98765-4321'), null)
 assert.equal(erroDoCelular('(21) 96543-2109'), null)
+assert.ok(erroDoCelular('(01) 98765-4321'), 'DDD não começa com zero, como na API')
 console.log('ok prova-3155-telefone-cadastro')

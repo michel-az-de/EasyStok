@@ -61,10 +61,12 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const [duplicado, definirDuplicado] = useState(null)
   const [abrirOutro, confirmarAbrirOutro] = useState(null)
   const buscaDuplicado = useRef(null)
+  const [avisoDoTelefoneLiberado, liberarAvisoDoTelefone] = useState(false)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort(); buscaDuplicado.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
     aoMudar({ ...editor, dados: mudarDadosCadastro(tela, dados, campo, valor) })
     definirErros(anteriores => ({ ...anteriores, [campo]: null }))
+    if (campo === 'telefone') liberarAvisoDoTelefone(false)
     // Mudar o campo tira o aviso e cancela a busca em voo: resposta velha não avisa.
     definirDuplicado(atual => atual?.campo === campo ? null : atual)
     if (campo === 'telefone' || campo === 'documento') buscaDuplicado.current?.abort()
@@ -93,9 +95,10 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   // #3155: o telefone que mudou passa pela regra da rota (a do telefone extra: Telefone.cs); o gravado não trava outro campo.
   // Só em clientes: fornecedores usam o mesmo campo. O aviso diz quando o número não recebe Novo pedido, sem bloquear.
   const erroDoTelefoneNovo = tela === 'clientes' && String(dados.telefone ?? '').trim() && dados.telefone !== inicial.telefone ? erroDoTelefoneExtra(dados.telefone) : null
-  const avisoDoTelefone = tela === 'clientes' && !erroDo('telefone') ? avisoDeCelularBr(dados.telefone) : null
+  // O aviso do número que mudou espera a pessoa sair do campo: digitando um celular, o 10º dígito parece um fixo.
+  const avisoDoTelefone = tela === 'clientes' && !erroDo('telefone') && (avisoDoTelefoneLiberado || dados.telefone === inicial.telefone) ? avisoDeCelularBr(dados.telefone) : null
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
-  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => { conferirDuplicado('telefone'); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
+  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => { conferirDuplicado('telefone'); liberarAvisoDoTelefone(true); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
   const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value)} onBlur={() => conferirDuplicado('documento')} erro={erroDo('documento')} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
