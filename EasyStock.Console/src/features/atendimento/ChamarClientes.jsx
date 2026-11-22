@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../aplicacao/novoPedidoDoCliente'
@@ -20,6 +20,7 @@ const ESPERA_DA_DIGITACAO_MS = 300
 export function ChamarClientes({ busca, conversas, aoAbrir }) {
   const { buscarClientesParaChamar, selecionar, selecionarIniciada } = useAcoes()
   const novoPedido = useNovoPedidoDoCliente({ aoAbrir })
+  const idDoMotivo = useId()
   const [achados, setAchados] = useState({ termo: '', lista: [] })
   const [escolhido, setEscolhido] = useState(null)
   const termo = busca.trim()
@@ -46,12 +47,13 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
       <AnfitriaoDeConfirmacao />
       {lista.length > 0 && <p className={css.chamarClientesTitulo}>Clientes cadastrados sem conversa aberta</p>}
       {novoPedido.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.chamarClienteErro} role="alert">{novoPedido.erro}</p>}
+      {novoPedido.disponivel && novoPedido.motivo && lista.length > 0 && <p id={idDoMotivo} className={css.chamarClientesTitulo} role="status">{novoPedido.motivo}</p>}
       {lista.map((cliente) => (
         <div key={cliente.id} className={css.chamarCliente}>
           <span className={css.chamarClienteNome}>{cliente.nome} · {telefoneDoE164(cliente.telefone)}</span>
           <span className={css.chamarClienteAcoes}>
             {novoPedido.disponivel && (
-              <Botao icone="mais" disabled={Boolean(novoPedido.abrindo)} aria-label={`Novo pedido de ${cliente.nome}`}
+              <Botao icone="mais" disabled={Boolean(novoPedido.abrindo || novoPedido.motivo)} title={novoPedido.motivo ?? undefined} aria-describedby={novoPedido.motivo ? idDoMotivo : undefined} aria-label={`Novo pedido de ${cliente.nome}`}
                 onClick={() => novoPedido.iniciar(cliente.id)}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : novoPedido.rotulo(cliente.id)}</Botao>
             )}
             <Botao disabled={Boolean(novoPedido.abrindo)} onClick={() => setEscolhido(cliente)}>Chamar no WhatsApp</Botao>

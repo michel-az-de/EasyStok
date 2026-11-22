@@ -46,7 +46,7 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
       <Avatar nome={dados.nome} foto={foto.url} tamanho="grande" />
       <div>
         <strong>{nome}</strong>
-        {situacao && <Pilula tom={situacao.tom}>{situacao.texto}</Pilula>}
+        {situacao && <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula>}
       </div>
       {aoEditar && !editando && <Botao icone="lapis" onClick={aoEditar}>Editar dados</Botao>}
     </header>

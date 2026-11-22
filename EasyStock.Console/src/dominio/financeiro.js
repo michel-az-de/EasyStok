@@ -10,9 +10,12 @@ export function nomeStatusConta(status, lado = 'pagar') {
 // #2095 (C2): a Pilula tem ok, aviso, perigo e neutro; "erro" não existe e apagava o vencido.
 export const tomDoStatusConta = (status) => status === 'Vencida' ? 'perigo' : status === 'Paga' ? 'ok' : status === 'ParcialmentePaga' ? 'aviso' : 'neutro'
 export const nomeStatusPagamento = (status) => ({ Confirmado: 'Registrado', Estornado: 'Estornado', Pendente: 'Pendente' })[status] ?? status
+// #3193: `emitir` é o `emitirAposCriar` da API: marcado, a conta entra nas contas a pagar (ou a receber), e "Já foi paga" só existe
+// com ele marcado; desmarcado, fica Rascunho. O texto não pode dizer "aberta": a conta que já foi paga sai Paga.
+const EMITIR = 'Lançar a conta ao salvar'
 export const palavrasDoLado = (lado) => lado === 'receber'
-  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida', emitir: 'Deixar a conta aberta ao salvar' }
-  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga', emitir: 'Deixar a conta aberta ao salvar' }
+  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e não entra nas contas a receber.' }
+  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga', emitir: EMITIR, emitirDica: 'Desmarcado, ela fica como rascunho e não entra nas contas a pagar.' }
 
 export function diaFinanceiro(instante = Date.now()) {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instante))

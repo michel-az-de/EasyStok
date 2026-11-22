@@ -21,6 +21,7 @@ async function preparar({ largura, hash, lojaDesligada = false }) {
   const contexto = await browser.newContext({ viewport: { width: largura, height: movel ? 844 : 900 }, isMobile: movel, hasTouch: movel, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' })
   await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja' }, usuario: { id: 'dona', nome: 'Dona de teste' } })))
   const acoes = Object.fromEntries(['verPedidos', 'atenderConversas', 'editarAtendimento', 'verCadastrosClientes', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros', 'visualizarContasPagar', 'gerenciarContasPagar', 'gerenciarCategoriasFinanceiras', 'visualizarContasReceber'].map((n) => [n, true]))
+  const clientes = [{ id: 'A', revisao: 1, nome: 'Pessoa Lead', telefone: '11911112222', email: '', documento: '', tipoPessoa: 'fisica', ativo: true, orderCount: 0 }, { id: 'B', revisao: 1, nome: 'Pessoa Dois', telefone: '11933334444', email: '', documento: '', tipoPessoa: 'fisica', ativo: true, orderCount: 0 }]
   const categorias = [{ id: 'K1', nome: 'Aluguel', tipo: 'Despesa', ativa: true }]
   await contexto.route('**/api/**', async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname
@@ -33,7 +34,9 @@ async function preparar({ largura, hash, lojaDesligada = false }) {
     if (path.startsWith('/api/atendimento/comanda/cardapio')) return ok({ itens: lojaDesligada ? [] : [{ sku: 'a', nome: 'Lasanha', preco: 10 }], porcoes: {} }, { meta: { lojaDisponivel: !lojaDesligada } })
     if (path === '/api/notificacoes/badge') return ok({ count: 0 })
     if (path === '/api/financeiro/categorias') return ok(categorias)
-    if (path === '/api/clientes') return ok([{ id: 'A', revisao: 1, nome: 'Pessoa Lead', telefone: '11911112222', email: '', documento: '', tipoPessoa: 'fisica', ativo: true, orderCount: 0 }], { meta: { total: 1 } })
+    if (path === '/api/clientes/buscar') return ok(clientes)
+    if (path === '/api/clientes/A') return ok({ cliente: clientes[0], enderecos: [], telefones: [] })
+    if (path === '/api/clientes') return ok(clientes, { meta: { total: 2 } })
     return ok([], { meta: { totalCount: 0, total: 0, page: 1, limit: 20 } })
   })
   const page = await contexto.newPage()
@@ -44,7 +47,7 @@ async function preparar({ largura, hash, lojaDesligada = false }) {
 }
 const falhas = []
 const item = async (nome, corpo) => {
-  try { await corpo(); console.log(`ok    ${nome}`) } catch (e) { falhas.push(`${nome}: ${e.message.split('\n')[0]}`); console.log(`FALHA ${nome}: ${e.message.split('\n')[0]}`) }
+  try { await corpo(); console.log(`ok    ${nome}`) } catch (e) { const motivo = e.message.split('\n').slice(0, 4).join(' | '); falhas.push(`${nome}: ${motivo}`); console.log(`FALHA ${nome}: ${motivo}`) }
 }
 const tamanhoDo = (alvo) => alvo.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
 
@@ -57,42 +60,65 @@ for (const largura of [1440, 390]) {
     await janela.getByRole('button', { name: '+ Nova categoria', exact: true }).click()
     await janela.getByRole('button', { name: 'Criar categoria', exact: true }).waitFor()
     assert.equal(await janela.getByRole('button', { name: 'Cancelar', exact: true }).count(), 1, 'botões Cancelar na janela')
-    assert.equal(await janela.getByText('Deixar a conta aberta ao salvar').count(), 1, 'C: texto de loja')
-    assert.equal(await janela.getByText(/Emitir a conta/).count(), 0, 'C: sem jargão')
+    assert.equal(await janela.getByText('Lançar a conta ao salvar', { exact: true }).count(), 1, 'I2: texto que mantém o sentido de Emitir')
+    assert.equal(await janela.getByText('Desmarcado, ela fica como rascunho e não entra nas contas a pagar.', { exact: true }).count(), 1, 'I2: apoio diz o que o desmarcado faz')
+    assert.equal(await janela.getByText(/Deixar a conta aberta|Emitir a conta/).count(), 0, 'I2: sem o texto que contradiz Já foi paga')
     await page.screenshot({ path: `${pasta}/categoria-${largura}.png` })
     await contexto.close()
   })
-  await item(`B ${largura}: título do Financeiro mede ${esperado}px, um só visível`, async () => {
-    const { contexto, page } = await preparar({ largura, hash: '#/m/financeiro/pagar' })
-    const h1 = page.getByRole('heading', { level: 1, name: /Contas a pagar/ }); await h1.waitFor()
-    assert.equal(await tamanhoDo(h1), esperado, 'font-size do título visível')
-    const visiveis = await page.locator('h1, h2').evaluateAll((els) => els.filter((el) => el.getClientRects().length && el.getBoundingClientRect().width > 1 && !el.classList.contains('sr') && /Contas a pagar/.test(el.textContent)).length)
-    assert.equal(visiveis, 1, 'título repetido')
-    await page.screenshot({ path: `${pasta}/financeiro-${largura}.png` })
-    await contexto.close()
-  })
-  await item(`B ${largura}: Cadastros mostra o título de ${esperado}px`, async () => {
-    const { contexto, page } = await preparar({ largura, hash: '#/m/cadastros/clientes' })
-    const h2 = page.getByRole('heading', { level: 2, name: /clientes/i }).first(); await h2.waitFor()
-    assert.equal(await tamanhoDo(h2), esperado, 'referência de Cadastros')
-    await contexto.close()
-  })
-  await item(`C/D ${largura}: Lead explicado e Novo pedido da linha desligado com a loja desligada`, async () => {
+  for (const [nome, hash, nomeDoTitulo] of [['Financeiro', '#/m/financeiro/pagar', /Contas a pagar/], ['Cadastros', '#/m/cadastros/clientes', /clientes/i], ['Pedidos', '#/m/cadastros/pedidos', /^Pedidos$/]]) {
+    await item(`B ${largura}: título visível de ${nome} é h2 de ${esperado}px`, async () => {
+      const { contexto, page } = await preparar({ largura, hash })
+      const titulo = page.getByRole('heading', { level: 2, name: nomeDoTitulo }).first(); await titulo.waitFor()
+      assert.equal(await tamanhoDo(titulo), esperado, 'font-size do título visível')
+      if (nome === 'Financeiro') {
+        const visiveis = await page.locator('h1, h2').evaluateAll((els) => els.filter((el) => el.getClientRects().length && el.getBoundingClientRect().width > 1 && !el.classList.contains('sr') && /Contas a pagar/.test(el.textContent)).length)
+        assert.equal(visiveis, 1, 'título repetido')
+      }
+      await page.screenshot({ path: `${pasta}/${nome.toLowerCase()}-${largura}.png` })
+      await contexto.close()
+    })
+  }
+  await item(`C/D ${largura}: Sem pedido ainda na lista, na aba e na Ficha; Novo pedido desligado com o motivo mostrado uma vez`, async () => {
     const { contexto, page } = await preparar({ largura, hash: '#/m/cadastros/clientes', lojaDesligada: true })
-    const selo = page.getByText('Sem pedido ainda', { exact: true }).first(); await selo.waitFor()
-    assert.equal(await page.getByText('Lead', { exact: true }).count(), 0, 'sem "Lead" visível na lista')
-    assert.match(await selo.getAttribute('title') ?? '', /ainda não fez nenhum pedido/i, 'selo explica')
-    const novo = page.getByRole('button', { name: 'Novo pedido de Pessoa Lead' })
-    await novo.waitFor()
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Novo pedido de Pessoa Lead' && b.disabled))
-    assert.equal(await novo.getAttribute('title'), AVISO, 'title com o motivo de Pedidos')
-    assert.equal(await page.getByText(AVISO, { exact: true }).count() >= 1, true, 'motivo visível')
-    await novo.click({ force: true }).catch(() => {})
-    await page.waitForTimeout(300)
-    assert.equal(chamadas.some((c) => c.includes('/do-cliente')), false, 'não chamou a API de conversa')
+    await page.getByText('Sem pedido ainda', { exact: true }).first().waitFor()
+    assert.equal(await page.getByText('Lead', { exact: true }).count(), 0, 'I3: sem "Lead" visível na lista e nas abas')
+    assert.equal(await page.getByRole('tab', { name: 'Leads' }).count(), 0, 'I3: a aba não se chama Leads')
+    assert.equal(await page.getByRole('tab', { name: 'Sem pedido', exact: true }).count(), 1, 'I3: aba com o termo do selo')
+    assert.match(await page.getByText('Sem pedido ainda', { exact: true }).first().getAttribute('title') ?? '', /ainda não fez nenhum pedido/i, 'selo explica')
+    await page.waitForFunction(() => document.querySelectorAll('button[aria-label^="Novo pedido de"]').length === 2)
+    for (const nome of ['Pessoa Lead', 'Pessoa Dois']) {
+      const novo = page.getByRole('button', { name: `Novo pedido de ${nome}` })
+      await page.waitForFunction((n) => [...document.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === `Novo pedido de ${n}` && b.disabled), nome)
+      assert.equal(await novo.getAttribute('title'), AVISO, 'title com o motivo de Pedidos')
+      const alvo = await novo.getAttribute('aria-describedby')
+      assert.ok(alvo, 'I4: botão ligado ao aviso por aria-describedby')
+      assert.equal(await page.locator(`[id="${alvo.split(' ')[0]}"]`).textContent(), AVISO, 'I4: aria-describedby aponta para o motivo')
+    }
+    assert.equal(await page.getByText(AVISO, { exact: true }).count(), 1, 'I4: o motivo aparece uma vez, com 2 clientes')
+    // I1: a Ficha aberta pela lista segue a mesma regra.
+    await page.getByRole('button', { name: 'Abrir ficha de Pessoa Lead' }).click()
+    const ficha = page.getByRole('dialog'); await ficha.waitFor()
+    const naFicha = ficha.getByRole('button', { name: /^(Novo|Continuar) pedido/ })
+    await naFicha.waitFor()
+    assert.equal(await naFicha.isDisabled(), true, 'I1: Novo pedido da Ficha desligado')
+    assert.equal(await naFicha.getAttribute('title'), AVISO, 'I1: Ficha com o motivo')
+    assert.equal(await ficha.getByText('Sem pedido ainda', { exact: true }).count() >= 1, true, 'I3: Ficha com o termo do selo')
+    assert.equal(await ficha.getByText('Lead', { exact: true }).count(), 0, 'I3: Ficha sem "Lead"')
     await page.screenshot({ path: `${pasta}/clientes-${largura}.png` })
     await contexto.close()
   })
+  await item(`D ${largura}: busca do Atendimento com a loja desligada: Novo pedido desligado com o motivo`, async () => {
+    const { contexto, page } = await preparar({ largura, hash: '#/m/atendimento/balcao', lojaDesligada: true })
+    const busca = page.locator('input[type="search"], input[placeholder*="uscar" i]').first(); await busca.waitFor()
+    await busca.fill('Pessoa')
+    const novo = page.getByRole('button', { name: 'Novo pedido de Pessoa Lead' }); await novo.waitFor()
+    assert.equal(await novo.isDisabled(), true, 'I1: Novo pedido da busca desligado')
+    assert.equal(await novo.getAttribute('title'), AVISO, 'I1: busca com o motivo')
+    assert.ok(await novo.getAttribute('aria-describedby'), 'I1: motivo acessível')
+    await contexto.close()
+  })
+  assert.equal(chamadas.some((c) => c.startsWith('POST') && c.includes('/do-cliente')), false, `nenhum POST /do-cliente (${largura})`)
 }
 assert.deepEqual(erros, [], 'sem erro de página')
 if (falhas.length) { console.error(`\n${falhas.length} falha(s):\n- ${falhas.join('\n- ')}`); await browser.close(); process.exit(1) }
