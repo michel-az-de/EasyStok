@@ -138,7 +138,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _pedidoRepository,
             _regrasAutomaticas,
             perfil,
-            respostaSemIa);
+            respostaSemIa,
+            _notificador);
 
     private void ConfigurarCenario()
     {
@@ -929,6 +930,37 @@ public class ProcessarEventoWhatsAppUseCaseTests
         iniciada.DentroDaJanela(resposta.AddHours(1)).Should().BeTrue("a resposta abre a janela de 24 h para texto livre");
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
         iniciada.Situacao.Should().Be(SituacaoConversa.Assumida, "segue com a atendente que chamou");
+    }
+
+    /// <summary>
+    /// #2992: na conversa assumida, o cliente diz que não quer mais o pedido que aguarda pagamento. A equipe é avisada
+    /// uma vez e a conversa guarda a desistência, que é o que para o lembrete e o link novo daquele pedido.
+    /// </summary>
+    [Theory]
+    [InlineData("não quero mais o pedido", 1)]
+    [InlineData("pode mandar o pedido hoje", 0)]
+    public async Task DesistenciaNaConversaAssumidaAvisaAEquipeUmaVez(string texto, int avisos)
+    {
+        var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
+        pedido.Status = StatusPedidoMapper.AguardandoPagamento;
+        _pedidoRepository.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        var assumida = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddHours(-2), "Ana", Guid.NewGuid());
+        assumida.DefinirPedidoEmAndamento(pedido.Id);
+        assumida.Assumir(DateTime.UtcNow.AddHours(-1), Guid.NewGuid());
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(assumida);
+        _conversaRepository.DevolverAberta(assumida);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.desiste1", texto));
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.desiste2", texto));
+
+        assumida.ClienteDesistiuDoPedido(pedido.Id).Should().Be(avisos == 1);
+        await _notificador.Received(avisos).EnfileirarEventoAsync(
+            EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento, _empresaId,
+            Arg.Is<string>(p => p.Contains("O cliente desistiu do pedido") && p.Contains(assumida.Id.ToString())),
+            assumida.Id, Arg.Any<CancellationToken>(), Arg.Any<string?>());
+        await _conversaRepository.Received(2).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ConversaId == assumida.Id && m.Direcao == DirecaoMensagem.Entrada), Arg.Any<CancellationToken>());
     }
 
     [Fact]
