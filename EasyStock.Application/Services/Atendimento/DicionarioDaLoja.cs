@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -26,23 +27,28 @@ public static class DicionarioDaLoja
     };
 
     /// <summary>O dicionário guardado pela loja; nulo, vazio, ilegível ou inválido devolve vazio.</summary>
-    public static IReadOnlyList<TermoDoDicionario> DaLoja(string? dicionarioJson)
+    public static IReadOnlyList<TermoDoDicionario> DaLoja(string? dicionarioJson) => Ler(dicionarioJson).Termos;
+
+    /// <summary>Há dicionário gravado, mas a leitura o descarta (ilegível ou fora das regras de hoje).</summary>
+    public static bool Descartado(string? dicionarioJson) => Ler(dicionarioJson).Descartado;
+
+    // Devolve aparado: é o texto que a conferência olhou, e o que vai ao prompt.
+    private static (IReadOnlyList<TermoDoDicionario> Termos, bool Descartado) Ler(string? dicionarioJson)
     {
-        if (string.IsNullOrWhiteSpace(dicionarioJson)) return [];
+        if (string.IsNullOrWhiteSpace(dicionarioJson)) return ([], false);
         try
         {
             var termos = JsonSerializer.Deserialize<List<TermoDoDicionario>>(dicionarioJson, Json);
-            return termos is { Count: > 0 } && Erro(termos) is null ? termos : [];
+            if (termos is not { Count: > 0 }) return ([], false);
+            return Erro(termos) is null
+                ? ([.. termos.Select(t => new TermoDoDicionario(t.Termo.Trim(), t.Significado.Trim()))], false)
+                : ([], true);
         }
         catch (JsonException)
         {
-            return [];
+            return ([], true);
         }
     }
-
-    /// <summary>Há dicionário gravado, mas a leitura o descarta (ilegível ou fora das regras de hoje).</summary>
-    public static bool Descartado(string? dicionarioJson) =>
-        !string.IsNullOrWhiteSpace(dicionarioJson) && DaLoja(dicionarioJson).Count == 0;
 
     /// <summary>Guarda aparado e na ordem recebida: a ordem estável mantém o cache do prompt entre os turnos.</summary>
     public static string Serializar(IEnumerable<TermoDoDicionario> termos) =>
@@ -59,8 +65,10 @@ public static class DicionarioDaLoja
                 return "Cada linha do dicionário precisa de termo e significado.";
             var (nome, significado) = (termo.Termo.Trim(), termo.Significado.Trim());
             // O texto entra no prompt como uma linha: quebra ou controle deixaria a loja forjar linhas de regra.
-            if (nome.Any(QuebraOuEsconde) || significado.Any(QuebraOuEsconde))
+            if (nome.EnumerateRunes().Any(QuebraOuEsconde) || significado.EnumerateRunes().Any(QuebraOuEsconde))
                 return "Termo e significado não aceitam quebra de linha, caractere de controle nem caractere invisível.";
+            // No prompt o termo vai entre aspas; aspas dentro dele desfariam o delimitador.
+            if (nome.Contains('"')) return $"O termo {nome} não pode ter aspas.";
             if (nome.Length > TermoTamanhoMaximo || significado.Length > SignificadoTamanhoMaximo)
                 return $"Cada termo tem até {TermoTamanhoMaximo} caracteres e cada significado até {SignificadoTamanhoMaximo}.";
             if (!vistos.Add(Chave(nome)))
@@ -74,12 +82,14 @@ public static class DicionarioDaLoja
 
     /// <summary>
     /// #3149: além dos controles, os separadores de linha e parágrafo (U+2028, U+2029) e os invisíveis que escondem ou
-    /// invertem texto (U+200B, U+2060, U+FEFF, U+202A a U+202E, U+2066 a U+2069). U+200D fica: monta emoji composto.
+    /// invertem texto: U+00AD, U+061C, U+200B, U+200E, U+200F, U+2060, U+3164, U+FEFF, U+202A a U+202E, U+2066 a U+2069 e
+    /// os caracteres de tag U+E0000 a U+E007F, que o modelo lê e a tela não mostra. U+200D fica: monta emoji composto.
     /// </summary>
-    private static bool QuebraOuEsconde(char c) =>
-        char.IsControl(c)
-        || char.GetUnicodeCategory(c) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
-        || (int)c is 0x200B or 0x2060 or 0xFEFF or (>= 0x202A and <= 0x202E) or (>= 0x2066 and <= 0x2069);
+    private static bool QuebraOuEsconde(Rune r) =>
+        Rune.IsControl(r)
+        || Rune.GetUnicodeCategory(r) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
+        || r.Value is 0x00AD or 0x061C or 0x200B or 0x200E or 0x200F or 0x2060 or 0x3164 or 0xFEFF
+            or (>= 0x202A and <= 0x202E) or (>= 0x2066 and <= 0x2069) or (>= 0xE0000 and <= 0xE007F);
 
     /// <summary>Bloco do prompt; vazio sem dicionário, para o prompt de quem não usa não mudar.</summary>
     public static string BlocoDoPrompt(IReadOnlyCollection<TermoDoDicionario> termos) =>
