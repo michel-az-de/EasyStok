@@ -145,6 +145,15 @@ public class RlsBypassAllowlistTests
         // todas as lojas. Verificacao de plataforma, sem tenant por natureza, num escopo de DI proprio e curto; so le.
         "EasyStock.Infra.Postgre/Integration/ChaveMestraNaSubida.cs",
 
+        // #3108: workers sem tenant que atravessam empresas por natureza, nas tabelas que ganham tenant_isolation.
+        // Outbox de integração: só a leitura do lote e a reclamação de eventos presos; cada evento é processado
+        // com o tenant dele (IntegrationEventDispatcher).
+        "EasyStock.Infra.Postgre/Repositories/OutboxEventoIntegracaoRepository.cs",
+        // Relatórios: picker, reserva da run (antes do tenant da execução), reciclagem e GC do watchdog.
+        "EasyStock.Infra.Postgre/Repositories/Reporting/ReportRunRepository.cs",
+        // Retenção diária da auditoria (entity_alteracoes) de todas as empresas.
+        "EasyStock.Infra.Postgre/Hosting/EntityAlteracaoRetentionService.cs",
+
         // #2743: o webhook Pix da Efi e anonimo e o processor generico roda sem usuario; a parcela e achada pelo txid
         // do payload (o tenant e descoberto por ela), e a policy RLS de parcelas_receber zera a busca sem o bypass.
         "EasyStock.Api/Controllers/WebhookPixController.cs",

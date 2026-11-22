@@ -35,7 +35,7 @@ public class IntegrationEventDispatcherTests
         services.AddKeyedSingleton(Tipo, handler);
         using var provider = services.BuildServiceProvider();
 
-        var dispatcher = new IntegrationEventDispatcher(repo, uow, provider, NullLogger<IntegrationEventDispatcher>.Instance);
+        var dispatcher = new IntegrationEventDispatcher(repo, uow, provider, Substitute.For<EasyStock.Application.Ports.Output.ITenantContextAccessor>(), NullLogger<IntegrationEventDispatcher>.Instance);
         await dispatcher.ExecutarRodadaAsync(10, CancellationToken.None);
 
         chamadas.Should().Equal("commit", "descartar", "commit");
@@ -51,7 +51,7 @@ public class IntegrationEventDispatcherTests
         repo.ProximosPendentesDeTodosOsShardsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
         using var provider = new ServiceCollection().BuildServiceProvider();
         var dispatcher = new IntegrationEventDispatcher(
-            repo, Substitute.For<IUnitOfWork>(), provider, NullLogger<IntegrationEventDispatcher>.Instance);
+            repo, Substitute.For<IUnitOfWork>(), provider, Substitute.For<EasyStock.Application.Ports.Output.ITenantContextAccessor>(), NullLogger<IntegrationEventDispatcher>.Instance);
 
         (await dispatcher.ExecutarRodadaAsync(50, CancellationToken.None)).Should().Be(0);
 

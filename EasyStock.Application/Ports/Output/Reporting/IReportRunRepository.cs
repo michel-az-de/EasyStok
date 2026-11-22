@@ -57,6 +57,12 @@ public interface IReportRunRepository
     /// </summary>
     Task<bool> TryAcquireLockAsync(Guid runId, CancellationToken ct);
 
+    /// <summary>
+    /// Reserva a run para este Worker numa transação: advisory lock, <c>TryStart</c> e commit.
+    /// Devolve a run já em Running, ou <c>null</c> se outra instância pegou ou ela saiu de Pending.
+    /// </summary>
+    Task<ReportRun?> TryStartAsync(Guid runId, TimeSpan leaseDuration, CancellationToken ct);
+
     /// <summary>Atualiza o lease_expires_at sem alterar outros campos.</summary>
     Task HeartbeatAsync(Guid runId, TimeSpan leaseDuration, CancellationToken ct);
 
