@@ -154,6 +154,13 @@ public class RlsBypassAllowlistTests
         // Retenção diária da auditoria (entity_alteracoes) de todas as empresas.
         "EasyStock.Infra.Postgre/Hosting/EntityAlteracaoRetentionService.cs",
 
+        // #3108: report_runs tem RLS e o SuperAdmin enfileira, lista, lê e cancela run sem empresa ou de outra
+        // empresa. O bypass só abre quando o nível é SuperAdmin.
+        "EasyStock.Application/UseCases/Reports/EnqueueReportRunCommand.cs",
+        "EasyStock.Application/UseCases/Reports/ListMyReportRunsQuery.cs",
+        "EasyStock.Application/UseCases/Reports/GetReportRunQuery.cs",
+        "EasyStock.Application/UseCases/Reports/CancelReportRunCommand.cs",
+
         // #2743: o webhook Pix da Efi e anonimo e o processor generico roda sem usuario; a parcela e achada pelo txid
         // do payload (o tenant e descoberto por ela), e a policy RLS de parcelas_receber zera a busca sem o bypass.
         "EasyStock.Api/Controllers/WebhookPixController.cs",

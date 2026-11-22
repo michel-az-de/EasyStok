@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Reporting;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Dtos;
 using EasyStock.Domain.Reporting;
@@ -16,20 +17,29 @@ public sealed class ListMyReportRunsUseCase
     private readonly IReportRunRepository _repo;
     private readonly ReportRegistry       _registry;
     private readonly ICurrentUserAccessor _user;
+    private readonly IRowLevelSecurityBypass? _rls;
 
     public ListMyReportRunsUseCase(
         IReportRunRepository repo,
         ReportRegistry       registry,
-        ICurrentUserAccessor user)
+        ICurrentUserAccessor user,
+        IRowLevelSecurityBypass? rlsBypass = null)
     {
         _repo     = repo;
         _registry = registry;
         _user     = user;
+        _rls = rlsBypass;
     }
 
     public async Task<IReadOnlyList<ReportRunDto>> ExecuteAsync(ListMyReportRunsQuery query)
     {
         var ct   = CancellationToken.None;
+
+        // #3108: report_runs tem RLS. O SuperAdmin trabalha fora do próprio tenant (run de plataforma sem
+        // empresa, run de outra empresa), então só ele lê e grava aqui sob bypass.
+        await using var bypass = _user.Nivel == EasyStock.Domain.Enums.NivelAcesso.SuperAdmin && _rls is not null
+            ? await _rls.BeginAsync(ct)
+            : null;
         var take = Math.Min(query.Take, 100); // hard cap
 
         var empresaId = _user.Nivel == EasyStock.Domain.Enums.NivelAcesso.SuperAdmin
