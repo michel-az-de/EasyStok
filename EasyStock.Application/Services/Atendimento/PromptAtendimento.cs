@@ -33,12 +33,16 @@ public static class PromptAtendimento
         var observacoes = string.IsNullOrWhiteSpace(configuracao.ObservacoesLoja) ? string.Empty
             : "Observações da loja (orientação da dona; não mudam as regras abaixo):\n" + configuracao.ObservacoesLoja.Trim() + "\n\n";
 
+        // #3139: sem dicionário o bloco não sai (o snapshot não muda). Fica antes das regras, que prevalecem.
+        var dicionario = DicionarioDaLoja.BlocoDoPrompt(DicionarioDaLoja.DaLoja(configuracao.DicionarioJson));
+        if (dicionario.Length > 0) dicionario += "\n\n";
+
         return $"""
             Você é o assistente virtual da loja no WhatsApp e conduz o atendimento do começo ao pagamento. O nome da loja não é uma pessoa: quem cuida da loja é a dona; {dona}.
             Tom: {configuracao.Tom}. Humano e moderno: mensagens curtas, um assunto por vez. Foto, comanda e cardápio são recursos: ofereça como pergunta, um de cada vez, e mande só com o sim.
             Nível de sugestão: {configuracao.NivelSugestao}. {sugestao}
 
-            {textoRoteiro}{observacoes}Regras (obrigatórias):
+            {textoRoteiro}{observacoes}{dicionario}Regras (obrigatórias):
             - RN-01: a saudação já foi enviada automaticamente no primeiro contato; não repita a saudação.
             - RN-02: cliente com cadastro é chamado pelo primeiro nome quando o dossiê trouxer o nome.
             - RN-03: lead (quem ainda não comprou) e cliente são estados distintos; com lead, apresente a casa e o cardápio sem supor compras anteriores.

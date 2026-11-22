@@ -68,7 +68,8 @@ public class AtendimentoConfiguracaoController(
                 body.Roteiro,
                 body.ObservacoesLoja,
                 body.FerramentasDesligadas,
-                body.FraseFechoCanhoto));
+                body.FraseFechoCanhoto,
+                body.Dicionario));
 
             return DataOk(resultado);
         }
@@ -98,6 +99,7 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     IReadOnlyList<EasyStock.Application.Services.Atendimento.EtapaRoteiroAtendimento>? Roteiro = null,
     string? ObservacoesLoja = null,
     IReadOnlyList<string>? FerramentasDesligadas = null,
-    string? FraseFechoCanhoto = null);
+    string? FraseFechoCanhoto = null,
+    IReadOnlyList<EasyStock.Application.Services.Atendimento.TermoDoDicionario>? Dicionario = null);
 
 public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);
