@@ -1,10 +1,10 @@
-using FluentAssertions;
 using System.Text.Encodings.Web;
 using EasyStock.Api.Authentication;
 using EasyStock.Api.Middleware;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
+using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,7 +37,7 @@ public class ClienteSessionCancelamentoTests : IDisposable
     private ClienteSession Sessao() => ClienteSession.Criar(Guid.NewGuid(), Guid.NewGuid(), _time);
 
     [Fact]
-    public async Task Middleware_le_com_o_token_da_requisicao_e_renova_sem_ele()
+    public async Task Middleware_le_com_o_token_da_requisicao_e_renova_a_sessao()
     {
         var sessao = Sessao();
         _repo.GetByIdAsync(sessao.Id, Arg.Any<CancellationToken>()).Returns(sessao);
@@ -48,7 +48,8 @@ public class ClienteSessionCancelamentoTests : IDisposable
         await new ClienteSessionMiddleware(_ => Task.CompletedTask).InvokeAsync(ctx);
 
         await _repo.Received(1).GetByIdAsync(sessao.Id, _cts.Token);
-        await _repo.Received(1).UpdateAsync(sessao, Arg.Any<CancellationToken>());
+        // A renovação não herda o cancelamento do cliente: token não cancelável (ADR-0013).
+        await _repo.Received(1).UpdateAsync(sessao, Arg.Is<CancellationToken>(t => !t.CanBeCanceled));
         await _uow.Received(1).CommitAsync();
     }
 
