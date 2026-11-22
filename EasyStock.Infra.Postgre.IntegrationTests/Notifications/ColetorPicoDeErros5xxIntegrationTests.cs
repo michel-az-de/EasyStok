@@ -1,4 +1,6 @@
 using EasyStock.Api.Data;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -110,6 +112,32 @@ public class ColetorPicoDeErros5xxIntegrationTests(PostgreSqlDatabaseFixture fix
         var mensagens = await _s.LerMensagensDaEmpresaAsync(empresaId);
         mensagens.Should().ContainSingle("um aviso por janela de dedupe e por superadmin").Which.UsuarioDestinoId.Should().Be(superadminId);
 
+        await using var db = fixture.CreateDbContext();
+        var estado = await db.EndpointHealthStates.AsNoTracking().SingleAsync(s => s.EndpointName == "sistema/5xx");
+        estado.LastAlertedAt.Should().NotBeNull();
+    }
+
+    /// <summary>
+    /// #3138 (e): quando a dedupe recusa o aviso, o publicador descarta o que está pendente na unidade de trabalho. O
+    /// estado do coletor tem de estar gravado antes, senão o incidente reabre a cada rodada sem nunca constar aberto.
+    /// </summary>
+    [SkippableFact]
+    public async Task AvisoRecusadoPelaDedupeNaoPerdeOEstado()
+    {
+        var (empresaId, _) = await PrepararAsync();
+        await using var provider = Provider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            using var bypass = scope.ServiceProvider.GetRequiredService<IRowLevelSecurityBypass>().Begin();
+            await scope.ServiceProvider.GetRequiredService<IPublicadorIncidenteSistema>().PublicarAsync(
+                ComponenteIncidente.Erros5xx, EstadoIncidente.ComProblema, SeveridadeIncidente.Alta, DateTime.UtcNow);
+        }
+        (await _s.LerEventosDaEmpresaAsync(empresaId)).Should().ContainSingle("o aviso prévio tem de existir para a dedupe agir");
+        await SemearErrosAsync(4);
+
+        await ColetarAsync(provider);
+
+        (await _s.LerEventosDaEmpresaAsync(empresaId)).Should().ContainSingle("o segundo aviso cai na mesma janela de dedupe");
         await using var db = fixture.CreateDbContext();
         var estado = await db.EndpointHealthStates.AsNoTracking().SingleAsync(s => s.EndpointName == "sistema/5xx");
         estado.LastAlertedAt.Should().NotBeNull();
