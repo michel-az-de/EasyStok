@@ -80,12 +80,15 @@ public sealed class AgenteAtendimentoService(
                 return ResultadoTurnoAgente.Ignorado;
             // O turno segue com o que foi lido sob o lock: é o histórico em que a retomada foi decidida.
             (dados, conversa, entradaRetomada) = (relido, relido.Conversa, entrada);
+            // #3121: fora da transação da retomada. Dentro dela o commit ainda não aconteceu e a conversa está travada.
+            await AvisarConsoleDaRetomadaAsync(empresaId, conversaId, ct);
         }
 
         if (PortoesDoAssistente.DaConversa(conversa, agora).FirstOrDefault(e => e.Barra) is { } portaoDaConversa)
         {
-            // #3121: o portão da situação roda a cada mensagem de conversa que está com a equipe e não vai ao log.
-            if (portaoDaConversa.Codigo != PortoesDoAssistente.Situacao)
+            // #3121: situação e vínculo em revisão barram a cada mensagem do cliente enquanto durarem, e a tela já os
+            // mostra; no log viram ruído.
+            if (portaoDaConversa.Codigo is not (PortoesDoAssistente.Situacao or PortoesDoAssistente.Vinculo))
                 LogsDoAssistente.PortaoBarrou(logger, conversaId, portaoDaConversa.Codigo);
             return ResultadoTurnoAgente.Ignorado;
         }
@@ -363,13 +366,12 @@ public sealed class AgenteAtendimentoService(
         // Warning: produção só grava de Warning para cima, e a retomada precisa aparecer no log.
         logger.LogWarning("Agente: conversa {ConversaId} retomada pelo Assistente após {Segundos} s sem resposta da equipe.",
             conversa.Id, prazo.TotalSeconds);
-        await AvisarConsoleDaRetomadaAsync(empresaId, conversa.Id, ct);
         return true;
     }
 
     /// <summary>
     /// #3121: o console atualiza a conversa retomada sem esperar a próxima volta da sincronização. Melhor esforço, depois
-    /// do commit: a retomada já está gravada e não pode cair por causa do aviso.
+    /// da transação da retomada: ela já está gravada e não pode cair por causa do aviso.
     /// </summary>
     private async Task AvisarConsoleDaRetomadaAsync(Guid empresaId, Guid conversaId, CancellationToken ct)
     {

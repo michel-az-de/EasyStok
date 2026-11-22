@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Tests.Services.Auth;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,38 @@ public partial class AgenteAtendimentoServiceTests
         Avisos.Should().Contain(LogsDoAssistente.EventoPortaoBarrou);
         _log.Linhas.Should().Contain(l => l.Contains(PortoesDoAssistente.Janela));
     }
+
+    [Fact]
+    public async Task Rastro_ClienteBloqueadoLogaAvisoComOCodigoDoPortao()
+    {
+        var cliente = Cliente.Criar(_empresaId, "Maria");
+        cliente.Bloquear("golpe", Agora.AddHours(-1));
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        Avisos.Should().Contain(LogsDoAssistente.EventoPortaoBarrou);
+        _log.Linhas.Should().Contain(l => l.Contains(PortoesDoAssistente.Bloqueado));
+        _log.Linhas.Should().NotContain(l => l.Contains("Maria") || l.Contains("golpe"), "nome e motivo não vão ao log");
+    }
+
+    [Theory]
+    [InlineData("Seu estorno já caiu na conta.")]
+    [InlineData("O frete já está acertado.")]
+    [InlineData("Vou pedir para a dona verificar isso com você.")]
+    [InlineData("Veja em https://exemplo.com/x")]
+    [InlineData("   ")]
+    public void Rastro_MotivoFixoDaGuardaTemCategoriaPropria(string resposta)
+    {
+        var motivo = GuardaRespostaAgente.Avaliar(resposta, [], ["escalar_para_dona"]);
+
+        LogsDoAssistente.CategoriaDaGuarda(motivo!).Should().Be(motivo, "se o texto da guarda mudar, a lista do log acompanha");
+    }
+
+    [Fact]
+    public void Rastro_MotivoDesconhecidoNaoVaiAoLog() =>
+        LogsDoAssistente.CategoriaDaGuarda("cliente Maria pediu 59").Should().Be(LogsDoAssistente.CategoriaOutra);
 
     [Fact]
     public async Task Rastro_ConversaComAEquipeNaoLogaAviso_RodaACadaMensagemDoCliente()
@@ -84,8 +117,23 @@ public partial class AgenteAtendimentoServiceTests
     public async Task Rastro_RetomadaAvisaOConsoleEmTempoReal()
     {
         EscaladaPeloRoboHa(AlemDoPrazo);
+        var servico = CriarServicoComRetomada();
+        var emTransacao = false;
+        bool? avisouEmTransacao = null;
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>(), Arg.Any<CancellationToken>())
+            .Returns(async c =>
+            {
+                emTransacao = true;
+                try { return await c.Arg<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>()(c.Arg<CancellationToken>()); }
+                finally { emTransacao = false; }
+            });
+        _eventos.WhenForAnyArgs(e => e.PublicarAsync(default!, default, default!, default))
+            .Do(_ => avisouEmTransacao = emTransacao); // o serviço engole falha do aviso: afirmar aqui dentro não prova nada
 
-        await Retomar();
+        await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora, retomada: true);
+
+        avisouEmTransacao.Should().BeFalse("dentro da transação o commit ainda não aconteceu e a conversa está travada");
 
         await _eventos.Received(1).PublicarAsync(EventosOperacao.ConversaAtualizada, _empresaId,
             new ConversaAtualizadaOperacao(_conversa.Id), Arg.Any<CancellationToken>());
