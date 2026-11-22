@@ -1,3 +1,4 @@
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.UseCases.AdicionarClienteEndereco;
 
 namespace EasyStock.Application.UseCases.Atendimento.Endereco;
@@ -26,7 +27,7 @@ public sealed class ConfirmarEnderecoClienteUseCase(
 
         var e = command.Endereco;
         var existente = cliente.Enderecos.FirstOrDefault(x =>
-            Igual(x.Cep, e.Cep) && Igual(x.Logradouro, e.Logradouro) && Igual(x.Numero, e.Numero));
+            EnderecoBr.NormalizarCep(x.Cep) == EnderecoBr.NormalizarCep(e.Cep) && Igual(x.Logradouro, e.Logradouro) && Igual(x.Numero, e.Numero));
 
         foreach (var outro in cliente.Enderecos.Where(x => x != existente))
             outro.Padrao = false;
