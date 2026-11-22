@@ -95,7 +95,8 @@ public class GestaoDeUsuariosUseCaseTests
 
         var acao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(outra.Id, _empresaId));
 
-        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        (await acao.Should().ThrowAsync<HierarquiaRecusadaException>("o alvo tem o mesmo nível de quem pede"))
+            .Which.Codigo.Should().Be("HIERARQUIA");
         outra.Empresas.Single().Ativo.Should().BeTrue();
     }
 
@@ -107,7 +108,8 @@ public class GestaoDeUsuariosUseCaseTests
 
         var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(outra.Id, _empresaId, cozinha.Id, null));
 
-        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        (await acao.Should().ThrowAsync<HierarquiaRecusadaException>("o alvo tem o mesmo nível de quem pede"))
+            .Which.Codigo.Should().Be("HIERARQUIA");
         _removidos.Should().BeEmpty();
     }
 

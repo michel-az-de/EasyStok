@@ -144,11 +144,12 @@ public sealed class RefreshTokenUseCase(
         {
             var perfil = usuario.Perfis
                 .Where(p => p.EmpresaId == empresaId.Value || p.Perfil is { EhSuporteGlobal: true })
-                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
+                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.NivelNaEmpresa : int.MaxValue)
                 .FirstOrDefault();
             if (perfil?.Perfil is not null)
             {
-                nivel = perfil.Perfil.Nivel;
+                // #3163: perfil de empresa nunca vira sessão de suporte, mesmo com nível SuperAdmin gravado.
+                nivel = perfil.Perfil.NivelNaEmpresa;
                 moduloInicial = perfil.Perfil.ModuloInicial;
                 permissoesExplicitas = perfil.Perfil.PermissoesExplicitas;
                 sessaoPersistente = Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfil.Perfil, empresaId.Value);

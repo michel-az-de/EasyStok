@@ -107,7 +107,8 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             // Só depois da trava lemos vínculo/perfil; um snapshot anterior ao commit não vira sessão nova.
             await usuarioRepository.AtualizarUltimoAcessoAsync(identificado.Id, DateTime.UtcNow);
             var atual = await usuarioRepository.GetByEmailAsync(identificado.Email);
-            if (atual is null || atual.Id != identificado.Id || !atual.Ativo || atual.EstaBloqueado()
+            // #3163: o bloqueio por senha errada não barra o Google (a senha não entra neste login).
+            if (atual is null || atual.Id != identificado.Id || !atual.Ativo
                 || atual.SessoesValidasDesde is { } corte && corte >= inicioAutenticacao)
                 throw new CredenciaisInvalidasException("O acesso mudou durante o login. Entre novamente.");
             return await ConcluirAsync(atual, empresaId ?? ResolveEmpresaIdPadrao(atual) ?? PrimeiraEmpresaAtiva(atual),

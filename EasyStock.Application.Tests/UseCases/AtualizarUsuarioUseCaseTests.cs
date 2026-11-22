@@ -181,10 +181,12 @@ public class AtualizarUsuarioUseCaseTests
             Perfil = new Perfil { Id = Guid.NewGuid(), Nome = "Administração", Nivel = NivelAcesso.Admin, EmpresaId = empresaA },
         });
         ComoAdmin(empresaA);
+        _vinculos.ContarDonasAtivasAsync(empresaA, Arg.Any<CancellationToken>()).Returns(1);
 
         var acao = () => CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "invasor@empresa.com"));
 
-        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        (await acao.Should().ThrowAsync<HierarquiaRecusadaException>("o alvo tem o mesmo nível de quem pede"))
+            .Which.Codigo.Should().Be("HIERARQUIA");
         alvo.EmailPendente.Should().BeNull();
     }
 

@@ -99,6 +99,17 @@ public sealed class SessoesNativasTests
         Assert.Equal(_sessao.EmpresaId, _claims.EmpresaId);
     }
 
+    // #3163: perfil de empresa com nível SuperAdmin gravado renova como Admin; sessão de suporte só pelo perfil global.
+    [Fact]
+    public async Task PerfilDeEmpresaComNivelSuperAdminRenovaComoAdminNaSessaoNativa()
+    {
+        _usuario.Perfis.Clear();
+        _usuario.Perfis.Add(new UsuarioPerfil { UsuarioId = _usuario.Id, EmpresaId = _sessao.EmpresaId,
+            Perfil = new Perfil { Id = Guid.NewGuid(), EmpresaId = _sessao.EmpresaId, Nome = "Indevido", Nivel = NivelAcesso.SuperAdmin } });
+        await Renovacao().ExecuteAsync(new(Segredo));
+        Assert.Equal(NivelAcesso.Admin, _claims!.Nivel);
+    }
+
     [Fact]
     public async Task RespostaPerdidaRepeteMesmoSucessor_ComNoncePersistido_MasSairPrevalece()
     {

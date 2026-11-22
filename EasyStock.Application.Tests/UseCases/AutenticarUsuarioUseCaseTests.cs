@@ -194,6 +194,23 @@ public class AutenticarUsuarioUseCaseTests
         Assert.Equal(empresaPadrao, result.EmpresaId);
     }
 
+    // #3163 (B4): cinco senhas erradas bloqueiam o login por senha, não a entrada pelo Google no aparelho.
+    [Fact]
+    public async Task LoginGoogleNativo_ContaBloqueadaPorSenhaEntra()
+    {
+        var usuario = SuperAdmin();
+        for (var falha = 1; falha <= 5; falha++) usuario.RegistrarFalhaDeSenha();
+        usuario.EstaBloqueado().Should().BeTrue();
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var empresaPadrao = Guid.NewGuid();
+
+        var result = await CriarUseCase(repo)
+            .RevalidarLoginGoogleNativoAsync(usuario, null, empresaPadrao, DateTime.UtcNow.AddMinutes(-1));
+
+        Assert.Equal(empresaPadrao, result.EmpresaId);
+    }
+
     [Fact]
     public async Task LoginGoogle_SuperAdminSemEmpresaPadraoContinuaSemEmpresa()
     {
