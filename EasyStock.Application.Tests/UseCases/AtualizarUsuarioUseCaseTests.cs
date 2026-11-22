@@ -151,6 +151,25 @@ public class AtualizarUsuarioUseCaseTests
         _f.Eventos.Should().BeEmpty();
     }
 
+    // RED #2070 (A1): Administração não troca o e-mail de outra Administração.
+    [Fact]
+    public async Task Red2070_AdministracaoNaoTrocaEmailDeOutraAdministracao()
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = AlvoDaEmpresa(empresaA);
+        alvo.Perfis.Add(new UsuarioPerfil
+        {
+            Id = Guid.NewGuid(), UsuarioId = alvo.Id, EmpresaId = empresaA,
+            Perfil = new Perfil { Id = Guid.NewGuid(), Nome = "Administração", Nivel = NivelAcesso.Admin, EmpresaId = empresaA },
+        });
+        ComoAdmin(empresaA);
+
+        var acao = () => CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "invasor@empresa.com"));
+
+        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        alvo.EmailPendente.Should().BeNull();
+    }
+
     [Fact]
     public async Task AdminTrocaEmailDeUsuarioExclusivoPeloFluxoPendente()
     {

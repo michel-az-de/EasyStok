@@ -75,6 +75,30 @@ public class GestaoDeUsuariosUseCaseTests
         _c.Usuarios, _usuariosPerfis, _perfis, _lojas, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
         Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
+    // RED #2070 (A2): Administração não age sobre quem está no mesmo nível.
+    [Fact]
+    public async Task Red2070_AdministracaoNaoDesativaOutraAdministracao()
+    {
+        var outra = Atendente(true, NovoPerfil("Administração", NivelAcesso.Admin));
+
+        var acao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(outra.Id, _empresaId));
+
+        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        outra.Empresas.Single().Ativo.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Red2070_AdministracaoNaoRebaixaOutraAdministracao()
+    {
+        var outra = Atendente(true, NovoPerfil("Administração", NivelAcesso.Admin));
+        var cozinha = NovoPerfil("Cozinha");
+
+        var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(outra.Id, _empresaId, cozinha.Id, null));
+
+        await acao.Should().ThrowAsync<Exception>("o alvo tem o mesmo nível de quem pede");
+        _removidos.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task DesativarDeixaRastroComQuemFez()
     {
