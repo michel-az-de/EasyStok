@@ -84,7 +84,8 @@ public class WebhookGatewayControllerTests
     private const string SegredoMp = "segredo-de-teste";
 
     private static WebhookGatewayController ControllerMercadoPago(
-        MercadoPagoWebhookFixture f, IWebhookRecebidoRepository repo, string corpo, string? assinatura = null)
+        MercadoPagoWebhookFixture f, IWebhookRecebidoRepository repo, string corpo, string? assinatura = null,
+        string? ts = null, string requestId = "req-1", string prefixoAssinatura = "")
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -96,15 +97,14 @@ public class WebhookGatewayControllerTests
             new IGatewayWebhookProcessor[] { f.Processor() }, new IWebhookSignatureValidator[] { validator }, repo,
             NullLogger<WebhookGatewayController>.Instance);
 
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
-        const string requestId = "req-1";
+        ts ??= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var manifesto = $"id:{MercadoPagoWebhookFixture.PagamentoId};request-id:{requestId};ts:{ts};";
         var v1 = assinatura ?? Convert.ToHexString(
             HMACSHA256.HashData(Encoding.UTF8.GetBytes(SegredoMp), Encoding.UTF8.GetBytes(manifesto))).ToLowerInvariant();
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(corpo));
-        ctx.Request.Headers["x-signature"] = $"ts={ts},v1={v1}";
+        ctx.Request.Headers["x-signature"] = $"{prefixoAssinatura}ts={ts},v1={v1}";
         ctx.Request.Headers["x-request-id"] = requestId;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
         return controller;
@@ -128,10 +128,81 @@ public class WebhookGatewayControllerTests
         var result = await ControllerMercadoPago(f, repo, MercadoPagoWebhookFixture.Notificacao()).Receber("mercadopago");
 
         result.Should().BeOfType<OkResult>();
-        await repo.Received(1).TryRegistrarAsync("MercadoPago", "MercadoPago:123456789", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await repo.Received(1).TryRegistrarAsync("MercadoPago", Arg.Is<string>(k => k.StartsWith("MercadoPago:20359978:")), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await repo.Received(1).MarcarProcessadoAsync(Arg.Any<Guid>(), true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
         f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
         f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
+    }
+
+    /// <summary>Repo que se comporta como o UNIQUE (provedor, eventId): o segundo registro da mesma chave volta null.</summary>
+    private static IWebhookRecebidoRepository RepoComUnique()
+    {
+        var registros = new Dictionary<string, WebhookRecebido>();
+        var repo = Substitute.For<IWebhookRecebidoRepository>();
+        repo.TryRegistrarAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var chave = $"{ci.ArgAt<string>(0)}|{ci.ArgAt<string>(1)}";
+                if (registros.ContainsKey(chave)) return null;
+                return registros[chave] = WebhookRecebido.Criar(ci.ArgAt<string>(0), ci.ArgAt<string>(1), ci.ArgAt<string>(2));
+            });
+        repo.ObterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => registros.GetValueOrDefault($"{ci.ArgAt<string>(0)}|{ci.ArgAt<string>(1)}"));
+        repo.When(r => r.MarcarProcessadoAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(ci => registros.Values.First(w => w.Id == ci.ArgAt<Guid>(0)).MarcarProcessado(ci.ArgAt<bool>(1), ci.ArgAt<string?>(2)));
+        return repo;
+    }
+
+    private static string CorpoComIdDeRaiz(long idRaiz) =>
+        MercadoPagoWebhookFixture.Notificacao().Replace("\"id\":123456789", $"\"id\":{idRaiz}");
+
+    // #3095: a assinatura cobre data.id, request-id e ts; o id da raiz do JSON nao e assinado.
+    [Fact]
+    public async Task MercadoPagoReplayComIdDeRaizTrocadoEDuplicado()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoComUnique();
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var primeiro = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts).Receber("mercadopago");
+        var replay = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(222), ts: ts).Receber("mercadopago");
+
+        primeiro.Should().BeOfType<OkResult>();
+        replay.Should().BeOfType<OkResult>();
+        await f.MpClient.Received(1).ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3095 (revisao): o validador usa o ULTIMO ts do x-signature; um ts extra na frente nao pode gerar chave nova.
+    [Fact]
+    public async Task MercadoPagoReplayComTsExtraNaAssinaturaEDuplicado()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoComUnique();
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var primeiro = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts).Receber("mercadopago");
+        var replay = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts, prefixoAssinatura: "ts=1,").Receber("mercadopago");
+
+        primeiro.Should().BeOfType<OkResult>();
+        replay.Should().BeOfType<OkResult>();
+        await f.MpClient.Received(1).ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    // O MP manda varias notificacoes legitimas do mesmo data.id (created, updated): cada uma traz ts e request-id novos.
+    [Fact]
+    public async Task MercadoPagoNotificacoesLegitimasDoMesmoDataIdNaoSaoDuplicadas()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoComUnique();
+        var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: agora.ToString(), requestId: "req-1").Receber("mercadopago");
+        await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(222), ts: (agora + 1000).ToString(), requestId: "req-2").Receber("mercadopago");
+
+        await f.MpClient.Received(2).ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

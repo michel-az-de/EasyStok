@@ -43,8 +43,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
             .Returns(new PagamentoMercadoPago(PagamentoMpId, "approved", null, pedidoId.ToString(), 38m,
                 DateTime.UtcNow, "pix", "bank_transfer"));
         var corpo = CorpoPagamentoMp("notificacao-2285-a", PagamentoMpId);
+        var tsPrimeira = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
 
-        using var primeira = await PostarWebhookMp(client, corpo, PagamentoMpId);
+        using var primeira = await PostarWebhookMp(client, corpo, PagamentoMpId, ts: tsPrimeira);
         primeira.StatusCode.Should().Be(HttpStatusCode.OK, await primeira.Content.ReadAsStringAsync());
 
         var pago = await LerPedidoAsync(factory, pedidoId);
@@ -53,8 +54,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         pago.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(38m);
         (await LerCobrancaAsync(factory, pedidoId)).Status.Should().Be(StatusCobrancaPedido.Paga);
 
-        // Mesmo evento reentregue: o dedup por id da notificação responde 200 e não processa de novo.
-        using var repetida = await PostarWebhookMp(client, corpo, PagamentoMpId);
+        // Mesma entrega reenviada (mesma assinatura): o dedup pelo dado assinado (#3095) responde 200 e não processa de novo.
+        using var repetida = await PostarWebhookMp(client, corpo, PagamentoMpId, ts: tsPrimeira);
         repetida.StatusCode.Should().Be(HttpStatusCode.OK);
         // O Mercado Pago também reenvia o mesmo pagamento com outro id de notificação: o use case não duplica.
         using var outraNotificacao = await PostarWebhookMp(client, CorpoPagamentoMp("notificacao-2285-b", PagamentoMpId), PagamentoMpId);
@@ -67,7 +68,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             (await db.WebhookRecebidos.IgnoreQueryFilters().CountAsync(w => w.Provedor == "MercadoPago"))
-                .Should().Be(2, "uma linha por id de notificação, não por entrega");
+                .Should().Be(2, "uma linha por entrega assinada distinta; o replay idêntico não grava");
         }
 
         // Extrato e Caixa (#2262): uma entrada só, com o valor e a origem do pedido.
@@ -168,9 +169,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
     /// <summary>Assina como o Mercado Pago: HMAC-SHA256 de <c>id:{data.id};request-id:{x-request-id};ts:{ts};</c>.</summary>
     private static Task<HttpResponseMessage> PostarWebhookMp(
-        HttpClient client, string corpo, string dataIdAssinado, string segredo = SegredoWebhookMp)
+        HttpClient client, string corpo, string dataIdAssinado, string segredo = SegredoWebhookMp, string? ts = null)
     {
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
+        ts ??= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
         const string requestId = "req-2285";
         var manifesto = $"id:{dataIdAssinado};request-id:{requestId};ts:{ts};";
         var v1 = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(segredo), Encoding.UTF8.GetBytes(manifesto)))
