@@ -30,6 +30,12 @@ public interface IWebhookRecebidoRepository
     Task<WebhookRecebido?> ObterAsync(string provedor, string eventIdExterno, CancellationToken ct = default);
 
     /// <summary>
+    /// Instante do registro mais recente do provedor cujo <c>EventIdExterno</c> começa com o prefixo, ou null se não há
+    /// nenhum (#3138: a última entrega da ponte de uma sessão).
+    /// </summary>
+    Task<DateTime?> UltimoRecebidoEmAsync(string provedor, string prefixoEventId, CancellationToken ct = default);
+
+    /// <summary>
     /// Marca processamento concluido (sucesso ou falha). Na falha, descarta antes as alteracoes pendentes do
     /// contexto: o processamento nao confirmou e nada dele pode ser gravado junto com a marca (#1562).
     /// </summary>
