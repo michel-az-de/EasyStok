@@ -20,9 +20,11 @@ namespace EasyStock.Infra.Postgre.Migrations
             // tabela. Fica fora do modelo EF (o snapshot nao muda).
             //
             // Deduplica ANTES do indice, senao a migration trava o deploy. Mantem o mais antigo
-            // (CriadoEm, Id) e renomeia os demais com sufixo do Id, unico por definicao: a
-            // renomeacao nunca gera nova colisao. Nada e apagado. left(...,160) + 15 de sufixo
-            // cabe no varchar(180).
+            // (CriadoEm, Id) e renomeia os demais com sufixo dos 8 primeiros caracteres do Id
+            // (Guid v4: nova colisao e improvavel, nao impossivel; se ocorrer, o indice falha e a
+            // transacao desfaz tudo). Nada e apagado. left(...,160) + 15 de sufixo cabe no
+            // varchar(180). AlteradoEm avanca para o pull do mobile (AlteradoEm > since) levar o
+            // nome novo aos aparelhos.
             //
             // RLS: o dedup precisa ver TODAS as empresas. Mesmo procedimento de
             // ProdutoUniqueNomePorEmpresa: desliga, opera e religa com FORCE na mesma transacao.
@@ -30,7 +32,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                 ALTER TABLE "produtos" DISABLE ROW LEVEL SECURITY;
 
                 UPDATE "produtos" p
-                SET "Nome" = left(p."Nome", 160) || ' (dup ' || left(p."Id"::text, 8) || ')'
+                SET "Nome" = left(p."Nome", 160) || ' (dup ' || left(p."Id"::text, 8) || ')',
+                    "AlteradoEm" = now()
                 FROM (
                     SELECT "Id", row_number() OVER (
                         PARTITION BY "EmpresaId", lower("Nome") ORDER BY "CriadoEm", "Id"

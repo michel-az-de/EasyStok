@@ -27,6 +27,9 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
         var categoriaId = Guid.NewGuid();
         var antigoId = Guid.NewGuid();
         var novoId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        var outraCategoriaId = Guid.NewGuid();
+        var daOutraEmpresaId = Guid.NewGuid();
         var antes = DateTime.UtcNow.AddDays(-2);
 
         await using (var db = fixture.CreateDbContext())
@@ -44,18 +47,33 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
             db.Produtos.Add(NovoProduto(novoId, empresaId, categoriaId, "vassoura", antes.AddDays(1)));
             await db.SaveChangesAsync();
 
+            // Outra empresa com o mesmo nome: a unicidade e o dedup sao por empresa.
+            db.ChangeTracker.Clear();
+            db.SetMobileTenantContext(outraEmpresaId);
+            db.Empresas.Add(new Empresa { Id = outraEmpresaId, Nome = "Outra Empresa", Documento = outraEmpresaId.ToString("N")[..14], CriadoEm = antes, AlteradoEm = antes });
+            db.Categorias.Add(new Categoria { Id = outraCategoriaId, EmpresaId = outraEmpresaId, Nome = "Limpeza", CriadoEm = antes, AlteradoEm = antes });
+            db.Produtos.Add(NovoProduto(daOutraEmpresaId, outraEmpresaId, outraCategoriaId, "VASSOURA", antes.AddDays(1)));
+            await db.SaveChangesAsync();
+
             await migrator.MigrateAsync(alvo);
+
+            // A RLS sai da migracao como entrou: ligada e forcada.
+            (await db.Database.SqlQuery<bool>($"""
+                SELECT (relrowsecurity AND relforcerowsecurity) AS "Value" FROM pg_class WHERE oid = 'produtos'::regclass
+                """).SingleAsync()).Should().BeTrue();
         }
 
         await using (var db = fixture.CreateDbContext())
         {
             db.SetMobileTenantContext(empresaId);
-            var nomes = await db.Produtos.AsNoTracking().Where(p => p.EmpresaId == empresaId)
-                .ToDictionaryAsync(p => p.Id, p => p.Nome);
+            var produtos = await db.Produtos.AsNoTracking().Where(p => p.EmpresaId == empresaId)
+                .ToDictionaryAsync(p => p.Id);
 
-            nomes.Should().HaveCount(2, "a migração renomeia, não apaga");
-            nomes[antigoId].Should().Be("Vassoura", "o mais antigo mantém o nome");
-            nomes[novoId].Should().Be($"vassoura (dup {novoId.ToString()[..8]})");
+            produtos.Should().HaveCount(2, "a migração renomeia, não apaga");
+            produtos[antigoId].Nome.Should().Be("Vassoura", "o mais antigo mantém o nome");
+            produtos[antigoId].AlteradoEm.Should().BeBefore(antes.AddHours(1), "quem não foi renomeado não muda");
+            produtos[novoId].Nome.Should().Be($"vassoura (dup {novoId.ToString()[..8]})");
+            produtos[novoId].AlteradoEm.Should().BeAfter(antes.AddDays(1).AddHours(1), "o pull do mobile só leva produto com AlteradoEm novo");
 
             db.Produtos.Add(NovoProduto(Guid.NewGuid(), empresaId, categoriaId, "VASSOURA", DateTime.UtcNow));
             var gravar = () => db.SaveChangesAsync();
@@ -63,6 +81,14 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
             (await gravar.Should().ThrowAsync<DbUpdateException>())
                 .WithInnerException<PostgresException>()
                 .Which.ConstraintName.Should().Be("uq_produtos_empresa_nome_lower");
+        }
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(outraEmpresaId);
+            var daOutra = await db.Produtos.AsNoTracking().SingleAsync(p => p.Id == daOutraEmpresaId);
+            daOutra.Nome.Should().Be("VASSOURA", "o mesmo nome em outra empresa não é duplicado");
+            daOutra.AlteradoEm.Should().BeBefore(DateTime.UtcNow.AddHours(-1));
         }
 
         await using (var db = fixture.CreateDbContext())
