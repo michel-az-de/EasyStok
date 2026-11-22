@@ -57,6 +57,10 @@ public sealed class ColetorPicoDeErros5xx(
         var avaliacao = AvaliadorIncidente.Avaliar(estado, saudavel: erros <= limite, agora, Limiares);
         if (erros > limite) estado.LastFailureMessage = $"5XX_{erros}";
 
+        // #3117: o estado e gravado antes do aviso. Na dedupe o publicador descarta o que estiver pendente na unidade de
+        // trabalho, e o estado nao pode ir junto.
+        await db.SaveChangesAsync(ct);
+
         switch (avaliacao.Decisao)
         {
             case DecisaoIncidente.Abrir:
@@ -72,10 +76,6 @@ public sealed class ColetorPicoDeErros5xx(
                     SeveridadeIncidente.Media, avaliacao.DesdeUtc ?? agora, ct);
                 break;
         }
-
-        // O publicador commita a mesma unidade de trabalho; sem publicacao (interruptor, sem empresa padrao) ou sem
-        // decisao, o estado ainda precisa ser gravado.
-        await db.SaveChangesAsync(ct);
     }
 
     private int Inteiro(string chave, int padrao) =>

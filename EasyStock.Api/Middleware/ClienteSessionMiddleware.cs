@@ -34,11 +34,12 @@ public class ClienteSessionMiddleware(RequestDelegate next)
                 var unitOfWork = context.RequestServices.GetRequiredService<IUnitOfWork>();
                 var timeProvider = context.RequestServices.GetRequiredService<TimeProvider>();
 
-                var session = await sessionRepo.GetByIdAsync(sessionId);
+                var session = await sessionRepo.GetByIdAsync(sessionId, context.RequestAborted);
                 if (session is not null && session.EstaValida(timeProvider))
                 {
                     session.RegistrarUso(timeProvider);
-                    await sessionRepo.UpdateAsync(session);
+                    // Se o cliente abortou, a leitura acima já cancelou e a renovação fica para a próxima requisição; UpdateAsync não faz I/O (ADR-0013).
+                    await sessionRepo.UpdateAsync(session, CancellationToken.None);
                     await unitOfWork.CommitAsync();
                 }
             }

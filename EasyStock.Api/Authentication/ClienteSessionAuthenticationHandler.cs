@@ -42,7 +42,7 @@ public class ClienteSessionAuthenticationHandler(
         var sessionRepo = Context.RequestServices.GetRequiredService<IClienteSessionRepository>();
         var timeProvider = Context.RequestServices.GetRequiredService<TimeProvider>();
 
-        var session = await sessionRepo.GetByIdAsync(sessionId);
+        var session = await sessionRepo.GetByIdAsync(sessionId, Context.RequestAborted);
 
         if (session is null)
             return AuthenticateResult.Fail("Sessão não encontrada.");

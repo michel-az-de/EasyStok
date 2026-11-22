@@ -44,6 +44,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<RespostaSemIa>(); // #2885: saudação solta respondida sem o modelo
         services.AddScoped<SaudacaoAtendimento>();
+        services.AddScoped<VigiaPonteWppConnect>(); // #3117: ponte conectada que não entrega ao webhook
+        services.AddSingleton<MemoriaVigiaPonteWppConnect>();
         services.AddScoped<PerfilClienteWhatsApp>(); // #2155: nome, e-mail e localização no cadastro
         services.AddSingleton<JanelaFotoPerfilWhatsApp>(); // #2838: uma consulta da foto por cliente a cada 12 h
 

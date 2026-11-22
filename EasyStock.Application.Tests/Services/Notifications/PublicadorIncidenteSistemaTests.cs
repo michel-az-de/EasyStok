@@ -43,6 +43,22 @@ public class PublicadorIncidenteSistemaTests
     private Task Publicar(PublicadorIncidenteSistema p, EstadoIncidente estado = EstadoIncidente.ComProblema) =>
         p.PublicarAsync(ComponenteIncidente.Api, estado, SeveridadeIncidente.Alta, _relogio.GetUtcNow().UtcDateTime.AddMinutes(-12));
 
+    /// <summary>
+    /// #3117: os coletores de uma rodada dividem a unidade de trabalho. O evento que a dedupe recusa não pode ficar
+    /// pendente: o próximo commit o reenviaria e derrubaria o coletor seguinte.
+    /// </summary>
+    [Fact]
+    public async Task DedupeRecusadaDescartaOEventoPendente()
+    {
+        var recusa = new InvalidOperationException("23505");
+        _uow.CommitAsync().Returns<Task<int>>(_ => throw recusa);
+        _uow.EhViolacaoDeUnicidade(recusa).Returns(true);
+
+        await Publicar(Criar());
+
+        _uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
     [Fact]
     public async Task PayloadSoTemChavesFechadas()
     {

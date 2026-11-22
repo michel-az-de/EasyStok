@@ -113,6 +113,34 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         return [.. itens.Select(Recente).OfType<MensagemRecenteWppConnect>()];
     }
 
+    /// <summary>
+    /// #3117: as conversas individuais mais recentes e a última mensagem recebida de cada uma (<c>lastReceivedKey</c>).
+    /// O servidor responde a lista direta; a forma com <c>response</c> também é aceita. Conversa sem a chave, de grupo,
+    /// de transmissão ou cuja última recebida é da própria loja fica de fora. Formato inesperado vira lista vazia.
+    /// </summary>
+    public async Task<IReadOnlyList<UltimaRecebidaWppConnect>> ListarUltimasRecebidasAsync(CredencialWppConnect sessao, int maximo,
+        CancellationToken ct = default)
+    {
+        using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, "list-chats"), sessao,
+            new { count = maximo, onlyUsers = true }, ct);
+        var lista = doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("response", out var r)
+            ? r : doc.RootElement;
+        if (lista.ValueKind != JsonValueKind.Array) return [];
+        return [.. lista.EnumerateArray().Select(UltimaRecebida).OfType<UltimaRecebidaWppConnect>().Take(maximo)];
+    }
+
+    private static UltimaRecebidaWppConnect? UltimaRecebida(JsonElement conversa)
+    {
+        if (conversa.ValueKind != JsonValueKind.Object
+            || !conversa.TryGetProperty("id", out var id) || Identificador(id) is not { Length: > 0 } chat
+            || chat.EndsWith("@g.us", StringComparison.Ordinal) || chat.EndsWith("@broadcast", StringComparison.Ordinal)
+            || !conversa.TryGetProperty("lastReceivedKey", out var chave) || chave.ValueKind != JsonValueKind.Object
+            || (chave.TryGetProperty("fromMe", out var deMim) && deMim.ValueKind == JsonValueKind.True)
+            || Identificador(chave) is not { Length: > 0 } mensagem)
+            return null;
+        return new(chat, mensagem);
+    }
+
     private static MensagemRecenteWppConnect? Recente(JsonElement m) =>
         m.ValueKind == JsonValueKind.Object && m.TryGetProperty("id", out var id) && Identificador(id) is { Length: > 0 } valor
             && m.TryGetProperty("t", out var t) && t.TryGetInt64(out var quando)
