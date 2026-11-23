@@ -18,6 +18,7 @@ public class NoticeSyncJob extends JobService {
     private final Handler main = new Handler(Looper.getMainLooper());
     private JobParameters running;
     public static void schedule(Context context) {
+        if (!Ambiente.ATUAL.distribuicaoOficial()) return;
         synchronized (SCHEDULING) {
             generation++;
             if (active) return;

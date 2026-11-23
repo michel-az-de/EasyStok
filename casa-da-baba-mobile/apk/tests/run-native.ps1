@@ -24,6 +24,8 @@ $sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/Notic
 $sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/NoticeClock.java'
 $sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/TokenRegistration.java'
 $sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/printer/PrinterClassifier.java'
+$sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/Ambiente.java'
+$sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/SessionHttpClient.java'
 # Sem extensão e com o separador do sistema: o mesmo script roda no Windows e no Linux do CI.
 & (Join-Path $JavaHome 'bin/javac') -encoding UTF-8 -cp $JsonJar -d $output $sources
 if ($LASTEXITCODE -ne 0) { throw 'Compilação do harness nativo falhou.' }
@@ -38,3 +40,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Teste dos recibos assinados falhou.' }
 
 & (Join-Path $JavaHome 'bin/java') -cp ($output + [IO.Path]::PathSeparator + $JsonJar) com.casadababa.app.printer.PrinterClassifierTest
 if ($LASTEXITCODE -ne 0) { throw 'Teste do classificador de impressoras falhou.' }
+
+& (Join-Path $JavaHome 'bin/java') -cp ($output + [IO.Path]::PathSeparator + $JsonJar) com.casadababa.app.AmbienteTest
+if ($LASTEXITCODE -ne 0) { throw 'Teste do ambiente do APK falhou.' }

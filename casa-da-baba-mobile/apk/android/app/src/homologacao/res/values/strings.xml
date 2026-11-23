@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- #3114: nome próprio para não confundir com o app da operação no mesmo aparelho.
+         O rótulo do ícone começa diferente porque o launcher corta nomes longos. -->
+    <string name="app_name">Casa da Baba Homologação</string>
+    <string name="title_activity_main">Homologação</string>
+</resources>

@@ -18,6 +18,11 @@ firebaseResources.each { name, value ->
     if (!(value instanceof String) || !(value ==~ /[A-Za-z0-9:_-]+/))
         throw new GradleException("Configuração pública Firebase inválida: ${name}")
 }
+// #3114: a homologação recebe as origens de teste por -P e só as confere quando há tarefa dela no build.
+def homologacaoApi = (project.findProperty('cdbHomologacaoApi') ?: '').toString()
+def homologacaoApp = (project.findProperty('cdbHomologacaoApp') ?: '').toString()
+def origemHttps = ~/https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+/
+def origemDaProducao = ~/https:\/\/(.+\.)?(easystok\.online|casadababa\.com)/
 android {
     namespace "com.casadababa.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -29,7 +34,29 @@ android {
         versionCode appVersion.versionCode as int
         versionName appVersion.version
         testInstrumentationRunner "com.casadababa.app.NativeSessionInstrumentacao"
-        firebaseResources.each { name, value -> resValue 'string', name, value }
+    }
+    buildFeatures { buildConfig true }
+    // #3114: a oficial segue com.casadababa.piloto e a produção; a de homologação instala ao lado, fala só
+    // com as origens de teste e não tem Firebase, OTA nem página de download (Ambiente.java).
+    flavorDimensions 'ambiente'
+    productFlavors {
+        oficial {
+            dimension 'ambiente'
+            buildConfigField 'String', 'CDB_AMBIENTE', '"oficial"'
+            buildConfigField 'String', 'CDB_API_ORIGIN', '"https://api.easystok.online"'
+            buildConfigField 'String', 'CDB_APP_ORIGIN', '"https://app.easystok.online"'
+            buildConfigField 'String', 'CDB_DOWNLOADS_ORIGIN', '"https://easystok.online"'
+            firebaseResources.each { name, value -> resValue 'string', name, value }
+        }
+        homologacao {
+            dimension 'ambiente'
+            applicationIdSuffix ".homologacao"
+            versionNameSuffix "-homologacao"
+            buildConfigField 'String', 'CDB_AMBIENTE', '"homologacao"'
+            buildConfigField 'String', 'CDB_API_ORIGIN', "\"${homologacaoApi}\""
+            buildConfigField 'String', 'CDB_APP_ORIGIN', "\"${homologacaoApp}\""
+            buildConfigField 'String', 'CDB_DOWNLOADS_ORIGIN', '""'
+        }
     }
     testBuildType "release"
     signingConfigs {
@@ -47,6 +74,30 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+// A homologação só se monta em debug: a release assinaria com a chave da distribuição oficial.
+androidComponents {
+    beforeVariants(selector().withName('homologacaoRelease')) { it.enable = false }
+}
+gradle.taskGraph.whenReady { graph ->
+    def tarefas = graph.allTasks.findAll { it.project == project }
+    def homologacao = tarefas.any { it.name.contains('Homologacao') }
+    def oficial = tarefas.any { it.name.contains('Oficial') }
+    if (!homologacao && !oficial) return
+    if (homologacao && oficial) throw new GradleException('Monte uma variante por vez: o conteúdo web empacotado é de um ambiente só.')
+    if (homologacao) {
+        [cdbHomologacaoApi: homologacaoApi, cdbHomologacaoApp: homologacaoApp].each { name, value ->
+            if (!(value ==~ origemHttps) || value ==~ origemDaProducao)
+                throw new GradleException("-P${name} precisa ser origem HTTPS de teste, sem caminho, fora de easystok.online e casadababa.com.")
+        }
+    }
+    // O conteúdo web fica em src/main/assets, comum às variantes: precisa ter sido empacotado para esta.
+    def ambiente = homologacao ? 'homologacao' : 'oficial'
+    def configJs = file('src/main/assets/public/config.js')
+    if (!configJs.isFile()) throw new GradleException('Conteúdo web ausente: rode scripts/copy-web.cjs e cap sync antes do build.')
+    def config = new groovy.json.JsonSlurper().parseText(configJs.text.replaceFirst(/^window\.CDB_CONFIG = /, '').replaceFirst(/;\s*$/, ''))
+    if (config.ambiente != ambiente || (homologacao && config.apiBaseUrl != homologacaoApi))
+        throw new GradleException("Conteúdo web empacotado para ${config.ambiente} (${config.apiBaseUrl}). Rode copy-web com CDB_AMBIENTE=${ambiente}" + (homologacao ? " e CDB_API_BASE_URL=${homologacaoApi}." : '.'))
 }
 repositories {
     flatDir { dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' }

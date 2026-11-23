@@ -33,6 +33,7 @@ public final class OtaManager {
     private boolean checking;
     private boolean checkSucceeded;
     private long lastCheck;
+    private final com.casadababa.app.Ambiente ambiente;
 
     public interface Callback { void complete(JSObject status); }
 
@@ -41,9 +42,12 @@ public final class OtaManager {
         return instance;
     }
 
+    private OtaManager(Context context) { this(context, com.casadababa.app.Ambiente.ATUAL); }
+
     @SuppressWarnings("deprecation")
-    private OtaManager(Context context) {
+    OtaManager(Context context, com.casadababa.app.Ambiente ambiente) {
         this.context = context;
+        this.ambiente = ambiente;
         root = new File(context.getFilesDir(), "ota");
         bundles = new File(root, "bundles");
         stateFile = new AtomicFile(new File(root, "state.json"));
@@ -321,6 +325,8 @@ public final class OtaManager {
     }
 
     private JSONObject manifest() throws Exception {
+        // #3114: o canal de conteúdo é o da produção e traria a configuração dela para a homologação.
+        if (!ambiente.distribuicaoOficial()) throw new UpdatePolicy.NotPublished("A homologação não recebe atualização de conteúdo.");
         JSONObject envelope = new JSONObject(new String(fetch(UpdatePolicy.manifestUrl(nativeCode), 65536), StandardCharsets.UTF_8));
         byte[] payload = decode(string(envelope, "payloadBase64"));
         byte[] signature = decode(string(envelope, "signatureBase64"));

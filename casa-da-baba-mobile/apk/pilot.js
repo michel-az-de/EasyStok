@@ -8,7 +8,7 @@
       throw new Error('Não foi possível conferir esta atualização.');
     }
     const url = new URL(data.url);
-    if (url.origin !== 'https://easystok.online' || url.username || url.password
+    if (url.origin !== new URL(config.updatePageUrl).origin || url.username || url.password
         || !/^\/downloads\/casa-da-baba\/[a-zA-Z0-9._-]+\.apk$/.test(url.pathname)
         || url.search || url.hash) throw new Error('Endereço de atualização inválido.');
     return { ...data, available: data.versionCode > config.versionCode };
@@ -865,6 +865,14 @@
   async function checkUpdate(options = {}) {
     const automatic = options.automatic === true;
     if (!automatic) openHome();
+    // #3114: a homologação não tem canal de atualização; o APK novo se instala pelo arquivo.
+    if (!config.updateManifestUrl) {
+      if (!automatic) {
+        const status = doc.getElementById('pilotUpdateStatus');
+        status.hidden = false; status.textContent = 'APK de homologação: instale a versão nova pelo arquivo.';
+      }
+      return;
+    }
     if (checkingUpdate) {
       if (!automatic) {
         const status = doc.getElementById('pilotUpdateStatus');

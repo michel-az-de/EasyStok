@@ -30,12 +30,14 @@ $keytool=Join-Path $JavaHome 'bin\keytool.exe'
 $apksigner=Join-Path $AndroidSdk 'build-tools\36.0.0\apksigner.bat'
 foreach ($required in @($npmCli,$keytool,$apksigner)) { if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Ferramenta ausente: $required" } }
 $previous=@{}
-foreach ($key in @('PATH','JAVA_HOME','ANDROID_HOME','CDB_API_BASE_URL','CDB_KEYSTORE','CDB_SIGNING_PASSWORD')) { $previous[$key]=[Environment]::GetEnvironmentVariable($key,'Process') }
+foreach ($key in @('PATH','JAVA_HOME','ANDROID_HOME','CDB_AMBIENTE','CDB_API_BASE_URL','CDB_KEYSTORE','CDB_SIGNING_PASSWORD')) { $previous[$key]=[Environment]::GetEnvironmentVariable($key,'Process') }
 Push-Location $apkRoot
 try {
     $env:JAVA_HOME=$JavaHome
     $env:ANDROID_HOME=$AndroidSdk
     $env:PATH="$nodeDir;$JavaHome\bin;$env:PATH"
+    # #3114: este script monta só a variante oficial; a de homologação segue docs/plan/apk-homologacao-3114.md.
+    $env:CDB_AMBIENTE='oficial'
     $env:CDB_API_BASE_URL=$ApiBaseUrl
     $signingDir=[IO.Path]::GetFullPath($SigningDirectory)
     $credentialsPath=Join-Path $signingDir 'credentials.json'
@@ -67,10 +69,10 @@ try {
     [IO.File]::WriteAllText((Join-Path $apkRoot 'android\local.properties'),('sdk.dir='+$AndroidSdk.Replace('\','/')+[Environment]::NewLine),$utf8)
     Push-Location (Join-Path $apkRoot 'android')
     try {
-        & .\gradlew.bat assembleRelease --no-daemon --console=plain 2>&1 | Select-Object -Last 35
-        if ($LASTEXITCODE -ne 0) { throw 'Gradle assembleRelease falhou.' }
+        & .\gradlew.bat assembleOficialRelease --no-daemon --console=plain 2>&1 | Select-Object -Last 35
+        if ($LASTEXITCODE -ne 0) { throw 'Gradle assembleOficialRelease falhou.' }
     } finally { Pop-Location }
-    $builtApk=Join-Path $apkRoot 'android\app\build\outputs\apk\release\app-release.apk'
+    $builtApk=Join-Path $apkRoot 'android\app\build\outputs\apk\oficial\release\app-oficial-release.apk'
     & (Join-Path $apkRoot 'scripts\verify-apk-runtime.ps1') -ApkPath $builtApk -BuildToolsDirectory (Split-Path -Parent $apksigner)
     $verification=& $apksigner verify --print-certs $builtApk 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'A verificação da assinatura do APK falhou.' }

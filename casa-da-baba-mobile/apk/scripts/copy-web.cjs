@@ -10,10 +10,10 @@ const contract = require('./ota-contract.cjs');
 const { adaptAppMarkup } = require('./app-markup.cjs');
 const { TROCAS, aplicarTrocas } = require('./pwa-trocas.cjs');
 const { arquivosDoApp, montarHtmlUnico } = require('./pwa-montagem.cjs');
+const { configWeb } = require('./ambiente.cjs');
 const bundleVersion = process.env.CDB_BUNDLE_VERSION || version.version;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(bundleVersion)) throw new Error('Versão do conteúdo inválida.');
-const apiBaseUrl = process.env.CDB_API_BASE_URL || 'https://api.easystok.online';
-if (new URL(apiBaseUrl).protocol !== 'https:') throw new Error('A API do piloto precisa de HTTPS.');
+const ambiente = configWeb({ ambiente: process.env.CDB_AMBIENTE || 'oficial', apiBaseUrl: process.env.CDB_API_BASE_URL });
 for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot.css']) {
   if (!fs.existsSync(path.join(root, name))) throw new Error('Arquivo obrigatório ausente: ' + name);
 }
@@ -29,7 +29,8 @@ for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.
 fs.cpSync(path.join(root, 'assets/guia'), path.join(target, 'guia'), { recursive: true });
 fs.copyFileSync(path.resolve(root, '../../EasyStock.Console/src/assets/casa-da-baba.png'), path.join(target, 'casa-da-baba.png'));
 const config = {
-  apiBaseUrl: apiBaseUrl.replace(/\/+$/, ''),
+  ambiente: ambiente.ambiente,
+  apiBaseUrl: ambiente.apiBaseUrl,
   isPilot: true,
   requiresGoogleSession: true,
   appId: contract.APP,
@@ -38,8 +39,8 @@ const config = {
   versionCode: version.versionCode,
   bundleVersion,
   dataSchemaVersion: contract.DATA_SCHEMA,
-  updateManifestUrl: 'https://easystok.online/downloads/casa-da-baba/latest.json',
-  updatePageUrl: 'https://easystok.online/downloads/casa-da-baba/'
+  updateManifestUrl: ambiente.updateManifestUrl,
+  updatePageUrl: ambiente.updatePageUrl
 };
 fs.writeFileSync(path.join(target, 'config.js'), 'window.CDB_CONFIG = ' + JSON.stringify(config) + ';\n');
 fs.writeFileSync(path.join(target, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: config.appId, channel: contract.CHANNEL, bundleVersion, nativeVersionCode: contract.NATIVE_VERSION_CODE, dataSchemaVersion: contract.DATA_SCHEMA }));
@@ -68,4 +69,4 @@ html = html.replace(/((?:src|href)=['"])([^'"<>]+\.(?:js|css)(?:\?[^'"<>]*)?)(['
 });
 fs.writeFileSync(htmlPath, html);
 fs.rmSync(path.join(target, 'sw.js'), { force: true });
-console.log('PWA empacotada: piloto ' + version.version);
+console.log('PWA empacotada: piloto ' + version.version + ' (' + ambiente.ambiente + ', ' + ambiente.apiBaseUrl + ')');

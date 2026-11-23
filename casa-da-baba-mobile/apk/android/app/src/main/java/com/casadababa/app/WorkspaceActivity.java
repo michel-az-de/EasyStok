@@ -24,7 +24,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class WorkspaceActivity extends Activity {
-    private static final String HOME = "https://app.easystok.online/#/m/atendimento/balcao";
+    private static final String HOME = Ambiente.ATUAL.appOrigin() + "/#/m/atendimento/balcao";
     private static final int PICK_FILE = 2101;
     private static final int RECORD_AUDIO = 2102;
     private WebView web;
@@ -36,7 +36,7 @@ public class WorkspaceActivity extends Activity {
 
     private boolean trustedOrigin(Uri uri) {
         return uri != null && "https".equalsIgnoreCase(uri.getScheme()) &&
-            "app.easystok.online".equalsIgnoreCase(uri.getHost()) &&
+            Ambiente.ATUAL.appHost().equalsIgnoreCase(uri.getHost()) &&
             uri.getUserInfo() == null && (uri.getPort() == -1 || uri.getPort() == 443);
     }
 
@@ -139,8 +139,8 @@ public class WorkspaceActivity extends Activity {
                 if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null ||
                     (uri.getPort() != -1 && uri.getPort() != 443)) return true;
                 String host = uri.getHost();
-                if ("app.easystok.online".equalsIgnoreCase(host) ||
-                    "api.easystok.online".equalsIgnoreCase(host)) return false;
+                if (Ambiente.ATUAL.appHost().equalsIgnoreCase(host) ||
+                    Ambiente.ATUAL.apiHost().equalsIgnoreCase(host)) return false;
                 if (request.isForMainFrame() && request.hasGesture()) {
                     try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
                     catch (Exception ignored) { error.setVisibility(View.VISIBLE); }
