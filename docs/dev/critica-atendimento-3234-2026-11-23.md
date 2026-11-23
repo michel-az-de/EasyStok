@@ -112,7 +112,8 @@ A revisão do plano dividiu o grupo A em três PRs, para cada uma caber numa rev
 | PR | Itens | Situação |
 |---|---|---|
 | A1 | C2, C3 e C4 (faixa da janela e compositor) | mergeada (#3236) e no ar |
-| A2 | C1 (falhas seguidas agrupadas) | esta |
+| A2 | C1 (falhas seguidas agrupadas) | mergeada (#3240) e no ar; na produção não pegou o caso real |
+| A2b | C1 para envio de modelo | esta |
 | A3 | C5 (modo como selo no cabeçalho) | adiada para o grupo B (medida abaixo) |
 
 Ficam fora do grupo A, com motivo:
@@ -137,6 +138,14 @@ Decisões da A2:
 - "Ver as N tentativas" mostra as de antes acima da mais recente. Cada uma diz só "Tentativa 1 de 4", sem repetir o aviso na tela nem para o leitor de tela (um só `role=alert`), sem Reenviar, sem o retorno de um reenvio antigo e sem "Modelos aprovados", que ficam só na mais recente. As de antes mantêm reagir e apagar.
 - Fica para o grupo D, junto com a #3229: quando a mais recente de um grupo é reenviada e sai, as de antes voltam a ser um grupo, com aviso e Reenviar, logo abaixo do envio que deu certo. Antes da A2 eram três balões, cada um com o seu aviso e o seu Reenviar. O certo é a falha igual seguida de um envio que saiu deixar de pedir reenvio, e isso depende de como a #3229 trata o "pode ter chegado". Também fica para lá: o grupo é guardado pela tentativa mais antiga já carregada, então "Ver mensagens anteriores" que traga uma falha igual mais antiga fecha o grupo aberto. E se a atendente reenviar a mais recente e, antes do retorno, mandar o mesmo texto que falha igual, o "Reenviando…" vai junto para as tentativas de antes.
 - Os prints de antes e depois, tirados do harness da prova-2185 (a demonstração não tem envio com falha), estão em `critica-atendimento-3234/a2/`.
+
+Decisões da A2b:
+
+- A conferência na produção, numa conversa de teste, mostrou que os envios repetidos que falharam eram de **modelo**, que a A2 deixava fora do grupo. As provas da A2 só usavam texto.
+- O modelo agora agrupa quando é o mesmo modelo com o mesmo texto. O nome do modelo entra na comparação, então dois modelos diferentes não se juntam, nem um texto digitado igual ao de um modelo. A mensagem programada também fica separada do envio feito na hora, porque tem selo próprio.
+- Modelo sem texto continua fora do grupo. O balão mostra só o rótulo "Mensagem de modelo sem texto", e dois envios podem ter parâmetros diferentes. A tradução da API marca esse caso.
+- O modelo continua sem Reenviar, no grupo e fora dele.
+- Os prints de antes e depois, tirados do harness da prova-2185 com 4 modelos que esgotaram o tempo, estão em `critica-atendimento-3234/a2b/`.
 
 Por que a A3 (C5) foi para o grupo B:
 

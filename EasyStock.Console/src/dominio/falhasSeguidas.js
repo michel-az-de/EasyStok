@@ -6,16 +6,20 @@
 
 import { TIPOS_DE_FALHA, falhaDeEnvio } from './falhaDeEnvio.js'
 
-// Só texto puro agrupa: foto, modelo e anexo chegam com rótulo no texto ("Foto"), e duas fotos diferentes
-// virariam "tentativas" da mesma coisa. A frase da falha entra inteira: recusas com motivos diferentes não se juntam.
+// Foto, formato e anexo chegam com rótulo no texto ("Foto"), e duas fotos diferentes virariam "tentativas" da
+// mesma coisa. O modelo agrupa quando é o mesmo modelo com o mesmo texto (o caso da produção, A2b); sem texto,
+// o balão mostra só o rótulo e dois envios podem ter parâmetros diferentes. O nome do modelo entra na assinatura:
+// texto digitado igual ao de um modelo não se junta a ele, nem a programada (selo próprio) ao envio feito na hora.
+// A frase da falha entra inteira: recusas com motivos diferentes não se juntam.
 const assinaturaDaFalha = (linha, soltas) => {
   const m = linha.tipo === 'mensagem' ? linha.mensagem : null
   if (!m || m.dir !== 'out' || m.status !== 'falhou' || soltas.has(m.id)) return null
-  if (m.midia || m.modelo || m.formato || m.arte) return null
+  if (m.midia || m.formato || m.arte) return null
+  if (m.modelo && (m.semTexto || !m.modeloNome)) return null
   // Saiu por SMS, espera o cliente responder, ainda não tem id no servidor ou foi apagada: estado e ação próprios.
   if (m.porSms || m.aguardaCliente || m.semIdServidor || m.apagadaEm) return null
   const falha = falhaDeEnvio(m.erro)
-  return `${falha.tipo}\u0000${falha.texto}\u0000${m.texto ?? ''}`
+  return [falha.tipo, falha.texto, m.modelo ? m.modeloNome : '', m.programada ? 'programada' : '', m.texto ?? ''].join('\u0000')
 }
 
 // `soltas`: mensagens que a atendente reenviou nesta tela. Ficam à vista onde ela clicou, com o retorno do

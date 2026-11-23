@@ -85,7 +85,8 @@ export function mensagemDaApi(m, conversaId = null) {
     ...(saida && m.autor === 'Sistema' ? { automatica: true, origemAutomatica: 'sistema' } : {}),
     // #1424: saiu pelo disparo da mensagem programada; o balão mostra o selo.
     ...(saida && m.programada ? { programada: true } : {}),
-    ...(m.modelo ? { modelo: true, modeloNome: m.modelo.nome } : {}),
+    // #3234 (A2b): sem texto, o balão mostra o rótulo; a marca deixa esse modelo fora do grupo de falhas iguais.
+    ...(m.modelo ? { modelo: true, modeloNome: m.modelo.nome, ...(m.texto?.trim() ? {} : { semTexto: true }) } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
     // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
     ...(m.aguardaClienteDesde ? { aguardaCliente: true } : {}),
