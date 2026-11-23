@@ -133,7 +133,8 @@ export const Balao = memo(function Balao({
   mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null, aoReagir, aoApagar,
   // #3234 (C1): envios seguidos iguais que falharam viram um balão. `tentativas` > 1 é o balão do grupo
   // (aviso único e o botão das tentativas); `rotuloDaTentativa` marca uma de antes, aberta a pedido, que não repete o aviso.
-  tentativas = 1, tentativasAbertas = false, aoAlternarTentativas, rotuloDaTentativa = null,
+  // `chaveDoGrupo` é a tentativa mais antiga: o grupo segue aberto quando uma nova falha igual vira a mais recente.
+  tentativas = 1, tentativasAbertas = false, aoAlternarTentativas, chaveDoGrupo = null, rotuloDaTentativa = null,
 }) {
   // #1761: o Reenviar não dava retorno nenhum. O botão diz "Reenviando…", trava o segundo toque
   // e, se o canal recusar de novo, a bolha diz que a nova tentativa também não saiu.
@@ -223,7 +224,7 @@ export const Balao = memo(function Balao({
           <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {avisoDasTentativas(falha, tentativas)}</span>
         ))}
         {tentativas > 1 && aoAlternarTentativas && (
-          <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(mensagem.id)}>
+          <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(chaveDoGrupo ?? mensagem.id)}>
             {tentativasAbertas ? 'Ocultar as tentativas' : `Ver as ${tentativas} tentativas`}
           </button>
         )}

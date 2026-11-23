@@ -103,6 +103,8 @@ const CONVERSAS = [
   conversa('robo'), conversa('meu', {
     ...(q.get('cabecalhoCheio') === '1' ? { nome: 'Maria Aparecida dos Santos Albuquerque', numeroComanda: 4821 } : {}),
     ...(q.get('falhas') === '1' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mf' + i, dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
+    // falhas=2: uma recusa seguida de um tempo esgotado com o mesmo texto; reenviar a recusa a deixa igual à vizinha.
+    ...(q.get('falhas') === '2' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, { id: 'rf0', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'Não enviada: Sem conexão', em: h(9) }, { id: 'rf1', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(8) }] } : {}),
   }), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('lead', { conta: 'lead', clienteId: null }),
   conversa('leadjanela', { conta: 'lead', clienteId: null, mensagens: [{ id: 'mlj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
@@ -178,6 +180,15 @@ function Cena() {
     concluirLembrete: noop, criarLembrete: noop, marcarLembretesVistos: noop, alternarLoja: noop,
     fecharAvisoApi: noop, pausarAvisos: noop, retomarAvisos: noop,
     pedirNotificacaoDoNavegador: noop, alternarSom: noop,
+    // #3234 (E32): com falhas, o fio ganha Reenviar (que esgota o tempo de novo), reagir e apagar, como no modo API.
+    ...(q.get('falhas') ? {
+      reenviar: async (id, mensagemId) => {
+        chamadas.push(['reenviar', id, mensagemId])
+        despachar({ tipo: A.FALHAR_ENVIO_API, id, mensagemId, erro: 'The operation was canceled. Envio incerto.' })
+        return null
+      },
+      reagir: async () => null, apagar: async () => null,
+    } : {}),
   }), [])
   const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
   const usuario = SESSAO.usuario
@@ -638,6 +649,32 @@ try {
     assert.equal(aberto.frases, 1, `abrir as tentativas repetiu a frase na tela (${aberto.frases} vezes)`)
     assert.deepEqual(aberto.rotulos, ['Tentativa 1 de 4', 'Tentativa 2 de 4', 'Tentativa 3 de 4'])
     assert.equal(await p.getByRole('button', { name: 'Ocultar as tentativas' }).getAttribute('aria-expanded'), 'true')
+    // Reenviar só na mais recente; reagir e apagar (o menu da mensagem) em cada uma das quatro.
+    const log = p.getByRole('log')
+    assert.equal(await log.getByRole('button', { name: 'Reenviar' }).count(), 1, 'Reenviar fora da mais recente')
+    assert.equal(await log.getByRole('button', { name: 'Mais opções da mensagem' }).count(), 5, 'as tentativas perderam o menu da mensagem')
+    await ctx.close()
+
+    // O Reenviar de uma falha solta que esgota o tempo de novo deixa a falha igual à vizinha: o balão clicado fica à
+    // vista (o mesmo nó, sem remontar) com o retorno do reenvio, em vez de sumir dentro de um grupo fechado.
+    const outra = await abrir('inicial=meu&falhas=2', { width: 1440, height: 900 })
+    await campo(outra.p).waitFor()
+    const reenviarRecusa = outra.p.getByRole('log').getByRole('button', { name: 'Reenviar' }).first()
+    await reenviarRecusa.evaluate((b) => { b.closest('[class*=balao]').dataset.clicado = '1' })
+    await reenviarRecusa.click()
+    await outra.p.getByText('Tentei de novo e o WhatsApp demorou outra vez', { exact: false }).waitFor()
+    const depois = await outra.p.evaluate(() => ({
+      clicado: document.querySelector('[data-clicado]')?.isConnected ?? false,
+      baloes: [...document.querySelectorAll('[role=log] *')].filter((e) => e.childElementCount === 0 && e.textContent === 'Tem sim, separo uma?').length,
+    }))
+    assert.deepEqual(depois, { clicado: true, baloes: 2 }, 'o balão reenviado sumiu ou remontou')
+    await outra.ctx.close()
+  })
+  await confere('E32b. (#3234 C1) a fixture sem as ações não ganha menu nem Reenviar', async () => {
+    const { ctx, p } = await abrir('inicial=meu', { width: 1440, height: 900 })
+    await campo(p).waitFor()
+    assert.equal(await p.getByRole('log').getByRole('button', { name: 'Mais opções da mensagem' }).count(), 0)
+    assert.equal(await p.getByRole('log').getByRole('button', { name: 'Reenviar' }).count(), 0)
     await ctx.close()
   })
   await confere('E31. (#3234 C2) 1024: abaixo de 1280 px o prazo folgado sai do cabeçalho (#1761 L4), e a linha não quebra', async () => {

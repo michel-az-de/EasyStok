@@ -56,6 +56,23 @@ confere('b  só agrupa o que é igual e seguido no fio', () => {
   }
 })
 
+confere('d  foto, modelo e anexo não agrupam: o texto deles é rótulo ("Foto"), não o conteúdo', () => {
+  for (const extra of [{ midia: { conversaId: 'c1', mensagemId: 'x' }, texto: 'Foto' }, { modelo: true, texto: 'Mensagem de modelo sem texto' }, { formato: 'imagem', arte: 'a.png' }]) {
+    const saida = agruparFalhasSeguidas([linha(msg('m1', extra)), linha(msg('m2', extra))])
+    assert.deepEqual(ids(saida), ['m1', 'm2'], JSON.stringify(extra))
+  }
+})
+
+confere('e  recusa com motivo diferente não agrupa: o motivo de cada uma se perderia', () => {
+  const saida = agruparFalhasSeguidas([linha(msg('r1', { erro: 'Não enviada: Sem conexão' })), linha(msg('r2', { erro: 'Não enviada: Número inválido' }))])
+  assert.deepEqual(ids(saida), ['r1', 'r2'])
+})
+
+confere('f  a mensagem que a atendente reenviou fica solta: não some dentro de um grupo fechado', () => {
+  const linhas = [linha(msg('m1')), linha(msg('m2')), linha(msg('m3')), linha(msg('m4'))]
+  assert.deepEqual(ids(agruparFalhasSeguidas(linhas, { soltas: new Set(['m2']) })), ['m1', 'm2', 'm4+m3'])
+})
+
 confere('c  o aviso do grupo sai do tipo: tempo esgotado pode ter chegado; os outros não saíram', () => {
   const tempo = falhaDeEnvio(TIMEOUT)
   assert.equal(tempo.tipo, TIPOS_DE_FALHA.TEMPO_ESGOTADO)

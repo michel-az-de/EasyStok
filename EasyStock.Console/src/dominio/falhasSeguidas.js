@@ -6,17 +6,23 @@
 
 import { TIPOS_DE_FALHA, falhaDeEnvio } from './falhaDeEnvio.js'
 
-const assinaturaDaFalha = (linha) => {
+// Só texto puro agrupa: foto, modelo e anexo chegam com rótulo no texto ("Foto"), e duas fotos diferentes
+// virariam "tentativas" da mesma coisa. A frase da falha entra inteira: recusas com motivos diferentes não se juntam.
+const assinaturaDaFalha = (linha, soltas) => {
   const m = linha.tipo === 'mensagem' ? linha.mensagem : null
-  if (!m || m.dir !== 'out' || m.status !== 'falhou') return null
-  return `${falhaDeEnvio(m.erro).tipo}\u0000${m.texto ?? ''}`
+  if (!m || m.dir !== 'out' || m.status !== 'falhou' || soltas.has(m.id)) return null
+  if (m.midia || m.modelo || m.formato || m.arte) return null
+  const falha = falhaDeEnvio(m.erro)
+  return `${falha.tipo}\u0000${falha.texto}\u0000${m.texto ?? ''}`
 }
 
-export function agruparFalhasSeguidas(linhas) {
+// `soltas`: mensagens que a atendente reenviou nesta tela. Ficam à vista onde ela clicou, com o retorno do
+// reenvio, em vez de sumir dentro de um grupo fechado quando a nova falha fica igual à vizinha.
+export function agruparFalhasSeguidas(linhas, { soltas = new Set() } = {}) {
   const saida = []
   let grupo = null
   for (const linha of linhas) {
-    const assinatura = assinaturaDaFalha(linha)
+    const assinatura = assinaturaDaFalha(linha, soltas)
     if (assinatura && grupo?.assinatura === assinatura) {
       grupo.mensagens.push(linha.mensagem)
       // A linha do grupo começa onde a primeira tentativa começava: a troca de voz é dela.

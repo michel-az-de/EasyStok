@@ -113,7 +113,7 @@ A revisão do plano dividiu o grupo A em três PRs, para cada uma caber numa rev
 |---|---|---|
 | A1 | C2, C3 e C4 (faixa da janela e compositor) | mergeada (#3236) e no ar |
 | A2 | C1 (falhas seguidas agrupadas) | esta |
-| A3 | C5 (modo como selo no cabeçalho) | a seguir |
+| A3 | C5 (modo como selo no cabeçalho) | adiada para o grupo B (medida abaixo) |
 
 Ficam fora do grupo A, com motivo:
 
@@ -129,7 +129,15 @@ Decisões da A1:
 
 Decisões da A2:
 
-- Envios seguidos que falharam com o mesmo texto e o mesmo tipo de falha viram um balão só: o mais recente, com o aviso uma vez. O grupo não atravessa mensagem do cliente, envio que saiu, troca de dia, nota, divisória nem troca de assunto.
+- Envios seguidos que falharam com o mesmo texto e o mesmo motivo viram um balão só: o mais recente, com o aviso uma vez. O grupo não atravessa mensagem do cliente, envio que saiu, troca de dia, nota, divisória nem troca de assunto.
+- Só texto agrupa. Foto, modelo e anexo chegam com um rótulo no lugar do texto ("Foto"), e duas fotos diferentes virariam tentativas da mesma coisa. Recusas com motivos diferentes também ficam separadas.
+- A mensagem que a atendente reenvia fica solta: se a nova falha a deixar igual à vizinha, ela continua à vista com o retorno do reenvio, em vez de sumir num grupo fechado. Grupo aberto continua aberto quando uma nova falha igual entra.
 - O texto do aviso sai do tipo da falha. Com tempo esgotado, a mensagem pode ter chegado, então o aviso diz "4 tentativas sem resposta do WhatsApp. Pode ter chegado: confira com o cliente antes de reenviar." e nunca "não saíram". Nos outros tipos, "N tentativas não saíram", seguido do motivo. O status em si continua com a #3229.
 - "Ver as N tentativas" mostra as de antes acima da mais recente. Cada uma diz só "Tentativa 1 de 4", sem repetir o aviso na tela nem para o leitor de tela (um só `role=alert`), e sem Reenviar, que fica só na mais recente. As de antes mantêm reagir, apagar e "Modelos aprovados".
 - Os prints de antes e depois, tirados do harness da prova-2185 (a demonstração não tem envio com falha), estão em `critica-atendimento-3234/a2/`.
+
+Por que a A3 (C5) foi para o grupo B:
+
+- O selo no cabeçalho não cabe ao lado do Assistente e do menu sem quebrar a linha "WhatsApp · Janela aberta por…", que a A1 deixou numa linha só. Com o painel do cliente aberto, o cabeçalho da conversa tem 580 px em 1280 e 740 px em 1440 (812 px na produção, em 1912).
+- Selo e "Assumir conversa" juntos quebram a linha nessas larguras. Só o selo, sem o Assumir, ainda quebra em 1280 com o cliente aberto e em 1440 com nome longo e comanda: o cabeçalho passa de 64 para 77 px.
+- O ganho só aparece com a coluna larga (1920, ou o cliente fechado), e não no uso comum. A saída depende de como o grupo B redistribui a largura entre a lista, a conversa e o cartão do cliente. Duas opções para levar ao B: o cabeçalho em duas linhas ou o botão do Assistente só com o ícone.

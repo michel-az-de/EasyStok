@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -16,6 +16,8 @@ import css from './atendimento.module.css'
 // reabre o MESMO atendimento — a próxima mensagem do cliente começa um
 // atendimento novo na mesma conversa, e o fio marca essa fronteira em vez de
 // deixar a passagem muda entre duas mensagens quaisquer.
+const VAZIO = new Set()
+
 function Divisoria({ numero }) {
   return (
     <div className={css.divisoriaAtendimento} role="separator">
@@ -77,13 +79,18 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
   const reagir = useChamadaEstavel(aoReagir)
   const apagar = useChamadaEstavel(aoApagar)
-  // #3234 (C1): grupos de falhas seguidas abertos, pela tentativa mais recente (a que fica à vista).
-  const [tentativasAbertas, setTentativasAbertas] = useState(() => new Set())
-  const alternarTentativas = useCallback((chave) => setTentativasAbertas((antes) => {
-    const depois = new Set(antes)
-    if (!depois.delete(chave)) depois.add(chave)
-    return depois
-  }), [])
+  // #3234 (C1): por conversa (o fio não remonta ao trocar), os grupos de falhas abertos, guardados pela tentativa
+  // mais antiga (não muda quando o grupo cresce), e as mensagens que a atendente reenviou soltas, que não somem num grupo.
+  const [marcas, setMarcas] = useState(() => ({ conversa: chaveRolagem, abertas: new Set(), soltas: new Set() }))
+  const daConversa = marcas.conversa === chaveRolagem ? marcas : { conversa: chaveRolagem, abertas: VAZIO, soltas: VAZIO }
+  const marcar = useCallback((campo, id, alternar) => setMarcas((antes) => {
+    const base = antes.conversa === chaveRolagem ? antes : { conversa: chaveRolagem, abertas: new Set(), soltas: new Set() }
+    const conjunto = new Set(base[campo])
+    if (!(alternar && conjunto.delete(id))) conjunto.add(id)
+    return { ...base, [campo]: conjunto }
+  }), [chaveRolagem])
+  const alternarTentativas = useCallback((id) => marcar('abertas', id, true), [marcar])
+  const reenviarSolta = useCallback((id) => { marcar('soltas', id, false); return reenviar(id) }, [marcar, reenviar])
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
   // #2232 (A5): `visivel` é o painel aberto na aba; ao abrir, o fio vai para a última mensagem.
@@ -126,12 +133,25 @@ export function Thread({
 
   // #2232 (B3): cada dia é um grupo, para a pílula de data ficar fixa só enquanto o dia dela rola.
   // #3234 (C1): antes, as falhas seguidas iguais viram uma linha só (o grupo não cruza dia, nota nem divisória).
+  // Aberto, as tentativas de antes entram como linhas próprias acima da mais recente: cada balão fica com a chave
+  // do seu id, entrando ou saindo de um grupo, e não remonta (o retorno do Reenviar e o foco ficam).
   const grupos = []
-  for (const l of agruparFalhasSeguidas(linhas)) {
+  const juntar = (l) => {
     const atual = grupos.at(-1)
     if (l.tipo === 'dia') grupos.push({ chave: l.chave, itens: [l] })
     else if (atual) atual.itens.push(l)
     else grupos.push({ chave: l.chave, itens: [l], solto: true })
+  }
+  for (const l of agruparFalhasSeguidas(linhas, { soltas: daConversa.soltas })) {
+    if (!l.anteriores?.length) { juntar(l); continue }
+    const total = l.anteriores.length + 1
+    const aberto = daConversa.abertas.has(l.anteriores[0].id)
+    if (aberto) {
+      l.anteriores.forEach((m, j) => juntar({
+        tipo: 'tentativa', chave: m.id, mensagem: m, trocaDeVoz: j === 0 && l.trocaDeVoz, rotulo: `Tentativa ${j + 1} de ${total}`,
+      }))
+    }
+    juntar({ ...l, trocaDeVoz: !aberto && l.trocaDeVoz, tentativas: total, aberto, chaveDoGrupo: l.anteriores[0].id })
   }
   const desenhar = (l) => {
     if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
@@ -147,21 +167,16 @@ export function Thread({
       aoReagir: aoReagir ? reagir : undefined,
       aoApagar: aoApagar ? apagar : undefined,
     }
-    // Sem a ação (demonstração) o balão não mostra o Reenviar.
-    const ultima = { ...comuns, aoReenviar: aoReenviar ? reenviar : undefined }
-    if (!l.anteriores?.length) return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...ultima} />
-    // #3234 (C1): aberto, as tentativas de antes aparecem acima, sem repetir o aviso e sem Reenviar (fica só na última).
-    const aberto = tentativasAbertas.has(l.mensagem.id)
+    // #3234 (C1): a tentativa de antes, aberta a pedido, não repete o aviso nem tem Reenviar (fica só na última).
+    if (l.tipo === 'tentativa') return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} rotuloDaTentativa={l.rotulo} {...comuns} />
+    // Sem a ação (demonstração) o balão não mostra o Reenviar. Fora de grupo, quem reenvia fica solta.
+    const aoReenviarAqui = aoReenviar ? (l.tentativas ? reenviar : reenviarSolta) : undefined
+    if (!l.tentativas) return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui} />
     return (
-      <Fragment key={l.chave}>
-        {aberto && l.anteriores.map((m, j) => (
-          <Balao key={m.id} mensagem={m} trocaDeVoz={j === 0 && l.trocaDeVoz} rotuloDaTentativa={`Tentativa ${j + 1} de ${l.anteriores.length + 1}`} {...comuns} />
-        ))}
-        <Balao
-          mensagem={l.mensagem} trocaDeVoz={!aberto && l.trocaDeVoz} {...ultima}
-          tentativas={l.anteriores.length + 1} tentativasAbertas={aberto} aoAlternarTentativas={alternarTentativas}
-        />
-      </Fragment>
+      <Balao
+        key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui}
+        tentativas={l.tentativas} tentativasAbertas={l.aberto} aoAlternarTentativas={alternarTentativas} chaveDoGrupo={l.chaveDoGrupo}
+      />
     )
   }
 
