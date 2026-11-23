@@ -75,6 +75,14 @@ confere('f  a mensagem que a atendente reenviou fica solta: não some dentro de 
   assert.deepEqual(ids(agruparFalhasSeguidas(linhas, { soltas: new Set(['m2']) })), ['m1', 'm2', 'm4+m3'])
 })
 
+confere('i  o que saiu por SMS, espera o cliente ou não tem id no servidor não agrupa: cada um tem o seu estado', () => {
+  for (const extra of [{ porSms: true }, { aguardaCliente: true }, { semIdServidor: true }]) {
+    const chave = Object.keys(extra)[0]
+    const saida = agruparFalhasSeguidas([linha(msg('m1', extra)), linha(msg('m2')), linha(msg('m3', extra))])
+    assert.deepEqual(saida.map((l) => l.mensagem.id + (l.anteriores?.length ? '+' + l.anteriores.length : '')), ['m1', 'm2', 'm3'], `${chave} entrou num grupo`)
+  }
+})
+
 confere('g  o grupo é guardado pela tentativa mais antiga: aberto continua aberto quando chega outra falha igual', () => {
   const dois = agruparFalhasSeguidas([linha(msg('m1')), linha(msg('m2'))])
   const tres = agruparFalhasSeguidas([linha(msg('m1')), linha(msg('m2')), linha(msg('m3'))])
