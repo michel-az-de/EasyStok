@@ -54,3 +54,10 @@
 .previaCaixa { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--preenchimento); font-size: var(--t-apoio); overflow-wrap: anywhere; }
 .previaCaixa p { margin: 0; white-space: pre-wrap; }
 .erroPainel { margin: 0; padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--erro); border-radius: var(--r-1); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); }
+
+/* Envio sem confirmação: conferir antes de liberar outro envio. Contorno uniforme, sem barra lateral. */
+.conferir { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); }
+.conferirOpcao { flex: 1 1 14rem; display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta); }
+.conferirOpcao input { margin-top: 2px; }
+
+.modeloCampos.modeloCamposComErro { max-height: min(20dvh, 150px); }

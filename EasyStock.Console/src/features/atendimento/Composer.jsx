@@ -349,7 +349,7 @@ export function Composer({
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
-              {visivel && modeloAberto && <PainelMensagensPadrao conversa={conversa} aoFechar={aoFecharModelos} />}
+              {visivel && modeloAberto && <PainelMensagensPadrao conversa={conversa} aoFechar={aoFecharModelos} janelaFechada={!podeEscrever} />}
             </div>
 
             <div className={css.acoes}>

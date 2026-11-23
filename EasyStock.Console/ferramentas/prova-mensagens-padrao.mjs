@@ -2,11 +2,14 @@
 // Prova da #3206 (S81): mensagem padrão no botão Respostas do compositor e em Gestão > Respostas.
 //   1. janela fechada: Respostas lista as mensagens padrão (nome legível e prévia), sem modal;
 //   2. escolher uma mostra um campo por {{n}}, a prévia ao vivo e o Enviar, no próprio compositor; o envio usa o
-//      endpoint de modelo e o erro do servidor aparece como veio;
-//   3. lista vazia: orienta, com caminho para Gestão > Respostas (gerência) ou pedido à gerência (operador);
-//   4. lead sem cadastro também envia (o servidor decide);
-//   5. Gestão > Respostas: criar, editar, arquivar, validação em PT-BR e sugestões prontas;
-//   6. o seletor do Programar mensagem só mostra modelo da Meta.
+//      endpoint de modelo e o erro do servidor aparece como veio (recusa clara deixa corrigir e reenviar);
+//   3. envio sem confirmação trava o Enviar e os campos até o "Enviar outro" conferido (sem segunda tentativa);
+//   4. clique fora não fecha com campo preenchido nem durante o envio; Esc e "Voltar à lista" seguem valendo;
+//   5. foco: lista, primeiro campo, volta à lista e botão Respostas depois do envio;
+//   6. lista vazia: orienta, com caminho para Gestão > Respostas (gerência);
+//   7. lead sem cadastro também lista e envia (o servidor decide);
+//   8. Gestão > Respostas: lista e formulário com sugestão pronta; operador vê a lista sem criar nem editar.
+//   Não coberto aqui: editar, arquivar, validação do formulário, vazio do operador e o seletor do Programar.
 // Componentes reais (PainelAtendimento, AbaRespostas) com CSS real, em Chromium, com ações de mentira. Nenhum
 // servidor: o harness é compilado com o Vite e servido pelo próprio Playwright.
 //
@@ -56,8 +59,7 @@ const MODELOS = [
   { nome: 'retomar_atendimento', idioma: 'pt_BR', categoria: 'UTILITY', origem: 'Local', quantidadeParametros: 0,
     cabecalho: 'Casa da Baba', corpo: 'Olá! Vimos que sua conversa ficou parada. Se ainda precisar de ajuda, é só responder aqui.' },
 ]
-const DA_META = { nome: 'aviso_oficial', idioma: 'pt_BR', categoria: 'UTILITY', origem: 'Meta', quantidadeParametros: 1, corpo: 'Aviso oficial para {{1}} do pedido.' }
-const catalogo = () => q.get('catalogo') === 'vazio' ? [] : q.get('catalogo') === 'misto' ? [...MODELOS, DA_META] : MODELOS
+const catalogo = () => q.get('catalogo') === 'vazio' ? [] : MODELOS
 
 function mensagens() {
   return [
@@ -77,7 +79,8 @@ function CenaConversa() {
   }
   const acoes = useMemo(() => ({
     descarregarRascunho: noop, enviarMidia: noop, definirRascunho: noop, devolverAutomatico: noop, selecionar: noop,
-    abrirEncerramento: noop, reabrir: noop, listarAtendentes: async () => [], enviar: noop, prepararOutroModelo: noop,
+    abrirEncerramento: noop, reabrir: noop, listarAtendentes: async () => [], enviar: noop,
+    prepararOutroModelo: (id) => { ordem.push('outro:' + id) },
     listarModelos: async () => {
       ordem.push('listar')
       await espera(120)
@@ -86,7 +89,8 @@ function CenaConversa() {
     },
     enviarModelo: async (id, dados) => {
       ordem.push('modelo:' + id + ':' + JSON.stringify(dados))
-      await espera(150)
+      await espera(q.get('envio') === 'lento' ? 700 : 150)
+      if (q.get('envio') === 'semconf') return { id: 'n2', status: 'Pendente' }
       if (q.get('envio') === 'erro') throw new Error('O cliente escreveu há mais de 7 dias: a mensagem padrão não pode mais ser enviada. Aguarde ele escrever de novo.')
       fixa.current.push({ id: 'n1', dir: 'out', texto: 'Olá, Renan! Seu pedido #4821 está pronto para retirada na loja.', em: new Date().toISOString(), status: 'Enviada' })
       redesenhar((n) => n + 1)
@@ -114,7 +118,7 @@ function CenaGestao() {
   const acoes = useMemo(() => ({ incluirRespostaPronta: noop, editarRespostaPronta: noop, alternarArquivamentoRespostaPronta: noop }), [])
   const estado = { fonteApi: true, selecionada: null, visiveis: [], agora }
   const cat = { janelas: [], canais: CANAIS, respostasProntas: [], cardapio: [], linhas: [], adicionais: [] }
-  const acesso = { permite: () => true, acoes: { editarRespostas: true }, aoSair: null }
+  const acesso = { permite: () => true, acoes: { editarRespostas: q.get('papel') !== 'operador' }, aoSair: null }
   return (
     <ContextoAcessoModulos value={acesso}><ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCatalogo value={cat}>
       <main style={{ padding: 16, height: '100dvh', overflow: 'auto', boxSizing: 'border-box' }}><div style={{ maxWidth: 960, margin: '0 auto' }}><AbaRespostas comAutomaticas={false} /></div></main>
@@ -242,6 +246,120 @@ try {
       await p.context().close()
       console.log('ok    ' + tela)
     }
+    // Cenários de achado de revisão: coletam as falhas para mostrar todas de uma vez.
+    const falhas = []
+    const cenario = async (nome, fn) => { try { await fn() } catch (e) { falhas.push(nome + ': ' + String(e.message).split('\n')[0] + ' @' + (String(e.stack).match(/mjs:(\d+)/)?.[1] ?? '?')) } }
+    const focado = async (p, loc, quem) => {
+      for (let i = 0; i < 20; i++) { if (await loc.evaluate((el) => el === document.activeElement)) return; await p.waitForTimeout(50) }
+      assert.fail('foco fora do esperado: ' + quem)
+    }
+    const preencher = async (p) => { await p.getByLabel('1º campo').fill('Renan'); await p.getByLabel('2º campo').fill('#4821') }
+    const enviosFeitos = (p) => p.evaluate(() => window.ordem.filter((o) => o.startsWith('modelo:')).length)
+    // keyboard.press não chega ao documento neste harness; o evento sai do elemento que tem o foco, como o teclado faria.
+    const esc = (p) => p.evaluate(() => (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true })))
+    const enviar = (p) => p.getByRole('button', { name: 'Enviar', exact: true })
+    const itens = (p) => p.getByRole('list', { name: 'Mensagens padrão' }).getByRole('button')
+    for (const tela of Object.keys(TELAS)) {
+      await cenario(`h-lead-${tela}`, async () => {
+        const p = await abrir(tela, 'lead=1')
+        await abrirPainel(p)
+        await itens(p).first().waitFor(T)
+        assert.equal(await itens(p).count(), 3)
+        await itens(p).first().click()
+        await preencher(p)
+        await enviar(p).click()
+        await painel(p).waitFor({ state: 'hidden', ...T })
+        assert.equal(await enviosFeitos(p), 1)
+        await p.context().close()
+      })
+      await cenario(`i-sem-confirmacao-${tela}`, async () => {
+        const p = await abrir(tela, 'envio=semconf')
+        await abrirPainel(p)
+        await itens(p).first().click()
+        await preencher(p)
+        await enviar(p).click()
+        await painel(p).getByRole('alert').filter({ hasText: 'Envio sem confirmação' }).waitFor(T)
+        assert.equal(await enviar(p).isDisabled(), true, 'Enviar deveria travar')
+        assert.equal(await p.getByLabel('1º campo').isDisabled(), true, 'campo deveria travar')
+        assert.equal(await enviosFeitos(p), 1)
+        await foto(p, `depois-i-travado-${tela}`)
+        const outro = painel(p).getByRole('button', { name: 'Enviar outro', exact: true })
+        await outro.waitFor(T)
+        assert.equal(await outro.isDisabled(), true, 'Enviar outro exige conferir antes')
+        await painel(p).getByLabel(/Conferi no WhatsApp/).check()
+        await outro.click()
+        assert.equal(await enviar(p).isDisabled(), false)
+        assert.equal(await p.getByLabel('1º campo').isDisabled(), false)
+        assert.ok((await p.evaluate(() => window.ordem.join('|'))).includes('outro:c1'))
+        await p.context().close()
+      })
+      await cenario(`i2-recusa-reenvia-${tela}`, async () => {
+        const p = await abrir(tela, 'envio=erro')
+        await abrirPainel(p)
+        await itens(p).first().click()
+        await preencher(p)
+        await enviar(p).click()
+        await painel(p).getByRole('alert').waitFor(T)
+        assert.equal(await enviar(p).isDisabled(), false, 'recusa clara deveria deixar reenviar')
+        assert.equal(await p.getByLabel('1º campo').isDisabled(), false)
+        await p.context().close()
+      })
+      await cenario(`j-clique-fora-${tela}`, async () => {
+        const p = await abrir(tela, 'envio=lento')
+        await abrirPainel(p)
+        await itens(p).first().click()
+        await p.getByLabel('1º campo').fill('Renan')
+        await p.mouse.click(4, 4)
+        await p.waitForTimeout(150)
+        assert.equal(await painel(p).isVisible(), true, 'clique fora fechou com campo preenchido')
+        await p.getByLabel('2º campo').fill('#4821')
+        await enviar(p).click()
+        await p.mouse.click(4, 4)
+        await esc(p)
+        await p.waitForTimeout(150)
+        assert.equal(await painel(p).isVisible(), true, 'o painel fechou durante o envio')
+        await painel(p).waitFor({ state: 'hidden', ...T })
+        assert.equal(await enviosFeitos(p), 1)
+        await p.context().close()
+      })
+      await cenario(`j2-esc-e-voltar-${tela}`, async () => {
+        const p = await abrir(tela)
+        await abrirPainel(p)
+        await itens(p).first().click()
+        await p.getByLabel('1º campo').fill('Renan')
+        await p.getByRole('button', { name: 'Voltar à lista' }).click()
+        await itens(p).first().waitFor(T)
+        await esc(p)
+        await painel(p).waitFor({ state: 'hidden', ...T })
+        await p.context().close()
+      })
+      await cenario(`k-foco-${tela}`, async () => {
+        const p = await abrir(tela)
+        await abrirPainel(p)
+        await itens(p).first().waitFor(T)
+        await focado(p, itens(p).first(), 'primeiro item da lista')
+        await itens(p).first().click()
+        await focado(p, p.getByLabel('1º campo'), '1º campo')
+        await p.getByRole('button', { name: 'Voltar à lista' }).click()
+        await focado(p, itens(p).first(), 'lista depois de Voltar')
+        await itens(p).nth(2).click()
+        await focado(p, enviar(p), 'Enviar quando não há campo')
+        await enviar(p).click()
+        await painel(p).waitFor({ state: 'hidden', ...T })
+        await focado(p, p.getByRole('button', { name: 'Respostas', exact: true }), 'botão Respostas depois do envio')
+        await p.context().close()
+      })
+    }
+    await cenario('m-gestao-operador', async () => {
+      const p = await abrir('desktop', 'cena=gestao&papel=operador', (pg) => pg.getByRole('heading', { name: 'Mensagens padrão' }))
+      await p.getByText('Somente a gerência pode criar, editar e arquivar mensagens padrão.').waitFor(T)
+      assert.equal(await p.getByRole('button', { name: 'Nova mensagem padrão' }).count(), 0)
+      assert.equal(await p.getByRole('button', { name: /^Editar mensagem padrão/ }).count(), 0)
+      assert.equal(await p.locator('section[aria-labelledby="gestao-mensagens-padrao"] ul > li').count(), 1)
+      await foto(p, 'depois-m-gestao-operador')
+      await p.context().close()
+    })
+    assert.deepEqual(falhas, [])
   }
   assert.deepEqual(erros, [])
 } finally { await navegador.close() }

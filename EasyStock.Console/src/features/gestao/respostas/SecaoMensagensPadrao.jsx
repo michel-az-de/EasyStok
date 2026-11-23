@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -16,6 +16,8 @@ import css from './abaRespostas.module.css'
 // #3206: mensagem padrão é o que dá para enviar quando o cliente ficou mais de 24 horas sem escrever. Idioma (pt_BR)
 // e categoria (UTILITY) são fixos: não aparecem na tela.
 function FormMensagemPadrao({ inicial, aoSalvar, aoCancelar }) {
+  const idSugestoes = useId()
+  const idPrevia = useId()
   const [titulo, setTitulo] = useState(inicial ? tituloDoNome(inicial.nome) : '')
   const [cabecalho, setCabecalho] = useState(inicial?.cabecalho ?? '')
   const [corpo, setCorpo] = useState(inicial?.corpo ?? '')
@@ -45,8 +47,8 @@ function FormMensagemPadrao({ inicial, aoSalvar, aoCancelar }) {
     <form className={css.form} onSubmit={salvar} noValidate aria-label={inicial ? 'Editar mensagem padrão' : 'Nova mensagem padrão'}>
       {!inicial && (
         <div className={css.sugestoes}>
-          <p className={css.rotuloPrevia} id="mp-sugestoes">Sugestões prontas</p>
-          <div className={css.acoes} role="group" aria-labelledby="mp-sugestoes">
+          <p className={css.rotuloPrevia} id={idSugestoes}>Sugestões prontas</p>
+          <div className={css.acoes} role="group" aria-labelledby={idSugestoes}>
             {SUGESTOES.map((s) => <Botao key={s.id} disabled={salvando} onClick={() => sugerir(s)}>{s.titulo}</Botao>)}
           </div>
         </div>
@@ -65,8 +67,8 @@ function FormMensagemPadrao({ inicial, aoSalvar, aoCancelar }) {
       <CampoTexto rotulo="Rodapé (opcional)" value={rodape} disabled={salvando} limite={RODAPE_MAXIMO}
         erro={ver('rodape')} onChange={(e) => setRodape(e.target.value)} />
       <div className={css.previaMensagem}>
-        <p className={css.rotuloPrevia} id="mp-previa">Prévia, com exemplos no lugar dos campos</p>
-        <div className={css.balao} role="group" aria-labelledby="mp-previa">
+        <p className={css.rotuloPrevia} id={idPrevia}>Prévia, com exemplos no lugar dos campos</p>
+        <div className={css.balao} role="group" aria-labelledby={idPrevia}>
           {cabecalho.trim() && <strong>{previaDoCorpo(cabecalho)}</strong>}
           <span>{corpo.trim() ? previaDoCorpo(corpo) : 'O texto aparece aqui.'}</span>
           {rodape.trim() && <small>{previaDoCorpo(rodape)}</small>}

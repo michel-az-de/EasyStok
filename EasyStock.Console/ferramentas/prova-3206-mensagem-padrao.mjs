@@ -25,6 +25,9 @@ assert.match(m.erroDoCorpo('olá {{2}} tchau'), /em ordem/)
 assert.match(m.erroDoCorpo('olá {{1}} e {{3}} tchau'), /em ordem/)
 assert.match(m.erroDoCorpo('olá {{nome}} tchau'), /chaves/)
 assert.match(m.erroDoCorpo('x'.repeat(1025)), /1024/)
+// Número do campo sem zero à esquerda e a partir de 1: {{01}} e {{0}} são chaves soltas.
+assert.match(m.erroDoCorpo('olá {{01}} tchau'), /chaves/)
+assert.match(m.erroDoCorpo('olá {{0}} tchau'), /chaves/)
 assert.equal(m.erroDoCorpo('Olá {{1}}, pedido {{2}} pronto.'), null)
 
 // Cabeçalho e rodapé: uma linha, até 60, sem campo.

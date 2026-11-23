@@ -31,6 +31,13 @@ const lista = [{ nome: 'a' }, { nome: 'b', origem: 'Meta' }, { nome: 'c', origem
 assert.deepEqual(m.soOrigemMeta(lista).map((x) => x.nome), ['a', 'b'])
 assert.deepEqual(m.soOrigemMeta(null), [])
 
+// 3b vazio do seletor: catálogo sem itens é diferente de catálogo só com mensagem padrão da loja (Local)
+assert.equal(m.motivoDaListaVazia([]), 'catalogo-vazio')
+assert.equal(m.motivoDaListaVazia(null), 'catalogo-vazio')
+assert.equal(m.motivoDaListaVazia([{ nome: 'c', origem: 'Local' }, { nome: 'd', origem: 'Local' }]), 'so-locais')
+assert.equal(m.motivoDaListaVazia(lista), null)
+assert.equal(m.motivoDaListaVazia([{ nome: 'a' }]), null)
+
 // 4 podeEnviarModelo não exige clienteId
 const base = { fonteApi: true, podeReabrir: true, aceitaModelo: true, encerrada: false, bloqueada: false }
 assert.equal(m.podeEnviarModelo(base), true)

@@ -1,5 +1,10 @@
 // Mensagem padrão (#3206): lógica pura do formulário da Gestão > Respostas. Espelha as regras do servidor
 // (ModeloMensagemLocal): nome técnico, cabeçalho, corpo com {{1}}, {{2}}… e rodapé. Sem React, para testar sozinha.
+import { PARAMETRO, nomeLegivel } from '../../../dominio/mensagensPadrao'
+
+// Nome técnico -> título legível ("pedido_pronto" -> "Pedido pronto"): a regra mora no domínio.
+export { nomeLegivel as tituloDoNome }
+
 export const NOME_MAXIMO = 512
 export const CABECALHO_MAXIMO = 60
 export const CORPO_MAXIMO = 1024
@@ -7,7 +12,6 @@ export const RODAPE_MAXIMO = 60
 export const IDIOMA = 'pt_BR'
 export const CATEGORIA = 'UTILITY'
 
-const PARAMETRO = /\{\{(\d{1,2})\}\}/g
 const EXEMPLOS = ['Maria', '#1234', '18:30', 'Rua das Flores, 120', 'R$ 45,90', '12/12']
 
 // Título livre -> nome técnico: minúsculo, sem acento, espaços e símbolos viram "_".
@@ -41,7 +45,7 @@ export function erroDoCorpo(corpo) {
   if (semCampos.includes('{{') || semCampos.includes('}}')) return 'Use as chaves só nos campos {{1}}, {{2}} e assim por diante.'
   const numeros = [...new Set(numerosDoCorpo(t))].sort((a, b) => a - b)
   if (numeros.some((n, i) => n !== i + 1)) return 'Os campos devem seguir em ordem, {{1}}, {{2}}, {{3}}, sem pular número.'
-  if (/^\{\{\d{1,2}\}\}/.test(t) || /\{\{\d{1,2}\}\}$/.test(t)) return 'A mensagem não pode começar nem terminar com um campo. Ponha um texto antes do primeiro e depois do último.'
+  if (/^\{\{[1-9][0-9]?\}\}/.test(t) || /\{\{[1-9][0-9]?\}\}$/.test(t)) return 'A mensagem não pode começar nem terminar com um campo. Ponha um texto antes do primeiro e depois do último.'
   return null
 }
 
@@ -70,12 +74,6 @@ export function corpoParaApi({ titulo, cabecalho, corpo, rodape }) {
     nome: nomeTecnico(titulo), idioma: IDIOMA, categoria: CATEGORIA,
     cabecalho: String(cabecalho ?? '').trim() || null, corpo: String(corpo ?? '').trim(), rodape: String(rodape ?? '').trim() || null,
   }
-}
-
-// Nome técnico -> título legível ("pedido_pronto" -> "Pedido pronto").
-export function tituloDoNome(nome) {
-  const t = String(nome ?? '').replace(/_+/g, ' ').trim()
-  return t ? t[0].toUpperCase() + t.slice(1) : ''
 }
 
 // Só avisos do pedido (categoria UTILITY): nada de promoção.

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Popover } from '../../componentes/Popover'
@@ -17,8 +17,8 @@ import css from './seletorRespostas.module.css'
 const LIMITE_PARAMETRO = 1024
 const ROTA_GESTAO_RESPOSTAS = hashDoModulo('atendimento', 'respostas')
 
-export function PainelMensagensPadrao({ conversa, aoFechar }) {
-  const { listarModelos, enviarModelo } = useAcoes()
+export function PainelMensagensPadrao({ conversa, aoFechar, janelaFechada = false }) {
+  const { listarModelos, enviarModelo, prepararOutroModelo } = useAcoes()
   const { acoes } = useAcessoModulos()
   const podeGerenciar = podeEditarRespostas(acoes)
   const podeIntegrar = podeVerIntegracoes(acoes)
@@ -29,7 +29,40 @@ export function PainelMensagensPadrao({ conversa, aoFechar }) {
   const [parametros, setParametros] = useState([])
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
+  // Envio sem confirmação (a modal antiga guardava o `resultado`): a primeira tentativa pode estar pendente, então
+  // Enviar e campos ficam travados até a atendente conferir no WhatsApp e pedir "Enviar outro".
+  const [semConfirmacao, setSemConfirmacao] = useState(false)
+  const [conferido, setConferido] = useState(false)
   const ocupado = useRef(false)
+  const listaRef = useRef(null)
+  const avisoRef = useRef(null)
+  const camposRef = useRef(null)
+  const enviarRef = useRef(null)
+  const conferidoRef = useRef(null)
+  const origem = useRef(globalThis.document?.activeElement ?? null)
+  // O Popover fecha por clique fora e por Esc sem dizer qual; o pointerdown em captura marca a origem.
+  const viaPonteiro = useRef(false)
+  const estado = useRef({})
+  estado.current = { enviando, protegido: parametros.some((p) => p.trim()) || Boolean(erro) || semConfirmacao }
+  useEffect(() => {
+    const marcar = () => { viaPonteiro.current = true; setTimeout(() => { viaPonteiro.current = false }, 0) }
+    const teclou = () => { viaPonteiro.current = false }
+    document.addEventListener('pointerdown', marcar, true)
+    document.addEventListener('keydown', teclou, true)
+    return () => { document.removeEventListener('pointerdown', marcar, true); document.removeEventListener('keydown', teclou, true) }
+  }, [])
+  const fecharDoPopover = useCallback(() => {
+    if (estado.current.enviando) return
+    if (viaPonteiro.current && estado.current.protegido) return
+    aoFechar()
+  }, [aoFechar])
+
+  // Foco: lista carregada (ou aviso), depois o primeiro campo ao escolher, e a lista de volta ao voltar.
+  useEffect(() => {
+    if (escolhido) (camposRef.current?.querySelector('input, textarea') ?? enviarRef.current)?.focus()
+    else if (lista !== null) (listaRef.current?.querySelector('button:not(:disabled)') ?? avisoRef.current)?.focus()
+  }, [escolhido, lista])
+  useEffect(() => { if (semConfirmacao) conferidoRef.current?.focus() }, [semConfirmacao])
 
   useEffect(() => {
     let vivo = true
@@ -50,23 +83,30 @@ export function PainelMensagensPadrao({ conversa, aoFechar }) {
     || algumPassaDoLimite(...parametros.map((p) => [p, LIMITE_PARAMETRO]))
 
   async function enviar() {
-    if (ocupado.current || falta) return
+    if (ocupado.current || falta || semConfirmacao) return
     ocupado.current = true; setEnviando(true); setErro(null)
     try {
       const m = await enviarModelo(conversa.id, { nome: escolhido.nome, idioma: escolhido.idioma, parametros: parametros.map((p) => p.trim()) })
-      if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) aoFechar()
-      else setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de enviar de novo.')
+      if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) {
+        aoFechar()
+        if (origem.current?.isConnected) origem.current.focus()
+      } else { setSemConfirmacao(true); setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de enviar de novo.') }
     } catch (e) { setErro(erroDoModelo(e, { envio: true, podeIntegrar }).texto) }
     finally { ocupado.current = false; setEnviando(false) }
   }
 
+  function prepararOutro() {
+    prepararOutroModelo?.(conversa.id)
+    setSemConfirmacao(false); setConferido(false); setErro(null)
+  }
+
   return (
-    <Popover rotulo="Mensagens padrão do WhatsApp" papel="group" aoFechar={aoFechar} portal folha>
+    <Popover rotulo="Mensagens padrão do WhatsApp" papel="group" aoFechar={fecharDoPopover} portal folha>
       <div className={css.seletor}>
         {lista === null && <output className={css.vazio}>Carregando as mensagens padrão…</output>}
-        {erroLista && <p className={css.erroPainel} role="alert">{erroLista}</p>}
+        {erroLista && <p ref={avisoRef} tabIndex={-1} className={css.erroPainel} role="alert">{erroLista}</p>}
         {lista?.length === 0 && !erroLista && (
-          <div className={css.vazio} data-vazio>
+          <div ref={avisoRef} tabIndex={-1} className={css.vazio} data-vazio>
             <p>Nenhuma mensagem padrão cadastrada</p>
             {podeGerenciar
               ? <a className={css.gerenciar} href={ROTA_GESTAO_RESPOSTAS} onClick={aoFechar}>Cadastrar em Gestão &gt; Respostas</a>
@@ -74,7 +114,7 @@ export function PainelMensagensPadrao({ conversa, aoFechar }) {
           </div>
         )}
         {!escolhido && Boolean(lista?.length) && (
-          <ul id={idLista} aria-label="Mensagens padrão" className={css.lista}>
+          <ul ref={listaRef} id={idLista} aria-label="Mensagens padrão" className={css.lista}>
             {lista.map((m) => (
               <li key={`${m.nome}-${m.idioma}`} className={css.linha}>
                 <Botao className={css.itemModelo} disabled={Boolean(m.indisponivel)} onClick={() => escolher(m)}>
@@ -86,7 +126,7 @@ export function PainelMensagensPadrao({ conversa, aoFechar }) {
           </ul>
         )}
         {escolhido && (
-          <fieldset className={`${css.modeloCampos} ${erro ? css.modeloCamposComErro : ''}`} disabled={enviando}>
+          <fieldset ref={camposRef} className={`${css.modeloCampos} ${erro ? css.modeloCamposComErro : ''}`} disabled={enviando || semConfirmacao}>
             <legend className={css.titulo}>{nomeLegivel(escolhido.nome)}</legend>
             {numeros.map((n, i) => <CampoTexto key={n} rotulo={`${n}º campo`} value={parametros[i] ?? ''} limite={LIMITE_PARAMETRO}
               onChange={(e) => setParametros((atuais) => atuais.map((v, k) => k === i ? e.target.value : v))} />)}
@@ -99,11 +139,20 @@ export function PainelMensagensPadrao({ conversa, aoFechar }) {
           </fieldset>
         )}
         {erro && <p className={css.erroPainel} role="alert">{erro}</p>}
+        {semConfirmacao && (
+          <div className={css.conferir}>
+            <label className={css.conferirOpcao}>
+              <input ref={conferidoRef} type="checkbox" checked={conferido} onChange={(e) => setConferido(e.target.checked)} />
+              Conferi no WhatsApp e preciso enviar outra mensagem.
+            </label>
+            <Botao disabled={!conferido} onClick={prepararOutro}>Enviar outro</Botao>
+          </div>
+        )}
         <div className={css.rodape}>
           {escolhido
-            ? <Botao disabled={enviando} onClick={() => { setEscolhido(null); setErro(null) }}>Voltar à lista</Botao>
-            : <span className={css.dica}>Fora da janela só sai mensagem padrão</span>}
-          {escolhido && <Botao variante="primario" disabled={enviando || falta} onClick={enviar}>{enviando ? 'Enviando…' : 'Enviar'}</Botao>}
+            ? <Botao disabled={enviando || semConfirmacao} onClick={() => { setEscolhido(null); setErro(null) }}>Voltar à lista</Botao>
+            : <span className={css.dica}>{janelaFechada ? 'Fora da janela só sai mensagem padrão' : ''}</span>}
+          {escolhido && <Botao ref={enviarRef} variante="primario" disabled={enviando || semConfirmacao || falta} onClick={enviar}>{enviando ? 'Enviando…' : 'Enviar'}</Botao>}
         </div>
       </div>
     </Popover>
