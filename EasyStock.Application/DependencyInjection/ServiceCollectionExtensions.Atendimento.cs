@@ -52,6 +52,7 @@ public static partial class ServiceCollectionExtensions
         // S42: variáveis e CRUDs agrupados (*UseCases, fora do sufixo da convenção).
         services.AddScoped<VariaveisAtendimento>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.RespostasProntasUseCases>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.ModelosMensagemLocaisUseCases>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.AutomacoesUseCases>();
 
         // S54: caderno da loja para o agente.

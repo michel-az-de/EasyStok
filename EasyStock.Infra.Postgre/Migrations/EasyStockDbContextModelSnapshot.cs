@@ -1598,6 +1598,61 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("mensagens_programadas", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ModeloMensagemLocal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Arquivado")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Cabecalho")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Categoria")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Corpo")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Idioma")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Rodape")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Nome", "Idioma")
+                        .IsUnique()
+                        .HasDatabaseName("ux_modelos_mensagem_empresa_nome_idioma");
+
+                    b.ToTable("modelos_mensagem", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Ocorrencia", b =>
                 {
                     b.Property<Guid>("Id")
