@@ -66,9 +66,9 @@ public sealed class DispararMensagemProgramadaUseCase(
             if (!await politica.PodeEnviarAsync(empresaId, mensagem.ClienteId, mensagem.Canal, mensagem.Finalidade, ct))
                 throw new RegraDeDominioVioladaException("O cliente revogou o consentimento neste canal.");
 
-            // #3205: defesa. Mensagem padrão local não sai programada, nem a que ficou agendada antes de a empresa trocar de ponte.
-            if (mensagem.Modelo is { } programado && (programado.Origem == OrigemModelo.Local
-                || catalogo is not null && await catalogo.UsaModelosLocaisAsync(empresaId, ct)))
+            // #3205: defesa para a programada com modelo que ficou agendada antes de a empresa passar à ponte web. A programada
+            // não guarda a origem (o agendamento já recusa a local), então quem decide aqui é a ponte da empresa.
+            if (mensagem.Modelo is not null && catalogo is not null && await catalogo.UsaModelosLocaisAsync(empresaId, ct))
                 throw new RegraDeDominioVioladaException(AgendarMensagemProgramadaUseCase.ModeloLocalNaoProgramavel);
 
             var canal = canais.Obter(mensagem.Canal);
