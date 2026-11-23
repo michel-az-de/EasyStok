@@ -201,7 +201,7 @@ jobs:
           docker tag ghcr.io/axllent/mailpit:v1.31.3 axllent/mailpit:v1.31.3
 
       - name: Baixar binários
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: integracao-bin
 
@@ -254,12 +254,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Baixar binários
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: integracao-bin
 
       - name: Baixar resultados das partes
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: integracao-parte-*
           path: trx
