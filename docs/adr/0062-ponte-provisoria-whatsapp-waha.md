@@ -7,8 +7,10 @@
   configuração; a API e o Worker recusam as duas ligadas ao mesmo tempo.
 - Emenda (22/11, Felipe, #3203): o item 4 ganha uma exceção. A loja passa a ter mensagens padrão locais, no formato
   da Meta (spec `docs/plan/atendimento-whatsapp/23-atendimento-coerente.md`). Com sessão web, a mensagem padrão local
-  sai como texto fora da janela, só por ação humana no Console e só em conversa onde o cliente já escreveu. Robô,
-  mensagem programada e Chamar no WhatsApp continuam recusando: a ponte não faz disparo ativo.
+  sai como texto fora da janela, só por ação humana no Console e só em conversa onde o cliente escreveu nos últimos
+  7 dias. Robô, mensagem programada e Chamar no WhatsApp continuam recusando: a ponte não faz disparo ativo. Só na
+  ponte, a emenda derroga a regra do ADR-0050 de que fora da janela só sai modelo aprovado pela Meta. Risco aceito:
+  mensagem fora da janela aumenta a exposição ao banimento descrito no Contexto e no item 5.
 - Prazo: provisório. Sai quando o número da loja entrar na Cloud API por coexistência (ADR-0050, #1417).
 - Relacionados: ADR-0050 (WhatsApp direto na Meta), ADR-0051 (multicanal), issue #2072, pesquisa
   `docs/plan/atendimento-whatsapp/ponte-provisoria-whatsapp-2026-10-26.md`, guia `docs/dev/whatsapp-ponte-waha.md`

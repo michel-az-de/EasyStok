@@ -21,7 +21,7 @@ existir no EasyStok, já no formato que a Meta aprova, para uso hoje pela ponte 
 | Spec | Issue | Tier | Entrega |
 |---|---|---|---|
 | S79 | #3204 | alto | Cadastro de mensagem padrão local: nome em snake_case, idioma, categoria UTILITY, cabeçalho, corpo com `{{n}}` em sequência, rodapé. Tabela `modelos_mensagem` com RLS, única por empresa, nome e idioma. `api/atendimento/modelos-locais`: Operador lê, Gerente escreve. |
-| S80 | #3205 | alto | Origem (Meta ou Local) no modelo. O catálogo decide por empresa com a regra do `RoteadorWhatsAppClient`: sessão web lista os locais. Modelo local sai como texto renderizado e fica gravado como modelo. |
+| S80 | #3205 | alto (muda a regra de envio do ADR-0062) | Origem (Meta ou Local) no modelo. O catálogo decide por empresa com a regra do `RoteadorWhatsAppClient`: sessão web lista os locais. Modelo local sai como texto renderizado e fica gravado como modelo. |
 | S81 | #3206 | baixo | Console: com a janela fechada, o botão Respostas lista as mensagens padrão com prévia e campos; o envio acontece no compositor, sem modal. Gestão > Respostas cria, edita e arquiva, com sugestões prontas. |
 | S82 | #3207 | baixo | Botão único "Cadastrar cliente" no cartão do lead, com formulário preenchido pelo que a conversa captou. |
 | S83 | #3208 | alto | Respostas rápidas com categoria (coluna nova), busca e edição no próprio chat. |
@@ -29,12 +29,14 @@ existir no EasyStok, já no formato que a Meta aprova, para uso hoje pela ponte 
 | S85 | #3210 | baixo | Seletor de emoji por categoria, com busca. |
 | S86 | #3210 | baixo | Assistente da conversa em painel móvel (`PainelMovel`), no lugar da modal. |
 
-Ordem: S79 → S80 → S81 → S82 → S83 → S84 → S85 e S86. Uma PR por issue, em sequência, porque `Composer.jsx` e
+Ordem: S79 → S80 → S81 → S82 → S83 → S84 → S85 e S86 (as duas últimas numa PR só, da #3210). Uma PR por issue, em sequência, porque `Composer.jsx` e
 `CartaoDoCliente.jsx` são compartilhados.
 
 ### Travas da mensagem padrão local (S80)
 
-- Só sai por ação humana, em conversa onde o cliente já escreveu (`UltimaMensagemEntradaEm` preenchido).
+- Só sai por ação humana, em conversa onde o cliente escreveu nos últimos 7 dias (`UltimaMensagemEntradaEm`).
+  Passado esse prazo, a conversa volta a depender do cliente escrever. Não é texto livre: o corpo é o da mensagem
+  cadastrada, só os campos numerados mudam.
 - Recusada no Chamar no WhatsApp (`IniciarConversaClienteUseCase`) e na mensagem programada.
 - Só categoria UTILITY nesta rodada. MARKETING local fica fora.
 - Lead sem cadastro recebe a mensagem local; com cliente, bloqueio e consentimento continuam valendo.
