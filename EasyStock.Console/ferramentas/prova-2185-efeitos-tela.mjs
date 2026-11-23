@@ -108,6 +108,8 @@ const CONVERSAS = [
   conversa('longa', { mensagens: MUITAS }),
   ...LISTA,
 ]
+// #3234 (E33): passagem=1 dá a 'meu' uma transferência com motivo, que continua na faixa abaixo do cabeçalho.
+if (q.get('passagem') === '1') CONVERSAS.find((c) => c.id === 'meu').passagem = { motivo: 'Restrição alimentar: alergia a camarão', em: null, assumida: false }
 const PAUSADAS = { meu: PAUSA_POR_ASSUMIR, janela: PAUSA_POR_ASSUMIR, lead: PAUSA_POR_ASSUMIR, leadjanela: PAUSA_POR_ASSUMIR, insta: PAUSA_POR_ASSUMIR, auto: PAUSA_POR_ASSUMIR, longa: PAUSA_POR_ASSUMIR }
 const memoriaDeNotas = criarRascunhosDeNotas('e1:u1', null)
 window.memoriaDeNotas = memoriaDeNotas
@@ -222,6 +224,8 @@ function Cena() {
               <PainelAtendimento aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} visivel={!ocultoNoCelular} />
             </section>
           </div>
+          {/* #3234 (E33): ficha=1 ocupa a coluna do cliente (360 px), e a conversa fica com a largura real do Balcão. */}
+          {q.get('ficha') === '1' && <aside aria-hidden="true" style={{ width: 360, flexShrink: 0 }} />}
           <BalaoAssistente sugestaoAgente={null} aoAbrirTela={(tela) => chamadas.push(['abrirTela', tela])} areaDoBalcao={{ tela: 1280, balcao: 340, ficha: 360, colunas: true }} />
           <PilhaDeAvisos />
         </div>
@@ -822,6 +826,44 @@ try {
       return evento.defaultPrevented
     })
     assert.equal(impediu, false)
+    await ctx.close()
+  })
+  await confere('E33. (#3234 C5) no desktop o modo é selo no cabeçalho, sem a faixa de 40 px; a transferência segue na faixa', async () => {
+    const medir = (p) => p.evaluate(() => {
+      const cabecalho = document.querySelector('[data-cabecalho-conversa]')
+      const regiao = document.querySelector('[data-controle-conversa]')
+      const assumir = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Assumir conversa')
+      const c = cabecalho.getBoundingClientRect()
+      const fio = document.querySelector('[role=log]').parentElement.getBoundingClientRect()
+      return {
+        noCabecalho: cabecalho.contains(regiao), texto: regiao.innerText.replace(/\s+/g, ' ').trim(),
+        alturaCabecalho: Math.round(c.height), vao: Math.round(fio.top - c.bottom),
+        assumirNoCabecalho: assumir ? cabecalho.contains(assumir) : null,
+        assumirCabe: assumir ? assumir.getBoundingClientRect().right <= c.right + 0.5 : null,
+        nomeNumaLinha: (() => { const n = cabecalho.querySelector('h2 > span'); return n.getBoundingClientRect().height <= parseFloat(getComputedStyle(n).lineHeight) * 1.5 })(),
+      }
+    })
+    for (const [largura, altura] of [[1280, 800], [1440, 900], [1920, 1080]]) {
+      for (const [inicial, selo, comAssumir] of [['robo', 'Assistente respondendo', true], ['meu', 'Você respondendo', false]]) {
+        const { ctx, p } = await abrir(`inicial=${inicial}`, { width: largura, height: altura })
+        await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+        const m = await medir(p)
+        const cena = `${inicial} em ${largura}: ${JSON.stringify(m)}`
+        assert.equal(m.noCabecalho, true, `o modo ficou numa faixa abaixo do cabeçalho (${cena})`)
+        assert.match(m.texto, new RegExp(selo), cena)
+        assert.ok(m.vao <= 1, `sobrou faixa entre o cabeçalho e a conversa (${cena})`)
+        assert.ok(m.alturaCabecalho <= 72, `o cabeçalho cresceu (${cena})`)
+        assert.equal(m.nomeNumaLinha, true, `o nome quebrou (${cena})`)
+        if (comAssumir) assert.deepEqual([m.assumirNoCabecalho, m.assumirCabe], [true, true], `Assumir fora do cabeçalho (${cena})`)
+        await ctx.close()
+      }
+    }
+    // A transferência diz quem passou e por quê: é frase, não cabe num selo, e segue na faixa com o Assumir.
+    const { ctx, p } = await abrir('inicial=meu&passagem=1', { width: 1440, height: 900 })
+    await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+    const passou = await medir(p)
+    assert.equal(passou.noCabecalho, false, `a transferência subiu para o cabeçalho: ${JSON.stringify(passou)}`)
+    assert.match(passou.texto, /alergia a camarão/)
     await ctx.close()
   })
 } finally {

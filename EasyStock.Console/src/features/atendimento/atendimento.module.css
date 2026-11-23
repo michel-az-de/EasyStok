@@ -279,6 +279,10 @@
 @container barra-modo (max-width: 559px) {
   .modoTexto { order: 1; flex: 1 1 100%; padding-bottom: var(--e-2); }
 }
+/* #3234 (C5): no desktop, só com a pílula (e o Assumir), o modo é selo no cabeçalho, ao lado do Assistente:
+   a faixa de 40 px some e a conversa ganha a altura. Sem fundo nem traço, como os outros controles do topo. */
+.modoNoCabecalho { padding: 0; min-height: 0; background: transparent; }
+.modoNoCabecalho .modoLinha { container-type: normal; flex-wrap: nowrap; min-height: 0; }
 .modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }

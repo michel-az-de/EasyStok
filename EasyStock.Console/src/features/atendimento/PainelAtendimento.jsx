@@ -18,7 +18,10 @@ import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
+import { apresentacaoDoModo } from '../../dominio/resumoDoModo'
+import { DESKTOP, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { BarraModo } from './BarraModo'
+import { useAssumirSemRepetir } from './useAssumirSemRepetir'
 import { Composer } from './Composer'
 import { ModalCompartilharComanda } from './CompartilharComanda'
 import { ModalAssistente } from './ModalAssistente'
@@ -67,6 +70,9 @@ function PainelDaConversa({
   const [modelosDe, setModelosDe] = useState(null)
   // Modal aberto pelo menu ⋮, guardado pelo id da conversa: trocar de conversa fecha.
   const [modalDoMenu, setModalDoMenu] = useState(null)
+  // #3234 (C5): no desktop o modo vira selo no cabeçalho; a barra muda de lugar, o Assumir em andamento fica aqui.
+  const desktop = useTamanhoTela() === DESKTOP
+  const assumirSemRepetir = useAssumirSemRepetir()
 
   // #2005 (console-09): só o modo API tem a ação; na demonstração o fio já é inteiro.
   const anterioresIds = useRef(new Set())
@@ -175,6 +181,24 @@ function PainelDaConversa({
   // #3206: lead sem cadastro também envia; o servidor decide.
   const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
   const prazo = prazoNoCabecalho(janela, motivo)
+  // #2134: quem responde e o Assumir ficam fora da área que rola. No modo nota a barra sai de cena.
+  // Com o Assumir a faixa fica: na coluna de 750 px (1440 com o cliente aberto) selo e botão empurravam a linha
+  // da janela para baixo. Sem ação nem frase, a faixa era só a pílula: essa sobe.
+  const modoNoCabecalho = desktop && !acoesTela.assumir && apresentacaoDoModo(selecionada, pausado, bloqueada, { podeReabrir }).noCabecalho
+  const barraModo = (
+    <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
+      <BarraModo
+        conversa={selecionada}
+        pausado={pausado}
+        bloqueada={bloqueada}
+        podeReabrir={podeReabrir}
+        acoes={acoesTela}
+        aoAssumir={() => assumirAtendimento(selecionada.id)}
+        assumirSemRepetir={assumirSemRepetir}
+        noCabecalho={modoNoCabecalho}
+      />
+    </div>
+  )
 
   return (
     <>
@@ -204,6 +228,7 @@ function PainelDaConversa({
           {/* #2437: "Bloqueado" fica só na barra de modo, com o motivo; aqui repetia a palavra (#2185). */}
           {/* O balão planta o gatilho do Assistente aqui. Com lugar próprio, ele não troca de lado com
               o menu conforme a conversa (#2185: a ordem dependia de quem montou por último). */}
+          {modoNoCabecalho && barraModo}
           <span className={css.ancoraAssistente} data-ancora-assistente />
           <MenuDeAcoes
             rotulo="Mais opções da conversa"
@@ -222,17 +247,8 @@ function PainelDaConversa({
 
       {/* #2134: quem responde a conversa e o Assumir ficam fixos entre o cabeçalho e a conversa.
           Dentro da área que rola, o aviso saía da tela (y=-228 px em 1280x720) e o campo seguia
-          enviando como pessoa por cima do Assistente. */}
-      <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
-      <BarraModo
-        conversa={selecionada}
-        pausado={pausado}
-        bloqueada={bloqueada}
-        podeReabrir={podeReabrir}
-        acoes={acoesTela}
-        aoAssumir={() => assumirAtendimento(selecionada.id)}
-      />
-      </div>
+          enviando como pessoa por cima do Assistente. #3234 (C5): no desktop, só com a pílula, sobe para o cabeçalho. */}
+      {!modoNoCabecalho && barraModo}
 
       {/* Uma área rolável só: conversa e painel do agente rolam juntos, e o composer fica
           preso no pé da coluna em qualquer largura. */}
