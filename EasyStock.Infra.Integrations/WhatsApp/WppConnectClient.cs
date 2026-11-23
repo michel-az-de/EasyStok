@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Atendimento;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Infra.Integrations.WhatsApp;
@@ -14,7 +16,7 @@ public sealed class WppConnectOptions
 }
 
 public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions> options, IRemetenteWhatsApp remetente,
-    BaixadorFotoPerfilWhatsApp? fotos = null, IMenusNumeradosWppConnect? menus = null)
+    BaixadorFotoPerfilWhatsApp? fotos = null, IMenusNumeradosWppConnect? menus = null, ILogger<WppConnectClient>? logger = null)
     : IWhatsAppCloudClient, IWppConnectSessaoClient
 {
     private readonly WppConnectOptions _options = options.Value;
@@ -32,22 +34,84 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
 
     // Sem retry: uma queda depois do POST pode ocorrer depois de o WhatsApp aceitar a mensagem.
     private async Task<JsonDocument> ChamarAsync(HttpMethod metodo, string caminho, CredencialWppConnect? sessao,
-        object? corpo, CancellationToken ct)
+        object? corpo, CancellationToken ct, string? acaoDeEnvio = null)
     {
         using var request = new HttpRequestMessage(metodo, caminho);
         if (sessao is not null) request.Headers.Authorization = new("Bearer", sessao.Token);
         if (corpo is not null) request.Content = JsonContent.Create(corpo);
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        HttpResponseMessage response;
+        try { response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct); }
+        catch (Exception ex) when (acaoDeEnvio is not null && !ct.IsCancellationRequested
+            && ex is HttpRequestException or TaskCanceledException)
+        {
+            // #3229: queda de transporte no envio não sai muda. Sem a exceção e sem a Message dela.
+            logger?.LogWarning("WPPConnect: falha de transporte no envio {Acao}, exceção {TipoExcecao}.", acaoDeEnvio, ex.GetType().Name);
+            throw;
+        }
+        using var _ = response;
         if (!response.IsSuccessStatusCode)
+        {
+            if (acaoDeEnvio is not null)
+                logger?.LogWarning("WPPConnect: recusa no envio {Acao}, status HTTP {StatusHttp}, detalhe {Detalhe}.",
+                    acaoDeEnvio, (int)response.StatusCode, await DetalheSeguroAsync(response, ct));
             throw Falha("O WPPConnect recusou a operação. Confira a conexão antes de tentar novamente.",
                 (int)response.StatusCode, response.StatusCode is System.Net.HttpStatusCode.BadRequest
                     or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden);
+        }
         if (response.Content.Headers.ContentLength > 30_000_000) throw new MidiaGrandeDemaisException(30_000_000);
         // LoadIntoBufferAsync impõe o teto também quando o servidor não informa Content-Length.
         await response.Content.LoadIntoBufferAsync(30_000_000, ct);
         try { return JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct)); }
         catch (JsonException) { throw Falha("O WPPConnect devolveu uma resposta inválida.", 502); }
     }
+
+    private const int DetalheMaximo = 160;
+    private static readonly Regex Digitos = new(@"\d{4,}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// #3229/#2590: o corpo da recusa carrega telefone e texto do cliente (<c>error.to</c>, <c>error.body</c>, e a própria
+    /// mensagem da lib). O detalhe sai só de uma lista fixa de campos, com número e endereço mascarados e o corte em 160.
+    /// Serve só ao log: lê até 64 KB por no máximo 2 s e nunca troca a falha que o envio devolve.
+    /// </summary>
+    private static async Task<string> DetalheSeguroAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        const string SemDetalhe = "sem detalhe";
+        using var limite = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limite.CancelAfter(TimeSpan.FromSeconds(2));
+        try
+        {
+            await response.Content.LoadIntoBufferAsync(65_536, limite.Token);
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(limite.Token));
+            var raiz = doc.RootElement;
+            var partes = new List<string>();
+            void Acrescentar(string rotulo, JsonElement origem, string campo)
+            {
+                if (origem.ValueKind != JsonValueKind.Object || !origem.TryGetProperty(campo, out var v)) return;
+                var texto = v.ValueKind switch
+                {
+                    JsonValueKind.String => v.GetString(),
+                    JsonValueKind.Number => v.GetRawText(),
+                    _ => null
+                };
+                if (!string.IsNullOrWhiteSpace(texto)) partes.Add($"{rotulo}={Mascarar(texto)}");
+            }
+            Acrescentar("message", raiz, "message");
+            var erro = raiz.ValueKind == JsonValueKind.Object && raiz.TryGetProperty("error", out var e) ? e : default;
+            Acrescentar("error.name", erro, "name");
+            Acrescentar("error.message", erro, "message");
+            Acrescentar("error.code", erro, "code");
+            if (partes.Count == 0) return SemDetalhe;
+            var detalhe = string.Join("; ", partes);
+            return detalhe.Length > DetalheMaximo ? detalhe[..DetalheMaximo] : detalhe;
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return SemDetalhe;
+        }
+    }
+
+    private static string Mascarar(string texto) =>
+        string.Join(' ', Digitos.Replace(texto, "***").Split(' ').Select(t => t.Contains('@') ? "***" : t));
 
     private static string Path(CredencialWppConnect sessao, string acao) =>
         $"api/{Uri.EscapeDataString(sessao.Sessao)}/{acao}";
@@ -187,7 +251,7 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
     private async Task<EnvioWhatsAppResult> EnviarAsync(string acao, object corpo, CancellationToken ct)
     {
         var sessao = await SessaoAsync(ct);
-        using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, acao), sessao, corpo, ct);
+        using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, acao), sessao, corpo, ct, acaoDeEnvio: acao);
         var root = doc.RootElement;
         if (LerTexto(root, "status") != "success" || !root.TryGetProperty("response", out var result))
             throw Falha("O WPPConnect não confirmou o envio. Confira o celular antes de repetir.", 502);

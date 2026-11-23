@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.TestHelpers;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Inbox;
 
@@ -23,7 +24,8 @@ public class EnviarModeloConversaUseCaseTests
     private readonly Cliente _cliente;
     private EnviarModeloConversaCommand Command => new(_empresa, _usuario, _conversa.Id, Guid.NewGuid(), "retomar", "pt_BR", ["Ana"]);
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
-    private EnviarModeloConversaUseCase UseCase => new(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System, _atendentes);
+    private readonly LoggerCapturado _log = new();
+    private EnviarModeloConversaUseCase UseCase => new(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System, _atendentes, _log);
 
     public EnviarModeloConversaUseCaseTests()
     {
@@ -410,6 +412,99 @@ public class EnviarModeloConversaUseCaseTests
 
         await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*outro conteúdo*");
         await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    // #3229: falha do canal que sai muda. Regra de dado #2590: o log não leva telefone nem texto, nem a Message da exceção.
+    private const string Telefone = "5511987654321";
+    private const string TextoSecreto = "texto-secreto-3229";
+
+    private sealed class LoggerCapturado : ILogger<EnviarModeloConversaUseCase>
+    {
+        public List<(LogLevel Nivel, string Mensagem, Exception? Excecao, Dictionary<string, object?> Estado)> Linhas { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Linhas.Add((logLevel, formatter(state, exception), exception,
+                state is IEnumerable<KeyValuePair<string, object?>> pares ? pares.ToDictionary(p => p.Key, p => p.Value) : []));
+    }
+
+    private static string TudoQueFoiLogado(IEnumerable<(LogLevel Nivel, string Mensagem, Exception? Excecao, Dictionary<string, object?> Estado)> linhas) =>
+        string.Join(Environment.NewLine, linhas.Select(l => l.Mensagem + "|" + string.Join(";", l.Estado.Select(p => $"{p.Key}={p.Value}"))));
+
+    [Fact]
+    public async Task FalhaDoCanal_GravaUmWarning_SemTelefoneTextoNemExcecao()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new InvalidOperationException($"falhou para {Telefone}@c.us com {TextoSecreto}"));
+        var command = Command;
+
+        var m = await UseCase.ExecuteAsync(command);
+
+        m.Status.Should().Be(StatusMensagem.Falhou);
+        var avisos = _log.Linhas.Where(l => l.Nivel == LogLevel.Warning).ToList();
+        avisos.Should().ContainSingle();
+        avisos[0].Excecao.Should().BeNull();
+        avisos[0].Estado.Should().ContainKey("TipoFalha").WhoseValue.Should().Be(TipoFalhaEnvio.Incerta);
+        avisos[0].Estado.Should().ContainKey("TipoExcecao").WhoseValue.Should().Be(nameof(InvalidOperationException));
+        avisos[0].Estado.Should().ContainKey("MensagemId").WhoseValue.Should().Be(command.TentativaId);
+        avisos[0].Estado.Should().ContainKey("ConversaId").WhoseValue.Should().Be(_conversa.Id);
+        var tudo = TudoQueFoiLogado(_log.Linhas);
+        tudo.Should().NotContain(Telefone).And.NotContain(TextoSecreto).And.NotContain(_conversa.ContatoIdExterno);
+    }
+
+    [Fact]
+    public async Task FalhaDoCanalComStatusECodigo_RegistraOsDoisNoWarning()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new WhatsAppCloudException(-2071, $"recusou {Telefone}", false, 500));
+
+        await UseCase.ExecuteAsync(Command);
+
+        var aviso = _log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning).Which;
+        aviso.Estado["StatusHttp"].Should().Be(500);
+        aviso.Estado["CodigoExcecao"].Should().Be(-2071);
+        TudoQueFoiLogado(_log.Linhas).Should().NotContain(Telefone);
+    }
+
+    [Fact]
+    public async Task FalhaNoConfirmarEnvio_GravaWarning()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns("");
+
+        var m = await UseCase.ExecuteAsync(Command);
+
+        m.Status.Should().Be(StatusMensagem.Falhou);
+        var aviso = _log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning).Which;
+        aviso.Excecao.Should().BeNull();
+        aviso.Estado["TipoExcecao"].Should().Be(nameof(RegraDeDominioVioladaException));
+    }
+
+    [Fact]
+    public async Task FalhaDoCanalComIntencaoJaEncerradaPorOutro_AindaGravaWarning()
+    {
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => { VarreduraMarcaFalhaIncerta(); throw new TimeoutException(TextoSecreto); });
+
+        await UseCase.ExecuteAsync(Command);
+
+        _log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning);
+        TudoQueFoiLogado(_log.Linhas).Should().NotContain(TextoSecreto);
+    }
+
+    [Fact]
+    public async Task RepeticaoDaMesmaTentativa_GravaInformationComMensagemIdEStatus()
+    {
+        var command = Command;
+        await UseCase.ExecuteAsync(command);
+        _log.Linhas.Should().NotContain(l => l.Nivel >= LogLevel.Information);
+
+        await UseCase.ExecuteAsync(command);
+
+        var info = _log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Information).Which;
+        info.Estado["MensagemId"].Should().Be(command.TentativaId);
+        info.Estado["Status"].Should().Be(StatusMensagem.Enviada);
+        TudoQueFoiLogado(_log.Linhas).Should().NotContain(_conversa.ContatoIdExterno);
     }
 
     private void VarreduraMarcaFalhaIncerta() =>

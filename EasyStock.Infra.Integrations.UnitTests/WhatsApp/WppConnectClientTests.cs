@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Infra.Integrations.WhatsApp;
 using EasyStock.TestHelpers.Http;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
@@ -326,5 +327,109 @@ public class WppConnectClientTests
         var act = () => roteador.EnviarTextoAsync("5511999999999", "Olá");
         await act.Should().ThrowAsync<WhatsAppCloudException>();
         _http.Chamadas.Should().BeEmpty();
+    }
+
+    // #3229: a recusa e a queda no envio saem em log, sem telefone, texto nem corpo cru (#2590).
+    private const string CorpoDeRecusa = """{"status":"error","message":"Error on send message","error":{"name":"Error","message":"falhou para 5511987654321@c.us","code":"E1","to":"5511987654321@c.us","body":"texto-secreto-3229"}}""";
+
+    private sealed class LoggerDeCaptura : ILogger<WppConnectClient>
+    {
+        public List<(LogLevel Nivel, string Mensagem, Exception? Excecao, Dictionary<string, object?> Estado)> Linhas { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Linhas.Add((logLevel, formatter(state, exception), exception,
+                state is IEnumerable<KeyValuePair<string, object?>> pares ? pares.ToDictionary(p => p.Key, p => p.Value) : []));
+        public string Tudo => string.Join(Environment.NewLine, Linhas.Select(l => l.Mensagem + "|" + string.Join(";", l.Estado.Select(p => $"{p.Key}={p.Value}"))));
+    }
+
+    private WppConnectClient ClientComLog(LoggerDeCaptura log) => new(_http.CriarClient("http://wpp.test/"),
+        Options.Create(new WppConnectOptions { Habilitado = true, SecretKey = "segredo-teste", WebhookToken = "token-webhook-teste" }),
+        _remetente, logger: log);
+
+    [Fact]
+    public async Task Recusa_no_envio_grava_um_warning_com_acao_status_e_detalhe_seguro()
+    {
+        var log = new LoggerDeCaptura();
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/send-message").Responde(HttpStatusCode.InternalServerError, CorpoDeRecusa);
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "texto-secreto-3229");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 500 && e.Codigo == -2071);
+        var aviso = log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning).Which;
+        aviso.Excecao.Should().BeNull();
+        aviso.Estado["Acao"].Should().Be("send-message");
+        aviso.Estado["StatusHttp"].Should().Be(500);
+        aviso.Mensagem.Should().Contain("Error on send message").And.Contain("E1");
+        log.Tudo.Should().NotContain("5511987654321").And.NotContain("@c.us").And.NotContain("texto-secreto-3229").And.NotContain(_sessao.Sessao);
+    }
+
+    [Fact]
+    public async Task Detalhe_da_recusa_e_truncado_em_160_caracteres()
+    {
+        var log = new LoggerDeCaptura();
+        _http.QuandoQualquer().Responde(HttpStatusCode.BadGateway, $$"""{"message":"{{new string('x', 400)}}"}""");
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "Olá");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ((string)log.Linhas.Single().Estado["Detalhe"]!).Length.Should().BeLessThanOrEqualTo(160);
+    }
+
+    [Fact]
+    public async Task Recusa_com_corpo_que_nao_e_json_grava_warning_sem_detalhe_e_sem_o_corpo()
+    {
+        var log = new LoggerDeCaptura();
+        _http.QuandoQualquer().Responde(HttpStatusCode.BadGateway, "<html>texto-secreto-3229 5511987654321</html>");
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "Olá");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 502);
+        log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning);
+        log.Tudo.Should().Contain("sem detalhe").And.NotContain("texto-secreto-3229").And.NotContain("5511987654321");
+    }
+
+    [Fact]
+    public async Task Recusa_em_acao_que_nao_e_envio_nao_grava_warning()
+    {
+        var log = new LoggerDeCaptura();
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/list-chats").Responde(HttpStatusCode.InternalServerError, CorpoDeRecusa);
+
+        var act = () => ClientComLog(log).ListarUltimasRecebidasAsync(_sessao, 10);
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 500);
+        log.Linhas.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Excecao_de_transporte_no_envio_grava_warning_sem_a_mensagem_da_excecao(bool timeout)
+    {
+        var log = new LoggerDeCaptura();
+        Exception falha = timeout
+            ? new TaskCanceledException("timeout para 5511987654321 texto-secreto-3229")
+            : new HttpRequestException("conexao recusada 5511987654321 texto-secreto-3229");
+        _http.QuandoQualquer().Lanca(falha);
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "texto-secreto-3229");
+
+        await act.Should().ThrowAsync<Exception>().Where(e => ReferenceEquals(e, falha));
+        var aviso = log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning).Which;
+        aviso.Excecao.Should().BeNull();
+        aviso.Estado["Acao"].Should().Be("send-message");
+        aviso.Estado["TipoExcecao"].Should().Be(falha.GetType().Name);
+        log.Tudo.Should().NotContain("5511987654321").And.NotContain("texto-secreto-3229");
+    }
+
+    [Fact]
+    public async Task Recusa_no_envio_segue_com_a_mesma_classificacao_de_antes()
+    {
+        var log = new LoggerDeCaptura();
+        _http.QuandoQualquer().Responde(HttpStatusCode.BadRequest, CorpoDeRecusa);
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "Olá");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 400 && e.EhPermanente && e.Codigo == -2071);
     }
 }

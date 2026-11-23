@@ -1,7 +1,9 @@
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
@@ -62,5 +64,52 @@ public class WebhookRecebidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture
         var marcado = await new WebhookRecebidoRepository(conferir).ObterAsync("teste-1562", evento);
         marcado!.Sucesso.Should().BeTrue();
         marcado.ProcessadoEm.Should().NotBeNull();
+    }
+
+    // #3229: a reentrega de um evento já registrado é o caminho normal da idempotência. Com o 23505 capturado,
+    // o EF ainda logava 2 linhas Error por reentrega (falha do comando e do SaveChanges).
+    [SkippableFact]
+    public async Task Reentrega_do_mesmo_evento_devolve_null_sem_log_de_erro()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var evento = Guid.NewGuid().ToString("N");
+        var capturados = new ErrosCapturados();
+        using var fabrica = LoggerFactory.Create(b => b.AddProvider(capturados));
+        var opcoes = new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseNpgsql(fixture.ConnectionString).UseLoggerFactory(fabrica).Options;
+
+        await using (var db = new EasyStockDbContext(opcoes))
+        {
+            var repo = new WebhookRecebidoRepository(db);
+            var primeiro = await repo.TryRegistrarAsync("teste-3229", evento, "hash");
+            var segundo = await repo.TryRegistrarAsync("teste-3229", evento, "hash");
+
+            primeiro.Should().NotBeNull();
+            segundo.Should().BeNull();
+        }
+
+        capturados.Erros.Should().BeEmpty();
+        await using var conferir = fixture.CreateDbContext();
+        var gravados = await conferir.WebhookRecebidos.Where(w => w.Provedor == "teste-3229" && w.EventIdExterno == evento).ToListAsync();
+        gravados.Should().ContainSingle().Which.Sucesso.Should().BeFalse();
+    }
+
+    private sealed class ErrosCapturados : ILoggerProvider
+    {
+        public List<string> Erros { get; } = [];
+        public ILogger CreateLogger(string categoryName) => new Registro(this, categoryName);
+        public void Dispose() { }
+
+        private sealed class Registro(ErrosCapturados dono, string categoria) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                if (logLevel < LogLevel.Error) return;
+                lock (dono.Erros) dono.Erros.Add($"{categoria}: {formatter(state, exception)}");
+            }
+        }
     }
 }

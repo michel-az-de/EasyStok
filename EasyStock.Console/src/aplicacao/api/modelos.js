@@ -3,6 +3,7 @@ import {
 } from '../../infra/api/modelosApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import * as acao from '../acoes'
+import { falhaDefinitiva } from '../../dominio/falhaDeEnvio'
 
 const SAIU = ['Enviada', 'Entregue', 'Lida']
 // #1408: a tentativa do "Chamar no WhatsApp" é do cliente (a conversa ainda não existe quando ela nasce).
@@ -30,7 +31,7 @@ export function criarAcoesModelosApi({ despachar, antesDeEnviar = (_id, fazer) =
       const corpo = corpoDoModelo(dados)
       return Promise.resolve(antesDeEnviar(id, () => comTentativa(id, corpo, (tentativaId) => enviarModelo(id, { ...corpo, tentativaId }).then(m => {
         despachar({ tipo: acao.RECEBER_MODELO_API, id, mensagem: mensagemDaApi(m, id) })
-        if (SAIU.includes(m.status)) limparTentativaModelo(id)
+        if (SAIU.includes(m.status) || falhaDefinitiva(m)) limparTentativaModelo(id)
         return m
       })), NAO_ASSUMIU)).then((m) => {
         if (m === NAO_ASSUMIU) throw new Error('Não consegui assumir a conversa, então o modelo não saiu.')
@@ -44,7 +45,7 @@ export function criarAcoesModelosApi({ despachar, antesDeEnviar = (_id, fazer) =
       const corpo = corpoDoModelo(dados)
       return comTentativa(chave, corpo, (tentativaId) =>
         iniciarConversaComModelo({ clienteId: cliente.id, ...corpo, tentativaId }).then(r => {
-          if (SAIU.includes(r.mensagem?.status)) limparTentativaModelo(chave)
+          if (SAIU.includes(r.mensagem?.status) || falhaDefinitiva(r.mensagem)) limparTentativaModelo(chave)
           return r
         }))
     },

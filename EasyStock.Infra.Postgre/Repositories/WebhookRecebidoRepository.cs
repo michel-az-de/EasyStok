@@ -1,14 +1,11 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
-using Npgsql;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
 /// <summary>
 /// Implementacao Postgres do <see cref="IWebhookRecebidoRepository"/>.
-/// Detecta violacao de UNIQUE em <c>(Provedor, EventIdExterno)</c> via
-/// PostgresException.SqlState 23505 e retorna null — fluxo padrao de
-/// idempotencia.
+/// Evento ja registrado em <c>(Provedor, EventIdExterno)</c> retorna null: fluxo padrao de idempotencia.
 /// </summary>
 public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookRecebidoRepository
 {
@@ -19,19 +16,14 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
         CancellationToken ct = default)
     {
         var entity = WebhookRecebido.Criar(provedor, eventIdExterno, rawBodyHash);
-        try
-        {
-            await db.WebhookRecebidos.AddAsync(entity, ct);
-            await db.SaveChangesAsync(ct);
-            return entity;
-        }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-        {
-            // Outro processo (ou retry do gateway) ja registrou este mesmo evento.
-            // Detacha para o context nao tentar de novo no proximo SaveChanges.
-            db.Entry(entity).State = EntityState.Detached;
-            return null;
-        }
+        // #3229: a reentrega e o caminho normal. Com Add + SaveChanges, o 23505 era capturado aqui, mas o EF ja tinha
+        // logado 2 linhas Error por evento repetido. ON CONFLICT nao falha, nao loga e nao aborta a transacao.
+        var inseridas = await db.Database.ExecuteSqlAsync($"""
+            INSERT INTO webhook_recebidos ("Id", "Provedor", "EventIdExterno", "RawBodyHash", "RecebidoEm", "Sucesso")
+            VALUES ({entity.Id}, {entity.Provedor}, {entity.EventIdExterno}, {entity.RawBodyHash}, {entity.RecebidoEm}, {entity.Sucesso})
+            ON CONFLICT ("Provedor", "EventIdExterno") DO NOTHING
+            """, ct);
+        return inseridas == 1 ? entity : null;
     }
 
     public Task<WebhookRecebido?> ObterAsync(string provedor, string eventIdExterno, CancellationToken ct = default) =>
@@ -56,11 +48,5 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
         if (existing is null) return;
         existing.MarcarProcessado(sucesso, erro);
         await db.SaveChangesAsync(ct);
-    }
-
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
-    {
-        // SQLSTATE 23505 = unique_violation em PostgreSQL.
-        return ex.InnerException is PostgresException pg && pg.SqlState == "23505";
     }
 }

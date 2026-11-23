@@ -12,7 +12,8 @@ public sealed record EnviarModeloConversaCommand(
 
 public sealed partial class EnviarModeloConversaUseCase(
     IConversaRepository conversas, IClienteRepository clientes, ICatalogoModelosAtendimento catalogo,
-    PoliticaEnvioCliente politica, ResolvedorCanal canais, IUnitOfWork unitOfWork, TimeProvider relogio, IAtendenteRepository? atendentes = null)
+    PoliticaEnvioCliente politica, ResolvedorCanal canais, IUnitOfWork unitOfWork, TimeProvider relogio, IAtendenteRepository? atendentes = null,
+    ILogger<EnviarModeloConversaUseCase>? logger = null)
 {
     /// <summary>Aviso da falha incerta: ninguém sabe se o modelo saiu, e por isso ele nunca é reenviado sozinho.</summary>
     public const string AvisoEnvioIncerto = "Confira a conversa no WhatsApp antes de iniciar outro envio.";
@@ -24,7 +25,7 @@ public sealed partial class EnviarModeloConversaUseCase(
         var modelo = ModeloDaTentativa(command.TentativaId, command.Nome, command.Idioma, command.Parametros);
         var conversa = ValidarConversa(await conversas.ObterPorIdAsync(command.EmpresaId, command.ConversaId, ct), command);
         var existente = await ObterTentativaAsync(command, modelo, ct);
-        if (existente is not null) return MensagemAtendimentoResult.De(existente);
+        if (existente is not null) return Repetida(existente);
         GarantirAbertaComModelo(conversa);
         // #2440: modelo em conversa de outra atendente pede confirmação, como o texto (ATD-1, #2305).
         await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, command.UsuarioId, command.Confirmada, ct);
@@ -66,7 +67,7 @@ public sealed partial class EnviarModeloConversaUseCase(
             unitOfWork.DescartarAlteracoesPendentes();
             throw new RegraDeDominioVioladaException("Esta tentativa já foi usada em outra mensagem.");
         }
-        if (!nova) return MensagemAtendimentoResult.De(mensagem);
+        if (!nova) return Repetida(mensagem);
 
         // A reserva já está gravada: repetição, cancelamento HTTP ou reinício nunca repetem o POST do canal.
         // Uma falha ao salvar o resultado deixa a intenção visível como sem confirmação.
@@ -103,22 +104,38 @@ public sealed partial class EnviarModeloConversaUseCase(
                     falha = ex;
                 }
             }
+            // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
+            // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
+            var tipo = falha is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
+                    or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
+                ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
+            // #3229: a falha do canal não sai muda, nem quando a varredura já encerrou a intenção. Sem a exceção e sem
+            // a Message dela: a ponte devolve o telefone e o texto do cliente nela (#2590).
+            if (falha is not null) RegistrarFalha(command.ConversaId, mensagem.Id, tipo, falha);
             // Falha depois de a varredura já ter encerrado a intenção não soma outra tentativa.
             if (falha is not null && atual.Status == StatusMensagem.Pendente)
-            {
-                // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
-                // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
-                var tipo = falha is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
-                        or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
-                    ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
                 atual.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
                     ? AvisoEnvioIncerto
                     : "O WhatsApp não confirmou o envio deste modelo. Confira a conexão e o modelo antes de tentar novamente.", tipo,
                     relogio.GetUtcNow().UtcDateTime);
-            }
             await unitOfWork.CommitAsync();
             return MensagemAtendimentoResult.De(atual);
         }, CancellationToken.None);
+    }
+
+    private MensagemAtendimentoResult Repetida(Mensagem existente)
+    {
+        logger?.LogInformation("Envio de modelo repetido: devolve a mensagem {MensagemId} já gravada, status {Status}.",
+            existente.Id, existente.Status);
+        return MensagemAtendimentoResult.De(existente);
+    }
+
+    private void RegistrarFalha(Guid conversaId, Guid mensagemId, TipoFalhaEnvio tipo, Exception falha)
+    {
+        var canal = falha as WhatsAppCloudException;
+        logger?.LogWarning(
+            "Envio de modelo sem confirmação do canal: tipo {TipoFalha}, status HTTP {StatusHttp}, código {CodigoExcecao}, exceção {TipoExcecao}, conversa {ConversaId}, mensagem {MensagemId}.",
+            tipo, canal?.StatusHttp, canal?.Codigo, falha.GetType().Name, conversaId, mensagemId);
     }
 
     private const string EntradaInvalida = "Informe a tentativa, o modelo, o idioma e os parâmetros preenchidos (até 1024 caracteres cada).";

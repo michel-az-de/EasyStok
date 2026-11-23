@@ -4,7 +4,7 @@ import { Modal } from '../../componentes/Modal'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeVerIntegracoes } from '../../dominio/acessoModulos'
-import { erroDoModelo } from '../../dominio/falhaDeEnvio'
+import { erroDoModelo, falhaDefinitiva } from '../../dominio/falhaDeEnvio'
 import { hashDoModulo } from '../../dominio/modulos'
 import { nomeDaConversa } from '../../dominio/nomeDoContato'
 import { SeletorDeModelo } from './SeletorDeModelo'
@@ -54,7 +54,8 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
         if (conversaIniciada) aoIniciar?.(conversaIniciada)
       }
       else {
-        setResultado(m)
+        // #3229: falha definitiva (nada saiu) mostra o erro e deixa reenviar; só a incerta pede a conferência.
+        if (!falhaDefinitiva(m)) setResultado(m)
         setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de iniciar outro envio.')
       }
     } catch (e) { falhar(erroDoModelo(e, { envio: true, podeIntegrar })) }
