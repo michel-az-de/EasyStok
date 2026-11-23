@@ -189,8 +189,8 @@ await confere('incluir resposta faz POST com título, atalho e texto e relê', a
   await acoes.incluirRespostaPronta({ titulo: 'Pix', atalho: '/pix', texto: 'Chave' })
   const post = chamadas.find((c) => c.metodo === 'POST')
   assert.match(post.url, /\/api\/atendimento\/respostas-prontas$/)
-  // #3208: o corpo leva a categoria (nula quando a dona não escolheu), que o PUT limpa se faltar.
-  assert.deepEqual(post.corpo, { titulo: 'Pix', atalho: 'pix', texto: 'Chave', categoria: null })
+  // #3208: o corpo leva a categoria ('' quando a dona não escolheu), que o PUT limpa; ausente/null a API mantém.
+  assert.deepEqual(post.corpo, { titulo: 'Pix', atalho: 'pix', texto: 'Chave', categoria: '' })
   assert.ok(chamadas.some((c) => c.metodo === 'GET'), 'não releu a lista')
 })
 

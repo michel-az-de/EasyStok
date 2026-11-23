@@ -96,4 +96,9 @@ public class AtendimentoRespostasProntasController(
     }
 }
 
+/// <summary>
+/// Corpo de POST/PUT. <c>Categoria</c>: no PUT, ausente ou <c>null</c> mantém a categoria atual (compatível com
+/// clientes antigos), string vazia ou só espaços limpa e texto grava (aparado, até 40, uma linha). No POST,
+/// ausente, nula ou vazia deixa a resposta sem categoria.
+/// </summary>
 public sealed record RespostaProntaBody(string? Titulo, string? Atalho, string? Texto, string? Categoria = null);

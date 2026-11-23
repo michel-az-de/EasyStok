@@ -23,7 +23,8 @@ export const corpoDaResposta = ({ titulo, atalho, texto, categoria }) => ({
   titulo: String(titulo ?? '').trim(),
   atalho: String(atalho ?? '').trim().replace(/^\/+/, ''),
   texto: String(texto ?? '').trim(),
-  categoria: normalizarCategoria(categoria),
+  // '' limpa de verdade no PUT (a API trata ausente/null como "manter").
+  categoria: normalizarCategoria(categoria) ?? '',
 })
 
 // Gatilho sem regra na API vem desligado e sem texto: a sugestão é o texto da

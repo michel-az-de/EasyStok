@@ -51,7 +51,9 @@ public sealed class RespostasProntasUseCases(
         await GarantirAtalhoLivreAsync(command.EmpresaId, atalho, id, ct);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
-        Validar(() => { resposta.Editar(command.Titulo, atalho, command.Texto, agora, command.Categoria); return resposta; });
+        // #3208: categoria ausente/nula mantém a gravada (cliente antigo não conhece o campo); "" ou espaços limpam.
+        var categoria = command.Categoria ?? resposta.Categoria;
+        Validar(() => { resposta.Editar(command.Titulo, atalho, command.Texto, agora, categoria); return resposta; });
         await unitOfWork.CommitAsync();
         return RespostaProntaResult.De(resposta);
     }

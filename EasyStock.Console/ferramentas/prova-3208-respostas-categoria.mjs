@@ -81,8 +81,8 @@ caso('API: lê a categoria (nula vira null) e envia no corpo, limpa quando vazia
   assert.equal(traducao.respostaDaApi({ id: 'x', titulo: 'T', atalho: 'x', texto: 'y', categoria: null }).categoria, null)
   assert.equal(traducao.respostaDaApi({ id: 'x', titulo: 'T', atalho: 'x', texto: 'y' }).categoria, null)
   assert.equal(traducao.corpoDaResposta({ titulo: 'T', atalho: 'x', texto: 'y', categoria: '  Entrega ' }).categoria, 'Entrega')
-  assert.equal(traducao.corpoDaResposta({ titulo: 'T', atalho: 'x', texto: 'y', categoria: '  ' }).categoria, null)
-  assert.equal(traducao.corpoDaResposta({ titulo: 'T', atalho: 'x', texto: 'y' }).categoria, null)
+  assert.equal(traducao.corpoDaResposta({ titulo: 'T', atalho: 'x', texto: 'y', categoria: '  ' }).categoria, '')
+  assert.equal(traducao.corpoDaResposta({ titulo: 'T', atalho: 'x', texto: 'y' }).categoria, '')
 })
 
 if (falhas) { console.error(`\n${falhas} caso(s) falharam`); process.exit(1) }

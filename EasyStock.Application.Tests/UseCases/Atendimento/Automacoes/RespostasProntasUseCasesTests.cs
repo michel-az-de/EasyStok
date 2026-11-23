@@ -65,6 +65,57 @@ public class RespostasProntasUseCasesTests
         resultado.Categoria.Should().Be("Horário");
     }
 
+    // #3208: cliente antigo (aba aberta antes do deploy) edita sem mandar a categoria: ela fica como está.
+    [Theory]
+    [InlineData(null)]
+    public async Task EditarSemCategoriaMantemACategoriaGravada(string? categoria)
+    {
+        var resposta = RespostaPronta.Criar(_empresaId, "A", "/a", "x", Agora, "Entrega");
+        _repo.ObterAsync(_empresaId, resposta.Id, Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var resultado = await UseCases().EditarAsync(resposta.Id, new SalvarRespostaProntaCommand(_empresaId, "A2", "/a", "x2", categoria));
+
+        resultado.Categoria.Should().Be("Entrega");
+        resposta.Categoria.Should().Be("Entrega");
+        resposta.Titulo.Should().Be("A2");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task EditarComCategoriaVaziaLimpaACategoria(string categoria)
+    {
+        var resposta = RespostaPronta.Criar(_empresaId, "A", "/a", "x", Agora, "Entrega");
+        _repo.ObterAsync(_empresaId, resposta.Id, Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var resultado = await UseCases().EditarAsync(resposta.Id, new SalvarRespostaProntaCommand(_empresaId, "A", "/a", "x", categoria));
+
+        resultado.Categoria.Should().BeNull();
+        resposta.Categoria.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EditarComTextoTrocaACategoriaAparada()
+    {
+        var resposta = RespostaPronta.Criar(_empresaId, "A", "/a", "x", Agora, "Entrega");
+        _repo.ObterAsync(_empresaId, resposta.Id, Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var resultado = await UseCases().EditarAsync(resposta.Id, new SalvarRespostaProntaCommand(_empresaId, "A", "/a", "x", "  Horário "));
+
+        resultado.Categoria.Should().Be("Horário");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task CriarSemCategoriaOuVaziaFicaSemCategoria(string? categoria)
+    {
+        var resultado = await UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá", categoria));
+
+        resultado.Categoria.Should().BeNull();
+    }
+
     [Fact]
     public async Task CategoriaComQuebraDeLinhaRecusaComoValidacao()
     {
