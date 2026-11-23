@@ -53,13 +53,20 @@ const LEAD = {
   contato: '5511987654321', mensagens: [], pedido: null, passagem: null, ultimaEm: new Date(agora).toISOString(),
   cliente: { tags: [], notas: [], pedidos: 0, telefone: '', endereco: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
 }
+// Variantes da conversa pela consulta: informado=1 (lead do chat do site que deixou nome, telefone e e-mail)
+// e vazio=1 (lead sem nada captado, que abre o formulário pelo nome).
+const LEAD_DA_CENA = {
+  ...LEAD,
+  ...(q.get('informado') === '1' ? { contatoInformado: { nome: 'Marina Souza', telefone: '5511987654321', email: 'marina@exemplo.com' } } : {}),
+  ...(q.get('vazio') === '1' ? { cliente: { ...LEAD.cliente, enderecoCapturado: '' } } : {}),
+}
 const CADASTRADO = {
   ...LEAD, conta: 'cliente', clienteId: 'cli1',
   cliente: { tags: [], notas: [], pedidos: 0, telefone: '(11) 98765-4321', endereco: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
 }
 
 function Cena() {
-  const [conversa, setConversa] = useState(LEAD)
+  const [conversa, setConversa] = useState(LEAD_DA_CENA)
   const acoes = useMemo(() => new Proxy({
     salvarCadastroRapido: async (id, dados) => {
       ordem.push('salvar:' + JSON.stringify(dados))
@@ -203,6 +210,25 @@ try {
       await p.getByRole('button', { name: /Abrir ficha de Marina/ }).waitFor(T)
       await semRolagemLateral(p)
       await foto(p, `depois-d-cadastrado-${tela}`)
+      await p.context().close()
+      // (e) lead do chat do site: o e-mail que o visitante informou vai junto no "Salvar cadastro" (achado 1)
+      p = await abrir(tela, 'informado=1')
+      await p.getByRole('button', { name: 'Cadastrar cliente', exact: true }).click()
+      await p.getByRole('dialog').getByLabel('Celular').waitFor(T)
+      await p.getByRole('button', { name: 'Salvar cadastro' }).click()
+      await p.getByRole('dialog').waitFor({ state: 'hidden', ...T })
+      assert.match(await p.evaluate(() => window.ordem.join('|')), /"email":"marina@exemplo.com"/, 'o e-mail informado se perdeu no cadastro forçado')
+      await p.context().close()
+      // (f) aberta pelo nome (não pelo botão): salvar não fecha a Ficha (achado 3)
+      p = await abrir(tela, 'vazio=1')
+      await p.getByRole('button', { name: /Abrir ficha de Marina/ }).click()
+      const fichaDoNome = p.getByRole('dialog')
+      await fichaDoNome.getByLabel('Celular').fill('11987654321')
+      await fichaDoNome.getByLabel('CEP').fill('01310-100')
+      await p.getByRole('button', { name: 'Salvar cadastro' }).click()
+      await p.waitForFunction(() => window.ordem.length > 0, null, T)
+      await p.waitForTimeout(600)
+      assert.equal(await p.getByRole('dialog').count(), 1, 'a Ficha aberta pelo nome não deve fechar ao salvar')
       await p.context().close()
       console.log('ok    ' + tela)
     }

@@ -1,3 +1,4 @@
+import { SITUACOES } from './areaEntrega'
 import { telefoneNaTela } from './cadastros'
 import { mascaraCep, partesDoEndereco } from './formato'
 
@@ -26,9 +27,11 @@ export function acoesDoCartao(conversa, { fonteApi = false } = {}) {
 const digitos = (valor) => String(valor ?? '').replace(/\D/g, '')
 
 // O que a conversa já captou, na ordem de confiança: cadastro da conversa, contato informado pelo
-// visitante do site, número do canal (só se parece telefone). Nada sobrescreve o que a dona digitar.
+// visitante do site, número do canal (só no WhatsApp, onde o id do contato é o telefone; nos outros
+// canais é um id externo, como no cadastrarEndereco). Nada sobrescreve o que a dona digitar.
 function telefoneDaConversa(conversa) {
-  const candidatos = [conversa.cliente?.telefone, conversa.contatoInformado?.telefone, conversa.contato]
+  const doCanal = conversa.canal === 'WhatsApp' ? conversa.contato : null
+  const candidatos = [conversa.cliente?.telefone, conversa.contatoInformado?.telefone, doCanal]
   const achado = candidatos.find((c) => digitos(c).length >= 10)
   return achado ? telefoneNaTela(achado) : ''
 }
@@ -44,3 +47,8 @@ export function valoresIniciaisDoCadastro(conversa) {
     cep: partes.cep ? mascaraCep(partes.cep) : '',
   }
 }
+
+// Aberta pelo botão, a Ficha já é o caminho de cadastrar: o banner do endereço capturado só fica quando
+// oferece uma decisão de área (fora ou no limite, na demonstração), que o formulário não tem.
+export const bannerDoEnderecoCapturado = (cadastrarLead, situacaoArea) =>
+  !cadastrarLead || situacaoArea === SITUACOES.FORA || situacaoArea === SITUACOES.LIMITE

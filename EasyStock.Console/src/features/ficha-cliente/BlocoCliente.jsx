@@ -195,7 +195,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
     setCadastro({ id, salvando: true, erro: null })
     let erro = null
     try {
-      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco }, agora, identidadeForm)
+      // #3207: no cadastro forçado o cartão "Informado pelo visitante" some; o e-mail que ele informou segue junto.
+      const email = cadastroForcado ? informado?.email : null
+      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco, ...(email ? { email } : {}) }, agora, identidadeForm)
       erro = resultado?.erro ?? null
       if (!erro) { guardarRapido(null); aoCadastrado?.() }
     } catch (falha) {

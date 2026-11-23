@@ -23,14 +23,14 @@ registerHooks({
 })
 
 const {
-  acoesDoCartao, leadSemCadastro, valoresIniciaisDoCadastro,
+  acoesDoCartao, leadSemCadastro, valoresIniciaisDoCadastro, bannerDoEnderecoCapturado,
   ROTULO_CADASTRAR_CLIENTE, ROTULO_VINCULAR_LEAD, ROTULO_CONFERIR_IDENTIDADE,
 } = await import('../src/dominio/cadastroDoLead.js')
 
 let passos = 0
 const ok = (texto) => { passos += 1; console.log(`ok ${passos} - ${texto}`) }
 
-const lead = { conta: 'lead', clienteId: null, nome: 'Marina (perfil)', contato: '5511987654321', cliente: { telefone: '' } }
+const lead = { conta: 'lead', canal: 'WhatsApp', clienteId: null, nome: 'Marina (perfil)', contato: '5511987654321', cliente: { telefone: '' } }
 const cliente = { conta: 'cliente', clienteId: 'c1', nome: 'Marina', cliente: { telefone: '11987654321' } }
 const clienteDaDemo = { conta: 'cliente', clienteId: null, nome: 'Marina', cliente: {} }
 
@@ -75,7 +75,21 @@ ok('contato que não parece telefone não vira telefone')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, cliente: { telefone: '21 91234-5678' } }).telefone, '(21) 91234-5678')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contatoInformado: { telefone: '31999998888', nome: 'Marina Souza' }, cliente: {} }).telefone, '(31) 99999-8888')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contatoInformado: { nome: 'Marina Souza' }, cliente: {} }).nome, 'Marina Souza')
-ok('o telefone do cadastro vale antes do contato informado, que vale antes do número do canal; nome informado vale antes do perfil')
+ok('o telefone do cadastro vale antes do contato informado, que vale antes do número do canal; o contato informado traz o nome nos valores iniciais (o salvar manda o nome da conversa, que a dona edita em linha)')
+
+// #3207 (revisão, achado 4): só o WhatsApp tem o número do canal no id; nos outros o id é externo.
+const doInstagram = { ...lead, canal: 'Instagram', contato: '17841400000000000', cliente: {} }
+assert.equal(valoresIniciaisDoCadastro(doInstagram).telefone, '')
+assert.equal(valoresIniciaisDoCadastro({ ...doInstagram, contatoInformado: { telefone: '31999998888' } }).telefone, '(31) 99999-8888')
+ok('fora do WhatsApp o Celular nasce vazio, ou com o telefone que o contato informou; nunca com o id externo')
+
+// #3207 (revisão, achado 5): o banner só some quando não tem decisão de área a oferecer.
+assert.equal(bannerDoEnderecoCapturado(false, null), true)
+assert.equal(bannerDoEnderecoCapturado(true, null), false)
+assert.equal(bannerDoEnderecoCapturado(true, 'dentro'), false)
+assert.equal(bannerDoEnderecoCapturado(true, 'fora'), true)
+assert.equal(bannerDoEnderecoCapturado(true, 'limite'), true)
+ok('aberta pelo botão, o banner do endereço some, exceto quando oferece decisão de área (fora ou no limite)')
 
 const vazio = valoresIniciaisDoCadastro({ conta: 'lead', nome: '', cliente: {} })
 assert.deepEqual(vazio, { nome: '', telefone: '', enderecoSemCep: '', cep: '' })
@@ -92,6 +106,8 @@ assert.match(painel, /aoCadastrar=\{editavel \? abrirCadastroDoLead/)
 const bloco = readFileSync(new URL('../src/features/ficha-cliente/BlocoCliente.jsx', import.meta.url), 'utf8')
 assert.match(bloco, /valoresIniciaisDoCadastro\(conversa\)/)
 assert.match(bloco, /cadastroForcado/)
-ok('cartão sem "Conferir cadastros"; "Cadastrar cliente" só no cartão; o formulário é o mesmo da Ficha, aberto pelo botão')
+// #3207 (revisão, achado 2): só o botão abre a Ficha no cadastro forçado; toda outra abertura zera.
+assert.equal((painel.match(/setSecao\('cliente'\)/g) ?? []).length, 2, 'só abrirFicha e abrirCadastroDoLead abrem a seção do cliente')
+ok('cartão sem "Conferir cadastros"; "Cadastrar cliente" só no cartão; o formulário é o mesmo da Ficha, aberto pelo botão; outras aberturas zeram o cadastro forçado')
 
 console.log(`\n${passos} verificações ok`)

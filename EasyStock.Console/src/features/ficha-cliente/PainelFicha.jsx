@@ -15,6 +15,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
+import { bannerDoEnderecoCapturado } from '../../dominio/cadastroDoLead'
 import { ROTULOS, rotuloDoPedido } from '../../dominio/rotulos'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar, totalPago } from '../../dominio/pagamento'
@@ -125,9 +126,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const [secao, setSecao] = useState(null)
   // #2849: quem pediu para editar (menu, endereço) cai na ficha única já com o formulário aberto.
   const [editarFicha, setEditarFicha] = useState(false)
-  const abrirFichaEditando = () => { setEditarFicha(true); setSecao('cliente') }
-  // #3207: "Cadastrar cliente" do cartão do lead abre a ficha já no formulário de cadastro.
+  // #3207: "Cadastrar cliente" do cartão do lead abre a ficha já no formulário de cadastro; toda outra
+  // abertura (nome, avatar, motivo, comanda) passa por abrirFicha e zera o cadastro forçado.
   const [cadastrarLead, setCadastrarLead] = useState(false)
+  const abrirFicha = () => { setCadastrarLead(false); setSecao('cliente') }
+  const abrirFichaEditando = () => { setEditarFicha(true); abrirFicha() }
   const abrirCadastroDoLead = () => { setCadastrarLead(true); setSecao('cliente') }
   // #2232 (F1, F7): o menu "Ações da ficha" reúne cadastro, PDF e as ações do pedido.
   const disponivel = useAcaoDisponivel()
@@ -143,7 +146,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const soltarComanda = comandaMovel.soltar
   useEffect(() => {
     if (!visivel || !solicitacaoFicha || solicitacaoFicha.conversaId !== selecionada?.id) return
-    if (solicitacaoFicha.destino === 'cadastro') setSecao('cliente')
+    if (solicitacaoFicha.destino === 'cadastro') abrirFicha()
     else {
       setSecao(null)
       if (selecionada?.pedido) soltarComanda()
@@ -229,7 +232,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
     if (alvo === ALVOS_DO_MOTIVO.CARDAPIO) { abrirCardapio(); return }
     if (alvo === ALVOS_DO_MOTIVO.JANELA) { abrirComanda(); focarCampoDaFicha('janela'); return }
     abrirSecao('contato')
-    setSecao('cliente')
+    abrirFicha()
     focarCampoDaFicha(alvo)
   }
   const chaves = chavesDaFicha({
@@ -273,7 +276,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       <div className={css.conteudo}>
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
-        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')} aoCadastrar={editavel ? abrirCadastroDoLead : undefined}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={abrirFicha} aoCadastrar={editavel ? abrirCadastroDoLead : undefined}
           aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
           aoConsultarFrete={() => setFreteAberto(true)} />
 
@@ -308,7 +311,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         </div>
         <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">
           <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
-            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={() => setSecao('cliente')} />
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={abrirFicha} />
           {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
             resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
@@ -330,7 +333,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         )}
 
         {/* #3207: aberta por "Cadastrar cliente", o formulário já traz o endereço captado; o banner seria um segundo caminho. */}
-        {cliente.enderecoCapturado && !cliente.endereco && !cadastrarLead && (
+        {cliente.enderecoCapturado && !cliente.endereco && bannerDoEnderecoCapturado(cadastrarLead, fonteApi ? null : situacaoDoCep(cliente.enderecoCapturado, prefixosCepAtendidos)) && (
           <BlocoEnderecoCapturado
             key={selecionada.id}
             conversa={fonteApi ? selecionada : undefined}
@@ -425,7 +428,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         {!fonteApi && !pedido.ocorrencia && <p>Nenhum problema registrado neste pedido.</p>}
       </Modal>}
 
-      {fonteApi && pedido && editavel && <ConferenciaPessoaDaComanda key={selecionada.id} conversa={selecionada} aoAbrirCadastro={() => setSecao('cliente')} />}
+      {fonteApi && pedido && editavel && <ConferenciaPessoaDaComanda key={selecionada.id} conversa={selecionada} aoAbrirCadastro={abrirFicha} />}
       {pedido && editavel && (
         <BarraProximoPasso
           key={`${selecionada.id}:${avancoEm ?? 'sem-avanco'}`}
