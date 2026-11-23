@@ -5,6 +5,7 @@ import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeVerIntegracoes } from '../../dominio/acessoModulos'
+import { motivoDaListaVazia, soOrigemMeta } from '../../dominio/mensagensPadrao'
 import { erroDoModelo } from '../../dominio/falhaDeEnvio'
 import { ROTULOS } from '../../dominio/rotulos'
 import css from './atendimento.module.css'
@@ -21,6 +22,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
   // #2007 (11c): sem acesso a Integrações, a frase manda pedir à gerência em vez de apontar a tela que ela não vê.
   const podeIntegrar = podeVerIntegracoes(acoes)
   const [lista, setLista] = useState(null)
+  const [motivoVazio, setMotivoVazio] = useState(null)
   const [falhou, setFalhou] = useState(false)
   const [escolha, setEscolha] = useState('')
   const [parametros, setParametros] = useState([])
@@ -31,7 +33,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
     setLista(null); setFalhou(false); aoFalhar?.(null); setEscolha(''); setParametros([])
     try {
       const modelos = await listarModelos(atualizar)
-      if (versao === consulta.current) setLista(modelos)
+      if (versao === consulta.current) { setMotivoVazio(motivoDaListaVazia(modelos)); setLista(soOrigemMeta(modelos)) }
     } catch (e) {
       if (versao === consulta.current) { setLista([]); setFalhou(true); aoFalhar?.(erroDoModelo(e, { podeIntegrar })) }
     }
@@ -60,7 +62,9 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
     <>
       <Botao onClick={() => carregar(true)} disabled={desabilitado}>Atualizar modelos</Botao>
       {lista === null && <output>Carregando as opções de {ROTULOS.MENSAGEM_PADRAO}…</output>}
-      {lista?.length === 0 && !falhou && <p data-vazio>Nenhuma {ROTULOS.MENSAGEM_PADRAO} nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
+      {lista?.length === 0 && !falhou && (motivoVazio === 'so-locais'
+        ? <p data-vazio>Mensagem padrão da loja não pode ser programada nem abrir conversa. Só modelo aprovado na Meta.</p>
+        : <p data-vazio>Nenhuma {ROTULOS.MENSAGEM_PADRAO} nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>)}
       {Boolean(lista?.length) && (
         <fieldset className={css.programarCampos} disabled={desabilitado}>
           <CampoSelecao rotulo={ROTULOS.MENSAGEM_PADRAO_INICIAL} value={escolha} opcoes={[
@@ -74,7 +78,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
             <p>{modelo.categoria === 'MARKETING' ? 'Novidades e promoções: exige autorização de marketing na Ficha.' : 'Aviso transacional: respeita os consentimentos da Ficha.'}</p>
             {modelo.indisponivel && <p role="alert" className={css.programarErro}>{modelo.indisponivel}</p>}
             {!modelo.indisponivel && parametros.length > 0 && <p>Preencha os campos numerados e confira cada substituição na prévia abaixo.</p>}
-            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Campo ${i + 1} ({{${i + 1}}})`} value={p} limite={LIMITE_PARAMETRO}
+            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`${i + 1}º campo`} value={p} limite={LIMITE_PARAMETRO}
               onChange={(e) => setParametros((atuais) => atuais.map((v, n) => n === i ? e.target.value : v))} />)}
             <p className={css.cardapioRotulo}>Prévia da mensagem</p>
             <p className={css.programadaTexto}>{previa}</p>

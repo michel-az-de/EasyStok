@@ -13,6 +13,7 @@ import { plural } from '../../../dominio/formato'
 import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { ATALHO_MAXIMO, gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
 import { hashDoModulo, NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
+import { SecaoMensagensPadrao } from './SecaoMensagensPadrao'
 import css from './abaRespostas.module.css'
 
 // Mesmo editor na janela contextual do Balcão e na rota direta de Atendimento.
@@ -353,6 +354,7 @@ export function AbaRespostas({ focoInicial = null, comAutomaticas = true }) {
     <div className={css.aba}>
       {comAutomaticas && <SecaoAutomaticas focoInicial={focoInicial} />}
       <SecaoRespostas />
+      <SecaoMensagensPadrao />
       {!comAutomaticas && (
         <p className={css.descricao}>
           As mensagens que saem sozinhas ficam em <a href={hashDoModulo('atendimento', 'respostas')}>{NOME_RESPOSTAS_AUTOMATICAS}</a>.

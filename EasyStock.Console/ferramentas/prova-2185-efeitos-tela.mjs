@@ -13,7 +13,7 @@
 //   F11     Instagram no modo API não oferece gravar áudio
 //   F16     Esc e toque no fundo não descartam o que foi digitado
 //   F22     "Reabrindo…" é da conversa que pediu
-//   E19     conversa sem cadastro não oferece modelo aprovado
+//   E19     (#3206) conversa sem cadastro também oferece a mensagem padrão
 //   E18     sugestão proativa não roda com o Assistente respondendo
 //   E25     selo "Assistente" só é botão quando há regra para abrir
 //   F25/F18 conversa aberta a partir de "Concluídas" ganha destaque; título e chip dizem o mesmo número
@@ -555,10 +555,11 @@ try {
   })
 
   // --- E19 ------------------------------------------------------------------------------------------------------------------------
-  await confere('E19. conversa sem cadastro com a janela fechada não oferece modelo aprovado; com cadastro oferece', async () => {
+  await confere('E19. (#3206) conversa sem cadastro com a janela fechada também oferece a mensagem padrão; o servidor decide', async () => {
     const { ctx, p } = await abrir('inicial=leadjanela')
     await campo(p).waitFor()
-    assert.equal(await campo(p).getAttribute('placeholder'), 'Mensagem indisponível nesta conversa')
+    assert.ok((await campo(p).getAttribute('placeholder')).startsWith('Janela fechada'), 'lead sem cadastro deve oferecer a mensagem padrão')
+    assert.equal(await p.getByRole('button', { name: /Respostas/ }).first().isEnabled(), true, 'o botão Respostas fica habilitado para o lead sem cadastro')
     await p.evaluate(() => window.trocar('janela'))
     await p.waitForFunction(() => document.querySelector('textarea[id]')?.placeholder?.startsWith('Janela fechada'))
     await ctx.close()
