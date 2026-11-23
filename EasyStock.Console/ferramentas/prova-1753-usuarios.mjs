@@ -13,7 +13,7 @@
 
 import assert from 'node:assert/strict'
 import {
-  botoesDe, campoDe, clicar, comTela, digitar, documento, elementos, enviar, escolher, esperar, guardado, marcar, resposta,
+  botaoDe, botoesDe, campoDe, clicar, comTela, digitar, documento, elementos, enviar, escolher, esperar, guardado, marcar, resposta,
   temCampo, textoDe, caixaDe,
 } from './tela-no-node.mjs'
 
@@ -398,13 +398,14 @@ await conferirAssincrono('convite na aba: marcou "como dona" e trocou para Gerê
 await conferirAssincrono('suporte marca a primeira dona: confirma sem motivo (a política não pede) e o PUT vai sem ele', async () => {
   const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', acoes: { ...nenhuma, marcarDona: true } })
   await naAba(SUPORTE, { usuarios: [ana] }, async (tela) => {
+    assert.equal(botaoDe(tela, 'Marcar como dona').getAttribute('aria-label'), 'Marcar Ana Souza como dona', 'o leitor de tela diz de quem é o botão (#3185)')
     clicar(tela, 'Marcar como dona')
     await esperar()
     assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'marcar não pede motivo, nem ao suporte')
     assert.equal(documento.activeElement?.textContent, 'Cancelar')
     clicar(tela, 'Marcar Ana como dona')
     await esperar()
-    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: true } }])
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona', corpo: { empresaId: 'empresa-1', dona: true } }])
     assert.match(textoDe(tela), /Ana Souza agora é dona\./)
   })
 })
@@ -430,7 +431,7 @@ await conferirAssincrono('suporte tira a marca de dona: o motivo é pedido, o er
     assert.equal(campoDe(tela, 'Motivo do suporte').getAttribute('aria-invalid'), null, 'escrever tira o erro')
     clicar(tela, 'Tirar a marca de dona de Ana')
     await esperar()
-    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: false, motivo: 'pedido da dona por telefone' } }])
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona', corpo: { empresaId: 'empresa-1', dona: false, motivo: 'pedido da dona por telefone' } }])
     assert.match(textoDe(tela), /Ana Souza não é mais dona\./)
     assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'deu certo: a confirmação fecha')
   })
@@ -440,6 +441,7 @@ await conferirAssincrono('a dona tira a marca de outra: confirmação em grupo r
   const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', nivel: 'Admin', dona: true, acoes: { ...nenhuma, desmarcarDona: true } })
   await naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
     assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), ['Tirar a marca de dona'])
+    assert.equal(botaoDe(tela, 'Tirar a marca de dona').getAttribute('aria-label'), 'Tirar a marca de dona de Ana Souza', 'o leitor de tela diz de quem é o botão (#3185)')
     clicar(tela, 'Tirar a marca de dona')
     await esperar()
     assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'fora do suporte não há motivo')
@@ -454,7 +456,7 @@ await conferirAssincrono('a dona tira a marca de outra: confirmação em grupo r
 
     clicar(tela, 'Tirar a marca de dona de Ana')
     await esperar()
-    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: false } }])
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona', corpo: { empresaId: 'empresa-1', dona: false } }])
     assert.match(textoDe(tela), /Ana Souza não é mais dona\./)
   })
 })
@@ -472,7 +474,7 @@ const comMarcaRecusada = async (codigo, fn) => {
 const caminhos = () => api.chamadas.map((c) => `${c.metodo} ${c.url.split('?')[0]}`)
 const selosDona = (tela) => elementos(tela, (no) => no.localName === 'span' && no.textContent === 'Dona')
 
-await conferirAssincrono('recusa da API na marca: a frase do código aparece e nada fica marcado', async () => {
+await conferirAssincrono('recusa da API na marca: a frase do código aparece, nada fica marcado e a confirmação só fecha em Cancelar', async () => {
   const ana = pessoa({ perfil: 'Atendimento', nivel: 'Operador', acoes: { ...nenhuma, marcarDona: true } })
   await comMarcaRecusada('DONA_NAO_ADMIN', () => naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
     clicar(tela, 'Marcar como dona')
@@ -482,7 +484,13 @@ await conferirAssincrono('recusa da API na marca: a frase do código aparece e n
     const ordem = caminhos()
     assert.ok(ordem.lastIndexOf('GET /api/usuarios') > ordem.indexOf('PUT /api/usuarios/ana/dona'), 'a lista é lida de novo depois da recusa')
     assert.deepEqual(selosDona(tela), [], 'sem selo de dona: nada ligado antes da resposta')
-    assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), comCodigo(['Marcar como dona'], ana), 'a linha volta ao que era')
+    // #3185: sem motivo a confirmação também espera a resposta; recusada, continua aberta, com o foco dentro dela.
+    const [grupo] = elementos(tela, (no) => no.localName === 'fieldset')
+    assert.ok(grupo, 'a confirmação continua aberta depois da recusa')
+    assert.ok(grupo.contains(documento.activeElement), 'e o foco fica dentro dela')
+    clicar(tela, 'Cancelar')
+    await esperar()
+    assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), comCodigo(['Marcar como dona'], ana), 'cancelar devolve a linha ao que era')
   }))
 })
 
@@ -568,9 +576,9 @@ await conferirAssincrono('marcar e tirar a marca de dona: PUT na rota da dona, c
   await marcarDona('u-2', { dona: false })
   await marcarDona('u-3', { dona: false, motivo: '   ' })
   assert.deepEqual(escritas(), [
-    { metodo: 'PUT', url: '/api/usuarios/u-1/dona?empresaId=empresa-1', corpo: { dona: true, motivo: 'pedido da dona por telefone' } },
-    { metodo: 'PUT', url: '/api/usuarios/u-2/dona?empresaId=empresa-1', corpo: { dona: false } },
-    { metodo: 'PUT', url: '/api/usuarios/u-3/dona?empresaId=empresa-1', corpo: { dona: false } },
+    { metodo: 'PUT', url: '/api/usuarios/u-1/dona', corpo: { empresaId: 'empresa-1', dona: true, motivo: 'pedido da dona por telefone' } },
+    { metodo: 'PUT', url: '/api/usuarios/u-2/dona', corpo: { empresaId: 'empresa-1', dona: false } },
+    { metodo: 'PUT', url: '/api/usuarios/u-3/dona', corpo: { empresaId: 'empresa-1', dona: false } },
   ])
 })
 

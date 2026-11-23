@@ -137,6 +137,32 @@ public class ConfiguracaoInicialRepositoryIntegrationTests(PostgreSqlDatabaseFix
         (await LinhasAsync(empresaId)).Should().ContainSingle().Which.Passo.Should().Be("cardapio");
     }
 
+    // #3185: dois aparelhos leem a empresa ainda pendente e concluem; vale a primeira conclusão, com quem e quando.
+    [SkippableFact]
+    public async Task DoisAparelhosConcluindoAoMesmoTempoValeAPrimeiraConclusao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresaId = await NovaEmpresaAsync();
+        var dona = await NovoUsuarioAsync("Dona de teste");
+        var suporte = await NovoUsuarioAsync("Suporte de teste");
+
+        await using var celular = NovoDbComRls(empresaId);
+        await using var computador = NovoDbComRls(empresaId);
+        // Os dois pedidos passam da leitura com a empresa pendente antes de qualquer um gravar.
+        (await new EmpresaRepository(celular).GetByIdAsync(empresaId))!.ConfiguracaoInicialConcluidaEm.Should().BeNull();
+        (await new EmpresaRepository(computador).GetByIdAsync(empresaId))!.ConfiguracaoInicialConcluidaEm.Should().BeNull();
+
+        (await new EmpresaRepository(celular).ConcluirConfiguracaoInicialAsync(empresaId, dona.Id, Antes)).Should().BeTrue();
+        (await new EmpresaRepository(computador).ConcluirConfiguracaoInicialAsync(empresaId, suporte.Id, Depois))
+            .Should().BeFalse("a empresa já estava concluída");
+
+        await using var leitura = fixture.CreateDbContext();
+        using var _ = leitura.UseRowLevelSecurityBypass();
+        var empresa = await leitura.Empresas.AsNoTracking().SingleAsync(e => e.Id == empresaId);
+        (empresa.ConfiguracaoInicialConcluidaEm, empresa.ConfiguracaoInicialConcluidaPorId, empresa.AlteradoEm)
+            .Should().Be(((DateTime?)Antes, (Guid?)dona.Id, Antes));
+    }
+
     [SkippableFact]
     public async Task ListarTrazOsPassosDaEmpresaComONomeDeQuemMarcou()
     {

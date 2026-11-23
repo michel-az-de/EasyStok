@@ -34,6 +34,7 @@ const ROTULO_DO_CONTROLE = {
 // O leitor de tela diz de quem é cada botão, já que os rótulos se repetem de linha em linha.
 const ARIA_DO_CONTROLE = {
   reenviarConvite: (nome) => `Reenviar convite para ${nome}`, desativar: (nome) => `Desativar ${nome}`, reativar: (nome) => `Reativar ${nome}`,
+  marcarDona: (nome) => `Marcar ${nome} como dona`, desmarcarDona: (nome) => `Tirar a marca de dona de ${nome}`,
 }
 
 export function Convite({ perfis, aoConvidar, aoCancelar }) {
@@ -192,8 +193,7 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
     const invalido = pedeMotivo ? erroDoMotivo(marca.motivo) : null
     if (invalido) { setMarca((atual) => ({ ...atual, erro: invalido })); return }
     const { acao, motivo } = marca
-    // O motivo que o suporte escreveu não se perde: com ele, a confirmação só fecha quando a API aceita.
-    if (!pedeMotivo) setMarca(null)
+    // A confirmação só fecha quando a API aceita: recusada, continua aberta (e o motivo do suporte não se perde).
     const feito = await aoAgir(acao, usuario, pedeMotivo ? motivo : null)
     if (feito) setMarca(null)
   }
@@ -229,7 +229,8 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
         {situacao !== SITUACAO.ativo && <Pilula tom={situacao.tom} fina>{situacao.rotulo}</Pilula>}
         <span className={css.acesso}>{ultimoAcesso(ultimo, agora)}</span>
       </div>
-      <div className={css.acoes}>
+      {/* Com a confirmação da marca aberta não há ação na linha: a área some, em vez de ocupar a altura de um botão. */}
+      {!confirmacao && <div className={css.acoes}>
         {!aberta && controles.filter((controle) => controle !== 'trocarPerfil').map((controle) => (
           <Botao
             key={controle} variante="texto" className={controle === 'desativar' ? css.desativar : undefined} disabled={ocupado}
@@ -259,7 +260,7 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setPerfilEscolhido(null)}>Cancelar</Botao>
           </>
         )}
-      </div>
+      </div>}
       {/* Ao entrar com o foco, o leitor de tela anuncia o que se confirma (a legenda) e o efeito (o texto). */}
       {confirmacao && (
         <fieldset ref={painel} className={css.confirmacao} aria-describedby={`${id}-texto`}>

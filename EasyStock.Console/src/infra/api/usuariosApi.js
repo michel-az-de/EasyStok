@@ -22,10 +22,11 @@ export const convidarUsuario = ({ nome, email, perfilId, dona = false }) =>
   })
 
 // #2070: marca e desmarca a dona. O motivo é do suporte (a API exige dele, com 10 caracteres ou mais).
+// A empresa vai no corpo, que é onde a API lê (#3185); na query ela era ignorada.
 export const marcarDona = (usuarioId, { dona, motivo = null }) => {
   const texto = motivo?.trim()
-  return chamarApi(comEmpresa(`/api/usuarios/${usuarioId}/dona`), {
-    metodo: 'PUT', corpo: { dona: dona === true, ...(texto ? { motivo: texto } : {}) },
+  return chamarApi(`/api/usuarios/${usuarioId}/dona`, {
+    metodo: 'PUT', corpo: { empresaId: empresa(), dona: dona === true, ...(texto ? { motivo: texto } : {}) },
   })
 }
 
