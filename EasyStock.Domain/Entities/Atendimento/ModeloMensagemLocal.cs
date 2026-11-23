@@ -96,7 +96,7 @@ public partial class ModeloMensagemLocal
 
     private static string ValidarCategoria(string? categoria)
     {
-        var limpa = categoria?.Trim() ?? string.Empty;
+        var limpa = Obrigatorio(categoria, "Categoria", CategoriaTamanhoMaximo);
         if (limpa != CategoriaUtility)
             throw new RegraDeDominioVioladaException(
                 "Mensagem de promoção ainda não é aceita em mensagem padrão local; use a categoria UTILITY (aviso do pedido).");
@@ -106,7 +106,11 @@ public partial class ModeloMensagemLocal
     private static string ValidarCorpo(string? corpo)
     {
         var limpo = Obrigatorio(corpo, "Corpo", CorpoTamanhoMaximo);
-        if (ParametroValido().Replace(limpo, string.Empty).Contains("{{", StringComparison.Ordinal))
+        // Fora dos parâmetros não sobra chave nenhuma colada: "{{{1}}}" e "}}" solto também são recusados.
+        var resto = ParametroValido().Replace(limpo, "\0");
+        if (resto.Contains("{{", StringComparison.Ordinal) || resto.Contains("}}", StringComparison.Ordinal)
+            || resto.Contains("\0{", StringComparison.Ordinal) || resto.Contains("}\0", StringComparison.Ordinal)
+            || resto.Contains("{\0", StringComparison.Ordinal) || resto.Contains("\0}", StringComparison.Ordinal))
             throw new RegraDeDominioVioladaException("Corpo: use '{{' só nos parâmetros {{1}}, {{2}}, e assim por diante.");
 
         var numeros = Numeros(limpo).Distinct().Order().ToList();

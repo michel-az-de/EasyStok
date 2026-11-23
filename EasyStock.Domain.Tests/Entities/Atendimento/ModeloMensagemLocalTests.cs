@@ -132,6 +132,9 @@ public class ModeloMensagemLocalTests
     [InlineData("Oi {{0}}, tudo bem?")]
     [InlineData("Oi {{1}, tudo bem?")]
     [InlineData("Oi {{, tudo bem?")]
+    [InlineData("Oi {{{1}}}, tudo bem?")]
+    [InlineData("Oi }} tudo bem?")]
+    [InlineData("Oi {{100}}, tudo bem?")]
     public void ChavesDuplasForaDoFormatoRecusa(string corpo)
     {
         var act = () => Criar(corpo: corpo);
@@ -170,8 +173,20 @@ public class ModeloMensagemLocalTests
     [Fact]
     public void CabecalhoERodapeComChavesDuplasRecusam()
     {
-        ((Action)(() => Criar(cabecalho: "Oi {{1}}"))).Should().Throw<RegraDeDominioVioladaException>();
-        ((Action)(() => Criar(rodape: "Oi {{1}}"))).Should().Throw<RegraDeDominioVioladaException>();
+        ((Action)(() => Criar(cabecalho: "Oi {{1}}"))).Should().Throw<RegraDeDominioVioladaException>().WithMessage("*parâmetros*");
+        ((Action)(() => Criar(rodape: "Oi {{1}}"))).Should().Throw<RegraDeDominioVioladaException>().WithMessage("*parâmetros*");
+    }
+
+    [Fact]
+    public void CategoriaVaziaDizQueEObrigatoria() =>
+        ((Action)(() => ModeloMensagemLocal.Criar(Guid.NewGuid(), "aviso", "pt_BR", " ", null, "texto", null, Agora)))
+            .Should().Throw<RegraDeDominioVioladaException>().WithMessage("*obrigatóri*");
+
+    [Fact]
+    public void CorpoComQuebraDeLinhaDoWindowsPassaEPreservaOTexto()
+    {
+        const string corpo = "Oi {{1}},\r\nseu pedido saiu.";
+        ModeloMensagemLocal.Criar(Guid.NewGuid(), "aviso", "pt_BR", "UTILITY", null, corpo, null, Agora).Corpo.Should().Be(corpo);
     }
 
     [Fact]
