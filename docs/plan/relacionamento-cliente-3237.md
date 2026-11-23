@@ -74,7 +74,7 @@ Outras decisões:
 - O nome `RelacionamentoCliente.jsx` já existe (notas e tags do editor). O módulo novo de domínio é `dominio/relacionamento.js` (puro: barras, rótulos), com nome distinto para não confundir.
 - O Atendimento não muda visualmente com S5. A prova de regressão é obrigatória.
 - Não se mexe no momento de abrir a conversa do Novo pedido (#3158), nem em tier ou critérios da #2921.
-- Título da tela (`TITULOS_CADASTROS.clientes` = "Leads e clientes", `EasyStock.Console/src/dominio/cadastros.js`, linha 258): decidir fora do caminho crítico (questões abertas).
+- Título da tela (`TITULOS_CADASTROS.clientes` = "Leads e clientes", `EasyStock.Console/src/dominio/cadastros.js`, linha 258): continua "Leads e clientes", por decisão do Felipe em 23/11/2026 (seção 11).
 
 ## 5. Fatias
 
