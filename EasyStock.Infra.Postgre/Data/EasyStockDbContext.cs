@@ -205,6 +205,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Campanhas.InteresseItem> InteressesItem { get; set; } = null!; // S31
         public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RespostaPronta> RespostasProntas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ModeloMensagemLocal> ModelosMensagem { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.TrechoCaderno> CadernoTrechos { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.TurnoAgente> TurnosAgente { get; set; } = null!; // S67
         public DbSet<EasyStock.Domain.Entities.Ia.ProvedorIa> ProvedoresIa { get; set; } = null!; // #2957

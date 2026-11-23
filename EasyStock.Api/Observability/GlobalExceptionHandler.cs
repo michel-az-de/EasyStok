@@ -277,6 +277,8 @@ public class GlobalExceptionHandler(
             "Pedido já está em outra viagem. Recarregue as viagens antes de tentar de novo.",
         "uq_produtos_empresa_nome_lower" =>
             "Já existe um produto com esse nome. Maiúsculas e minúsculas não diferenciam o nome.",
+        "ux_modelos_mensagem_empresa_nome_idioma" =>
+            "Já existe uma mensagem padrão com esse nome nesse idioma.",
         _ => "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
     };
 

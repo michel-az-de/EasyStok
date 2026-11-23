@@ -89,6 +89,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRespostaProntaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RespostaProntaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IModeloMensagemLocalRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ModeloMensagemLocalRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICadernoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.CadernoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.TurnoAgenteRepository>(); // S67
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRegraAutomaticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RegraAutomaticaRepository>();
