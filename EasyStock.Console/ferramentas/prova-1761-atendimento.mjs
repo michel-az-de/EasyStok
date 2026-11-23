@@ -314,8 +314,9 @@ const SITE = { nome: 'Chat do site', temJanela: false }
 const janelaCom = (minutosRestantes) => estadoDaJanela(
   { janelaExpiraEm: new Date(AGORA + minutosRestantes * 60000).toISOString(), mensagens: [] }, AGORA, WHATSAPP,
 )
-// #3234 (C2) muda a regra da #1761 (L4): com a janela aberta o prazo fica sempre no cabeçalho (no desktop a linha
-// cabe, prova-2185 E31); fechada, não iniciada ou sem regra, quem diz é a faixa junto do campo, uma vez só.
+// #3234 (C2) muda a regra da #1761 (L4) no desktop largo: com a janela aberta o prazo fica no cabeçalho a partir de
+// 1280 px (a linha cabe, prova-2185 E31); abaixo, só perto do fim (`prazoFolgado` + CSS). Fechada, não iniciada ou
+// sem regra, a janela é dita uma vez só.
 await confere('J  prazo no cabeçalho com a janela aberta; fechada ou sem regra, diz uma vez só (a faixa, se ela disser)', () => {
   assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'Janela aberta por 23 h 55 min')
   assert.equal(prazoNoCabecalho(janelaCom(119)), 'Janela aberta por 1 h 59 min')

@@ -616,6 +616,8 @@ try {
     await campo(p).waitFor()
     const linha = p.locator('[data-cabecalho-conversa] h2 small')
     assert.doesNotMatch(await linha.innerText(), /Janela aberta/)
+    const { altura, alturaLinha } = await linha.evaluate((el) => ({ altura: el.getBoundingClientRect().height, alturaLinha: parseFloat(getComputedStyle(el).lineHeight) }))
+    assert.ok(altura <= alturaLinha * 1.5, `a linha do cabeçalho quebrou: ${altura} px para ${alturaLinha} px`)
     await ctx.close()
   })
 

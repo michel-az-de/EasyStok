@@ -122,7 +122,7 @@ Ficam fora do grupo A, com motivo:
 
 Decisões da A1:
 
-- Com a janela aberta, o cabeçalho passa a mostrar sempre o prazo ("Janela aberta por 3 h 10 min"). Isso revê a #1761 (L4), que mostrava o prazo só abaixo de 2 h porque a linha quebrava. No desktop a linha cabe, como a prova mede em 1280 e 1440 px com nome longo e comanda.
+- Com a janela aberta, o cabeçalho mostra o prazo ("Janela aberta por 3 h 10 min") sempre que a tela tem 1280 px ou mais. A prova mede, em 1280 e 1440 px, que a linha cabe mesmo com nome longo e comanda. Isso revê a regra L4 da #1761 só no desktop largo. Abaixo de 1280 px a regra antiga continua: o prazo só aparece quando falta menos de 2 h, porque ali a linha quebra.
 - Com a janela fechada, "Janela fechada" aparece uma vez só. Quando o assunto da faixa junto do campo é a janela, quem avisa é a faixa. Quando a conversa está concluída ou bloqueada, a faixa fala de outra coisa e quem avisa é o cabeçalho.
 - Os prints de antes e depois, tirados da demonstração, estão em `critica-atendimento-3234/a1/`.
 - O botão "Escolher modelo" sai. A lista de mensagens padrão passa a ter uma entrada só, Respostas, e o campo diz onde ela está. Ficam como estão o "Modelos aprovados" perto do fim da janela (#1839) e o da bolha que falhou fora da janela.
