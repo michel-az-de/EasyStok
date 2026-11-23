@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
@@ -38,6 +40,29 @@ namespace EasyStock.Infra.Postgre.Repositories
             bool? ativo = null, string? search = null,
             string? sort = "nome", string? order = "asc", string? relacionamento = null)
         {
+            var (query, compras) = Filtrar(empresaId, ativo, search, relacionamento);
+
+            var total = await query.CountAsync();
+            var ordenada = Ordenar(query, compras, sort, order);
+
+            var clientes = await ordenada.ThenByDescending(c => c.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(c => new
+                {
+                    Cliente = c,
+                    Quantidade = compras.Count(p => p.ClienteId == c.Id),
+                    UltimoEm = compras.Where(p => p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)
+                }).ToListAsync();
+            // Apenas o retrato sem tracking recebe as métricas; o contador legado não inclui todos os canais.
+            foreach (var item in clientes)
+                (item.Cliente.OrderCount, item.Cliente.LastOrderAt) = (item.Quantidade, item.UltimoEm);
+            return (clientes.Select(item => item.Cliente), total);
+        }
+
+        // #3244: filtro e ordenação da lista, comuns à lista simples e à lista com relação.
+        private (IQueryable<Cliente> Query, IQueryable<Pedido> Compras) Filtrar(
+            Guid empresaId, bool? ativo, string? search, string? relacionamento)
+        {
             var query = db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId);
             // #2777: a mesma regra de compra do dossiê na contagem, no filtro e na ordenação.
@@ -47,14 +72,8 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (relacionamento == "lead") query = query.Where(c => !compras.Any(p => p.ClienteId == c.Id));
             if (relacionamento == "cliente") query = query.Where(c => compras.Any(p => p.ClienteId == c.Id));
             if (relacionamento == RegraDeRecompra.Relacionamento)
-            {
                 // #2946: bloqueado e inativo ficam fora mesmo sem o filtro de situação, porque a lista é de quem chamar.
-                var corte = DateTime.UtcNow.AddDays(-RegraDeRecompra.DiasSemCompra);
-                query = query.Where(c => c.Ativo && !c.Bloqueado
-                    && compras.Count(p => p.ClienteId == c.Id) >= RegraDeRecompra.MinimoDeCompras
-                    && !compras.Any(p => p.ClienteId == c.Id && p.CriadoEm > corte)
-                    && !db.ClienteTags.Any(t => t.ClienteId == c.Id && t.Tag == RegraDeRecompra.TagConvidada && t.CriadoEm > corte));
-            }
+                query = query.Where(PredicadoDeRecompra(compras));
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -76,11 +95,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (c.Email != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Email.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)) ||
                     (c.Apt != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Apt.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)));
             }
+            return (query, compras);
+        }
 
-            var total = await query.CountAsync();
+        private static IOrderedQueryable<Cliente> Ordenar(
+            IQueryable<Cliente> query, IQueryable<Pedido> compras, string? sort, string? order)
+        {
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
 
-            var ordenada = sort?.ToLowerInvariant() switch
+            return sort?.ToLowerInvariant() switch
             {
                 "criadoem"    => desc ? query.OrderByDescending(c => c.CriadoEm)    : query.OrderBy(c => c.CriadoEm),
                 "lastorderat" => desc
@@ -89,21 +112,83 @@ namespace EasyStock.Infra.Postgre.Repositories
                 "ordercount" => desc
                     ? query.OrderByDescending(c => compras.Count(p => p.ClienteId == c.Id))
                     : query.OrderBy(c => compras.Count(p => p.ClienteId == c.Id)),
+                "gasto" => desc
+                    ? query.OrderByDescending(c => compras.Where(p => p.ClienteId == c.Id).Sum(p => (decimal?)p.Total) ?? 0m)
+                    : query.OrderBy(c => compras.Where(p => p.ClienteId == c.Id).Sum(p => (decimal?)p.Total) ?? 0m),
+                "ticketmedio" => desc
+                    ? query.OrderByDescending(c => compras.Where(p => p.ClienteId == c.Id).Average(p => (decimal?)p.Total) ?? 0m)
+                    : query.OrderBy(c => compras.Where(p => p.ClienteId == c.Id).Average(p => (decimal?)p.Total) ?? 0m),
                 _             => desc ? query.OrderByDescending(c => c.Nome)        : query.OrderBy(c => c.Nome),
             };
+        }
 
-            var clientes = await ordenada.ThenByDescending(c => c.Id)
-                .Skip((page - 1) * pageSize).Take(pageSize)
-                .Select(c => new
+        /// <summary>
+        /// #3244: o predicado de <c>relacionamento=recompra</c> (<see cref="RegraDeRecompra"/>), uma expressão só para o filtro
+        /// e para o campo <c>EmRisco</c>: cadastro ativo e não bloqueado, 2 compras ou mais, nenhuma nos últimos 30 dias e
+        /// sem a tag de convite nesse prazo.
+        /// </summary>
+        private Expression<Func<Cliente, bool>> PredicadoDeRecompra(IQueryable<Pedido> compras)
+        {
+            var corte = DateTime.UtcNow.AddDays(-RegraDeRecompra.DiasSemCompra);
+            return c => c.Ativo && !c.Bloqueado
+                && compras.Count(p => p.ClienteId == c.Id) >= RegraDeRecompra.MinimoDeCompras
+                && !compras.Any(p => p.ClienteId == c.Id && p.CriadoEm > corte)
+                && !db.ClienteTags.Any(t => t.EmpresaId == c.EmpresaId && t.ClienteId == c.Id
+                    && t.Tag == RegraDeRecompra.TagConvidada && t.CriadoEm > corte);
+        }
+
+        public async Task<ListaDeClientes> ListarComRelacaoAsync(
+            Guid empresaId, int page, int pageSize, bool? ativo = null, string? search = null,
+            string? sort = "nome", string? order = "asc", string? relacionamento = null, CancellationToken ct = default)
+        {
+            var (query, compras) = Filtrar(empresaId, ativo, search, relacionamento);
+            var total = await query.CountAsync(ct);
+            var clientes = await Ordenar(query, compras, sort, order).ThenByDescending(c => c.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+            var ids = clientes.Select(c => c.Id).ToList();
+
+            // Cada bloco abaixo é UMA consulta para a página inteira (sem consulta por linha) e filtra EmpresaId.
+            var carteira = await compras.Where(p => p.ClienteId != null).SumAsync(p => (decimal?)p.Total, ct) ?? 0m;
+            var metricas = (await compras.Where(p => ids.Contains(p.ClienteId!.Value))
+                .GroupBy(p => p.ClienteId!.Value)
+                .Select(g => new
                 {
-                    Cliente = c,
-                    Quantidade = compras.Count(p => p.ClienteId == c.Id),
-                    UltimoEm = compras.Where(p => p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)
-                }).ToListAsync();
-            // Apenas o retrato sem tracking recebe as métricas; o contador legado não inclui todos os canais.
-            foreach (var item in clientes)
-                (item.Cliente.OrderCount, item.Cliente.LastOrderAt) = (item.Quantidade, item.UltimoEm);
-            return (clientes.Select(item => item.Cliente), total);
+                    Id = g.Key, Compras = g.Count(), Gasto = g.Sum(p => (decimal)p.Total),
+                    Primeira = (DateTime?)g.Min(p => p.CriadoEm), Ultima = (DateTime?)g.Max(p => p.CriadoEm)
+                }).ToListAsync(ct)).ToDictionary(m => m.Id);
+            var ocorrencias = (await db.Ocorrencias.Where(o => o.EmpresaId == empresaId && ids.Contains(o.ClienteId))
+                .GroupBy(o => o.ClienteId)
+                .Select(g => new { Id = g.Key, Total = g.Count(), Abertas = g.Count(o => o.Status == StatusOcorrencia.Aberta) })
+                .ToListAsync(ct)).ToDictionary(o => o.Id);
+            var notas = (await db.ClienteNotas.Where(n => n.EmpresaId == empresaId && ids.Contains(n.ClienteId))
+                .GroupBy(n => n.ClienteId)
+                .Select(g => new
+                {
+                    Id = g.Key, Total = g.Count(),
+                    Ultima = g.OrderByDescending(n => n.CriadoEm).Select(n => n.Texto).FirstOrDefault()
+                }).ToListAsync(ct)).ToDictionary(n => n.Id);
+            var tags = (await db.ClienteTags.Where(t => t.EmpresaId == empresaId && ids.Contains(t.ClienteId))
+                .OrderByDescending(t => t.CriadoEm).ThenBy(t => t.Tag)
+                .Select(t => new { t.ClienteId, t.Tag }).ToListAsync(ct))
+                .GroupBy(t => t.ClienteId).ToDictionary(g => g.Key, g => g.Take(ClienteRelacao.MaximoDeTags).Select(t => t.Tag).ToList());
+            var emRisco = (await db.Clientes.Where(c => c.EmpresaId == empresaId && ids.Contains(c.Id))
+                .Where(PredicadoDeRecompra(compras)).Select(c => c.Id).ToListAsync(ct)).ToHashSet();
+
+            var itens = clientes.Select(c =>
+            {
+                metricas.TryGetValue(c.Id, out var m);
+                ocorrencias.TryGetValue(c.Id, out var o);
+                notas.TryGetValue(c.Id, out var n);
+                // O retrato sem tracking leva as métricas, como em GetByEmpresaAsync (o contador legado não inclui todos os canais).
+                (c.OrderCount, c.LastOrderAt) = (m?.Compras ?? 0, m?.Ultima);
+                var ultima = n?.Ultima;
+                return new ClienteRelacao(
+                    c, m?.Compras ?? 0, m?.Gasto ?? 0m, m?.Primeira, m?.Ultima,
+                    o?.Abertas ?? 0, o?.Total ?? 0, n?.Total ?? 0,
+                    ultima is { Length: > ClienteRelacao.TamanhoDaNotaCurta } ? ultima[..ClienteRelacao.TamanhoDaNotaCurta] : ultima,
+                    tags.TryGetValue(c.Id, out var t) ? t : [], emRisco.Contains(c.Id));
+            }).ToList();
+            return new ListaDeClientes(itens, total, carteira);
         }
 
         public async Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20, bool incluirInativos = false)

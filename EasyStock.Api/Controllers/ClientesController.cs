@@ -55,7 +55,13 @@ public class ClientesController(
         var (p, sz) = NormalisePage(page, pageSize);
         var result = await listarUseCase.ExecuteAsync(
             new ListarClientesQuery(emp, p, sz, ativo, search, sort, NormaliseOrder(order), relacionamento));
-        return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
+        // #3244: o gasto da carteira inteira vai no meta, ao lado da paginação (denominador da barra de gasto).
+        var paginas = result.PageSize > 0 ? (int)Math.Ceiling((double)result.Total / result.PageSize) : 0;
+        return Ok(new ApiResponse<IEnumerable<ClienteListaResult>>(result.Items, new
+        {
+            total = result.Total, pages = paginas, page = result.Page, limit = result.PageSize,
+            gastoTotalDaCarteira = result.GastoTotalDaCarteira,
+        }));
     }
 
     [SwaggerOperation(Summary = "Quick search clients (autocomplete)")]
