@@ -333,6 +333,18 @@ try {
         await painel(p).waitFor({ state: 'hidden', ...T })
         await p.context().close()
       })
+      await cenario(`j3-voltar-solta-o-clique-fora-${tela}`, async () => {
+        // De volta à lista não há campo na tela: o que foi digitado some e o clique fora fecha de novo.
+        const p = await abrir(tela)
+        await abrirPainel(p)
+        await itens(p).first().click()
+        await p.getByLabel('1º campo').fill('Renan')
+        await p.getByRole('button', { name: 'Voltar à lista' }).click()
+        await itens(p).first().waitFor(T)
+        await p.mouse.click(4, 4)
+        await painel(p).waitFor({ state: 'hidden', ...T })
+        await p.context().close()
+      })
       await cenario(`k-foco-${tela}`, async () => {
         const p = await abrir(tela)
         await abrirPainel(p)

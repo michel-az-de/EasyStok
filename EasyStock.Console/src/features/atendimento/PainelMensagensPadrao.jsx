@@ -150,7 +150,7 @@ export function PainelMensagensPadrao({ conversa, aoFechar, janelaFechada = fals
         )}
         <div className={css.rodape}>
           {escolhido
-            ? <Botao disabled={enviando || semConfirmacao} onClick={() => { setEscolhido(null); setErro(null) }}>Voltar à lista</Botao>
+            ? <Botao disabled={enviando || semConfirmacao} onClick={() => { setEscolhido(null); setErro(null); setParametros([]) }}>Voltar à lista</Botao>
             : <span className={css.dica}>{janelaFechada ? 'Fora da janela só sai mensagem padrão' : ''}</span>}
           {escolhido && <Botao ref={enviarRef} variante="primario" disabled={enviando || semConfirmacao || falta} onClick={enviar}>{enviando ? 'Enviando…' : 'Enviar'}</Botao>}
         </div>
