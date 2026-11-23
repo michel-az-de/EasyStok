@@ -193,7 +193,7 @@ public class WppConnectClientTests
 
     /// <summary>
     /// #3138 (i): a ponte real (wppconnect-server 2.10.81) devolve <c>lastReceivedKey</c> sem <c>_serialized</c>:
-    /// <c>fromMe</c>, <c>remote</c> (objeto), <c>id</c> e <c>$1</c>. O id montado é o mesmo que o webhook lê do evento.
+    /// <c>fromMe</c>, <c>remote</c> (objeto), <c>id</c> e <c>$1</c>. Grupo e mensagem da loja seguem fora (guarda de regressão).
     /// </summary>
     [Fact]
     public async Task Lista_a_ultima_recebida_no_formato_real_da_ponte_sem_serialized()
@@ -210,7 +210,8 @@ public class WppConnectClientTests
         ultimas.Should().Equal(
             new UltimaRecebidaWppConnect("5511999999999@c.us", "false_5511999999999@c.us_ABC"),
             new UltimaRecebidaWppConnect("123@lid", "false_123@lid_DEF"));
-        // Contrato com o webhook: o evento da mesma mensagem carrega id._serialized, e é esse valor que vira a marca de entrega.
+        // Forma ESPERADA do evento da mesma mensagem, não medida na ponte real: o webhook lê id._serialized, e o
+        // id montado só serve ao vigia se tiver essa forma. A prova na ponte é a conferência 2 do runbook.
         using var evento = System.Text.Json.JsonDocument.Parse(
             """{"event":"onmessage","id":{"fromMe":false,"remote":"5511999999999@c.us","id":"ABC","_serialized":"false_5511999999999@c.us_ABC"}}""");
         ultimas[0].MensagemId.Should().Be(
