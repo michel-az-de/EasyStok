@@ -10,6 +10,50 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ⚠️ TOLERADO (#3221): três provas de navegador do Console estouram 10 s na primeira tentativa do CI
+
+Três falhas em três execuções do job `qualidade` (workflow `console`), em 23/11/2026, cada uma numa prova
+diferente e sempre por espera de 10 s vencida. Nenhuma se repetiu: o job passou em seguida sem mudança de código.
+
+| Execução | Commit | Prova e linha | Erro |
+|---|---|---|---|
+| master, run 45128292422, 1ª tentativa | `6b76d58d3` | `prova-2853-painel-assistente-navegador:116` | `locator.click` no botão Subir, 10 s |
+| master, run 45135404512, 1ª tentativa | `a31803667` | `prova-2855-assistente-na-conversa-navegador:174` | `waitFor` detached, 10 s |
+| PR 3222, run 45140513161 | `da36629c3` | `prova-1743-tamanhos-navegador:124` | `waitFor` visible da linha "Anotação para ... 1 kg", 10 s |
+
+- **Por que é flaky:** causa não provada. O que se mediu: as três passam localmente na mesma árvore; a 2853 e a
+  2855 passam com a CPU do navegador limitada em 1x, 4x, 8x e 12x (`Emulation.setCPUThrottlingRate`) e na suíte
+  inteira local (425 ok); a 1743 passa com 5x (98 s) e, com 10x, não chega à linha 124: o executor a encerra no
+  limite de 180 s, que é outra falha. Hipótese ainda sem prova para a 2853: `CanvasDoFluxo.jsx` reenquadra o canvas
+  150 ms depois de abrir ou fechar o grupo e o clique pega o nó em movimento. Na 1743 a espera da linha 124 é a
+  correção da #2982 (logo abaixo): se ela vence, a linha de 1 kg não apareceu em 10 s depois do clique em "Somar".
+- **O que não é:** não é a corrida da `prova-1738` com a sugestão do Assistente, corrigida na #3223; aquela falhava
+  por asserção e reproduz com CPU 10x. Também não há evidência de que as provas visuais novas saturem o Vite.
+- **Como confirmar:** a mesma prova passa na execução seguinte do job no mesmo commit, sem mudança.
+- **Por que não foi corrigido:** sem reprodução não há Red. A 2853 e a 2855 gravam `falha.png` em
+  `EasyStock.Console/.build/`, mas o workflow `console` não publica artefato, então a tela da falha se perde.
+- **Quando promover a "corrigir":** na próxima falha de qualquer uma das três. Antes disso, o passo que destrava
+  é publicar `EasyStock.Console/.build/` como artefato do job `qualidade` quando ele falha (mudança de workflow,
+  tier alto) e fazer a 1743 gravar screenshot na falha, como as outras duas.
+
+---
+
+## ✅ CORRIGIDO (#3223, registrado na #3221): `prova-1738-pedido-navegador` contava a sugestão do Assistente como escrita
+
+Falhou 1 vez no workflow `console` do master em `a31803667` (23/11/2026), linha 103: a asserção "Montar e
+recarregar não envia pedido nem inicia conversa na API" viu uma chamada que não era GET nem `marcar-lida`.
+
+- **Por que era flaky:** a sugestão proativa do Assistente (`src/aplicacao/api/agente.js`) faz
+  `POST /api/atendimento/conversas/{id}/sugestao` sozinha, 1,2 s depois de a conversa parar. Em máquina lenta a
+  espera vencia no meio da prova.
+- **Como se confirmou:** CPU do navegador 10x mais lenta: 5 de 5 falhas, a asserção listando só essa rota. Com a
+  preferência do complemento desligada: 2 de 2 verdes.
+- **Correção (#3223):** a prova roda com a preferência do complemento desligada e a asserção, sem afrouxar, diz
+  método e rota do que viu.
+- **Lição:** prova que proíbe escrita na API precisa desligar o que o Console dispara por temporizador.
+
+---
+
 ## ✅ CORRIGIDO (#2982, registrado na #2973): `prova-1743-tamanhos-navegador` conta a linha de 1 kg antes de ela aparecer
 
 Falhou 1 vez no workflow `console` do master em `925309989` (20/11/2026, 18:08Z), linha 127:
