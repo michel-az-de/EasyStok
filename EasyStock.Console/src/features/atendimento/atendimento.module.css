@@ -683,14 +683,6 @@
 .ancoraEmoji { position: relative; display: inline-flex; }
 /* Abaixo de 360px o botão a mais empurra o Enviar para fora da tela (#2178); ali o teclado do celular já tem emoji. */
 @media (max-width: 359px) { .ancoraEmoji { display: none; } }
-.seletorEmoji { display: flex; flex-direction: column; gap: var(--e-2); padding: var(--e-3); }
-.buscaEmoji {
-  min-height: var(--toque); padding: 0 var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
-  background: var(--papel); color: var(--tinta); font-size: var(--t-corpo);
-}
-.tituloEmoji, .semEmoji { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
-.gradeEmoji { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--e-1); }
-.gradeEmoji .emoji { min-width: var(--toque); min-height: var(--toque); padding: 0; font-size: var(--t-valor); line-height: 1; }
 
 /* O gatilho fica ao lado da bolha e só aparece no hover ou no foco; no toque, sempre. */
 .menuDaMensagem { position: absolute; top: 2px; }
@@ -708,3 +700,6 @@
 }
 .entrada .reacaoDaBolha { right: auto; left: var(--e-3); }
 .apagada p { display: flex; align-items: center; gap: var(--e-1); font-style: italic; color: var(--tinta-2); }
+/* #3210: botões do Assistente da conversa, no fim do painel móvel. */
+/* Gruda no pé do painel (a rolagem é do corpo): era o rodapé fixo da modal. */
+.assistenteRodape { position: sticky; bottom: calc(-1 * var(--e-3)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e-2); padding: var(--e-3) 0; margin-bottom: calc(-1 * var(--e-3)); background: var(--papel); }
