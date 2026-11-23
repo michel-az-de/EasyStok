@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const app = path.join(root, 'android/app');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -79,12 +79,50 @@ test('conteúdo web da homologação recusa produção e desliga a atualização
   assert.equal(oficial.apiBaseUrl, 'https://api.easystok.online');
   assert.match(oficial.updateManifestUrl, /^https:\/\/easystok\.online\/downloads\/casa-da-baba\/latest\.json$/);
   for (const apiBaseUrl of [undefined, '', 'http://api.teste.example', 'https://api.easystok.online', 'https://API.EasyStok.Online',
-    'https://easystok.online', 'https://x.app.easystok.online', 'https://casadababa.com', 'https://www.casadababa.com/', 'https://u@api.teste.example']) {
+    'https://easystok.online', 'https://x.app.easystok.online', 'https://casadababa.com', 'https://www.casadababa.com/', 'https://u@api.teste.example',
+    // Ponto final do nome absoluto resolve para o mesmo servidor da produção.
+    'https://api.easystok.online.', 'https://API.EASYSTOK.ONLINE.', 'https://api.easystok.online%2e', 'https://casadababa.com.']) {
     assert.throws(() => configWeb({ ambiente: 'homologacao', apiBaseUrl }), /homologação/i, String(apiBaseUrl));
   }
   const hml = configWeb({ ambiente: 'homologacao', apiBaseUrl: 'https://api-teste.example/' });
   assert.deepEqual(hml, { ambiente: 'homologacao', apiBaseUrl: 'https://api-teste.example', updateManifestUrl: '', updatePageUrl: '' });
   assert.throws(() => configWeb({ ambiente: 'producao' }));
+});
+
+test('build confere origens e conteúdo web pela regra testada do ambiente.cjs', () => {
+  const gradle = read('android/app/build.gradle');
+  const pronto = gradle.slice(gradle.indexOf('gradle.taskGraph.whenReady'));
+  assert.match(pronto, /file\('\.\.\/\.\.\/scripts\/ambiente\.cjs'\)\.path, 'conferir'/, 'Gradle delega a regra ao ambiente.cjs');
+  assert.match(pronto, /exitValue\(\) != 0\) throw new GradleException/, 'recusa do ambiente.cjs derruba o build');
+  assert.doesNotMatch(gradle, /easystok\\\.online|casadababa\\\.com/, 'Gradle sem regra própria de origem');
+  assert.doesNotMatch(pronto, /JsonSlurper|config\.ambiente/, 'Gradle sem regra própria de conteúdo web');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cdb-conferir-'));
+  try {
+    const { configWeb } = require('../scripts/ambiente.cjs');
+    const gravar = (nome, config) => { const file = path.join(tmp, nome); fs.writeFileSync(file, 'window.CDB_CONFIG = ' + JSON.stringify(config) + ';\n'); return file; };
+    const api = 'https://api-teste.example', app = 'https://console-teste.example';
+    const oficial = gravar('oficial.js', configWeb({})), hml = gravar('hml.js', configWeb({ ambiente: 'homologacao', apiBaseUrl: api }));
+    const conferir = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts/ambiente.cjs'), 'conferir', ...args], { encoding: 'utf8' });
+    assert.equal(conferir('oficial', oficial).status, 0);
+    assert.equal(conferir('homologacao', hml, api, app).status, 0);
+    for (const [motivo, args] of [
+      ['conteúdo oficial no build de homologação', ['homologacao', oficial, api, app]],
+      ['conteúdo de homologação no build oficial', ['oficial', hml]],
+      ['API do -P diferente da do conteúdo web', ['homologacao', hml, 'https://outra-api.example', app]],
+      ['-P de API da produção', ['homologacao', hml, 'https://api.easystok.online', app]],
+      ['-P de app da produção', ['homologacao', hml, api, 'https://app.easystok.online']],
+      ['-P da produção com ponto final', ['homologacao', hml, api, 'https://app.easystok.online.']],
+      ['-P sem HTTPS', ['homologacao', hml, api, 'http://console-teste.example']],
+      ['-P com barra final', ['homologacao', hml, api, app + '/']],
+      ['-P ausente', ['homologacao', hml, api, '']],
+      ['conteúdo web ausente', ['homologacao', path.join(tmp, 'nada.js'), api, app]],
+      ['ambiente desconhecido', ['producao', oficial]]
+    ]) {
+      const resultado = conferir(...args);
+      assert.notEqual(resultado.status, 0, motivo);
+      assert.ok(resultado.stderr.trim(), motivo + ': recusa com motivo');
+    }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
 test('empacotador real gera conteúdo de homologação sem nenhum host da produção', () => {

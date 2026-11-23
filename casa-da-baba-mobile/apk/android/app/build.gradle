@@ -21,8 +21,6 @@ firebaseResources.each { name, value ->
 // #3114: a homologação recebe as origens de teste por -P e só as confere quando há tarefa dela no build.
 def homologacaoApi = (project.findProperty('cdbHomologacaoApi') ?: '').toString()
 def homologacaoApp = (project.findProperty('cdbHomologacaoApp') ?: '').toString()
-def origemHttps = ~/https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+/
-def origemDaProducao = ~/https:\/\/(.+\.)?(easystok\.online|casadababa\.com)/
 android {
     namespace "com.casadababa.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -85,19 +83,13 @@ gradle.taskGraph.whenReady { graph ->
     def oficial = tarefas.any { it.name.contains('Oficial') }
     if (!homologacao && !oficial) return
     if (homologacao && oficial) throw new GradleException('Monte uma variante por vez: o conteúdo web empacotado é de um ambiente só.')
-    if (homologacao) {
-        [cdbHomologacaoApi: homologacaoApi, cdbHomologacaoApp: homologacaoApp].each { name, value ->
-            if (!(value ==~ origemHttps) || value ==~ origemDaProducao)
-                throw new GradleException("-P${name} precisa ser origem HTTPS de teste, sem caminho, fora de easystok.online e casadababa.com.")
-        }
-    }
-    // O conteúdo web fica em src/main/assets, comum às variantes: precisa ter sido empacotado para esta.
-    def ambiente = homologacao ? 'homologacao' : 'oficial'
-    def configJs = file('src/main/assets/public/config.js')
-    if (!configJs.isFile()) throw new GradleException('Conteúdo web ausente: rode scripts/copy-web.cjs e cap sync antes do build.')
-    def config = new groovy.json.JsonSlurper().parseText(configJs.text.replaceFirst(/^window\.CDB_CONFIG = /, '').replaceFirst(/;\s*$/, ''))
-    if (config.ambiente != ambiente || (homologacao && config.apiBaseUrl != homologacaoApi))
-        throw new GradleException("Conteúdo web empacotado para ${config.ambiente} (${config.apiBaseUrl}). Rode copy-web com CDB_AMBIENTE=${ambiente}" + (homologacao ? " e CDB_API_BASE_URL=${homologacaoApi}." : '.'))
+    // A regra mora em scripts/ambiente.cjs, testada lá: origens de teste do -P e conteúdo web da variante,
+    // que fica em src/main/assets, comum às variantes.
+    def conferir = ['node', file('../../scripts/ambiente.cjs').path, 'conferir', homologacao ? 'homologacao' : 'oficial',
+                    file('src/main/assets/public/config.js').path, homologacaoApi, homologacaoApp].execute()
+    def saida = new StringBuilder(), erro = new StringBuilder()
+    conferir.waitForProcessOutput(saida, erro)
+    if (conferir.exitValue() != 0) throw new GradleException(erro.toString().trim() ?: 'scripts/ambiente.cjs recusou o build.')
 }
 repositories {
     flatDir { dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' }

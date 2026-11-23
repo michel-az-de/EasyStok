@@ -41,7 +41,8 @@ public final class AmbienteTest {
         check(abertas.equals(List.of("https://api.easystok.online/api/mobile/session")), "cliente padrão segue o ambiente do build");
 
         String[] producao = { "https://api.easystok.online", "https://API.EasyStok.Online", "https://easystok.online",
-            "https://x.app.easystok.online", "https://casadababa.com", "https://www.casadababa.com" };
+            "https://x.app.easystok.online", "https://casadababa.com", "https://www.casadababa.com",
+            "https://api.easystok.online.", "https://casadababa.com." };
         for (String origem : producao) {
             recusa(origem, "https://console-teste.example", "");
             recusa("https://api-teste.example", origem, "");

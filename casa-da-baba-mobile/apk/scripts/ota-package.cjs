@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
 const { APP, NATIVE_VERSION_CODE, DATA_SCHEMA } = require('./ota-contract.cjs');
+const { exigirConteudoOficial } = require('./ambiente.cjs');
 const BASE = 'https://easystok.online/downloads/casa-da-baba/ota/';
 const MAX_ZIP = 64 * 1024 * 1024;
 const MAX_FILE = 32 * 1024 * 1024;
@@ -79,6 +80,7 @@ function zipWeb(directory, version) {
   const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'bundle.json'), 'utf8'));
   assert(metadata.schemaVersion === 1 && metadata.appId === APP && metadata.channel === 'piloto' && metadata.bundleVersion === version && metadata.nativeVersionCode === NATIVE_VERSION_CODE && metadata.dataSchemaVersion === DATA_SCHEMA,'bundle.json incompatível; gere web novamente.');
   assert(fs.statSync(path.join(directory, 'index.html')).isFile(), 'index.html ausente.');
+  exigirConteudoOficial(path.join(directory, 'config.js'));
   const files = [];
   function walk(relative) {
     for (const entry of fs.readdirSync(path.join(directory, relative)).sort()) {
