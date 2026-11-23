@@ -91,16 +91,18 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     const g = gesto.current
     if (!g || g.id !== e.pointerId) return
     gesto.current = null; setArrastando(false)
-    mover(cancelar ? g.antes : atual.current, true)
+    origemTeclado.current = mover(cancelar ? g.antes : atual.current, true) // gesto concluído: nada mais a desfazer, o Esc seguinte segue para quem usa o painel
     if (e.currentTarget.hasPointerCapture(g.id)) e.currentTarget.releasePointerCapture(g.id)
   }
   function teclar(e, modo = 'posicao') {
     const setas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
     if (e.key === 'Escape') {
+      // Só consome o Esc quando há o que desfazer; sem nada a desfazer ele segue para quem usa o painel (fechar).
+      const antes = gesto.current?.antes ?? origemTeclado.current, a = atual.current
+      if (!antes || (!gesto.current && antes.x === a.x && antes.y === a.y && antes.largura === a.largura && antes.altura === a.altura)) return
       e.preventDefault(); e.stopPropagation()
-      const antes = gesto.current?.antes ?? origemTeclado.current
       gesto.current = null; setArrastando(false)
-      if (antes) mover(antes, true)
+      origemTeclado.current = mover(antes, true) // o limite pode ter mudado a posição: a próxima comparação já parte do que está na tela
     } else if (setas[e.key] && !e.altKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault(); e.stopPropagation()
       const [dx, dy] = setas[e.key], passo = e.shiftKey ? 24 : 8, antes = atual.current, r = tamanho()

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
-import { Modal } from '../../componentes/Modal'
 import { ModalConfirmar } from '../../componentes/ModalConfirmar'
+import { PainelMovel, usePainelMovel } from '../../componentes/PainelMovel'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useChecagemAssistente } from '../../aplicacao/useChecagemAssistente'
@@ -17,7 +17,32 @@ import css from './atendimento.module.css'
 // robô, todas à vista (o robô para na primeira que barra). A chave liga e desliga o Assistente na loja toda;
 // as instruções e as ferramentas são as que o modelo recebe nesta conversa, só para ler.
 // #2855: com o painel entregue pelo App, o modal ganha as abas Uso e cota, Fluxo e Histórico ao lado da conversa.
-export function ModalAssistente({ conversa, aoFechar }) {
+// #3210: o invólucro é um PainelMovel (não modal): arrasta, encaixa e lembra a posição por loja e usuário, e a conversa
+// atrás segue clicável. Esc e Fechar devolvem o foco ao campo de mensagem; a confirmação (ModalConfirmar) fica por cima.
+export function ModalAssistente({ conversa, aoFechar, escopoMovel = 'assistente:demo:demo' }) {
+  const movel = usePainelMovel(escopoMovel, 'assistente')
+  const soltar = movel.soltar
+  useEffect(() => { soltar() }, [soltar])
+  const focarCampo = () => {
+    const campo = document.querySelector('[data-area-envio] textarea:not(:disabled)')
+    if (!campo) return movel.devolverFoco()
+    campo.focus({ preventScroll: true }); return true
+  }
+  const fechar = () => { focarCampo(); aoFechar() }
+  // Esc na fase de bolha: a alça e o redimensionar do painel consomem o Esc que desfaz um movimento (defaultPrevented); sem nada a
+  // desfazer ele chega aqui e fecha. Um diálogo aberto por cima (a confirmação) fica com o Esc. Com o foco no corpo da página
+  // (clique em texto do painel), o ouvinte do documento fecha.
+  const aoTeclar = (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('dialog')) return
+    e.stopPropagation(); fechar()
+  }
+  const fecharRef = useRef(fechar)
+  useEffect(() => { fecharRef.current = fechar })
+  useEffect(() => {
+    const ouvir = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && e.target === document.body && !document.querySelector('dialog[open]')) fecharRef.current() }
+    document.addEventListener('keydown', ouvir)
+    return () => document.removeEventListener('keydown', ouvir)
+  }, [])
   const { acoes } = useAcessoModulos()
   const { carregando, checagem, erro, salvandoChave, erroChave, checarDeNovo, mudarChave } = useChecagemAssistente(conversa.id)
   const [sinalRecarregar, setSinalRecarregar] = useState(0)
@@ -120,25 +145,23 @@ export function ModalAssistente({ conversa, aoFechar }) {
   )
 
   return (
-    <Modal
-      titulo="Assistente nesta conversa"
-      descricao={`O que decide se o Assistente responde ${primeiroNomeDaConversa(conversa)}.`}
-      largura={renderizarPainel ? 'lg' : 'md'}
-      aoFechar={aoFechar}
-      rodape={(
-        <>
-          <Botao icone="refresh-cw" onClick={() => { checarDeNovo(); setSinalRecarregar((n) => n + 1) }} disabled={carregando}>Checar de novo</Botao>
-          <Botao variante="primario" onClick={aoFechar}>Fechar</Botao>
-        </>
-      )}
+    <PainelMovel
+      controle={{ ...movel, devolverFoco: focarCampo }} titulo="Assistente nesta conversa" alinharDireita
+      larguraInicial={renderizarPainel ? 560 : 440} alturaInicial={560} aoRecolher={aoFechar}
+      atributos={{ role: 'dialog', onKeyDown: aoTeclar }}
     >
+      <p className={css.checagemNota}>{`O que decide se o Assistente responde ${primeiroNomeDaConversa(conversa)}.`}</p>
       {renderizarPainel
         ? renderizarPainel({ conversaId: conversa.id, podeEditar: acoes?.editarAtendimento === true, sinalRecarregar, abaAntes: { id: 'conversa', rotulo: 'Esta conversa', conteudo: daConversa } })
         : daConversa}
+      <div className={css.assistenteRodape}>
+        <Botao icone="refresh-cw" onClick={() => { checarDeNovo(); setSinalRecarregar((n) => n + 1) }} disabled={carregando}>Checar de novo</Botao>
+        <Botao variante="primario" onClick={fechar}>Fechar</Botao>
+      </div>
       {desligando && (
         <ModalConfirmar titulo="Desligar o Assistente?" descricao={PERGUNTA_AO_DESLIGAR} rotuloConfirmar="Desligar o Assistente"
           aoConfirmar={() => mudarChave(false)} aoFechar={() => setDesligando(false)} />
       )}
-    </Modal>
+    </PainelMovel>
   )
 }

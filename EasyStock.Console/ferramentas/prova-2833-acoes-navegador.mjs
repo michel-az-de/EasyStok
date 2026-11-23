@@ -98,8 +98,9 @@ try {
   await foto(page, '01-seletor-de-emoji-1280')
   await page.getByRole('button', { name: 'sorriso', exact: true }).click()
   assert.equal(await campo.inputValue(), 'Oi😊 tudo', 'o emoji entra no cursor')
-  await page.getByRole('searchbox', { name: 'Buscar emoji' }).fill(':mas')
-  assert.equal(await page.getByRole('dialog', { name: 'Emoji' }).getByRole('button').count(), 1, ':mas acha só a massa')
+  await page.getByRole('searchbox', { name: 'Buscar emoji' }).fill(':massa')
+  // #3210: a busca passou a olhar todas as categorias; ":mas" também acha as palmas.
+  assert.equal(await page.getByRole('dialog', { name: 'Emoji' }).getByRole('button').count(), 1, ':massa acha só a massa')
   await page.keyboard.press('Enter')
   assert.equal(await campo.inputValue(), 'Oi😊🍝 tudo', 'Enter insere o primeiro, logo depois do anterior')
   await page.keyboard.press('Escape')

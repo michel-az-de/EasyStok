@@ -44,7 +44,7 @@ function PainelDaConversa({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,
 }) {
   const {
-    selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao,
+    selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao, sessao,
   } = useAtendimento()
   const {
     enviar, reabrir, assumirAtendimento, devolverAutomatico,
@@ -296,7 +296,7 @@ function PainelDaConversa({
       {modalAberto === 'cardapio' && <ModalCompartilharComanda conversa={selecionada} aoFechar={fecharModal} />}
       {modalAberto === 'passar' && <ModalPassarConversa conversa={selecionada} aoFechar={fecharModal} />}
       {modalAberto === 'devolver' && <ModalDevolverAssistente conversa={selecionada} aoFechar={fecharModal} aoConfirmar={() => devolverAutomatico(selecionada.id)} />}
-      {modalAberto === 'assistente' && <ModalAssistente key={selecionada.id} conversa={selecionada} aoFechar={fecharModal} />}
+      {modalAberto === 'assistente' && <ModalAssistente key={selecionada.id} conversa={selecionada} aoFechar={fecharModal} escopoMovel={`assistente:${sessao?.empresa?.id ?? 'demo'}:${sessao?.usuario?.id ?? 'demo'}`} />}
     </>
   )
 }
