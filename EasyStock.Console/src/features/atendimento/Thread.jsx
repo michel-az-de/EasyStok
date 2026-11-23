@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import { Fragment, useCallback, useRef, useState } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { marcarMudancasDeAssunto } from '../../dominio/email'
+import { agruparFalhasSeguidas } from '../../dominio/falhasSeguidas'
 import { Pilula } from '../../componentes/Pilula'
 import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
@@ -76,6 +77,13 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
   const reagir = useChamadaEstavel(aoReagir)
   const apagar = useChamadaEstavel(aoApagar)
+  // #3234 (C1): grupos de falhas seguidas abertos, pela tentativa mais recente (a que fica à vista).
+  const [tentativasAbertas, setTentativasAbertas] = useState(() => new Set())
+  const alternarTentativas = useCallback((chave) => setTentativasAbertas((antes) => {
+    const depois = new Set(antes)
+    if (!depois.delete(chave)) depois.add(chave)
+    return depois
+  }), [])
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
   // #2232 (A5): `visivel` é o painel aberto na aba; ao abrir, o fio vai para a última mensagem.
@@ -117,8 +125,9 @@ export function Thread({
   }
 
   // #2232 (B3): cada dia é um grupo, para a pílula de data ficar fixa só enquanto o dia dela rola.
+  // #3234 (C1): antes, as falhas seguidas iguais viram uma linha só (o grupo não cruza dia, nota nem divisória).
   const grupos = []
-  for (const l of linhas) {
+  for (const l of agruparFalhasSeguidas(linhas)) {
     const atual = grupos.at(-1)
     if (l.tipo === 'dia') grupos.push({ chave: l.chave, itens: [l] })
     else if (atual) atual.itens.push(l)
@@ -129,21 +138,30 @@ export function Thread({
     if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
     if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
     if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
+    const comuns = {
+      numeroComanda,
+      aoAbrirDefinicaoAutomatica: abrirDefinicaoAutomatica,
+      // #1761: só onde o compositor já oferece Modelos aprovados.
+      aoAbrirModelos: aoAbrirModelos ? abrirModelos : undefined,
+      // #2833: reagir e apagar para todos só com a API.
+      aoReagir: aoReagir ? reagir : undefined,
+      aoApagar: aoApagar ? apagar : undefined,
+    }
+    // Sem a ação (demonstração) o balão não mostra o Reenviar.
+    const ultima = { ...comuns, aoReenviar: aoReenviar ? reenviar : undefined }
+    if (!l.anteriores?.length) return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...ultima} />
+    // #3234 (C1): aberto, as tentativas de antes aparecem acima, sem repetir o aviso e sem Reenviar (fica só na última).
+    const aberto = tentativasAbertas.has(l.mensagem.id)
     return (
-      <Balao
-        key={l.chave}
-        mensagem={l.mensagem}
-        trocaDeVoz={l.trocaDeVoz}
-        numeroComanda={numeroComanda}
-        aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
-        // Sem a ação (demonstração) o balão não mostra o Reenviar.
-        aoReenviar={aoReenviar ? reenviar : undefined}
-        // #1761: só onde o compositor já oferece Modelos aprovados.
-        aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
-        // #2833: reagir e apagar para todos só com a API.
-        aoReagir={aoReagir ? reagir : undefined}
-        aoApagar={aoApagar ? apagar : undefined}
-      />
+      <Fragment key={l.chave}>
+        {aberto && l.anteriores.map((m, j) => (
+          <Balao key={m.id} mensagem={m} trocaDeVoz={j === 0 && l.trocaDeVoz} rotuloDaTentativa={`Tentativa ${j + 1} de ${l.anteriores.length + 1}`} {...comuns} />
+        ))}
+        <Balao
+          mensagem={l.mensagem} trocaDeVoz={!aberto && l.trocaDeVoz} {...ultima}
+          tentativas={l.anteriores.length + 1} tentativasAbertas={aberto} aoAlternarTentativas={alternarTentativas}
+        />
+      </Fragment>
     )
   }
 

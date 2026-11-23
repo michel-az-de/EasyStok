@@ -111,8 +111,8 @@ A revisão do plano dividiu o grupo A em três PRs, para cada uma caber numa rev
 
 | PR | Itens | Situação |
 |---|---|---|
-| A1 | C2, C3 e C4 (faixa da janela e compositor) | esta |
-| A2 | C1 (falhas seguidas agrupadas) | a seguir |
+| A1 | C2, C3 e C4 (faixa da janela e compositor) | mergeada (#3236) e no ar |
+| A2 | C1 (falhas seguidas agrupadas) | esta |
 | A3 | C5 (modo como selo no cabeçalho) | a seguir |
 
 Ficam fora do grupo A, com motivo:
@@ -126,3 +126,10 @@ Decisões da A1:
 - Com a janela fechada, "Janela fechada" aparece uma vez só. Quando o assunto da faixa junto do campo é a janela, quem avisa é a faixa. Quando a conversa está concluída ou bloqueada, a faixa fala de outra coisa e quem avisa é o cabeçalho.
 - Os prints de antes e depois, tirados da demonstração, estão em `critica-atendimento-3234/a1/`.
 - O botão "Escolher modelo" sai. A lista de mensagens padrão passa a ter uma entrada só, Respostas, e o campo diz onde ela está. Ficam como estão o "Modelos aprovados" perto do fim da janela (#1839) e o da bolha que falhou fora da janela.
+
+Decisões da A2:
+
+- Envios seguidos que falharam com o mesmo texto e o mesmo tipo de falha viram um balão só: o mais recente, com o aviso uma vez. O grupo não atravessa mensagem do cliente, envio que saiu, troca de dia, nota, divisória nem troca de assunto.
+- O texto do aviso sai do tipo da falha. Com tempo esgotado, a mensagem pode ter chegado, então o aviso diz "4 tentativas sem resposta do WhatsApp. Pode ter chegado: confira com o cliente antes de reenviar." e nunca "não saíram". Nos outros tipos, "N tentativas não saíram", seguido do motivo. O status em si continua com a #3229.
+- "Ver as N tentativas" mostra as de antes acima da mais recente. Cada uma diz só "Tentativa 1 de 4", sem repetir o aviso na tela nem para o leitor de tela (um só `role=alert`), e sem Reenviar, que fica só na mais recente. As de antes mantêm reagir, apagar e "Modelos aprovados".
+- Os prints de antes e depois, tirados do harness da prova-2185 (a demonstração não tem envio com falha), estão em `critica-atendimento-3234/a2/`.

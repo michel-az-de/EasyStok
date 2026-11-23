@@ -99,7 +99,11 @@ const LISTA = [
 ]
 const CONVERSAS = [
   // #3234 (E31): cabecalhoCheio=1 dá a 'meu' nome longo e comanda, o pior caso da linha do cabeçalho.
-  conversa('robo'), conversa('meu', q.get('cabecalhoCheio') === '1' ? { nome: 'Maria Aparecida dos Santos Albuquerque', numeroComanda: 4821 } : {}), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
+  // #3234 (E32): falhas=1 dá a 'meu' quatro envios seguidos que esgotaram o tempo, como na produção.
+  conversa('robo'), conversa('meu', {
+    ...(q.get('cabecalhoCheio') === '1' ? { nome: 'Maria Aparecida dos Santos Albuquerque', numeroComanda: 4821 } : {}),
+    ...(q.get('falhas') === '1' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mf' + i, dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
+  }), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('lead', { conta: 'lead', clienteId: null }),
   conversa('leadjanela', { conta: 'lead', clienteId: null, mensagens: [{ id: 'mlj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('insta', { canal: 'Instagram' }),
@@ -611,6 +615,31 @@ try {
       await ctx.close()
     })
   }
+  await confere('E32. (#3234 C1) 4 envios seguidos que falharam iguais viram 1 balão com 1 aviso; Ver as tentativas mostra as 4', async () => {
+    const { ctx, p } = await abrir('inicial=meu&falhas=1', { width: 1440, height: 900 })
+    await campo(p).waitFor()
+    const contar = () => p.evaluate(() => ({
+      baloes: [...document.querySelectorAll('[role=log] *')].filter((e) => e.childElementCount === 0 && e.textContent === 'Tem sim, separo uma?').length,
+      alertas: [...document.querySelectorAll('[role=log] [role=alert]')].map((e) => e.textContent.trim()),
+      // Na tela (não só para o leitor): a frase da falha aparece uma vez, aberto ou fechado.
+      frases: (document.querySelector('[role=log]').textContent.match(/Pode ter chegado/g) ?? []).length,
+      rotulos: [...document.querySelector('[role=log]').textContent.matchAll(/Tentativa \d de 4/g)].map((m) => m[0]),
+    }))
+    const fechado = await contar()
+    assert.equal(fechado.baloes, 1, `${fechado.baloes} balões iguais à vista`)
+    assert.equal(fechado.alertas.length, 1, `${fechado.alertas.length} avisos de falha`)
+    assert.match(fechado.alertas[0], /4 tentativas sem resposta do WhatsApp\. Pode ter chegado/)
+    const ver = p.getByRole('button', { name: 'Ver as 4 tentativas' })
+    assert.equal(await ver.getAttribute('aria-expanded'), 'false')
+    await ver.click()
+    const aberto = await contar()
+    assert.equal(aberto.baloes, 4, 'Ver as tentativas não mostrou as 4')
+    assert.equal(aberto.alertas.length, 1, 'abrir as tentativas repetiu o aviso')
+    assert.equal(aberto.frases, 1, `abrir as tentativas repetiu a frase na tela (${aberto.frases} vezes)`)
+    assert.deepEqual(aberto.rotulos, ['Tentativa 1 de 4', 'Tentativa 2 de 4', 'Tentativa 3 de 4'])
+    assert.equal(await p.getByRole('button', { name: 'Ocultar as tentativas' }).getAttribute('aria-expanded'), 'true')
+    await ctx.close()
+  })
   await confere('E31. (#3234 C2) 1024: abaixo de 1280 px o prazo folgado sai do cabeçalho (#1761 L4), e a linha não quebra', async () => {
     const { ctx, p } = await abrir('inicial=meu&cabecalhoCheio=1', { width: 1024, height: 768 })
     await campo(p).waitFor()
