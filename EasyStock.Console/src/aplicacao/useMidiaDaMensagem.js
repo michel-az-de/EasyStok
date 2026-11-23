@@ -6,13 +6,25 @@ import { criarCacheDeMidia } from './cacheDeMidia'
 // Um cache para a aba inteira (#1577). Sai tudo quando a conta muda (sair, sessão vencida, outro
 // login); a renovação do token dispara o mesmo evento e não mexe em nada.
 const cache = criarCacheDeMidia()
+// #3209: o balão e a miniatura do cartão mostram a mesma foto e montam juntos; o arquivo trafega uma vez.
+const emVoo = new Map()
 let dona = identidadeDaSessao(lerSessao())
 globalThis.addEventListener?.(EVENTO_SESSAO_ALTERADA, () => {
   const agora = identidadeDaSessao(lerSessao())
   if (agora === dona) return
   dona = agora
   cache.limpar()
+  emVoo.clear()
 })
+
+function baixarUmaVez(conversaId, mensagemId) {
+  let pedido = emVoo.get(mensagemId)
+  if (!pedido) {
+    pedido = baixarMidia(conversaId, mensagemId).finally(() => { if (emVoo.get(mensagemId) === pedido) emVoo.delete(mensagemId) })
+    emVoo.set(mensagemId, pedido)
+  }
+  return pedido
+}
 
 // Mídia recebida na conversa (modo API, #1287): o arquivo mora no storage privado do
 // EasyStok e só sai pelo endpoint autenticado, então vem como Blob e vira um endereço
@@ -31,9 +43,10 @@ export function useMidiaDaMensagem(midia, naTela = true) {
     let segura = Boolean(guardada)
     const arquivo = guardada
       ? Promise.resolve(guardada)
-      : baixarMidia(conversaId, mensagemId).then((blob) => {
+      : baixarUmaVez(conversaId, mensagemId).then((blob) => {
         if (!blob) return null
-        const url = cache.guardar(mensagemId, URL.createObjectURL(blob))
+        // Quem dividiu o download com outro encontra o endereço já guardado.
+        const url = cache.usar(mensagemId) ?? cache.guardar(mensagemId, URL.createObjectURL(blob))
         // O balão saiu antes de o arquivo chegar: fica guardado para a volta.
         if (vivo) segura = true
         else cache.soltar(mensagemId)

@@ -66,6 +66,12 @@ caso('mídias: só imagem carregável, mais recente primeiro, limite e "+N"', ()
   assert.deepEqual(r.midias.itens.map((m) => m.mensagemId), ['n5', 'n4', 'n3', 'n2', 'n1', 'n0'])
   assert.equal(r.midias.restantes, 2)
 })
+caso('foto apagada para todos (#2833) sai das miniaturas e da conta do "+N"', () => {
+  const mensagens = [msg('m1', 1000, 'image/jpeg'), msg('m2', 2000, 'image/jpeg', { apagadaEm: '2026-11-22T10:00:00Z' })]
+  const r = resumoQuemE({ ...lead('WhatsApp', '5511987654321'), mensagens })
+  assert.deepEqual(r.midias.itens.map((m) => m.mensagemId), ['m1'])
+  assert.equal(r.midias.restantes, 0)
+})
 caso('sem mídia de imagem: lista vazia e nada sobrando', () => {
   const r = resumoQuemE({ ...lead('WhatsApp', '5511987654321'), mensagens: [msg('m2', 2000, 'audio/ogg'), { id: 'm5', dir: 'in', texto: 'oi', em: 5000 }] })
   assert.deepEqual(r.midias, { itens: [], restantes: 0 })

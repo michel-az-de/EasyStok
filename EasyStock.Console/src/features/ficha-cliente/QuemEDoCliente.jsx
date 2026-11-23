@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
+import { useChegouNaTela } from '../../hooks/useChegouNaTela'
 import { useMidiaDaMensagem } from '../../aplicacao/useMidiaDaMensagem'
 import { diaMes, moeda, plural } from '../../dominio/formato'
 import { resumoQuemE } from '../../dominio/quemE'
@@ -29,13 +30,17 @@ function Telefone({ telefone }) {
   )
 }
 
+// Só baixa com o cartão na tela (#1577): no celular ele pode estar atrás da conversa.
 function Miniatura({ midia, aoAbrir }) {
-  const { url, erro } = useMidiaDaMensagem(midia)
+  const itemRef = useRef(null)
+  const { url, erro } = useMidiaDaMensagem(midia, useChegouNaTela(itemRef))
   return (
-    <Botao variante="texto" className={css.miniatura} disabled={!url} onClick={(e) => aoAbrir(e.currentTarget)}
-      aria-label={erro ? 'Foto que não abriu' : 'Abrir foto em tamanho inteiro'} data-miniatura>
-      {url ? <img src={url} alt="" /> : <Icone nome={erro ? 'alerta' : 'imagem'} tamanho={16} />}
-    </Botao>
+    <li ref={itemRef}>
+      <Botao variante="texto" className={css.miniatura} disabled={!url} onClick={(e) => aoAbrir(e.currentTarget)}
+        aria-label={erro ? 'Foto que não abriu' : 'Abrir foto em tamanho inteiro'} data-miniatura>
+        {url ? <img src={url} alt="" /> : <Icone nome={erro ? 'alerta' : 'imagem'} tamanho={16} />}
+      </Botao>
+    </li>
   )
 }
 
@@ -62,7 +67,7 @@ export function QuemEDoCliente({ conversa }) {
       {midias.itens.length > 0 && (
         <div className={css.midiasQuemE} data-quem-e-midias>
           <ul className={css.listaMiniaturas} aria-label="Fotos da conversa">
-            {midias.itens.map((m) => <li key={m.mensagemId}><Miniatura midia={m} aoAbrir={(botao) => setAberta({ midia: m, botao })} /></li>)}
+            {midias.itens.map((m) => <Miniatura key={m.mensagemId} midia={m} aoAbrir={(botao) => setAberta({ midia: m, botao })} />)}
             {midias.restantes > 0 && <li className={css.maisMidias}>+{midias.restantes}</li>}
           </ul>
           {conversa.temAnteriores && <small className={css.apoioQuemE}>Só as mensagens já carregadas.</small>}

@@ -5,7 +5,8 @@ import { telefoneDaConversa } from './cadastroDoLead'
 // dossiê e as imagens das mensagens já carregadas da conversa.
 export const LIMITE_DE_MIDIAS = 6
 
-const ehImagemCarregavel = (m) => Boolean(m.midia?.conversaId && m.midia.mensagemId && String(m.midia.mime ?? '').startsWith('image/'))
+// Foto apagada para todos (#2833) some do balão; aqui também.
+const ehImagemCarregavel = (m) => Boolean(!m.apagadaEm && m.midia?.conversaId && m.midia.mensagemId && String(m.midia.mime ?? '').startsWith('image/'))
 
 export function resumoQuemE(conversa) {
   const historico = (conversa.cliente?.historico ?? []).filter((p) => p.estado !== 'cancelado')
