@@ -105,6 +105,9 @@ const CONVERSAS = [
     ...(q.get('falhas') === '1' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mf' + i, dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
     // falhas=2: uma recusa seguida de um tempo esgotado com o mesmo texto; reenviar a recusa a deixa igual à vizinha.
     ...(q.get('falhas') === '2' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, { id: 'rf0', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'Não enviada: Sem conexão', em: h(9) }, { id: 'rf1', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(8) }] } : {}),
+    // falhas=3 (A2b): o caso da produção, quatro envios do mesmo modelo, com o mesmo texto, que esgotaram o tempo.
+    // O texto é o que o servidor grava: cabeçalho, corpo e rodapé por quebra de linha.
+    ...(q.get('falhas') === '3' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mm' + i, dir: 'out', texto: 'Pedido 21 pronto\\nOi Ana, seu pedido 21 está pronto para retirar.\\nEasyStok', modelo: true, modeloNome: 'pedido_pronto', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
   }), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('lead', { conta: 'lead', clienteId: null }),
   conversa('leadjanela', { conta: 'lead', clienteId: null, mensagens: [{ id: 'mlj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
@@ -694,6 +697,29 @@ try {
     }))
     assert.deepEqual(depois, { clicado: true, baloes: 2 }, 'o balão reenviado sumiu ou remontou')
     await outra.ctx.close()
+  })
+  await confere('E32c. (#3234 A2b) 4 envios do mesmo modelo que falharam iguais viram 1 balão com 1 aviso e o selo do modelo', async () => {
+    const { ctx, p } = await abrir('inicial=meu&falhas=3', { width: 1440, height: 900 })
+    await campo(p).waitFor()
+    const contar = () => p.evaluate(() => ({
+      baloes: [...document.querySelectorAll('[role=log] *')].filter((e) => e.childElementCount === 0 && e.textContent === 'Pedido 21 pronto\nOi Ana, seu pedido 21 está pronto para retirar.\nEasyStok').length,
+      alertas: [...document.querySelectorAll('[role=log] [role=alert]')].map((e) => e.textContent.trim()),
+      selos: document.querySelectorAll('[role=log] [title=pedido_pronto]').length,
+      frases: (document.querySelector('[role=log]').textContent.match(/Pode ter chegado/g) ?? []).length,
+      rotulos: [...document.querySelector('[role=log]').textContent.matchAll(/Tentativa \d de \d/g)].map((m) => m[0]),
+    }))
+    const fechado = await contar()
+    assert.deepEqual({ baloes: fechado.baloes, alertas: fechado.alertas.length, frases: fechado.frases, selos: fechado.selos },
+      { baloes: 1, alertas: 1, frases: 1, selos: 1 }, 'o mesmo modelo repetido ainda aparece um balão por envio')
+    assert.match(fechado.alertas[0], /4 tentativas sem resposta do WhatsApp\. Pode ter chegado/)
+    await p.getByRole('button', { name: 'Ver as 4 tentativas' }).click()
+    const aberto = await contar()
+    assert.deepEqual({ baloes: aberto.baloes, alertas: aberto.alertas.length, frases: aberto.frases, selos: aberto.selos },
+      { baloes: 4, alertas: 1, frases: 1, selos: 4 }, 'abrir as tentativas não mostrou as 4 ou repetiu o aviso')
+    assert.deepEqual(aberto.rotulos, ['Tentativa 1 de 4', 'Tentativa 2 de 4', 'Tentativa 3 de 4'])
+    // Modelo não tem Reenviar (volta por Modelos aprovados), aberto ou fechado.
+    assert.equal(await p.getByRole('log').getByRole('button', { name: 'Reenviar' }).count(), 0)
+    await ctx.close()
   })
   await confere('E32b. (#3234 C1) a fixture sem as ações não ganha menu nem Reenviar', async () => {
     const { ctx, p } = await abrir('inicial=meu', { width: 1440, height: 900 })
