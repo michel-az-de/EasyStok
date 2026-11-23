@@ -73,6 +73,55 @@ public class RespostaProntaTests
         resposta.Texto.Should().Be("y");
         resposta.Arquivada.Should().BeTrue();
     }
+
+    [Fact]
+    public void CategoriaAntigaOuOmitidaFicaNula()
+    {
+        RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora).Categoria.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("  Entrega ", "Entrega")]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData(null, null)]
+    public void CategoriaApararEVazioViraNulo(string? entrada, string? esperado)
+    {
+        var resposta = RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora, entrada);
+
+        resposta.Categoria.Should().Be(esperado);
+    }
+
+    [Fact]
+    public void EditarTrocaELimpaACategoria()
+    {
+        var resposta = RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora, "Entrega");
+
+        resposta.Editar("T", "/p", "x", Agora.AddMinutes(1), "Pagamento");
+        resposta.Categoria.Should().Be("Pagamento");
+
+        resposta.Editar("T", "/p", "x", Agora.AddMinutes(2), null);
+        resposta.Categoria.Should().BeNull();
+    }
+
+    [Fact]
+    public void CategoriaNoLimiteAceitaEAcimaRecusa()
+    {
+        RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora, new string('a', RespostaPronta.CategoriaTamanhoMaximo))
+            .Categoria.Should().HaveLength(RespostaPronta.CategoriaTamanhoMaximo);
+
+        var act = () => RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora, new string('a', RespostaPronta.CategoriaTamanhoMaximo + 1));
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Theory]
+    [InlineData("Entrega\nrápida")]
+    [InlineData("Entrega\r\nrápida")]
+    public void CategoriaComQuebraDeLinhaRecusa(string categoria)
+    {
+        var act = () => RespostaPronta.Criar(Empresa, "T", "/p", "x", Agora, categoria);
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }
 
 /// <summary>S42: regra automática por gatilho e a escolha do gatilho na entrada do cliente.</summary>

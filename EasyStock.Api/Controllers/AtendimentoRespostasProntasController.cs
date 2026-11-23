@@ -65,7 +65,7 @@ public class AtendimentoRespostasProntasController(
         Executar(async () => DataOk(await useCases.RenderizarAsync(currentUser.EmpresaId, id, conversaId, ct)));
 
     private SalvarRespostaProntaCommand Comando(RespostaProntaBody body) =>
-        new(currentUser.EmpresaId, body.Titulo ?? string.Empty, body.Atalho ?? string.Empty, body.Texto ?? string.Empty);
+        new(currentUser.EmpresaId, body.Titulo ?? string.Empty, body.Atalho ?? string.Empty, body.Texto ?? string.Empty, body.Categoria);
 
     /// <summary>#1781: escrita na biblioteca é ação de atendimento, como no <c>AtendimentoConversasController</c>.</summary>
     private Task<IActionResult> Atendendo(Func<Task<IActionResult>> acao)
@@ -96,4 +96,4 @@ public class AtendimentoRespostasProntasController(
     }
 }
 
-public sealed record RespostaProntaBody(string? Titulo, string? Atalho, string? Texto);
+public sealed record RespostaProntaBody(string? Titulo, string? Atalho, string? Texto, string? Categoria = null);

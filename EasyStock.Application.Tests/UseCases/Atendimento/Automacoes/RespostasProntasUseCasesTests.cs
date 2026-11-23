@@ -38,6 +38,42 @@ public class RespostasProntasUseCasesTests
     }
 
     [Fact]
+    public async Task CriarComCategoriaGravaEDevolve()
+    {
+        var resultado = await UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá", " Entrega "));
+
+        resultado.Categoria.Should().Be("Entrega");
+        await _repo.Received(1).AddAsync(Arg.Is<RespostaPronta>(r => r.Categoria == "Entrega"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CriarSemCategoriaDevolveNula()
+    {
+        var resultado = await UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá"));
+
+        resultado.Categoria.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EditarTrocaACategoriaDeRespostaAntigaSemCategoria()
+    {
+        var resposta = RespostaPronta.Criar(_empresaId, "A", "/a", "x", Agora);
+        _repo.ObterAsync(_empresaId, resposta.Id, Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var resultado = await UseCases().EditarAsync(resposta.Id, new SalvarRespostaProntaCommand(_empresaId, "A", "/a", "x", "Horário"));
+
+        resultado.Categoria.Should().Be("Horário");
+    }
+
+    [Fact]
+    public async Task CategoriaComQuebraDeLinhaRecusaComoValidacao()
+    {
+        var act = () => UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá", "a\nb"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    [Fact]
     public async Task CriarGravaERetorna()
     {
         var resultado = await UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá {nome}"));

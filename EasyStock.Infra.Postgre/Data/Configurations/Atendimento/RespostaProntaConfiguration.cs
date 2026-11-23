@@ -13,6 +13,7 @@ public class RespostaProntaConfiguration : IEntityTypeConfiguration<RespostaPron
         builder.Property(r => r.Titulo).HasMaxLength(RespostaPronta.TituloTamanhoMaximo).IsRequired();
         builder.Property(r => r.Atalho).HasMaxLength(RespostaPronta.AtalhoTamanhoMaximo).IsRequired();
         builder.Property(r => r.Texto).HasMaxLength(RespostaPronta.TextoTamanhoMaximo).IsRequired();
+        builder.Property(r => r.Categoria).HasMaxLength(RespostaPronta.CategoriaTamanhoMaximo);
         builder.Property(r => r.CriadaEm).IsRequired();
         builder.Property(r => r.AlteradaEm).IsRequired();
 

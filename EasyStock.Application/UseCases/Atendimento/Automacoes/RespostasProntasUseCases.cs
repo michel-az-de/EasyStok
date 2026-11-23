@@ -5,14 +5,14 @@ using EasyStock.Domain.Entities.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Automacoes;
 
-public sealed record RespostaProntaResult(Guid Id, string Titulo, string Atalho, string Texto, bool Arquivada, DateTime AlteradaEm)
+public sealed record RespostaProntaResult(Guid Id, string Titulo, string Atalho, string Texto, bool Arquivada, DateTime AlteradaEm, string? Categoria = null)
 {
-    internal static RespostaProntaResult De(RespostaPronta r) => new(r.Id, r.Titulo, r.Atalho, r.Texto, r.Arquivada, r.AlteradaEm);
+    internal static RespostaProntaResult De(RespostaPronta r) => new(r.Id, r.Titulo, r.Atalho, r.Texto, r.Arquivada, r.AlteradaEm, r.Categoria);
 }
 
 public sealed record RespostaRenderizadaResult(Guid RespostaId, Guid ConversaId, string Texto);
 
-public sealed record SalvarRespostaProntaCommand(Guid EmpresaId, string Titulo, string Atalho, string Texto);
+public sealed record SalvarRespostaProntaCommand(Guid EmpresaId, string Titulo, string Atalho, string Texto, string? Categoria = null);
 
 public sealed class RespostaProntaNaoEncontradaException(Guid id) : Exception($"Resposta pronta {id} não encontrada.");
 
@@ -36,7 +36,7 @@ public sealed class RespostasProntasUseCases(
     public async Task<RespostaProntaResult> CriarAsync(SalvarRespostaProntaCommand command, CancellationToken ct = default)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var resposta = Validar(() => RespostaPronta.Criar(command.EmpresaId, command.Titulo, command.Atalho, command.Texto, agora));
+        var resposta = Validar(() => RespostaPronta.Criar(command.EmpresaId, command.Titulo, command.Atalho, command.Texto, agora, command.Categoria));
         await GarantirAtalhoLivreAsync(command.EmpresaId, resposta.Atalho, null, ct);
 
         await repository.AddAsync(resposta, ct);
@@ -51,7 +51,7 @@ public sealed class RespostasProntasUseCases(
         await GarantirAtalhoLivreAsync(command.EmpresaId, atalho, id, ct);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
-        Validar(() => { resposta.Editar(command.Titulo, atalho, command.Texto, agora); return resposta; });
+        Validar(() => { resposta.Editar(command.Titulo, atalho, command.Texto, agora, command.Categoria); return resposta; });
         await unitOfWork.CommitAsync();
         return RespostaProntaResult.De(resposta);
     }
