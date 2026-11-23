@@ -84,6 +84,8 @@ public sealed partial class EnviarModeloConversaUseCase(
         catch (Exception ex)
         {
             falha = ex;
+            // #3229: registrada antes da transação, para não depender da releitura sob lock.
+            RegistrarFalha(command.ConversaId, mensagem.Id, Classificar(ex), ex);
         }
 
         // #1599: a varredura de intenção presa pode ter marcado falha incerta com o POST ainda no ar. O desfecho é
@@ -102,16 +104,10 @@ public sealed partial class EnviarModeloConversaUseCase(
                 catch (Exception ex)
                 {
                     falha = ex;
+                    RegistrarFalha(command.ConversaId, mensagem.Id, Classificar(ex), ex);
                 }
             }
-            // Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.:
-            // empresa sem phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
-            var tipo = falha is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
-                    or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
-                ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
-            // #3229: a falha do canal não sai muda, nem quando a varredura já encerrou a intenção. Sem a exceção e sem
-            // a Message dela: a ponte devolve o telefone e o texto do cliente nela (#2590).
-            if (falha is not null) RegistrarFalha(command.ConversaId, mensagem.Id, tipo, falha);
+            var tipo = Classificar(falha);
             // Falha depois de a varredura já ter encerrado a intenção não soma outra tentativa.
             if (falha is not null && atual.Status == StatusMensagem.Pendente)
                 atual.RegistrarFalhaEnvio(tipo == TipoFalhaEnvio.Incerta
@@ -130,6 +126,19 @@ public sealed partial class EnviarModeloConversaUseCase(
         return MensagemAtendimentoResult.De(existente);
     }
 
+    /// <summary>
+    /// Nada saiu: a Meta recusou (4xx) ou o cliente barrou antes da rede (permanente e sem status, ex.: empresa sem
+    /// phone_number_id). O resto fica incerto, inclusive o "2xx sem message id".
+    /// </summary>
+    private static TipoFalhaEnvio Classificar(Exception? falha) =>
+        falha is WhatsAppCloudException { StatusHttp: >= 400 and < 500 }
+            or WhatsAppCloudException { EhPermanente: true, StatusHttp: null }
+            ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Incerta;
+
+    /// <summary>
+    /// #3229: a falha do canal não sai muda, nem quando a varredura já encerrou a intenção. Sem a exceção e sem a
+    /// Message dela: a ponte devolve o telefone e o texto do cliente nela (#2590).
+    /// </summary>
     private void RegistrarFalha(Guid conversaId, Guid mensagemId, TipoFalhaEnvio tipo, Exception falha)
     {
         var canal = falha as WhatsAppCloudException;

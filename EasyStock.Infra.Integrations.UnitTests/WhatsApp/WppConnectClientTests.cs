@@ -432,4 +432,30 @@ public class WppConnectClientTests
 
         await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 400 && e.EhPermanente && e.Codigo == -2071);
     }
+
+    [Fact]
+    public async Task Telefone_em_grupos_tambem_e_mascarado_no_detalhe()
+    {
+        var log = new LoggerDeCaptura();
+        _http.QuandoQualquer().Responde(HttpStatusCode.InternalServerError,
+            """{"message":"falha para +55 11 987 654 321","error":{"message":"(11) 98765-4321"}}""");
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "Olá");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 500);
+        log.Tudo.Should().Contain("falha para").And.NotContain("987").And.NotContain("654").And.NotContain("4321").And.NotContain("(11)");
+    }
+
+    [Fact]
+    public async Task Corpo_da_recusa_acima_do_limite_nao_troca_a_falha_nem_vai_ao_log()
+    {
+        var log = new LoggerDeCaptura();
+        _http.QuandoQualquer().Responde(HttpStatusCode.InternalServerError, $$"""{"message":"{{new string('x', 70_000)}}"}""");
+
+        var act = () => ClientComLog(log).EnviarTextoAsync("5511987654321", "Olá");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.StatusHttp == 500 && e.Codigo == -2071 && !e.EhPermanente);
+        log.Linhas.Should().ContainSingle(l => l.Nivel == LogLevel.Warning);
+        log.Tudo.Length.Should().BeLessThan(1_000);
+    }
 }

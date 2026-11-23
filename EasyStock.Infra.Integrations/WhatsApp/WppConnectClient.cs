@@ -51,8 +51,8 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         using var _ = response;
         if (!response.IsSuccessStatusCode)
         {
-            if (acaoDeEnvio is not null)
-                logger?.LogWarning("WPPConnect: recusa no envio {Acao}, status HTTP {StatusHttp}, detalhe {Detalhe}.",
+            if (acaoDeEnvio is not null && logger?.IsEnabled(LogLevel.Warning) == true)
+                logger.LogWarning("WPPConnect: recusa no envio {Acao}, status HTTP {StatusHttp}, detalhe {Detalhe}.",
                     acaoDeEnvio, (int)response.StatusCode, await DetalheSeguroAsync(response, ct));
             throw Falha("O WPPConnect recusou a operação. Confira a conexão antes de tentar novamente.",
                 (int)response.StatusCode, response.StatusCode is System.Net.HttpStatusCode.BadRequest
@@ -66,7 +66,8 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
     }
 
     private const int DetalheMaximo = 160;
-    private static readonly Regex Digitos = new(@"\d{4,}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    // Quatro ou mais dígitos, juntos ou separados por espaço, ponto, hífen ou parênteses (+55 11 987 654 321).
+    private static readonly Regex Digitos = new(@"\+?\d(?:[\s().-]*\d){3,}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <summary>
     /// #3229/#2590: o corpo da recusa carrega telefone e texto do cliente (<c>error.to</c>, <c>error.body</c>, e a própria
@@ -104,8 +105,9 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
             var detalhe = string.Join("; ", partes);
             return detalhe.Length > DetalheMaximo ? detalhe[..DetalheMaximo] : detalhe;
         }
-        catch (Exception) when (!ct.IsCancellationRequested)
+        catch (Exception)
         {
+            // Inclusive cancelamento: quem decide a falha devolvida é o status da recusa, como antes do log.
             return SemDetalhe;
         }
     }
