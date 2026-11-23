@@ -14,7 +14,7 @@ import css from './ModalCliente.module.css'
 // cliente e não pela conversa. O que só a conversa sabe (apontamentos do assistente, avisos, endereço que
 // chegou pela conversa) entra como complemento, depois do resumo. Lead, modo demonstração e leitura que
 // falhou seguem com a ficha da conversa: o clique nunca morre.
-export function FichaDoClienteNoAtendimento({ conversa, aoFechar, editarAoAbrir = false, children }) {
+export function FichaDoClienteNoAtendimento({ conversa, aoFechar, editarAoAbrir = false, cadastrarLead = false, children }) {
   const { fonteApi } = useAtendimento()
   const renderizar = useFichaUnicaDoCliente()
   const clienteId = conversa.clienteId
@@ -31,7 +31,7 @@ export function FichaDoClienteNoAtendimento({ conversa, aoFechar, editarAoAbrir 
     return () => controle.abort()
   }, [unica, clienteId, contexto])
 
-  if (!unica || falhou) return <ModalCliente conversa={conversa} aoFechar={aoFechar}>{children}</ModalCliente>
+  if (!unica || falhou) return <ModalCliente conversa={conversa} aoFechar={aoFechar} forcarCadastro={cadastrarLead}>{children}</ModalCliente>
   if (!editor) return <Modal titulo="Ficha do cliente" largura="md" aoFechar={aoFechar}><p role="status">Abrindo a ficha…</p></Modal>
   return renderizar({
     tela: 'clientes', editor, aoMudar: editar, contexto, conversa, podeEditar: true, editarAoAbrir,

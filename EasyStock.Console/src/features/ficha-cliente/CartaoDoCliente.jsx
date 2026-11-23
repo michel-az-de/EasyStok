@@ -7,7 +7,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag } from '../../dominio/cliente'
-import { hashDoModulo } from '../../dominio/modulos'
+import { acoesDoCartao, ROTULO_CADASTRAR_CLIENTE } from '../../dominio/cadastroDoLead'
 import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
@@ -45,7 +45,7 @@ function EnderecoDoCliente({ endereco }) {
 // #1839: o que se vê sempre no Resumo, sem abrir nada: quem é o cliente (resumo da IA), quanto já
 // comprou no total, o que costuma pedir, as tags e a última nota interna como post-it. O resto
 // (endereço, histórico, conversas) segue em "Cliente e histórico".
-export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVerEntrega, aoConsultarFrete, aoVerAoLado, focoFrete, mostrarEntrega = true }) {
+export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, aoCadastrar, foto = null, aoVerEntrega, aoConsultarFrete, aoVerAoLado, focoFrete, mostrarEntrega = true }) {
   const { cliente } = conversa
   const fotoCadastro = useFotoCliente(cliente.fotoUrl)
   const [freteAberto, setFreteAberto] = useState(false)
@@ -55,6 +55,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
   const nome = apresentacaoDoNome(nomeDaConversa(conversa), { comanda: conversa.numeroComanda })
   // #2944 (E1-13): contato sem nome de verdade leva o selo, mesmo com o padrão do lead no lugar do nome.
   const capsula = nome.capsula ?? (clienteSemNome({ nome: conversa.nome, telefone: conversa.contato }) ? { texto: 'Sem nome', tom: 'neutro' } : null)
+  const acoes = acoesDoCartao(conversa, { fonteApi })
   const { restricoes } = useCatalogo()
   const tags = ordenarTags(cliente.tags ?? [], restricoes).filter((tag, indice) => indice < 4 || ehRestricao(tag, restricoes))
   return (
@@ -79,8 +80,9 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
         </p>
       )}
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
-      {fonteApi && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} />}
-      {fonteApi && !conversa.clienteId && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('cadastros', 'clientes') }}>Conferir cadastros</Botao>}
+      {/* #3207: lead tem UM botão principal; vincular a um cadastro que já existe fica como ação discreta. */}
+      {acoes.cadastrar && aoCadastrar && <Botao largo variante="primario" icone="user-plus" data-cadastrar-cliente onClick={aoCadastrar}>{ROTULO_CADASTRAR_CLIENTE}</Botao>}
+      {acoes.vincular && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} rotulo={acoes.rotuloDoVinculo} />}
       {mostrarEntrega && <div className={notasCss.acoesCliente}>
         {aoVerEntrega
           ? <Botao data-foco-reserva={focoFrete} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>
