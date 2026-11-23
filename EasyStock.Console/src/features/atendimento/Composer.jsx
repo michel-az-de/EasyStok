@@ -31,7 +31,7 @@ import { SeletorDeEmoji } from './SeletorDeEmoji'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { inserirNoCursor } from '../../dominio/acoesNaMensagem'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
-import { ModalEnviarModelo } from './ModalEnviarModelo'
+import { PainelMensagensPadrao } from './PainelMensagensPadrao'
 import { acoesDoComposer } from './apresentacaoDaConversa'
 import { revisaoDoContexto } from '../../dominio/contextoDaSugestao'
 import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
@@ -264,7 +264,7 @@ export function Composer({
             <strong>{motivo.titulo}</strong> <span>{motivo.detalhe}</span>
           </p>
           {motivo.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && (
-            <Botao className={css.escolherModelo} aria-haspopup="dialog" onClick={aoAbrirModelos}>
+            <Botao className={css.escolherModelo} aria-haspopup="true" onClick={aoAbrirModelos}>
               <Icone nome="modelo" /> Escolher modelo
             </Botao>
           )}
@@ -274,7 +274,7 @@ export function Composer({
       {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
       {/* #1839: perto do fim da janela, quando ainda dá para escrever, o botão à parte fica aqui.
           #2420: com a janela fechada, o Escolher modelo mora no aviso junto do campo, além de Respostas. */}
-      {modelosFixos && podeEnviarModelo && podeEscrever && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
+      {modelosFixos && podeEnviarModelo && podeEscrever && <Botao className={css.abrirModelos} aria-haspopup="true" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
       {modelosFixos && podeEnviarModelo && podeEscrever && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
@@ -349,6 +349,7 @@ export function Composer({
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
+              {visivel && modeloAberto && <PainelMensagensPadrao conversa={conversa} aoFechar={aoFecharModelos} />}
             </div>
 
             <div className={css.acoes}>
@@ -361,11 +362,11 @@ export function Composer({
               <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}><Botao
                 ref={respostasRef}
                 disabled={!podeEscrever && !podeEnviarModelo}
-                aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
-                aria-expanded={podeEscrever ? barra.aberto : undefined}
+                aria-haspopup={podeEscrever ? 'listbox' : 'true'}
+                aria-expanded={podeEscrever ? barra.aberto : modeloAberto}
                 aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
                 className={css.botaoRespostas}
-                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : aoAbrirModelos}
+                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : (modeloAberto ? aoFecharModelos : aoAbrirModelos)}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>
@@ -466,8 +467,6 @@ export function Composer({
             : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
         </>
       )}
-
-      {modeloAberto && <ModalEnviarModelo conversa={conversa} aoFechar={aoFecharModelos} />}
 
       {programarEm === conversa.id && (
         <ModalProgramarMensagem

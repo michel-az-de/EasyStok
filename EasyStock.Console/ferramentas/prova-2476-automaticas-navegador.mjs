@@ -36,7 +36,12 @@ createRoot(document.getElementById('root')).render(<Cena/>);
 `)
 const browser = await chromium.launch({ headless: true })
 const contexto = await browser.newContext({ viewport: { width: 1280, height: 2400 }, locale: 'pt-BR', reducedMotion: 'reduce' })
-await contexto.route('**/api/**', route => new URL(route.request().url()).pathname.startsWith('/api/') ? route.abort() : route.continue())
+// #3206: a aba Respostas lista as mensagens padrão locais (fonte API); a lista vazia chega pela rota, o resto do /api/ segue recusado.
+await contexto.route('**/api/**', route => {
+  const caminho = new URL(route.request().url()).pathname
+  if (caminho === '/api/atendimento/modelos-locais') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  return caminho.startsWith('/api/') ? route.abort() : route.continue()
+})
 const pagina = await contexto.newPage()
 pagina.setDefaultTimeout(10000)
 const erros = []

@@ -46,6 +46,7 @@ public class MensagemProgramada
     public DateTime? EnviadaEm { get; private set; }
     public DateTime AlteradaEm { get; private set; }
 
+    // A programada não guarda a origem do modelo (#3206): aqui ela sai sempre como Meta.
     public ModeloMensagem? Modelo => ModeloNome is null
         ? null
         : new ModeloMensagem(ModeloNome, ModeloIdioma ?? "pt_BR",

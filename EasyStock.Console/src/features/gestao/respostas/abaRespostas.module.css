@@ -69,3 +69,13 @@
   padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); color: var(--tinta);
 }
 .descarte p { margin: 0; font-weight: 600; }
+
+/* Mensagem padrão (#3206): selo e prévia com contorno uniforme de 1px, sem barra de um lado só. */
+.selo { font-size: var(--t-micro); color: var(--tinta-2); justify-self: start; padding: 0 var(--e-2); border: 1px solid var(--tinta-3); border-radius: var(--r-2); }
+.sugestoes { display: grid; gap: var(--e-1); }
+.previaMensagem { display: grid; gap: var(--e-1); }
+.balao {
+  display: grid; gap: var(--e-1); padding: var(--e-3); border: 1px solid var(--marca); border-radius: var(--r-2);
+  background: var(--marca-claro); color: var(--tinta); white-space: pre-line; overflow-wrap: anywhere;
+}
+.balao small { color: var(--tinta-2); }

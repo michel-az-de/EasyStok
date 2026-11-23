@@ -5,6 +5,7 @@ import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeVerIntegracoes } from '../../dominio/acessoModulos'
+import { soOrigemMeta } from '../../dominio/mensagensPadrao'
 import { erroDoModelo } from '../../dominio/falhaDeEnvio'
 import { ROTULOS } from '../../dominio/rotulos'
 import css from './atendimento.module.css'
@@ -31,7 +32,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
     setLista(null); setFalhou(false); aoFalhar?.(null); setEscolha(''); setParametros([])
     try {
       const modelos = await listarModelos(atualizar)
-      if (versao === consulta.current) setLista(modelos)
+      if (versao === consulta.current) setLista(soOrigemMeta(modelos))
     } catch (e) {
       if (versao === consulta.current) { setLista([]); setFalhou(true); aoFalhar?.(erroDoModelo(e, { podeIntegrar })) }
     }
@@ -74,7 +75,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
             <p>{modelo.categoria === 'MARKETING' ? 'Novidades e promoções: exige autorização de marketing na Ficha.' : 'Aviso transacional: respeita os consentimentos da Ficha.'}</p>
             {modelo.indisponivel && <p role="alert" className={css.programarErro}>{modelo.indisponivel}</p>}
             {!modelo.indisponivel && parametros.length > 0 && <p>Preencha os campos numerados e confira cada substituição na prévia abaixo.</p>}
-            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Campo ${i + 1} ({{${i + 1}}})`} value={p} limite={LIMITE_PARAMETRO}
+            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`${i + 1}º campo`} value={p} limite={LIMITE_PARAMETRO}
               onChange={(e) => setParametros((atuais) => atuais.map((v, n) => n === i ? e.target.value : v))} />)}
             <p className={css.cardapioRotulo}>Prévia da mensagem</p>
             <p className={css.programadaTexto}>{previa}</p>
