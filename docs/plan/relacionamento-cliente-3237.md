@@ -148,7 +148,7 @@ API antes do Console: `scripts/deploy/vps-deploy.sh`, depois `scripts/deploy/con
 ## 11. Questões abertas
 
 1. Trocar o cliente no Novo pedido, com itens já montados: decidido pelo Felipe em 23/11/2026, 18:22: mantém os itens e refaz a cotação.
-2. Título da tela "Leads e clientes": manter, ou trocar (por exemplo "Clientes") agora que o estágio "Sem pedido" substitui "Lead" na lista? Não bloqueia nenhuma fatia.
+2. Título da tela: decidido pelo Felipe em 23/11/2026, 18:23: continua "Leads e clientes".
 3. Critérios do S4a que não vêm de regra existente: "cadastro incompleto" = sem telefone; "sem pedido parado" = 0 compras e cadastro com mais de 30 dias; e a ordem de prioridade da tabela. São proposta da revisão; decidir antes de abrir a PR do S4a.
 
 ## 12. Referências
