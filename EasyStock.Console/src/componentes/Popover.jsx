@@ -58,7 +58,8 @@ export function Popover({
     if (janelaDoMenu !== janelaDoFoco) return
     evento.preventDefault()
     evento.stopImmediatePropagation()
-    aoFechar()
+    // `aoFechar` devolver false = o painel recusou fechar (formulário com algo digitado): o foco fica onde está.
+    if (aoFechar() === false) return
     if (origemRef.current?.isConnected) origemRef.current.focus()
   }, { capturar: true })
 

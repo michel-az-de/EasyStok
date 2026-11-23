@@ -1,5 +1,8 @@
 /* Formulário de resposta pronta, compartilhado entre a Gestão e o painel do chat (#3208). */
-.form { display: grid; gap: var(--e-3); padding: var(--e-2) 0; min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--e-3); padding: var(--e-2) 0; min-width: 0; min-height: 0; }
+/* Só os campos rolam quando o contêiner limita a altura (painel do chat); erro, descarte e a barra Salvar/Cancelar ficam sempre à vista. */
+.campos { position: relative; display: grid; gap: var(--e-3); min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px; margin: -2px 0 -2px -2px; }
+.barra { flex: none; }
 .duas { display: grid; gap: var(--e-3); grid-template-columns: 2fr 1fr; }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
 

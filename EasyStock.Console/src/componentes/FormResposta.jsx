@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Botao } from './Botao'
 import { CampoArea, CampoTexto } from './Campo'
 import { SelosDeVariaveis } from './EditorDeAutomatica'
@@ -21,7 +21,7 @@ function faltando(titulo, texto) {
   return semTitulo ? 'Preencha o título.' : semTexto ? 'Preencha o texto.' : undefined
 }
 
-export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias = [], erro = null, className = '' }) {
+export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias = [], erro = null, className = '', aoMudarAlterado }) {
   const { atalhoMaximo: ATALHO_MAXIMO, categoriaMaxima: CATEGORIA_MAXIMA, gerarAtalho, normalizarCategoria, variaveis } = regras
   const [titulo, setTitulo] = useState(inicial?.titulo ?? '')
   const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
@@ -39,6 +39,12 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
   const alterado = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '')
     || texto !== (inicial?.texto ?? '') || categoria !== (inicial?.categoria ?? '')
 
+  // O painel do chat precisa saber se há algo digitado para não fechar por Esc ou clique fora (#3208).
+  useEffect(() => {
+    aoMudarAlterado?.(alterado)
+    return () => aoMudarAlterado?.(false)
+  }, [alterado, aoMudarAlterado])
+
   function salvar(evento) {
     evento.preventDefault()
     if (salvando || !pronto) return
@@ -49,6 +55,7 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
 
   return (
     <form className={`${css.form} ${className}`} onSubmit={salvar}>
+      <div className={css.campos}>
       <div className={css.duas}>
         <CampoTexto
           disabled={salvando} rotulo="Título" value={titulo} limite={TITULO_MAXIMO}
@@ -80,6 +87,7 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
           {categorias.map((c) => <option key={c} value={c} />)}
         </datalist>
       )}
+      </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {descartando && (
         <div className={css.descarte} role="alert">
@@ -91,7 +99,7 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
           </div>
         </div>
       )}
-      <div className={css.acoes}>
+      <div className={`${css.acoes} ${css.barra}`}>
         <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}
           motivo={passaDoLimite ? 'Algum campo passa do limite de caracteres.' : faltando(titulo, texto)}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
         <Botao variante="texto" disabled={salvando || descartando} onClick={() => (alterado ? setDescartando(true) : aoCancelar())}>Cancelar</Botao>

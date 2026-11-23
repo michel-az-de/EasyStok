@@ -112,9 +112,12 @@ try {
   assert.equal(await esperarFoco(respostas), true)
   assert.equal(await campo.inputValue(), 'Rascunho antes.')
   await respostas.click()
+  // #3208: com categorias a lista sai em grupos; o primeiro item não é mais o primeiro da demonstração, é o primeiro da tela.
+  const primeiro = (await page.locator('[role="option"]').first().locator('[class*=previa]').textContent()).trim()
+  assert.ok(primeiro.length > 0)
   await busca.press('Enter')
   await lista.waitFor({ state: 'detached' })
-  assert.match(await campo.inputValue(), /^Rascunho antes\. Obrigada pela preferência!/)
+  assert.equal(await campo.inputValue(), `Rascunho antes. ${primeiro}`)
   assert.equal(await esperarFoco(campo), true)
   registrar('App: botão Respostas abre busca acessível; Escape volta ao botão e Enter insere sem enviar')
 

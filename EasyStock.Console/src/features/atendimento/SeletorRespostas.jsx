@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { FormResposta } from '../../componentes/FormResposta'
 import { Popover } from '../../componentes/Popover'
@@ -32,6 +32,11 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   const { agrupado, grupos } = useMemo(() => agruparRespostasDoSeletor(itens), [itens])
   const emEdicao = editando === 'nova' ? {} : (respostasProntas ?? []).find((r) => r.id === editando)
   const abrirForm = (alvo) => { setRecusou(false); setEditando(alvo) }
+  // Formulário com algo digitado não se perde por Esc nem por clique fora: o Popover só fecha se `aoFechar` não devolver false.
+  const sujo = useRef(false)
+  const marcarSujo = useCallback((v) => { sujo.current = v }, [])
+  const { fechar } = seletor
+  const fecharPainel = useCallback(() => { if (sujo.current) return false; fechar(); return true }, [fechar])
   // A ação do modo API devolve `false` quando não gravou (o motivo vai para `sincronizacao.aviso`); a da
   // demonstração não devolve nada. Sem `false`, volta à lista com o item atualizado.
   const gravar = (dados) => Promise.resolve(
@@ -49,46 +54,48 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
     else if (item.bottom > janela.bottom) caixa.scrollTop += item.bottom - janela.bottom
   }, [destaque, itens])
 
+  // O Editar é irmão da opção, não filho: botão dentro de role="option" é interativo aninhado (#3208).
   const opcao = (r, i) => (
-    <li
-      key={r.id}
-      id={idDe(i)}
-      role="option"
-      ref={i === destaque ? opcaoAtiva : undefined}
-      aria-selected={i === destaque}
-      className={`${css.linha} ${i === destaque ? css.ativa : ''}`}
-      onMouseEnter={() => seletor.destacar(i)}
-      // Não tira o foco do campo antes do clique valer.
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => seletor.inserir(r, aoInserido)}
-    >
-      <span className={css.titulo}>{r.titulo}</span>
-      <span className={css.lateral}>
+    <li key={r.id} role="presentation" className={`${css.itemResposta} ${i === destaque ? css.ativa : ''}`}>
+      <div
+        id={idDe(i)}
+        role="option"
+        ref={i === destaque ? opcaoAtiva : undefined}
+        aria-selected={i === destaque}
+        className={css.opcaoResposta}
+        onMouseEnter={() => seletor.destacar(i)}
+        // Não tira o foco do campo antes do clique valer.
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => seletor.inserir(r, aoInserido)}
+      >
+        <span className={css.titulo}>{r.titulo}</span>
         <span className={css.atalho}>{r.atalho}</span>
-        {editavel && (
-          <Botao
-            variante="texto" icone="lapis" aria-label={`Editar resposta ${r.titulo}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => { e.stopPropagation(); abrirForm(r.id) }}
-          >Editar</Botao>
-        )}
-      </span>
-      <span className={css.previa}>{r.texto}</span>
+        <span className={css.previa}>{r.texto}</span>
+      </div>
+      {editavel && (
+        <Botao
+          variante="texto" icone="lapis" className={css.editar} aria-label={`Editar resposta ${r.titulo}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => abrirForm(r.id)}
+        >Editar</Botao>
+      )}
     </li>
   )
 
   return (
-    <Popover rotulo="Respostas rápidas" papel="group" aoFechar={seletor.fechar} semAutoFoco portal>
+    <Popover rotulo="Respostas rápidas" papel="group" aoFechar={fecharPainel} semAutoFoco portal>
       <div className={css.seletor}>
         {editando !== null && emEdicao ? (
           <FormResposta
             key={editando}
+            className={css.formNoPainel}
             inicial={emEdicao}
             regras={REGRAS_DO_FORM}
             categorias={categorias}
             erro={recusou ? (sincronizacao?.aviso ?? 'Não foi possível salvar a resposta.') : null}
             aoSalvar={gravar}
             aoCancelar={() => setEditando(null)}
+            aoMudarAlterado={marcarSujo}
           />
         ) : (
           <>
@@ -106,7 +113,12 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
                 placeholder="Buscar por título, atalho, texto ou categoria"
                 value={seletor.busca}
                 onChange={(e) => seletor.mudarBusca(e.target.value)}
-                onKeyDown={(e) => { seletor.aoTeclar(e, aoInserido) }}
+                aria-keyshortcuts={editavel ? 'F2' : undefined}
+                onKeyDown={(e) => {
+                  // F2 edita a resposta ativa (o botão Editar fica fora da lista de opções).
+                  if (e.key === 'F2' && editavel && itens[destaque]) { e.preventDefault(); abrirForm(itens[destaque].id); return }
+                  seletor.aoTeclar(e, aoInserido)
+                }}
               />
             )}
 

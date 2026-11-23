@@ -25,7 +25,7 @@ fontes.set(urlSeletor.href, (await transformWithOxc(fonteSeletor, urlSeletor.pat
 let host
 const hookRef = valor => host.valores[host.indice++] ??= { current: valor }
 const hooks = {
-  useRef: hookRef, useMemo: (fn) => fn(), useId: () => `prova-${host.indice++}`,
+  useRef: hookRef, useMemo: (fn) => fn(), useCallback: (fn) => fn, useId: () => `prova-${host.indice++}`,
   useState(valor) {
     const atual = host, indice = atual.indice++
     if (!(indice in atual.valores)) atual.valores[indice] = typeof valor === 'function' ? valor() : valor
@@ -38,7 +38,7 @@ globalThis.__provaSuperbancaAcessibilidade = { hooks }
 const dados = codigo => 'data:text/javascript,' + encodeURIComponent(codigo)
 registerHooks({
   resolve(spec, contexto, proximo) {
-    if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useMemo=h.useMemo,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
+    if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useMemo=h.useMemo,useCallback=h.useCallback,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
     // #2185: `BotaoIcone` e `Pilula` entram como componentes transparentes: viram o próprio elemento, com o nome em
     // `aria-label`, para a árvore continuar sendo a do que o leitor de tela encontra.
     if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>type&&type.transparente?type(props):({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
