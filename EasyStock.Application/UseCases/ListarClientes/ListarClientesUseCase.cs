@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Cliente.Foto;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.ListarClientes;
 
@@ -86,7 +87,7 @@ public class ListarClientesUseCase(IClienteRepository repo)
             c.CriadoEm, c.AlteradoEm,
             c.TipoPessoa, c.NomeFantasia, c.InscricaoEstadual,
             ClienteFotoUseCase.Url(c),
-            r.Gasto, r.Compras, r.Compras == 0 ? 0m : Math.Round(r.Gasto / r.Compras, 2),
+            r.Gasto, r.Compras, r.Compras == 0 ? 0m : Dinheiro.Arredondar(r.Gasto / r.Compras),
             r.PrimeiraCompraEm, r.UltimaCompraEm,
             r.OcorrenciasAbertas, r.OcorrenciasTotal, r.NotasTotal, r.UltimaNota,
             r.Tags, RegraDeEstagio.De(r.Compras), r.EmRisco)

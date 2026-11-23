@@ -47,4 +47,19 @@ public class ListarClientesRelacaoTests
         var s = r.Items[1];
         (s.TicketMedio, s.Estagio, s.EmRisco).Should().Be((0m, "sem_pedido", false));
     }
+
+    [Fact]
+    public async Task Ticket_medio_arredonda_meio_para_longe_do_zero_pela_regra_do_dinheiro()
+    {
+        var empresaId = Guid.NewGuid();
+        var repo = Substitute.For<IClienteRepository>();
+        repo.ListarComRelacaoAsync(empresaId, 1, 20, null, null, "nome", "asc", null, Arg.Any<CancellationToken>())
+            .Returns(new ListaDeClientes(
+                [new ClienteRelacao(Cliente.Criar(empresaId, "Ana Ficticia"), 4, 20.50m, null, null, 0, 0, 0, null, [], false)],
+                1, 20.50m));
+
+        var r = await new ListarClientesUseCase(repo).ExecuteAsync(new ListarClientesQuery(empresaId));
+
+        r.Items.Single().TicketMedio.Should().Be(5.13m, "20,50 / 4 = 5,125 e a regra #2373 arredonda o meio para longe do zero");
+    }
 }

@@ -189,11 +189,18 @@ public sealed class ListaRelacaoClienteIntegrationTests(PostgreSqlDatabaseFixtur
             using var bypass = sql.UseRowLevelSecurityBypass();
             await sql.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO cliente_tags (\"Id\",\"EmpresaId\",\"ClienteId\",\"Tag\",\"Origem\",\"CriadoEm\") VALUES ({Guid.NewGuid()},{c.B.Id},{c.Ana.Id},'alheia',{OrigemClienteTag.Dona},{Agora})");
+            // #3244: convite da empresa B apontando para a Duda (em risco na A) não pode tirá-la do risco.
+            await sql.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO cliente_tags (\"Id\",\"EmpresaId\",\"ClienteId\",\"Tag\",\"Origem\",\"CriadoEm\") VALUES ({Guid.NewGuid()},{c.B.Id},{c.Duda.Id},{RegraDeRecompra.TagConvidada},{OrigemClienteTag.Dona},{Agora})");
         }
 
         var repo = Repo(c.A.Id, out var db);
         var lista = await repo.ListarComRelacaoAsync(c.A.Id, 1, 200, search: "Relacao 3244");
+        var recompra = await repo.ListarComRelacaoAsync(c.A.Id, 1, 200, relacionamento: RegraDeRecompra.Relacionamento);
         await db.DisposeAsync();
+
+        lista.Itens.Single(i => i.Cliente.Id == c.Duda.Id).EmRisco.Should().BeTrue("a tag de convite da empresa B não vale na A");
+        recompra.Itens.Select(i => i.Cliente.Id).Should().Contain(c.Duda.Id);
 
         var ana = lista.Itens.Single(i => i.Cliente.Id == c.Ana.Id);
         (ana.Compras, ana.Gasto, ana.OcorrenciasAbertas, ana.OcorrenciasTotal, ana.NotasTotal).Should().Be((3, 200m, 1, 2, 2));
@@ -246,6 +253,13 @@ public sealed class ListaRelacaoClienteIntegrationTests(PostgreSqlDatabaseFixtur
         {
             Comandos++;
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<object> result, CancellationToken cancellationToken = default)
+        {
+            Comandos++;
+            return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
         }
     }
 }
