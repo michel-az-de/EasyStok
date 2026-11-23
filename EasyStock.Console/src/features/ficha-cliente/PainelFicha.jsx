@@ -329,7 +329,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           <BlocoCapturaAutomatica conversa={selecionada} pausado={Boolean(automaticoPausado[selecionada.id])} />
         )}
 
-        {cliente.enderecoCapturado && !cliente.endereco && (
+        {/* #3207: aberta por "Cadastrar cliente", o formulário já traz o endereço captado; o banner seria um segundo caminho. */}
+        {cliente.enderecoCapturado && !cliente.endereco && !cadastrarLead && (
           <BlocoEnderecoCapturado
             key={selecionada.id}
             conversa={fonteApi ? selecionada : undefined}

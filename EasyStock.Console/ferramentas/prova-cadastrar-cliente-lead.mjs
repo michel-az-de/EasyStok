@@ -172,6 +172,8 @@ try {
       await salvar.waitFor(T)
       const caixa = await salvar.boundingBox()
       assert.ok(caixa && caixa.y >= 0 && caixa.y + caixa.height <= TELAS[tela].height, 'Salvar cadastro fora da tela')
+      // Um caminho só: aberta pelo botão, a Ficha não repete o "Confirmar e cadastrar" do endereço capturado.
+      assert.equal(await p.getByRole('button', { name: 'Confirmar e cadastrar' }).count(), 0, 'dois botões de cadastrar na mesma Ficha')
       await semRolagemLateral(p)
       await foto(p, `depois-b-ficha-${tela}`)
       await p.context().close()
