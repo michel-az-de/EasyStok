@@ -126,6 +126,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // #2849: quem pediu para editar (menu, endereço) cai na ficha única já com o formulário aberto.
   const [editarFicha, setEditarFicha] = useState(false)
   const abrirFichaEditando = () => { setEditarFicha(true); setSecao('cliente') }
+  // #3207: "Cadastrar cliente" do cartão do lead abre a ficha já no formulário de cadastro.
+  const [cadastrarLead, setCadastrarLead] = useState(false)
+  const abrirCadastroDoLead = () => { setCadastrarLead(true); setSecao('cliente') }
   // #2232 (F1, F7): o menu "Ações da ficha" reúne cadastro, PDF e as ações do pedido.
   const disponivel = useAcaoDisponivel()
   const { acoes: capacidades } = useAcessoModulos()
@@ -238,10 +241,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const cadastrarPrimeiro = primeiroPassoAntesDaVenda({ conversa: selecionada, pedido, fonteApi }) === 'cadastro'
   const acaoMontar = !clienteEscolhendo && (!pedido || (!pedidoCriado && !comandaTravada(pedido, { fonteApi })))
     ? (cadastrarPrimeiro
-      ? <>
-        <Botao largo variante="primario" disabled={!editavel} onClick={() => setSecao('cliente')}>Cadastrar cliente</Botao>
-        <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
-      </>
+      ? <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
       : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
@@ -273,7 +273,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       <div className={css.conteudo}>
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
-        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')} aoCadastrar={editavel ? abrirCadastroDoLead : undefined}
           aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
           aoConsultarFrete={() => setFreteAberto(true)} />
 
@@ -322,7 +322,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       </div>
 
-      {secao === 'cliente' && <FichaDoClienteNoAtendimento key={`ficha:${selecionada.id}:${selecionada.clienteId ?? ''}`} conversa={selecionada} editarAoAbrir={editarFicha} aoFechar={() => { setSecao(null); setEditarFicha(false) }}>
+      {secao === 'cliente' && <FichaDoClienteNoAtendimento key={`ficha:${selecionada.id}:${selecionada.clienteId ?? ''}`} conversa={selecionada} editarAoAbrir={editarFicha} cadastrarLead={cadastrarLead} aoFechar={() => { setSecao(null); setEditarFicha(false); setCadastrarLead(false) }}>
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (

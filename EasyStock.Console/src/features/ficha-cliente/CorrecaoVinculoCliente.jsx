@@ -13,12 +13,12 @@ import css from './CorrecaoVinculoCliente.module.css'
 
 const LIMITE_MOTIVO = 500
 const nomeAcao = { retirar: 'Retirada do vínculo', restaurar: 'Restauração do vínculo', vincular: 'Vínculo conferido' }
-export function CorrecaoVinculoCliente({ conversa }) {
+export function CorrecaoVinculoCliente({ conversa, rotulo = 'Conferir identidade' }) {
   const { acoes } = useAcessoModulos()
   const [aberto, abrir] = useState(false)
   if (!acoes.corrigirVinculoClienteConversa) return null
   return <>
-    <Botao variante="texto" icone="usuarios" onClick={() => abrir(true)}>Conferir identidade</Botao>
+    <Botao variante="texto" icone="usuarios" onClick={() => abrir(true)}>{rotulo}</Botao>
     {aberto && <ConferenciaVinculo key={conversa.id} conversa={conversa} aoFechar={() => abrir(false)} />}
   </>
 }

@@ -592,7 +592,8 @@ await confere('C  "Salvar cadastro" espera a resposta, trava o segundo toque e m
   // #2258 (auditoria T14): o botão só para durante o envio; telefone ou CEP inválido vira erro no campo.
   assert.match(fonte, /disabled=\{cadastro\.salvando\} onClick=\{aoPedirSalvar\}/)
   assert.match(fonte, /\{salvandoCadastro \? 'Salvando…' : 'Salvar cadastro'\}/)
-  assert.match(fonte, /\{erroCadastro && <p className=\{css\.erroEmLinha\} role="alert">\{erroCadastro\}<\/p>\}/)
+  // #3207: o aviso ganhou ref para rolar até ele quando a recusa cai fora da tela (390 px).
+  assert.match(fonte, /\{erroCadastro && <p ref=\{erroRef\} className=\{css\.erroEmLinha\} role="alert">\{erroCadastro\}<\/p>\}/)
 })
 
 const pedidoComLink = (extra = {}) => ({
