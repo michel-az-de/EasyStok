@@ -8,8 +8,12 @@ namespace EasyStock.Infra.Integrations.WhatsApp;
 public sealed class RoteadorWhatsAppClient(IRemetenteWhatsApp remetente, WppConnectClient web,
     WhatsAppCloudClient meta, IConfiguration configuration) : IWhatsAppCloudClient
 {
+    /// <summary>A regra do roteador: empresa com sessão web usa a ponte. O catálogo de modelos (#3205) decide pela mesma pergunta.</summary>
+    public static async Task<bool> UsaSessaoWebAsync(IRemetenteWhatsApp remetente, CancellationToken ct) =>
+        await remetente.ObterSessaoWebAsync(ct) is not null;
+
     private async Task<IWhatsAppCloudClient> ClienteAsync(CancellationToken ct) =>
-        await remetente.ObterSessaoWebAsync(ct) is not null ? web :
+        await UsaSessaoWebAsync(remetente, ct) ? web :
         WhatsAppCloudClientServiceCollectionExtensions.UsaClienteMeta(
             configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveClienteAtendimento],
             configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveProviderNotificacoes]) ? meta

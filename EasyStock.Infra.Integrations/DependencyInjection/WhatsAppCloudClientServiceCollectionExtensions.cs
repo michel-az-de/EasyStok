@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Infra.Integrations.WhatsApp;
 using EasyStock.Infra.Integrations.WhatsApp.Waha;
 using Microsoft.Extensions.Configuration;
@@ -78,8 +79,17 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         services.AddScoped<TradutorEventoWaha>();
 
         var clienteMeta = UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes]);
+        // #3205: com a ponte web ligada, a empresa que tem sessão lista as mensagens padrão locais (mesma regra do roteador).
+        var ponteWeb = configuration.GetValue<bool>("Atendimento:WppConnect:Habilitado");
         services.AddScoped<ICatalogoModelosAtendimento>(sp =>
-            clienteMeta && !ponteWaha ? sp.GetRequiredService<CatalogoModelosWhatsApp>() : new CatalogoModelosIndisponivel());
+        {
+            ICatalogoModelosAtendimento catalogo = clienteMeta && !ponteWaha
+                ? sp.GetRequiredService<CatalogoModelosWhatsApp>() : new CatalogoModelosIndisponivel();
+            return ponteWeb
+                ? new CatalogoModelosPorEmpresa(catalogo, sp.GetRequiredService<IRemetenteWhatsApp>(),
+                    sp.GetRequiredService<IModeloMensagemLocalRepository>())
+                : catalogo;
+        });
 
         if (ponteWaha)
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WahaWhatsAppClient>());

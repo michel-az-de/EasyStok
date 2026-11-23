@@ -232,6 +232,186 @@ public class EnviarModeloConversaUseCaseTests
         _mensagens.Single().UltimaFalhaEnvio.Should().Be(TipoFalhaEnvio.Incerta);
     }
 
+    // #3205 (S80): mensagem padrão local sai como texto renderizado pela ponte e fica gravada como modelo de origem Local.
+    private void AprovarLocal() =>
+        _catalogo.ListarAsync(_empresa, Arg.Any<CancellationToken>()).Returns([
+            new ModeloAtendimento("retomar", "pt_BR", "UTILITY", "Olá {{1}}, vamos continuar? {{1}}", 1, "Casa", "Até logo", null, OrigemModelo.Local)]);
+
+    private Conversa ConversaDeLead(DateTime? ultimaEntrada)
+    {
+        var lead = Conversa.Abrir(_empresa, "5511999990003", DateTime.UtcNow.AddDays(-9));
+        if (ultimaEntrada is { } entrada) lead.RegistrarEntrada(entrada);
+        _conversas.ObterPorIdAsync(_empresa, lead.Id, Arg.Any<CancellationToken>()).Returns(lead);
+        _conversas.ObterPorIdComLockAsync(_empresa, lead.Id, Arg.Any<CancellationToken>()).Returns(lead);
+        return lead;
+    }
+
+    private async Task NadaSaiu()
+    {
+        _mensagens.Should().BeEmpty();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ModeloLocal_SaiPorTextoRenderizado_EGravaOrigemLocal()
+    {
+        AprovarLocal();
+        _canal.EnviarTextoAsync("5511999990001", Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.texto");
+        var command = Command;
+
+        var m = await UseCase.ExecuteAsync(command);
+
+        m.Status.Should().Be(StatusMensagem.Enviada);
+        m.Texto.Should().Be("Casa\nOlá Ana, vamos continuar? Ana\nAté logo");
+        m.Modelo!.Origem.Should().Be(OrigemModelo.Local);
+        _mensagens.Single().ModeloJson.Should().Contain("\"Local\"");
+        await _canal.Received(1).EnviarTextoAsync("5511999990001", "Casa\nOlá Ana, vamos continuar? Ana\nAté logo", Arg.Any<CancellationToken>());
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+        await UseCase.ExecuteAsync(command);
+        _mensagens.Should().ContainSingle();
+        await _canal.Received(1).EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ModeloMeta_GravaOrigemMeta_ESegueSemTexto()
+    {
+        var m = await UseCase.ExecuteAsync(Command);
+
+        m.Modelo!.Origem.Should().Be(OrigemModelo.Meta);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public void ModeloJsonAntigoSemOrigem_LeComoMeta()
+    {
+        var antigo = System.Text.Json.JsonSerializer.Deserialize<ModeloMensagem>("{\"Nome\":\"retomar\",\"Idioma\":\"pt_BR\",\"Parametros\":[\"Ana\"]}");
+
+        antigo!.Origem.Should().Be(OrigemModelo.Meta);
+    }
+
+    [Fact]
+    public async Task ModeloLocal_ClienteNuncaEscreveu_Recusa()
+    {
+        AprovarLocal();
+        var lead = ConversaDeLead(null);
+
+        var act = () => UseCase.ExecuteAsync(Command with { ConversaId = lead.Id });
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*ainda não escreveu*");
+        await NadaSaiu();
+    }
+
+    [Theory]
+    [InlineData(6, true)]
+    [InlineData(8, false)]
+    public async Task ModeloLocal_SoAte7DiasDaUltimaEntradaDoCliente(int diasAtras, bool sai)
+    {
+        AprovarLocal();
+        var lead = ConversaDeLead(DateTime.UtcNow.AddDays(-diasAtras));
+        _canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.texto");
+
+        var act = () => UseCase.ExecuteAsync(Command with { ConversaId = lead.Id });
+
+        if (sai) (await act()).Status.Should().Be(StatusMensagem.Enviada);
+        else
+        {
+            await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*mais de 7 dias*");
+            await NadaSaiu();
+        }
+    }
+
+    [Fact]
+    public async Task ModeloLocal_LeadSemCadastro_Recebe()
+    {
+        AprovarLocal();
+        var lead = ConversaDeLead(DateTime.UtcNow.AddDays(-1));
+        _canal.EnviarTextoAsync("5511999990003", Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.lead");
+
+        var m = await UseCase.ExecuteAsync(Command with { ConversaId = lead.Id });
+
+        m.Status.Should().Be(StatusMensagem.Enviada);
+        m.Modelo!.Origem.Should().Be(OrigemModelo.Local);
+        await _clientes.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    [Theory]
+    [InlineData("SAIR")]
+    [InlineData("Parar.")]
+    [InlineData("Stop")]
+    public async Task ModeloLocal_LeadQuePediuParaParar_NaoRecebe(string palavra)
+    {
+        AprovarLocal();
+        var lead = ConversaDeLead(DateTime.UtcNow.AddHours(-1));
+        _conversas.ListarMensagensAsync(_empresa, lead.Id, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([
+            Mensagem.Entrada(_empresa, lead.Id, DateTime.UtcNow.AddHours(-2), TipoConteudoMensagem.Texto, "oi"),
+            Mensagem.Entrada(_empresa, lead.Id, DateTime.UtcNow.AddHours(-1), TipoConteudoMensagem.Texto, palavra)]);
+
+        var act = () => UseCase.ExecuteAsync(Command with { ConversaId = lead.Id });
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*pediu para parar*");
+        await NadaSaiu();
+    }
+
+    [Fact]
+    public async Task ModeloLocal_LeadQueEscreveuFraseComAPalavra_Recebe()
+    {
+        AprovarLocal();
+        var lead = ConversaDeLead(DateTime.UtcNow.AddHours(-1));
+        _conversas.ListarMensagensAsync(_empresa, lead.Id, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([
+            Mensagem.Entrada(_empresa, lead.Id, DateTime.UtcNow.AddHours(-1), TipoConteudoMensagem.Texto, "quero sair do grupo")]);
+        _canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.lead");
+
+        (await UseCase.ExecuteAsync(Command with { ConversaId = lead.Id })).Status.Should().Be(StatusMensagem.Enviada);
+    }
+
+    [Theory]
+    [InlineData("bloqueado")]
+    [InlineData("revogado")]
+    public async Task ModeloLocal_ComClienteCadastrado_BloqueioEConsentimentoValem(string caso)
+    {
+        AprovarLocal();
+        if (caso == "bloqueado") _cliente.Bloquear("motivo", DateTime.UtcNow);
+        else _consentimentos.ListarDoClienteAsync(_empresa, _cliente.Id, Arg.Any<CancellationToken>()).Returns([
+            ConsentimentoContato.Registrar(_empresa, _cliente.Id, CanalConversa.WhatsApp, FinalidadeContato.Transacional,
+                SituacaoConsentimento.Revogado, "teste", DateTime.UtcNow)]);
+
+        var act = () => UseCase.ExecuteAsync(Command);
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
+        await NadaSaiu();
+    }
+
+    [Fact]
+    public async Task ModeloMeta_LeadSemCadastro_SegueExigindoCliente()
+    {
+        var lead = ConversaDeLead(DateTime.UtcNow.AddDays(-1));
+
+        var act = () => UseCase.ExecuteAsync(Command with { ConversaId = lead.Id });
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Cadastre o cliente*");
+        await NadaSaiu();
+    }
+
+    // Idempotência com a origem: a tentativa gravada como Meta não vira texto local se o catálogo mudou no meio.
+    [Fact]
+    public async Task TentativaGravadaComOutraOrigem_RecusaEmVezDeReenviar()
+    {
+        var command = Command;
+        await UseCase.ExecuteAsync(command);
+        AprovarLocal();
+        var chamadas = 0;
+        _conversas.ObterMensagemAsync(_empresa, _conversa.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => chamadas++ == 0 ? null : _mensagens.FirstOrDefault(m => m.Id == c.ArgAt<Guid>(2)));
+        _conversas.ObterMensagemComLockAsync(_empresa, _conversa.Id, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => _mensagens.FirstOrDefault(m => m.Id == c.ArgAt<Guid>(2)));
+
+        var act = () => UseCase.ExecuteAsync(command);
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*outro conteúdo*");
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
     private void VarreduraMarcaFalhaIncerta() =>
         _mensagens.Single().RegistrarFalhaEnvio(EnviarModeloConversaUseCase.AvisoEnvioIncerto, TipoFalhaEnvio.Incerta, DateTime.UtcNow);
 }

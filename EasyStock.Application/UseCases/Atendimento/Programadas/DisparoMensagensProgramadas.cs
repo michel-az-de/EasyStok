@@ -42,7 +42,8 @@ public sealed class DispararMensagemProgramadaUseCase(
     IOperacaoEventPublisher publisher,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<DispararMensagemProgramadaUseCase> logger)
+    ILogger<DispararMensagemProgramadaUseCase> logger,
+    ICatalogoModelosAtendimento? catalogo = null)
 {
     public async Task ExecuteAsync(Guid empresaId, Guid id, CancellationToken ct = default)
     {
@@ -64,6 +65,11 @@ public sealed class DispararMensagemProgramadaUseCase(
             mensagem.GarantirPodeSairPor(conversa, agora);
             if (!await politica.PodeEnviarAsync(empresaId, mensagem.ClienteId, mensagem.Canal, mensagem.Finalidade, ct))
                 throw new RegraDeDominioVioladaException("O cliente revogou o consentimento neste canal.");
+
+            // #3205: defesa. Mensagem padrão local não sai programada, nem a que ficou agendada antes de a empresa trocar de ponte.
+            if (mensagem.Modelo is { } programado && (programado.Origem == OrigemModelo.Local
+                || catalogo is not null && await catalogo.UsaModelosLocaisAsync(empresaId, ct)))
+                throw new RegraDeDominioVioladaException(AgendarMensagemProgramadaUseCase.ModeloLocalNaoProgramavel);
 
             var canal = canais.Obter(mensagem.Canal);
             var idExterno = mensagem.Modelo is { } modelo

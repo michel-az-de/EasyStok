@@ -263,4 +263,20 @@ public class IniciarConversaClienteUseCaseTests
         await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command() with { ClienteId = Guid.NewGuid() }))
             .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Cliente não encontrado*");
     }
+
+    // #3205: a mensagem padrão local só responde a quem escreveu; Chamar no WhatsApp a recusa e nada é aberto nem enviado.
+    [Fact]
+    public async Task ModeloLocal_Recusa_SemAbrirConversaNemEnviar()
+    {
+        _catalogo.ListarAsync(_empresa, Arg.Any<CancellationToken>()).Returns([
+            new ModeloAtendimento("boas_vindas", "pt_BR", "UTILITY", "Olá {{1}}, aqui é a Casa da Baba.", 1, null, null, null, OrigemModelo.Local)]);
+
+        var act = () => UseCase().ExecuteAsync(Command());
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*escreveu*");
+        _abertas.Should().BeEmpty();
+        _mensagens.Should().BeEmpty();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
 }

@@ -36,13 +36,15 @@ public class MensagensProgramadasUseCasesTests
         _sms.Canal.Returns(CanalConversa.Sms);
     }
 
+    private readonly ICatalogoModelosAtendimento _catalogo = Substitute.For<ICatalogoModelosAtendimento>();
+
     private AgendarMensagemProgramadaUseCase Agendar() =>
-        new(_clientes, _conversas, _repo, new PoliticaEnvioCliente(_consentimentos), _uow, _relogio);
+        new(_clientes, _conversas, _repo, new PoliticaEnvioCliente(_consentimentos), _uow, _relogio, _catalogo);
 
     private DispararMensagemProgramadaUseCase Disparar() =>
         new(_repo, _clientes, _conversas, new PoliticaEnvioCliente(_consentimentos),
             new ResolvedorCanal([_whats, _sms]), Substitute.For<IOperacaoEventPublisher>(), _uow, _relogio,
-            NullLogger<DispararMensagemProgramadaUseCase>.Instance);
+            NullLogger<DispararMensagemProgramadaUseCase>.Instance, _catalogo);
 
     private Conversa ConversaAberta(DateTime ultimaEntrada, Guid? clienteId = null)
     {
@@ -364,5 +366,52 @@ public class MensagensProgramadasUseCasesTests
         await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
 
         mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+    }
+
+    // #3205: mensagem padrão local não se programa (nem na criação, nem, por defesa, no disparo).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Agendar_ModeloLocal_Recusa(bool origemNoPedido)
+    {
+        ConversaAberta(Agora.AddHours(-2));
+        _catalogo.UsaModelosLocaisAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(!origemNoPedido);
+        var modelo = new ModeloMensagem("aviso", "pt_BR", [], origemNoPedido ? OrigemModelo.Local : OrigemModelo.Meta);
+
+        var act = () => Agendar().ExecuteAsync(Comando(CanalConversa.WhatsApp, Agora.AddHours(1), texto: null, modelo: modelo));
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).WithMessage("*Não dá para programá-la*");
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Agendar_ModeloComMetaConectadaSemPonteWeb_SegueIgual()
+    {
+        ConversaAberta(Agora.AddHours(-2));
+        var modelo = new ModeloMensagem("aviso", "pt_BR", []);
+
+        var r = await Agendar().ExecuteAsync(Comando(CanalConversa.WhatsApp, Agora.AddHours(1), texto: null, modelo: modelo));
+
+        r.Modelo!.Nome.Should().Be("aviso");
+        await _repo.Received(1).AddAsync(Arg.Any<MensagemProgramada>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Disparar_ModeloEmEmpresaComPonteWeb_NaoEnviaEFalha()
+    {
+        ConversaAberta(Agora.AddHours(-2));
+        _catalogo.UsaModelosLocaisAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(true);
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, null, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, null, new ModeloMensagem("aviso", "pt_BR", []),
+            Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
     }
 }

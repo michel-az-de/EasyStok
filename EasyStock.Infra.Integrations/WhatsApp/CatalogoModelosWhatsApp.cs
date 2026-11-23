@@ -4,6 +4,8 @@ using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Integration;
 
 namespace EasyStock.Infra.Integrations.WhatsApp;
@@ -95,4 +97,25 @@ public sealed class CatalogoModelosIndisponivel : ICatalogoModelosAtendimento
 {
     public Task<IReadOnlyList<ModeloAtendimento>> ListarAsync(Guid empresaId, CancellationToken ct = default) =>
         throw CatalogoModelosException.SemConexao("O envio real do WhatsApp não está conectado. Configure a conexão em Integrações.");
+}
+
+/// <summary>
+/// #3205: o catálogo decide por empresa com a regra do <see cref="RoteadorWhatsAppClient"/>. Com sessão web a ponte não tem
+/// modelo, e a lista é a das mensagens padrão locais não arquivadas; sem sessão, vale o catálogo da Meta (ou o indisponível).
+/// </summary>
+public sealed class CatalogoModelosPorEmpresa(
+    ICatalogoModelosAtendimento meta, IRemetenteWhatsApp remetente, IModeloMensagemLocalRepository locais) : ICatalogoModelosAtendimento
+{
+    public Task<bool> UsaModelosLocaisAsync(Guid empresaId, CancellationToken ct = default) =>
+        RoteadorWhatsAppClient.UsaSessaoWebAsync(remetente, ct);
+
+    public async Task<IReadOnlyList<ModeloAtendimento>> ListarAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        if (!await UsaModelosLocaisAsync(empresaId, ct)) return await meta.ListarAsync(empresaId, ct);
+        return (await locais.ListarAsync(empresaId, incluirArquivados: false, ct))
+            .OrderBy(m => m.Nome, StringComparer.Ordinal).ThenBy(m => m.Idioma, StringComparer.Ordinal)
+            .Select(m => new ModeloAtendimento(m.Nome, m.Idioma, m.Categoria, m.Corpo, m.QuantidadeParametros,
+                m.Cabecalho, m.Rodape, null, OrigemModelo.Local))
+            .ToList();
+    }
 }

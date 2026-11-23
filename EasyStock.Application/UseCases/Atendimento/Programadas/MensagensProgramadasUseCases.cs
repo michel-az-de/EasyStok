@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
@@ -33,14 +34,23 @@ public sealed class AgendarMensagemProgramadaUseCase(
     IMensagemProgramadaRepository repository,
     PoliticaEnvioCliente politica,
     IUnitOfWork unitOfWork,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    ICatalogoModelosAtendimento? catalogo = null)
 {
+    internal const string ModeloLocalNaoProgramavel =
+        "A mensagem padrão só pode ser enviada na hora, em conversa em que o cliente escreveu nos últimos 7 dias. Não dá para programá-la.";
+
     public async Task<MensagemProgramadaResult> ExecuteAsync(AgendarMensagemProgramadaCommand command, CancellationToken ct = default)
     {
         var cliente = await clientes.GetByIdAsync(command.EmpresaId, command.ClienteId)
             ?? throw new UseCaseValidationException($"Cliente {command.ClienteId} não encontrado nesta empresa.");
         if (cliente.Bloqueado)
             throw new UseCaseValidationException("Cliente bloqueado: desbloqueie o cadastro antes de programar mensagens.");
+
+        // #3205: com a ponte web não há modelo da Meta; o que seria programado é mensagem padrão local, que não se agenda.
+        if (command.Modelo is { } modelo && (modelo.Origem == OrigemModelo.Local
+            || catalogo is not null && await catalogo.UsaModelosLocaisAsync(command.EmpresaId, ct)))
+            throw new UseCaseValidationException(ModeloLocalNaoProgramavel);
 
         MensagemProgramada mensagem;
         try

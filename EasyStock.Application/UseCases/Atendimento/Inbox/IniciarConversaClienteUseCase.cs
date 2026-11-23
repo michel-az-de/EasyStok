@@ -38,6 +38,9 @@ public sealed class IniciarConversaClienteUseCase(
         var contato = ConversaWhatsAppDoCliente.ContatoDoCliente(cliente, command.EmpresaId);
 
         var aprovado = await EnviarModeloConversaUseCase.ModeloAprovadoAsync(catalogo, command.EmpresaId, modelo, ct);
+        // #3205: a mensagem padrão local só responde a quem escreveu; abrir conversa com quem nunca escreveu é envio ativo.
+        if (aprovado.Origem == OrigemModelo.Local)
+            throw new UseCaseValidationException("A mensagem padrão só pode ser enviada em conversa em que o cliente escreveu. Para chamar quem nunca escreveu, o WhatsApp oficial precisa estar conectado.");
         if (!await politica.PodeEnviarAsync(command.EmpresaId, cliente!.Id, CanalConversa.WhatsApp,
                 EnviarModeloConversaUseCase.FinalidadeDaCategoria(aprovado.Categoria), ct))
             throw new RegraDeDominioVioladaException("O cliente não autorizou esta finalidade neste canal. Confira os consentimentos na Ficha.");
