@@ -24,6 +24,8 @@ globalThis.__prova1587 = {
     return [hooks.valores[i], (v) => { hooks.valores[i] = typeof v === 'function' ? v(hooks.valores[i]) : v }]
   },
   useMemo(fn) { hooks.indice++; return fn() },
+  useRef(inicial) { const i = hooks.indice++; if (!(i in hooks.valores)) hooks.valores[i] = { current: inicial }; return hooks.valores[i] },
+  useCallback(fn) { hooks.indice++; return fn },
   catalogo: { respostasProntas: [] },
 }
 const modulo = (fonte) => 'data:text/javascript,' + encodeURIComponent(fonte)
@@ -31,7 +33,7 @@ const modulo = (fonte) => 'data:text/javascript,' + encodeURIComponent(fonte)
 registerHooks({
   resolve(especificador, contexto, proximo) {
     if (especificador === 'react') {
-      return { url: modulo('const p = globalThis.__prova1587; export const useState = (i) => p.useState(i); export const useMemo = (f) => p.useMemo(f)'), shortCircuit: true }
+      return { url: modulo('const p = globalThis.__prova1587; export const useState = (i) => p.useState(i); export const useMemo = (f) => p.useMemo(f); export const useRef = (i) => p.useRef(i); export const useCallback = (f) => p.useCallback(f)'), shortCircuit: true }
     }
     if (especificador === './contextos') {
       return { url: modulo('export const useCatalogo = () => globalThis.__prova1587.catalogo'), shortCircuit: true }
@@ -373,7 +375,7 @@ await confere('E pelo atalho "/" nada muda: o texto troca o termo e o Enter do c
 await confere('E o seletor repassa o aviso no clique e no Enter, e o composer foca o campo de texto', () => {
   const seletor = fonte('features/atendimento/SeletorRespostas.jsx')
   assert.match(seletor, /onClick=\{\(\) => seletor\.inserir\(r, aoInserido\)\}/)
-  assert.match(seletor, /onKeyDown=\{\(e\) => \{ seletor\.aoTeclar\(e, aoInserido\) \}\}/)
+  assert.match(seletor, /onKeyDown=\{\(e\) => \{[\s\S]*?seletor\.aoTeclar\(e, aoInserido\)\s*\}\}/)
   assert.match(composer, /<SeletorRespostas seletor=\{barra\} aoInserido=\{\(\) => campoRef\.current\?\.querySelector\('textarea'\)\?\.focus\(\)\}/)
   assert.match(composer, /<div ref=\{campoRef\}>\s*<CampoArea/, 'o campo de texto mora dentro de campoRef')
 })

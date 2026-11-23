@@ -11,7 +11,9 @@
 //   i) nenhum item, selo ou cabeçalho destaca por borda colorida só à esquerda;
 //   k/l) rodapé inteiro e em uma linha; Salvar/Cancelar visíveis no painel SEM rolar (elementFromPoint do próprio centro);
 //   m) linha do item compacta; n) formulário sujo não se perde por Esc nem por clique fora (limpo fecha);
-//   o) nenhum botão dentro de [role=option] e F2 edita o item ativo; p) operador sem permissão não vê Nova/Editar.
+//   o) na árvore de acessibilidade o listbox só tem group/option e os "Editar resposta X" ficam fora dele; F2 edita o
+//      item ativo (no campo de busca e, aberto por "/", no campo de texto); p) operador sem permissão não vê Nova/Editar;
+//   q/r) formulário sujo também não se perde pelo botão Respostas nem pela Nota interna (trocar de conversa remonta o Composer: sem preservação).
 // FASE=antes: a mesma tela no código do master (CODIGO_ANTES=<pasta EasyStock.Console>), sem grupos.
 // Componentes reais com CSS real, em Chromium, ações de mentira; sem servidor.
 //
@@ -161,10 +163,11 @@ async function abrir(tela, consulta = '') {
 const foto = (p, nome) => p.screenshot({ path: resolve(evidencias, `${nome}.png`) })
 const painel = (p) => p.getByRole('group', { name: 'Respostas rápidas' })
 const abrirPainel = async (p) => { await p.getByRole('button', { name: 'Respostas', exact: true }).click(); await painel(p).waitFor(T) }
-const cabecalhos = (p) => p.locator('[role="listbox"] [role="group"]').evaluateAll((gs) => gs.map((g) => document.getElementById(g.getAttribute('aria-labelledby'))?.textContent))
+const cabecalhos = (p) => p.locator('[role="group"][aria-labelledby]').evaluateAll((gs) => gs.map((g) => document.getElementById(g.getAttribute('aria-labelledby'))?.textContent))
 const titulos = (p) => p.locator('[role="option"] > span:first-child').allTextContents()
 const grupoDe = (p, titulo) => p.getByRole('option').filter({ hasText: titulo }).first().evaluate((o) => {
-  const g = o.closest('[role="group"]')
+  // Grupo ancestral (estrutura antiga) ou o que assume a opção por aria-owns.
+  const g = o.closest('[role="group"][aria-labelledby]') ?? document.querySelector(`[role="group"][aria-owns~="${o.id}"]`)
   return g ? document.getElementById(g.getAttribute('aria-labelledby'))?.textContent : null
 })
 // Borda colorida só à esquerda: largura na esquerda e nenhuma nas outras três, ou ::before vertical.
@@ -218,7 +221,7 @@ try {
       await cenario(`h-antes-${tela}`, async () => {
         const p = await abrir(tela)
         await abrirPainel(p)
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         assert.equal(await p.locator('[role="listbox"] [role="group"]').count(), 0, 'master não agrupa')
         assert.equal(await p.getByRole('button', { name: 'Nova resposta' }).count(), 0)
         await foto(p, `antes-seletor-${tela}`)
@@ -232,7 +235,7 @@ try {
       await cenario(`a-grupos-em-ordem-${tela}`, async () => {
         const p = await abrir(tela)
         await abrirPainel(p)
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         assert.deepEqual(await cabecalhos(p), ['Logística', 'Pagamento', 'Sem categoria'])
         assert.deepEqual(await titulos(p), ['Prazo de envio', 'Taxa de frete', 'Chave Pix', 'Parcelamento', 'Bom dia', 'Obrigado'])
         assert.equal(await p.getByRole('dialog').count(), 0)
@@ -280,7 +283,7 @@ try {
           await foto(p, `depois-g-formulario-celular`)
         }
         await f.getByRole('button', { name: 'Salvar' }).click()
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         assert.equal(await grupoDe(p, 'Retirada na loja'), 'Logística')
         assert.deepEqual(await cabecalhos(p), ['Logística', 'Pagamento', 'Sem categoria'])
         await foto(p, `depois-d-salvou-${tela}`)
@@ -296,7 +299,7 @@ try {
         await f.getByLabel('Categoria').fill('Pagamento')
         await foto(p, `depois-e-editando-${tela}`)
         await f.getByRole('button', { name: 'Salvar' }).click()
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         assert.equal(await grupoDe(p, 'Taxa de frete'), 'Pagamento')
         assert.deepEqual(await cabecalhos(p), ['Logística', 'Pagamento', 'Sem categoria'])
         await foto(p, `depois-e-trocou-${tela}`)
@@ -335,7 +338,7 @@ try {
         const p = await abrir(tela)
         await abrirPainel(p)
         const achados = [
-          ...await bordaSoEsquerda(p, '[role="option"], [role="listbox"] p, [role="listbox"] [role="group"]'),
+          ...await bordaSoEsquerda(p, '[role="option"], [role="group"][aria-label="Respostas rápidas"] li, [role="group"][aria-label="Respostas rápidas"] p'),
           ...await bordaSoEsquerda(p, '[role="group"][aria-label="Respostas rápidas"], [role="group"][aria-label="Respostas rápidas"] > div'),
         ]
         const g = await abrir(tela, 'cena=gestao')
@@ -388,30 +391,92 @@ try {
         await p.getByRole('button', { name: 'Nova resposta' }).click()
         const f = painel(p)
         await f.getByLabel('Título').fill('Rascunho importante')
+        const pergunta = f.getByText('Descartar o que foi digitado?')
         await p.keyboard.press('Escape')
         assert.equal(await painel(p).count(), 1, 'Esc fechou o painel com formulário sujo')
         assert.equal(await f.getByLabel('Título').inputValue(), 'Rascunho importante', 'Esc apagou o que foi digitado')
+        await pergunta.waitFor(T) // Esc dá retorno: a mesma pergunta do Cancelar
+        await f.getByRole('button', { name: 'Continuar editando' }).click()
+        assert.equal(await pergunta.count(), 0)
         await p.mouse.click(5, 5)
         assert.equal(await painel(p).count(), 1, 'clique fora fechou o painel com formulário sujo')
         assert.equal(await f.getByLabel('Título').inputValue(), 'Rascunho importante', 'clique fora apagou o que foi digitado')
+        await pergunta.waitFor(T) // clique fora também pergunta
+        await f.getByRole('button', { name: 'Continuar editando' }).click()
         await f.getByRole('button', { name: 'Cancelar' }).click()
         await f.getByRole('button', { name: 'Descartar' }).click()
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         await p.getByRole('button', { name: 'Nova resposta' }).click()
         await f.getByLabel('Título').waitFor(T)
         await p.keyboard.press('Escape')
         assert.equal(await painel(p).count(), 0, 'formulário limpo deve fechar por Esc')
+        // Edição: sujo = diferente do valor inicial (voltar ao original deixa limpo).
+        await abrirPainel(p)
+        await p.getByRole('button', { name: 'Editar resposta Taxa de frete' }).click()
+        await f.getByLabel('Título').waitFor(T)
+        await f.getByLabel('Título').fill('Taxa de frete 2')
+        await p.keyboard.press('Escape')
+        assert.equal(await painel(p).count(), 1, 'Esc fechou a edição suja')
+        assert.equal(await f.getByLabel('Título').inputValue(), 'Taxa de frete 2')
+        await pergunta.waitFor(T)
+        await f.getByRole('button', { name: 'Continuar editando' }).click()
+        await f.getByLabel('Título').fill('Taxa de frete')
+        await p.keyboard.press('Escape')
+        assert.equal(await painel(p).count(), 0, 'edição de volta ao original deve fechar por Esc')
       })
-      await cenario(`o-editar-fora-da-opcao-e-por-teclado-${tela}`, async () => {
+      await cenario(`o-editar-fora-do-listbox-e-por-teclado-${tela}`, async () => {
         const p = await abrir(tela)
         await abrirPainel(p)
-        assert.equal(await p.locator('[role="option"] button, [role="option"] [role="button"]').count(), 0, 'botão dentro de role=option')
-        assert.ok(await p.getByRole('button', { name: /^Editar resposta / }).count() >= 6, 'cada item tem o seu Editar')
+        // Árvore de acessibilidade (não a do DOM): o listbox só tem group/option, e os Editar existem fora dele.
+        const lista = await p.getByRole('listbox', { name: 'Respostas prontas' }).ariaSnapshot()
+        const papeis = [...lista.matchAll(/^\s*- ([a-z]+)/gm)].map((m) => m[1])
+        assert.ok(papeis.includes('group') && papeis.includes('option'), `listbox sem group/option na árvore:\n${lista}`)
+        assert.deepEqual([...new Set(papeis)].filter((r) => !['listbox', 'group', 'option', 'text', 'paragraph'].includes(r)), [], `filho proibido no listbox:\n${lista}`)
+        assert.doesNotMatch(lista, /Editar resposta/, 'Editar dentro do listbox na árvore')
+        const tudo = await painel(p).ariaSnapshot()
+        assert.equal([...tudo.matchAll(/button "Editar resposta [^"]+"/g)].length, 6, `cada item tem o seu Editar, com nome acessível:\n${tudo}`)
+        // Com o mouse a linha segue inteira: o Editar fica na altura da opção, à direita dela.
+        const caixa = await p.getByRole('option').filter({ hasText: 'Taxa de frete' }).boundingBox()
+        const botao = await p.getByRole('button', { name: 'Editar resposta Taxa de frete' }).boundingBox()
+        assert.ok(Math.abs((botao.y + botao.height / 2) - (caixa.y + caixa.height / 2)) < 8 && botao.x >= caixa.x + caixa.width - 1, `Editar fora da linha da opção: ${JSON.stringify({ caixa, botao })}`)
         const busca = p.getByRole('combobox', { name: 'Buscar resposta pronta' })
         assert.equal(await busca.getAttribute('aria-keyshortcuts'), 'F2')
         await busca.press('ArrowDown') // Prazo -> Taxa de frete
         await busca.press('F2')
         assert.equal(await painel(p).getByLabel('Título').inputValue(), 'Taxa de frete', 'F2 não abriu a edição do item ativo')
+      })
+      await cenario(`o2-f2-pela-barra-${tela}`, async () => {
+        const p = await abrir(tela)
+        const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
+        await campo.fill('/')
+        await painel(p).waitFor(T)
+        assert.equal(await p.getByRole('combobox', { name: 'Buscar resposta pronta' }).count(), 0, 'pela barra não há campo de busca')
+        assert.equal(await p.getByRole('listbox', { name: 'Respostas prontas' }).getAttribute('aria-keyshortcuts'), 'F2')
+        await campo.press('ArrowDown') // Prazo -> Taxa de frete
+        await campo.press('F2')
+        assert.equal(await painel(p).getByLabel('Título').inputValue(), 'Taxa de frete', 'F2 pela barra não abriu a edição')
+      })
+      const sujar = async (p) => {
+        await abrirPainel(p)
+        await p.getByRole('button', { name: 'Nova resposta' }).click()
+        await painel(p).getByLabel('Título').fill('Rascunho importante')
+        return painel(p)
+      }
+      await cenario(`q-botao-respostas-nao-apaga-formulario-sujo-${tela}`, async () => {
+        const p = await abrir(tela)
+        const f = await sujar(p)
+        await p.getByRole('button', { name: 'Respostas', exact: true }).click()
+        assert.equal(await painel(p).count(), 1, 'o botão Respostas fechou o painel com formulário sujo')
+        assert.equal(await f.getByLabel('Título').inputValue(), 'Rascunho importante')
+        await f.getByText('Descartar o que foi digitado?').waitFor(T)
+      })
+      await cenario(`r-nota-interna-nao-apaga-formulario-sujo-${tela}`, async () => {
+        const p = await abrir(tela)
+        const f = await sujar(p)
+        await p.getByRole('button', { name: 'Nota interna' }).click()
+        assert.equal(await painel(p).count(), 1, 'a Nota interna fechou o painel com formulário sujo')
+        assert.equal(await f.getByLabel('Título').inputValue(), 'Rascunho importante')
+        await f.getByText('Descartar o que foi digitado?').waitFor(T)
       })
       await cenario(`p-sem-permissao-nao-edita-${tela}`, async () => {
         const p = await abrir(tela, 'semedicao=1')
@@ -428,7 +493,7 @@ try {
       await cenario(`j-sem-categoria-nenhuma-${tela}`, async () => {
         const p = await abrir(tela, 'sem=categorias')
         await abrirPainel(p)
-        await p.getByRole('listbox', { name: 'Respostas prontas' }).waitFor(T)
+        await p.getByRole('option').first().waitFor(T)
         assert.deepEqual(await cabecalhos(p), [], 'sem categoria, sem cabeçalho')
         assert.deepEqual(await titulos(p), ['Bom dia', 'Chave Pix'])
         await foto(p, `depois-j-sem-categorias-${tela}`)

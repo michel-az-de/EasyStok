@@ -69,7 +69,7 @@ export function Composer({
   const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
   function abrirNotaInterna() {
     // Recolhe as respostas sem apagar um rascunho iniciado por "/".
-    if (!barra.pelaBarra) barra.fechar()
+    if (!barra.pelaBarra && barra.fechar() === false) return
     aoAbrirNota?.()
   }
 

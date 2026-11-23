@@ -1,4 +1,4 @@
-import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { FormResposta } from '../../componentes/FormResposta'
 import { Popover } from '../../componentes/Popover'
@@ -32,20 +32,30 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   const { agrupado, grupos } = useMemo(() => agruparRespostasDoSeletor(itens), [itens])
   const emEdicao = editando === 'nova' ? {} : (respostasProntas ?? []).find((r) => r.id === editando)
   const abrirForm = (alvo) => { setRecusou(false); setEditando(alvo) }
-  // Formulário com algo digitado não se perde por Esc nem por clique fora: o Popover só fecha se `aoFechar` não devolver false.
-  const sujo = useRef(false)
-  const marcarSujo = useCallback((v) => { sujo.current = v }, [])
-  const { fechar } = seletor
-  const fecharPainel = useCallback(() => { if (sujo.current) return false; fechar(); return true }, [fechar])
+  // Formulário com algo digitado trava o `fechar` da barra (devolve false e pede o "Descartar?"): vale para Esc, clique
+  // fora, o botão Respostas e a Nota interna, que fecham por ele. O Popover só fecha se `aoFechar` não devolver false.
+  const { fechar, travar, pedidoDescarte } = seletor
   // A ação do modo API devolve `false` quando não gravou (o motivo vai para `sincronizacao.aviso`); a da
   // demonstração não devolve nada. Sem `false`, volta à lista com o item atualizado.
   const gravar = (dados) => Promise.resolve(
     editando === 'nova' ? incluirRespostaPronta(dados) : editarRespostaPronta(editando, dados),
   ).then((ok) => { if (ok === false) setRecusou(true); else setEditando(null) })
   const opcaoAtiva = useRef(null)
+  // Aberto por "/" não há campo de busca: F2 vale no campo de texto do compositor, onde o foco está.
+  const { pelaBarra } = seletor
+  const itemAtivo = itens[destaque]
+  useEffect(() => {
+    if (!pelaBarra || !editavel || editando !== null || !itemAtivo) return undefined
+    const aoTeclar = (e) => {
+      if (e.key !== 'F2' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return
+      e.preventDefault(); setRecusou(false); setEditando(itemAtivo.id)
+    }
+    document.addEventListener('keydown', aoTeclar)
+    return () => document.removeEventListener('keydown', aoTeclar)
+  }, [pelaBarra, editavel, editando, itemAtivo])
   useLayoutEffect(() => {
     const opcao = opcaoAtiva.current
-    const caixa = opcao?.closest('[role="listbox"]')
+    const caixa = opcao?.closest('[data-rolagem]')
     if (!caixa) return
     const item = opcao.getBoundingClientRect()
     const janela = caixa.getBoundingClientRect()
@@ -54,9 +64,11 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
     else if (item.bottom > janela.bottom) caixa.scrollTop += item.bottom - janela.bottom
   }, [destaque, itens])
 
-  // O Editar é irmão da opção, não filho: botão dentro de role="option" é interativo aninhado (#3208).
+  // O Editar é irmão da opção, não filho (botão dentro de role="option" é interativo aninhado), e a lista visual não
+  // tem papel: o listbox e os grupos ficam em elementos vazios que assumem as opções por aria-owns, e assim o
+  // listbox só tem group/option (ARIA 1.2) enquanto o Editar segue na linha (#3208).
   const opcao = (r, i) => (
-    <li key={r.id} role="presentation" className={`${css.itemResposta} ${i === destaque ? css.ativa : ''}`}>
+    <li key={r.id} className={`${css.itemResposta} ${i === destaque ? css.ativa : ''}`}>
       <div
         id={idDe(i)}
         role="option"
@@ -83,7 +95,7 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   )
 
   return (
-    <Popover rotulo="Respostas rápidas" papel="group" aoFechar={fecharPainel} semAutoFoco portal>
+    <Popover rotulo="Respostas rápidas" papel="group" aoFechar={fechar} semAutoFoco portal>
       <div className={css.seletor}>
         {editando !== null && emEdicao ? (
           <FormResposta
@@ -95,7 +107,8 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
             erro={recusou ? (sincronizacao?.aviso ?? 'Não foi possível salvar a resposta.') : null}
             aoSalvar={gravar}
             aoCancelar={() => setEditando(null)}
-            aoMudarAlterado={marcarSujo}
+            aoMudarAlterado={travar}
+            pedidoDescarte={pedidoDescarte}
           />
         ) : (
           <>
@@ -127,16 +140,30 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
                 {seletor.temRespostas ? 'Nenhuma resposta com esse termo.' : 'Nenhuma resposta pronta cadastrada ainda.'}
               </p>
             ) : (
-              <ul id={idLista} role="listbox" aria-label="Respostas prontas" className={css.lista}>
-                {agrupado ? grupos.map((g, n) => (
-                  <li key={g.chave ?? 'sem-categoria'} role="presentation">
-                    <p id={`${idLista}-grupo-${n}`} className={css.grupo}>{g.rotulo}</p>
-                    <ul role="group" aria-labelledby={`${idLista}-grupo-${n}`} className={css.grupoLista}>
-                      {g.itens.map(({ resposta, indice }) => opcao(resposta, indice))}
-                    </ul>
-                  </li>
-                )) : itens.map((r, i) => opcao(r, i))}
-              </ul>
+              <>
+                <ul data-rolagem className={css.lista}>
+                  {agrupado ? grupos.map((g, n) => (
+                    <li key={g.chave ?? 'sem-categoria'}>
+                      <p id={`${idLista}-grupo-${n}`} aria-hidden="true" className={css.grupo}>{g.rotulo}</p>
+                      <ul className={css.grupoLista}>
+                        {g.itens.map(({ resposta, indice }) => opcao(resposta, indice))}
+                      </ul>
+                    </li>
+                  )) : itens.map((r, i) => opcao(r, i))}
+                </ul>
+                <div className={css.posse}>
+                  <div
+                    id={idLista} role="listbox" aria-label="Respostas prontas" aria-keyshortcuts={editavel ? 'F2' : undefined}
+                    aria-owns={agrupado ? grupos.map((g, n) => `${idLista}-g${n}`).join(' ') : itens.map((r, i) => idDe(i)).join(' ')}
+                  />
+                  {agrupado && grupos.map((g, n) => (
+                    <div
+                      key={g.chave ?? 'sem-categoria'} id={`${idLista}-g${n}`} role="group" aria-labelledby={`${idLista}-grupo-${n}`}
+                      aria-owns={g.itens.map(({ indice }) => idDe(indice)).join(' ')}
+                    />
+                  ))}
+                </div>
+              </>
             )}
 
             <div className={css.rodape}>

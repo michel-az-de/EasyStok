@@ -96,7 +96,7 @@ export function incluirRespostaPronta(lista, dados) {
   const item = {
     id,
     titulo: dados.titulo.trim(),
-    categoria: dados.categoria?.trim() || 'Geral',
+    categoria: dados.categoria?.trim() || null,
     atalho: dados.atalho?.trim() || gerarAtalho(dados.titulo),
     texto: dados.texto.trim(),
     arquivada: false,

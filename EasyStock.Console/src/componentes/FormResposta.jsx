@@ -21,7 +21,7 @@ function faltando(titulo, texto) {
   return semTitulo ? 'Preencha o título.' : semTexto ? 'Preencha o texto.' : undefined
 }
 
-export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias = [], erro = null, className = '', aoMudarAlterado }) {
+export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias = [], erro = null, className = '', aoMudarAlterado, pedidoDescarte = 0 }) {
   const { atalhoMaximo: ATALHO_MAXIMO, categoriaMaxima: CATEGORIA_MAXIMA, gerarAtalho, normalizarCategoria, variaveis } = regras
   const [titulo, setTitulo] = useState(inicial?.titulo ?? '')
   const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
@@ -30,6 +30,8 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
   const [salvando, setSalvando] = useState(false)
   const [descartando, setDescartando] = useState(false)
   const idSugestoes = useId()
+  // Esc ou clique fora no painel (`pedidoDescarte` sobe) fazem a mesma pergunta do Cancelar, sem apagar nada.
+  const [pedidoVisto, setPedidoVisto] = useState(pedidoDescarte)
   // #2792: sem atalho digitado, o servidor recebe o gerado do título, que já nasce dentro de 40 (gerarAtalho) e
   // aparece no placeholder: a pessoa vê o atalho exato antes de salvar.
   const atalhoGerado = gerarAtalho(titulo)
@@ -38,6 +40,8 @@ export function FormResposta({ inicial, aoSalvar, aoCancelar, regras, categorias
   // Mesma pergunta do Modal (`confirmarDescarte`): com algo digitado, Cancelar não descarta calado.
   const alterado = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '')
     || texto !== (inicial?.texto ?? '') || categoria !== (inicial?.categoria ?? '')
+
+  if (pedidoDescarte !== pedidoVisto) { setPedidoVisto(pedidoDescarte); if (alterado) setDescartando(true) }
 
   // O painel do chat precisa saber se há algo digitado para não fechar por Esc ou clique fora (#3208).
   useEffect(() => {

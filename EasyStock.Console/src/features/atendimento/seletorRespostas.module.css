@@ -81,3 +81,7 @@
     linear-gradient(rgb(0 0 0 / .16), transparent) center top / 100% 8px scroll no-repeat,
     linear-gradient(transparent, rgb(0 0 0 / .16)) center bottom / 100% 8px scroll no-repeat;
 }
+
+/* Elementos vazios que só existem para a árvore de acessibilidade (listbox e grupos assumem as opções por aria-owns). */
+.posse { position: absolute; width: 1px; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
+.posse > div { height: 1px; }

@@ -64,6 +64,17 @@ caso('EditorCadastro só marca carregando até o primeiro dossiê (em releitura 
 caso('Atalho e Texto usam limite 40 e 4096 e o Título migra para a mesma primitiva', () => {
   // O teto do atalho mora no domínio, junto do gerarAtalho que o respeita.
   assert.match(respostas, /atalhoMaximo: ATALHO_MAXIMO[^}]*\} = regras/)
+  // #2792: o teto e as variáveis exibidas vêm do domínio, nunca de literal no formulário.
+  assert.doesNotMatch(respostas, /ATALHO_MAXIMO\s*=\s*\d|(?:atalhoMaximo|variaveis)\s*[:=]\s*(?:\d|\[)/, 'o formulário tem literal próprio de teto ou de variáveis')
+  assert.doesNotMatch(respostas, /from '[./]*dominio\//, 'componentes não importa dominio')
+  const regras = semComentario(ler('dominio/respostas.js'))
+  assert.match(regras, /REGRAS_DO_FORM = \{[^}]*atalhoMaximo: ATALHO_MAXIMO[^}]*variaveis: VARIAVEIS_DA_API[^}]*\}/, 'REGRAS_DO_FORM não deriva do teto e de VARIAVEIS_DA_API')
+  assert.match(regras, /ATALHO_MAXIMO = 40/)
+  for (const chamador of ['features/gestao/respostas/AbaRespostas.jsx', 'features/atendimento/SeletorRespostas.jsx']) {
+    const fonte = semComentario(ler(chamador))
+    assert.match(fonte, /import \{[^}]*REGRAS_DO_FORM[^}]*\} from '[./]*dominio\/respostas'/, `${chamador} não importa REGRAS_DO_FORM do domínio`)
+    assert.match(fonte, /<FormResposta[\s\S]*?regras=\{REGRAS_DO_FORM\}/, `${chamador} não passa REGRAS_DO_FORM ao formulário`)
+  }
   assert.match(respostas, /TEXTO_MAXIMO = 4096/)
   assert.match(respostas, /rotulo="Título"[^>]*limite=\{TITULO_MAXIMO\}/)
   assert.match(respostas, /rotulo="Atalho"[\s\S]{0,200}limite=\{ATALHO_MAXIMO\}/)
