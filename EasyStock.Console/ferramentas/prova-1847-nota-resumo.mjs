@@ -91,7 +91,7 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   const compilado = await build({ root: raiz, configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [react(), {
     name: 'prova-isolada', enforce: 'pre',
     resolveId(id) { if (/(^|\/)contextos(?:\.js)?$/.test(id)) return '\0contextos'; if (id.endsWith('/infra/api/conversasApi')) return '\0api-resumo'; if (id === 'prova' || id.replaceAll('\\', '/').endsWith('/prova')) return '\0prova' },
-    load(id) { if (id === '\0prova') return entrada; if (id === '\0contextos') return "export const useAtendimento=()=>({fonteApi:true,fidelidade:{}});export const useCatalogo=()=>({cardapio:[]});export const useAcoes=()=>({})"; if (id === '\0api-resumo') return "export async function obterResumoDoCliente(){window.resumos=(window.resumos??0)+1;return {texto:'Resumo '+window.resumos}}" },
+    load(id) { if (id === '\0prova') return entrada; if (id === '\0contextos') return "export const useAtendimento=()=>({fonteApi:true,fidelidade:{}});export const useCatalogo=()=>({cardapio:[]});export const useAcoes=()=>({})"; if (id === '\0api-resumo') return "export async function baixarMidia(){return null};export async function obterResumoDoCliente(){window.resumos=(window.resumos??0)+1;return {texto:'Resumo '+window.resumos}}" },
   }], build: { write: false, minify: false, lib: { entry: 'prova', formats: ['iife'], name: 'Prova' } } })
   const arquivos = (Array.isArray(compilado) ? compilado[0] : compilado).output
   const codigo = arquivos.find(a => a.type === 'chunk').code

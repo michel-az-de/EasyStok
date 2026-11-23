@@ -591,6 +591,25 @@ await confere('2. mídia: voltar para a conversa reaproveita o arquivo, sem baix
   } finally { volta.desmontar() }
 })
 
+// #3209: o cartão do cliente mostra a miniatura da mesma foto que o balão; os dois montam juntos.
+await confere('2. mídia: balão e miniatura da mesma foto, juntos, baixam uma vez só', async () => {
+  baixadas.length = 0
+  liberadasNoNavegador.length = 0
+  const midia = { conversaId: 'c-1', mensagemId: 'm-4' }
+  const doBalao = new Hospedeiro(balao, { midia, naTela: true })
+  const daMiniatura = new Hospedeiro(balao, { midia, naTela: true })
+  try {
+    await doBalao.estabilizar()
+    await daMiniatura.estabilizar()
+    assert.deepEqual(baixadas, ['m-4'], 'a foto trafegava duas vezes ao abrir a conversa')
+    assert.match(doBalao.resultado.url, /^blob:/)
+    assert.equal(daMiniatura.resultado.url, doBalao.resultado.url)
+    assert.deepEqual(liberadasNoNavegador, [])
+    doBalao.desmontar()
+    assert.deepEqual(liberadasNoNavegador, [], 'a miniatura ainda segura o arquivo')
+  } finally { doBalao.desmontar(); daMiniatura.desmontar() }
+})
+
 await confere('2. mídia: sair da sessão libera os arquivos; renovar o token não', async () => {
   liberadasNoNavegador.length = 0
   const h = new Hospedeiro(balao, { midia: { conversaId: 'c-1', mensagemId: 'm-3' }, naTela: true })

@@ -501,6 +501,17 @@
 .abrirNoMapa:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
 .retornoEndereco { flex-basis: 100%; min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
 .retornoEndereco:empty { display: none; }
+/* #3209: "Quem é": telefone, pedidos e fotos do cartão, em contorno uniforme e sem barra de cor. */
+.quemE { display: grid; gap: var(--e-2); }
+.linhaQuemE { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); margin: 0; font-size: var(--t-corpo); min-width: 0; }
+.linhaQuemE > svg { flex: none; color: var(--tinta-3); }
+.midiasQuemE { display: grid; gap: var(--e-1); }
+.listaMiniaturas { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1); }
+.miniatura { width: 44px; height: 44px; min-width: 44px; padding: 0; overflow: hidden; border: 1px solid var(--linha); border-radius: var(--r-1); display: grid; place-items: center; background: var(--fundo-2, transparent); }
+.miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.maisMidias { font-weight: 700; color: var(--tinta-2); font-size: var(--t-corpo); }
+.apoioQuemE { color: var(--tinta-3); font-size: var(--t-apoio); }
+.fotoInteira { display: block; max-width: 100%; max-height: 70dvh; margin: 0 auto; object-fit: contain; }
 .notaCliente { margin: 0; padding: var(--e-3); background: var(--alerta-pastel); color: var(--tinta); border-radius: var(--r-1); font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; overflow-wrap: anywhere; }
 .notaCliente small { display: block; font-family: var(--f-corpo); color: var(--tinta-2); font-size: var(--t-micro); }
 .cartaoClienteAbrir { all: unset; display: grid; text-align: left; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
