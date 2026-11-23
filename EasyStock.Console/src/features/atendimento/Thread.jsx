@@ -3,7 +3,7 @@ import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { marcarMudancasDeAssunto } from '../../dominio/email'
-import { agruparFalhasSeguidas } from '../../dominio/falhasSeguidas'
+import { agruparFalhasSeguidas, marcarNaConversa, marcasDaConversa } from '../../dominio/falhasSeguidas'
 import { Pilula } from '../../componentes/Pilula'
 import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
@@ -16,7 +16,6 @@ import css from './atendimento.module.css'
 // reabre o MESMO atendimento — a próxima mensagem do cliente começa um
 // atendimento novo na mesma conversa, e o fio marca essa fronteira em vez de
 // deixar a passagem muda entre duas mensagens quaisquer.
-const VAZIO = new Set()
 
 function Divisoria({ numero }) {
   return (
@@ -79,16 +78,13 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
   const reagir = useChamadaEstavel(aoReagir)
   const apagar = useChamadaEstavel(aoApagar)
-  // #3234 (C1): por conversa (o fio não remonta ao trocar), os grupos de falhas abertos, guardados pela tentativa
-  // mais antiga (não muda quando o grupo cresce), e as mensagens que a atendente reenviou soltas, que não somem num grupo.
-  const [marcas, setMarcas] = useState(() => ({ conversa: chaveRolagem, abertas: new Set(), soltas: new Set() }))
-  const daConversa = marcas.conversa === chaveRolagem ? marcas : { conversa: chaveRolagem, abertas: VAZIO, soltas: VAZIO }
-  const marcar = useCallback((campo, id, alternar) => setMarcas((antes) => {
-    const base = antes.conversa === chaveRolagem ? antes : { conversa: chaveRolagem, abertas: new Set(), soltas: new Set() }
-    const conjunto = new Set(base[campo])
-    if (!(alternar && conjunto.delete(id))) conjunto.add(id)
-    return { ...base, [campo]: conjunto }
-  }), [chaveRolagem])
+  // #3234 (C1): por conversa (o fio não remonta ao trocar), os grupos de falhas abertos e as mensagens que a
+  // atendente reenviou soltas, que não somem num grupo. A regra está em dominio/falhasSeguidas.
+  const [marcas, setMarcas] = useState({})
+  const daConversa = marcasDaConversa(marcas, chaveRolagem)
+  const marcar = useCallback(
+    (campo, id, alternar) => setMarcas((antes) => marcarNaConversa(antes, chaveRolagem, campo, id, alternar)), [chaveRolagem],
+  )
   const alternarTentativas = useCallback((id) => marcar('abertas', id, true), [marcar])
   const reenviarSolta = useCallback((id) => { marcar('soltas', id, false); return reenviar(id) }, [marcar, reenviar])
 
@@ -145,13 +141,13 @@ export function Thread({
   for (const l of agruparFalhasSeguidas(linhas, { soltas: daConversa.soltas })) {
     if (!l.anteriores?.length) { juntar(l); continue }
     const total = l.anteriores.length + 1
-    const aberto = daConversa.abertas.has(l.anteriores[0].id)
+    const aberto = daConversa.abertas.has(l.chaveDoGrupo)
     if (aberto) {
       l.anteriores.forEach((m, j) => juntar({
         tipo: 'tentativa', chave: m.id, mensagem: m, trocaDeVoz: j === 0 && l.trocaDeVoz, rotulo: `Tentativa ${j + 1} de ${total}`,
       }))
     }
-    juntar({ ...l, trocaDeVoz: !aberto && l.trocaDeVoz, tentativas: total, aberto, chaveDoGrupo: l.anteriores[0].id })
+    juntar({ ...l, trocaDeVoz: !aberto && l.trocaDeVoz, tentativas: total, aberto })
   }
   const desenhar = (l) => {
     if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />

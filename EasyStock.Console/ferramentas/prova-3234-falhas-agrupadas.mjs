@@ -4,7 +4,9 @@
 // Só regra pura, sem navegador (a prova-2185 E32 mede a tela).
 //   a  4 falhas seguidas iguais viram 1 linha com 3 anteriores; a mais recente fica à vista;
 //   b  texto diferente, tipo diferente, mensagem do cliente, dia, nota ou divisória quebram o grupo;
-//   c  o aviso do grupo sai do tipo: tempo esgotado diz "pode ter chegado", nunca "não saíram".
+//   c  o aviso do grupo sai do tipo: tempo esgotado diz "pode ter chegado", nunca "não saíram";
+//   d, e, f  foto/modelo/formato/arte, recusa de outro motivo e mensagem reenviada não agrupam;
+//   g, h  o grupo aberto continua aberto quando cresce; abertas e soltas são de cada conversa.
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
 
@@ -18,7 +20,7 @@ registerHooks({
   },
 })
 
-const { agruparFalhasSeguidas, avisoDasTentativas } = await import('../src/dominio/falhasSeguidas.js')
+const { agruparFalhasSeguidas, avisoDasTentativas, marcarNaConversa, marcasDaConversa } = await import('../src/dominio/falhasSeguidas.js')
 const { TIPOS_DE_FALHA, falhaDeEnvio } = await import('../src/dominio/falhaDeEnvio.js')
 
 let passou = 0
@@ -57,7 +59,7 @@ confere('b  só agrupa o que é igual e seguido no fio', () => {
 })
 
 confere('d  foto, modelo e anexo não agrupam: o texto deles é rótulo ("Foto"), não o conteúdo', () => {
-  for (const extra of [{ midia: { conversaId: 'c1', mensagemId: 'x' }, texto: 'Foto' }, { modelo: true, texto: 'Mensagem de modelo sem texto' }, { formato: 'imagem', arte: 'a.png' }]) {
+  for (const extra of [{ midia: { conversaId: 'c1', mensagemId: 'x' }, texto: 'Foto' }, { modelo: true, texto: 'Mensagem de modelo sem texto' }, { formato: 'imagem' }, { arte: 'a.png' }]) {
     const saida = agruparFalhasSeguidas([linha(msg('m1', extra)), linha(msg('m2', extra))])
     assert.deepEqual(ids(saida), ['m1', 'm2'], JSON.stringify(extra))
   }
@@ -71,6 +73,29 @@ confere('e  recusa com motivo diferente não agrupa: o motivo de cada uma se per
 confere('f  a mensagem que a atendente reenviou fica solta: não some dentro de um grupo fechado', () => {
   const linhas = [linha(msg('m1')), linha(msg('m2')), linha(msg('m3')), linha(msg('m4'))]
   assert.deepEqual(ids(agruparFalhasSeguidas(linhas, { soltas: new Set(['m2']) })), ['m1', 'm2', 'm4+m3'])
+})
+
+confere('g  o grupo é guardado pela tentativa mais antiga: aberto continua aberto quando chega outra falha igual', () => {
+  const dois = agruparFalhasSeguidas([linha(msg('m1')), linha(msg('m2'))])
+  const tres = agruparFalhasSeguidas([linha(msg('m1')), linha(msg('m2')), linha(msg('m3'))])
+  assert.equal(dois[0].chaveDoGrupo, 'm1')
+  assert.equal(tres[0].chaveDoGrupo, 'm1', 'a chave do grupo mudou quando ele cresceu')
+  assert.equal(agruparFalhasSeguidas([linha(msg('m1'))])[0].chaveDoGrupo, undefined, 'mensagem sozinha não é grupo')
+})
+
+confere('h  abertas e soltas são de cada conversa: ir a outra e voltar não perde nem mistura', () => {
+  let marcas = marcarNaConversa({}, 'A', 'abertas', 'm1', true)
+  marcas = marcarNaConversa(marcas, 'A', 'soltas', 'm9', false)
+  marcas = marcarNaConversa(marcas, 'B', 'abertas', 'x1', true)
+  assert.deepEqual([...marcasDaConversa(marcas, 'A').abertas], ['m1'], 'clicar em B apagou o que estava aberto em A')
+  assert.deepEqual([...marcasDaConversa(marcas, 'A').soltas], ['m9'])
+  assert.deepEqual([...marcasDaConversa(marcas, 'B').abertas], ['x1'])
+  assert.equal(marcasDaConversa(marcas, 'B').soltas.size, 0, 'a solta de A vazou para B')
+  assert.equal(marcasDaConversa(marcas, 'C').abertas.size, 0)
+  const fechado = marcarNaConversa(marcas, 'A', 'abertas', 'm1', true)
+  assert.equal(marcasDaConversa(fechado, 'A').abertas.size, 0, 'alternar de novo não fechou')
+  assert.deepEqual([...marcasDaConversa(marcarNaConversa(marcas, 'A', 'soltas', 'm9', false), 'A').soltas], ['m9'], 'soltar de novo não pode desfazer')
+  assert.equal(marcasDaConversa(marcas, 'A').abertas.has('m1'), true, 'o estado anterior foi mutado')
 })
 
 confere('c  o aviso do grupo sai do tipo: tempo esgotado pode ter chegado; os outros não saíram', () => {

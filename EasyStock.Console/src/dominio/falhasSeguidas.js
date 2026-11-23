@@ -25,14 +25,28 @@ export function agruparFalhasSeguidas(linhas, { soltas = new Set() } = {}) {
     const assinatura = assinaturaDaFalha(linha, soltas)
     if (assinatura && grupo?.assinatura === assinatura) {
       grupo.mensagens.push(linha.mensagem)
-      // A linha do grupo começa onde a primeira tentativa começava: a troca de voz é dela.
-      saida[saida.length - 1] = { ...linha, trocaDeVoz: grupo.trocaDeVoz, anteriores: grupo.mensagens.slice(0, -1) }
+      // A linha do grupo começa onde a primeira tentativa começava: a troca de voz é dela. A chave também:
+      // não muda quando o grupo cresce, então o grupo aberto continua aberto com a falha nova.
+      saida[saida.length - 1] = {
+        ...linha, trocaDeVoz: grupo.trocaDeVoz, anteriores: grupo.mensagens.slice(0, -1), chaveDoGrupo: grupo.mensagens[0].id,
+      }
       continue
     }
     grupo = assinatura ? { assinatura, trocaDeVoz: linha.trocaDeVoz, mensagens: [linha.mensagem] } : null
     saida.push(linha)
   }
   return saida
+}
+
+// O que a atendente marcou no fio (grupos `abertas`, mensagens `soltas`), por conversa: ir a outra e voltar
+// não perde nem mistura. Imutável: cada marca devolve um objeto novo.
+const SEM_MARCAS = Object.freeze({ abertas: new Set(), soltas: new Set() })
+export const marcasDaConversa = (marcas, conversa) => marcas[conversa] ?? SEM_MARCAS
+export function marcarNaConversa(marcas, conversa, campo, id, alternar) {
+  const base = marcasDaConversa(marcas, conversa)
+  const conjunto = new Set(base[campo])
+  if (!(alternar && conjunto.delete(id))) conjunto.add(id)
+  return { ...marcas, [conversa]: { ...base, [campo]: conjunto } }
 }
 
 // O aviso do grupo sai do tipo: com tempo esgotado a mensagem pode ter chegado, então não se diz "não saíram".

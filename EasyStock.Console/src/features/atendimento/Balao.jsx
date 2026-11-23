@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
@@ -224,11 +225,12 @@ export const Balao = memo(function Balao({
           <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {avisoDasTentativas(falha, tentativas)}</span>
         ))}
         {tentativas > 1 && aoAlternarTentativas && (
-          <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(chaveDoGrupo ?? mensagem.id)}>
+          <Botao variante="texto" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(chaveDoGrupo ?? mensagem.id)}>
             {tentativasAbertas ? 'Ocultar as tentativas' : `Ver as ${tentativas} tentativas`}
-          </button>
+          </Botao>
         )}
-        {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
+        {/* #3234 (C1): a tentativa de antes não repete o que a mais recente já oferece (Modelos, retorno do Reenviar). */}
+        {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && !rotuloDaTentativa && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>
             <Icone nome="modelo" /> Modelos aprovados
           </button>
@@ -240,7 +242,7 @@ export const Balao = memo(function Balao({
             <Icone nome="refresh-cw" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
         )}
-        {mensagem.status === 'falhou' && reenvio === 'falhou' && (
+        {mensagem.status === 'falhou' && reenvio === 'falhou' && !rotuloDaTentativa && (
           <output ref={resultadoDoReenvio} className={css.falhou}>{fraseDoReenvio(mensagem.erro)}</output>
         )}
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
