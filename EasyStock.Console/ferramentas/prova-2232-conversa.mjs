@@ -324,6 +324,14 @@ await confere('C2  sem valor na mensagem, o rótulo é "Abrir link de pagamento"
   assert.doesNotMatch(doCliente, /<a /, 'mensagem que chega do cliente não vira link (#1510)')
 })
 
+// #3234 (C1): a tentativa de antes, aberta no grupo, não repete o que a mais recente já oferece.
+await confere('C1  fora da janela, "Modelos aprovados" fica só na tentativa mais recente', () => {
+  const foraDaJanela = { status: 'falhou', erro: '131047 re-engagement' }
+  assert.match(tira(balao(foraDaJanela, { aoAbrirModelos() {} })), /Modelos aprovados/)
+  assert.doesNotMatch(tira(balao(foraDaJanela, { aoAbrirModelos() {}, rotuloDaTentativa: 'Tentativa 1 de 3' })), /Modelos aprovados/,
+    'cada tentativa aberta repetia o botão')
+})
+
 // --- C3 -------------------------------------------------------------------------------------------
 await confere('C3  todo tique de status traz ícone e palavra à vista', () => {
   for (const status of ['enviada', 'entregue', 'lida']) {

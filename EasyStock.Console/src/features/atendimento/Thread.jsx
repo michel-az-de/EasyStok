@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { marcarMudancasDeAssunto } from '../../dominio/email'
+import { agruparFalhasSeguidas, marcarNaConversa, marcasDaConversa } from '../../dominio/falhasSeguidas'
 import { Pilula } from '../../componentes/Pilula'
 import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
@@ -15,6 +16,7 @@ import css from './atendimento.module.css'
 // reabre o MESMO atendimento — a próxima mensagem do cliente começa um
 // atendimento novo na mesma conversa, e o fio marca essa fronteira em vez de
 // deixar a passagem muda entre duas mensagens quaisquer.
+
 function Divisoria({ numero }) {
   return (
     <div className={css.divisoriaAtendimento} role="separator">
@@ -76,6 +78,15 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
   const reagir = useChamadaEstavel(aoReagir)
   const apagar = useChamadaEstavel(aoApagar)
+  // #3234 (C1): por conversa (o fio não remonta ao trocar), os grupos de falhas abertos e as mensagens que a
+  // atendente reenviou soltas, que não somem num grupo. A regra está em dominio/falhasSeguidas.
+  const [marcas, setMarcas] = useState({})
+  const daConversa = marcasDaConversa(marcas, chaveRolagem)
+  const marcar = useCallback(
+    (campo, id, alternar) => setMarcas((antes) => marcarNaConversa(antes, chaveRolagem, campo, id, alternar)), [chaveRolagem],
+  )
+  const alternarTentativas = useCallback((id) => marcar('abertas', id, true), [marcar])
+  const reenviarSolta = useCallback((id) => { marcar('soltas', id, false); return reenviar(id) }, [marcar, reenviar])
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
   // #2232 (A5): `visivel` é o painel aberto na aba; ao abrir, o fio vai para a última mensagem.
@@ -117,32 +128,50 @@ export function Thread({
   }
 
   // #2232 (B3): cada dia é um grupo, para a pílula de data ficar fixa só enquanto o dia dela rola.
+  // #3234 (C1): antes, as falhas seguidas iguais viram uma linha só (o grupo não cruza dia, nota nem divisória).
+  // Aberto, as tentativas de antes entram como linhas próprias acima da mais recente: cada balão fica com a chave
+  // do seu id, entrando ou saindo de um grupo, e não remonta (o retorno do Reenviar e o foco ficam).
   const grupos = []
-  for (const l of linhas) {
+  const juntar = (l) => {
     const atual = grupos.at(-1)
     if (l.tipo === 'dia') grupos.push({ chave: l.chave, itens: [l] })
     else if (atual) atual.itens.push(l)
     else grupos.push({ chave: l.chave, itens: [l], solto: true })
+  }
+  for (const l of agruparFalhasSeguidas(linhas, { soltas: daConversa.soltas })) {
+    if (!l.anteriores?.length) { juntar(l); continue }
+    const total = l.anteriores.length + 1
+    const aberto = daConversa.abertas.has(l.chaveDoGrupo)
+    if (aberto) {
+      l.anteriores.forEach((m, j) => juntar({
+        tipo: 'tentativa', chave: m.id, mensagem: m, trocaDeVoz: j === 0 && l.trocaDeVoz, rotulo: `Tentativa ${j + 1} de ${total}`,
+      }))
+    }
+    juntar({ ...l, trocaDeVoz: !aberto && l.trocaDeVoz, tentativas: total, aberto })
   }
   const desenhar = (l) => {
     if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
     if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
     if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
     if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
+    const comuns = {
+      numeroComanda,
+      aoAbrirDefinicaoAutomatica: abrirDefinicaoAutomatica,
+      // #1761: só onde o compositor já oferece Modelos aprovados.
+      aoAbrirModelos: aoAbrirModelos ? abrirModelos : undefined,
+      // #2833: reagir e apagar para todos só com a API.
+      aoReagir: aoReagir ? reagir : undefined,
+      aoApagar: aoApagar ? apagar : undefined,
+    }
+    // #3234 (C1): a tentativa de antes, aberta a pedido, não repete o aviso nem tem Reenviar (fica só na última).
+    if (l.tipo === 'tentativa') return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} rotuloDaTentativa={l.rotulo} {...comuns} />
+    // Sem a ação (demonstração) o balão não mostra o Reenviar. Fora de grupo, quem reenvia fica solta.
+    const aoReenviarAqui = aoReenviar ? (l.tentativas ? reenviar : reenviarSolta) : undefined
+    if (!l.tentativas) return <Balao key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui} />
     return (
       <Balao
-        key={l.chave}
-        mensagem={l.mensagem}
-        trocaDeVoz={l.trocaDeVoz}
-        numeroComanda={numeroComanda}
-        aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
-        // Sem a ação (demonstração) o balão não mostra o Reenviar.
-        aoReenviar={aoReenviar ? reenviar : undefined}
-        // #1761: só onde o compositor já oferece Modelos aprovados.
-        aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
-        // #2833: reagir e apagar para todos só com a API.
-        aoReagir={aoReagir ? reagir : undefined}
-        aoApagar={aoApagar ? apagar : undefined}
+        key={l.chave} mensagem={l.mensagem} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui}
+        tentativas={l.tentativas} tentativasAbertas={l.aberto} aoAlternarTentativas={alternarTentativas} chaveDoGrupo={l.chaveDoGrupo}
       />
     )
   }

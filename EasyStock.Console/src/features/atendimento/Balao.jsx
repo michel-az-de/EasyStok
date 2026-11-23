@@ -1,10 +1,12 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { comLinksDePagamento, resumoDoPedidoNoTexto, rotuloDaComanda } from '../../dominio/conteudoDaMensagem'
 import { falhaDeEnvio, fraseDoReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
+import { avisoDasTentativas } from '../../dominio/falhasSeguidas'
 import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
@@ -130,6 +132,10 @@ const TITULO_DO_ASSISTENTE = Object.freeze({
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
 export const Balao = memo(function Balao({
   mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null, aoReagir, aoApagar,
+  // #3234 (C1): envios seguidos iguais que falharam viram um balão. `tentativas` > 1 é o balão do grupo
+  // (aviso único e o botão das tentativas); `rotuloDaTentativa` marca uma de antes, aberta a pedido, que não repete o aviso.
+  // `chaveDoGrupo` é a tentativa mais antiga: o grupo segue aberto quando uma nova falha igual vira a mais recente.
+  tentativas = 1, tentativasAbertas = false, aoAlternarTentativas, chaveDoGrupo = null, rotuloDaTentativa = null,
 }) {
   // #1761: o Reenviar não dava retorno nenhum. O botão diz "Reenviando…", trava o segundo toque
   // e, se o canal recusar de novo, a bolha diz que a nova tentativa também não saiu.
@@ -213,10 +219,18 @@ export const Balao = memo(function Balao({
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
-        {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {falha.texto}</span>
+        {mensagem.status === 'falhou' && (rotuloDaTentativa ? (
+          <span className={css.falhou}><Icone nome="alerta" tamanho={16} /> {rotuloDaTentativa}</span>
+        ) : (
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {avisoDasTentativas(falha, tentativas)}</span>
+        ))}
+        {tentativas > 1 && aoAlternarTentativas && (
+          <Botao variante="texto" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(chaveDoGrupo ?? mensagem.id)}>
+            {tentativasAbertas ? 'Ocultar as tentativas' : `Ver as ${tentativas} tentativas`}
+          </Botao>
         )}
-        {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
+        {/* #3234 (C1): a tentativa de antes não repete o que a mais recente já oferece (Modelos, retorno do Reenviar). */}
+        {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && !rotuloDaTentativa && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>
             <Icone nome="modelo" /> Modelos aprovados
           </button>
@@ -228,7 +242,7 @@ export const Balao = memo(function Balao({
             <Icone nome="refresh-cw" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
         )}
-        {mensagem.status === 'falhou' && reenvio === 'falhou' && (
+        {mensagem.status === 'falhou' && reenvio === 'falhou' && !rotuloDaTentativa && (
           <output ref={resultadoDoReenvio} className={css.falhou}>{fraseDoReenvio(mensagem.erro)}</output>
         )}
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
