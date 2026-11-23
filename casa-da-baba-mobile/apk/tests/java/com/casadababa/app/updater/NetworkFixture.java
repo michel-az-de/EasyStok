@@ -12,10 +12,13 @@ final class NetworkFixture {
     /** Status por URL; vence o status global. */
     static final ConcurrentHashMap<String, Integer> statusByUrl = new ConcurrentHashMap<>();
     static volatile int packageRequests;
+    /** Toda URL aberta no processo, para provar quem não abriu nenhuma. */
+    static final java.util.List<String> opened = new java.util.concurrent.CopyOnWriteArrayList<>();
     static void install() {
         URL.setURLStreamHandlerFactory(protocol -> new URLStreamHandler() {
             @Override protected URLConnection openConnection(URL url) {
                 if (!protocol.equals("https")) throw new AssertionError("Unexpected protocol");
+                opened.add(url.toString());
                 return new HttpsURLConnection(url) {
                     public void disconnect() {}
                     public boolean usingProxy() { return false; }

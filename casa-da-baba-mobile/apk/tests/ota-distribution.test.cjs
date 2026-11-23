@@ -24,6 +24,7 @@ function fixture(version = '0.3.0') {
   const dir = fs.mkdtempSync(path.join(temporary, 'web-'));
   fs.writeFileSync(path.join(dir, 'index.html'), '<html>' + version + '</html>');
   fs.writeFileSync(path.join(dir, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: ota.APP, channel: 'piloto', bundleVersion: version, nativeVersionCode: require('../package.json').versionCode, dataSchemaVersion: 2 }));
+  fs.writeFileSync(path.join(dir, 'config.js'), 'window.CDB_CONFIG = ' + JSON.stringify(require('../scripts/ambiente.cjs').configWeb({})) + ';\n');
   return dir;
 }
 function build(version, sequence, content = '') {
@@ -74,6 +75,15 @@ test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () 
   const metadata = read(path.join(web, 'bundle.json')); metadata.dataSchemaVersion = 3;
   fs.writeFileSync(path.join(web, 'bundle.json'), JSON.stringify(metadata));
   assert.throws(() => ota.zipWeb(web, '0.3.0'), /bundle.json/);
+});
+test('OTA só empacota conteúdo web oficial, nunca o de homologação (#3114)', () => {
+  const { configWeb } = require('../scripts/ambiente.cjs');
+  const comConfig = config => { const web = fixture(); fs.writeFileSync(path.join(web, 'config.js'), 'window.CDB_CONFIG = ' + JSON.stringify(config) + ';\n'); return web; };
+  assert.ok(ota.zipWeb(comConfig(configWeb({})), '0.3.0').length > 0);
+  assert.throws(() => ota.zipWeb(comConfig(configWeb({ ambiente: 'homologacao', apiBaseUrl: 'https://api-teste.example' })), '0.3.0'), /oficial/);
+  assert.throws(() => ota.zipWeb(comConfig(configWeb({ apiBaseUrl: 'https://outra-api.example' })), '0.3.0'), /oficial/);
+  const semConfig = fixture(); fs.rmSync(path.join(semConfig, 'config.js'), { force: true });
+  assert.throws(() => ota.zipWeb(semConfig, '0.3.0'), /config\.js/);
 });
 test('distribuidor gera a versao nativa atual e recusa conteúdo para APK anterior', () => {
   const release = build('0.4.0', 10);

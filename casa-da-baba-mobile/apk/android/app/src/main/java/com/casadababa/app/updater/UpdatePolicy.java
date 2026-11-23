@@ -24,9 +24,11 @@ public final class UpdatePolicy {
     public static final int MAX_TRIAL_BOOTS = 2;
     public static final String APP_ID = "com.casadababa.piloto";
     public static final String CHANNEL = "piloto";
-    public static final String MANIFEST_URL = "https://easystok.online/downloads/casa-da-baba/ota/latest.json";
+    /** Nulo na homologação (#3114): ela não tem canal de conteúdo. */
+    public static final String MANIFEST_URL = com.casadababa.app.Ambiente.ATUAL.distribuicaoOficial()
+        ? com.casadababa.app.Ambiente.ATUAL.downloadsOrigin() + "/downloads/casa-da-baba/ota/latest.json" : null;
     public static String manifestUrl(int nativeCode) {
-        return nativeCode >= 5 ? MANIFEST_URL.replace("latest.json", "native-" + nativeCode + "/latest.json") : MANIFEST_URL;
+        return MANIFEST_URL == null ? null : nativeCode >= 5 ? MANIFEST_URL.replace("latest.json", "native-" + nativeCode + "/latest.json") : MANIFEST_URL;
     }
     private UpdatePolicy() {}
 
@@ -38,7 +40,7 @@ public final class UpdatePolicy {
         try {
             URI uri = new URI(value);
             String path = uri.getRawPath();
-            require("https".equals(uri.getScheme()) && "easystok.online".equals(uri.getHost())
+            require("https".equals(uri.getScheme()) && uri.getHost() != null && uri.getHost().equals(com.casadababa.app.Ambiente.ATUAL.downloadsHost())
                 && uri.getPort() == -1 && uri.getRawUserInfo() == null && uri.getRawQuery() == null
                 && uri.getRawFragment() == null && path != null
                 && path.startsWith("/downloads/casa-da-baba/ota/")

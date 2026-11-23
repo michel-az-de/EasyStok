@@ -10,11 +10,11 @@ import org.json.JSONObject;
 
 final class WorkspaceSessionBridge {
     private static final String NAME = "EasyStokSession";
-    private static final String ORIGIN = "https://app.easystok.online";
+    private static final String ORIGIN = Ambiente.ATUAL.appOrigin();
 
     static boolean trusted(Uri uri) {
         return uri != null && "https".equalsIgnoreCase(uri.getScheme())
-            && "app.easystok.online".equalsIgnoreCase(uri.getHost()) && uri.getUserInfo() == null
+            && Ambiente.ATUAL.appHost().equalsIgnoreCase(uri.getHost()) && uri.getUserInfo() == null
             && (uri.getPort() == -1 || uri.getPort() == 443);
     }
 

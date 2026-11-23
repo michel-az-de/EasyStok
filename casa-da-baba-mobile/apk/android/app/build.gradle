@@ -18,6 +18,9 @@ firebaseResources.each { name, value ->
     if (!(value instanceof String) || !(value ==~ /[A-Za-z0-9:_-]+/))
         throw new GradleException("Configuração pública Firebase inválida: ${name}")
 }
+// #3114: a homologação recebe as origens de teste por -P e só as confere quando há tarefa dela no build.
+def homologacaoApi = (project.findProperty('cdbHomologacaoApi') ?: '').toString()
+def homologacaoApp = (project.findProperty('cdbHomologacaoApp') ?: '').toString()
 android {
     namespace "com.casadababa.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -29,7 +32,29 @@ android {
         versionCode appVersion.versionCode as int
         versionName appVersion.version
         testInstrumentationRunner "com.casadababa.app.NativeSessionInstrumentacao"
-        firebaseResources.each { name, value -> resValue 'string', name, value }
+    }
+    buildFeatures { buildConfig true }
+    // #3114: a oficial segue com.casadababa.piloto e a produção; a de homologação instala ao lado, fala só
+    // com as origens de teste e não tem Firebase, OTA nem página de download (Ambiente.java).
+    flavorDimensions 'ambiente'
+    productFlavors {
+        oficial {
+            dimension 'ambiente'
+            buildConfigField 'String', 'CDB_AMBIENTE', '"oficial"'
+            buildConfigField 'String', 'CDB_API_ORIGIN', '"https://api.easystok.online"'
+            buildConfigField 'String', 'CDB_APP_ORIGIN', '"https://app.easystok.online"'
+            buildConfigField 'String', 'CDB_DOWNLOADS_ORIGIN', '"https://easystok.online"'
+            firebaseResources.each { name, value -> resValue 'string', name, value }
+        }
+        homologacao {
+            dimension 'ambiente'
+            applicationIdSuffix ".homologacao"
+            versionNameSuffix "-homologacao"
+            buildConfigField 'String', 'CDB_AMBIENTE', '"homologacao"'
+            buildConfigField 'String', 'CDB_API_ORIGIN', "\"${homologacaoApi}\""
+            buildConfigField 'String', 'CDB_APP_ORIGIN', "\"${homologacaoApp}\""
+            buildConfigField 'String', 'CDB_DOWNLOADS_ORIGIN', '""'
+        }
     }
     testBuildType "release"
     signingConfigs {
@@ -47,6 +72,24 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+// A homologação só se monta em debug: a release assinaria com a chave da distribuição oficial.
+androidComponents {
+    beforeVariants(selector().withName('homologacaoRelease')) { it.enable = false }
+}
+gradle.taskGraph.whenReady { graph ->
+    def tarefas = graph.allTasks.findAll { it.project == project }
+    def homologacao = tarefas.any { it.name.contains('Homologacao') }
+    def oficial = tarefas.any { it.name.contains('Oficial') }
+    if (!homologacao && !oficial) return
+    if (homologacao && oficial) throw new GradleException('Monte uma variante por vez: o conteúdo web empacotado é de um ambiente só.')
+    // A regra mora em scripts/ambiente.cjs, testada lá: origens de teste do -P e conteúdo web da variante,
+    // que fica em src/main/assets, comum às variantes.
+    def conferir = ['node', file('../../scripts/ambiente.cjs').path, 'conferir', homologacao ? 'homologacao' : 'oficial',
+                    file('src/main/assets/public/config.js').path, homologacaoApi, homologacaoApp].execute()
+    def saida = new StringBuilder(), erro = new StringBuilder()
+    conferir.waitForProcessOutput(saida, erro)
+    if (conferir.exitValue() != 0) throw new GradleException(erro.toString().trim() ?: 'scripts/ambiente.cjs recusou o build.')
 }
 repositories {
     flatDir { dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' }

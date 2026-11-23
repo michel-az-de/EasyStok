@@ -18,6 +18,7 @@ final class UpdatePush {
     }
 
     static void subscribe(Context context, boolean newToken) {
+        if (!com.casadababa.app.Ambiente.ATUAL.distribuicaoOficial()) return;
         Context app = context.getApplicationContext();
         synchronized (UpdatePush.class) {
             if (newToken) preferences(app).edit().putBoolean("subscribed", false).apply();

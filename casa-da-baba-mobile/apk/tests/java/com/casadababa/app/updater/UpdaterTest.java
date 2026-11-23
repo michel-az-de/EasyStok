@@ -319,6 +319,22 @@ public class UpdaterTest {
         signedManifest(new JSONObject(next.toString()).put("bundleVersion", "0.3.2"), key);
         check(!checkUpdate(tamperApp).getBoolean("checkSucceeded"), "Internal bundle version mismatch rejected");
         notPublishedTests(key, next, data.toByteArray());
+        homologacaoTests(key);
+    }
+
+    /** #3114: o APK de homologacao nao abre conexao com o canal de conteudo, que e o da producao. */
+    private static void homologacaoTests(KeyPair key) throws Exception {
+        Path files = directory("homologacao");
+        Files.createDirectories(files.resolve("assets"));
+        Files.write(files.resolve("assets/ota-public-key.der"), key.getPublic().getEncoded());
+        com.casadababa.app.Ambiente hml = com.casadababa.app.Ambiente.de("homologacao", "https://api-teste.example", "https://console-teste.example", "");
+        OtaManager app = new OtaManager(new Context(files.toFile()), hml);
+        app.beginBoot(false);
+        int before = NetworkFixture.opened.size();
+        JSONObject status = checkUpdate(app);
+        check(NetworkFixture.opened.size() == before, "Homologation opens no connection to the content channel");
+        check(status.getBoolean("checkSucceeded") && status.getString("lastError").isEmpty(), "Homologation without channel is not a failure");
+        check(status.getString("pendingVersion").isEmpty() && !jobRetries(status), "Homologation prepares nothing and does not retry");
     }
 
     /** Canal sem pacote publicado para este APK (manifesto 404) nao e falha; qualquer outro erro continua sendo. */

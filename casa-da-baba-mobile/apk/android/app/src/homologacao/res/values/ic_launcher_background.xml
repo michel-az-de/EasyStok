@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- #3114: fundo índigo no ícone e na abertura marca o APK de homologação. -->
+    <color name="ic_launcher_background">#3730A3</color>
+</resources>

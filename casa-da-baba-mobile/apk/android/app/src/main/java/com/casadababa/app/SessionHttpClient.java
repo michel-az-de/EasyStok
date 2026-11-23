@@ -9,7 +9,12 @@ import javax.net.ssl.HttpsURLConnection;
 import org.json.JSONObject;
 
 class SessionHttpClient {
-    static final String ORIGIN = "https://api.easystok.online";
+    private final String origin;
+
+    SessionHttpClient() { this(Ambiente.ATUAL); }
+    SessionHttpClient(Ambiente ambiente) { origin = ambiente.apiOrigin(); }
+
+    private String url(String path) { return origin + path; }
 
     static final class Failure extends Exception {
         final int status;
@@ -26,7 +31,7 @@ class SessionHttpClient {
     }
 
     JSONObject request(String path, JSONObject body, String token, String deviceKey) throws Exception {
-        HttpsURLConnection connection = (HttpsURLConnection) new URL(ORIGIN + path).openConnection();
+        HttpsURLConnection connection = (HttpsURLConnection) new URL(url(path)).openConnection();
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(10000);

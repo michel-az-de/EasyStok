@@ -97,9 +97,10 @@ public class PilotAppPlugin extends Plugin {
 
     @PluginMethod
     public void openDownload(PluginCall call) {
+        String page = Ambiente.ATUAL.paginaDownloads();
+        if (page == null) { call.reject("A homologação não tem página de atualização. Instale o APK novo pelo arquivo."); return; }
         try {
-            Intent browser = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://easystok.online/downloads/casa-da-baba/"));
+            Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(page));
             getActivity().startActivity(browser);
             call.resolve();
         } catch (Exception error) {

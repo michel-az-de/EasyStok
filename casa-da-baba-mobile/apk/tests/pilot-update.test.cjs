@@ -3,7 +3,7 @@ const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { validateManifest } = require('../pilot.js');
-const config = { appId: 'com.casadababa.piloto', versionCode: 1 };
+const config = { appId: 'com.casadababa.piloto', versionCode: 1, updatePageUrl: 'https://easystok.online/downloads/casa-da-baba/' };
 const manifest = {
   schemaVersion: 1, appId: config.appId, versionCode: 2, version: '0.1.1',
   url: 'https://easystok.online/downloads/casa-da-baba/casa-da-baba-2.apk',

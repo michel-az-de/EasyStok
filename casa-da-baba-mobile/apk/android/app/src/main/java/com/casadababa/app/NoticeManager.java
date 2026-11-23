@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Installation identity is separate from production pairing; only public notices enter here. */
 public final class NoticeManager {
-    private static final String API = "https://api.easystok.online/api/mobile/push/";
+    private static final String API = Ambiente.ATUAL.apiOrigin() + "/api/mobile/push/";
     private static final String KEY_ALIAS = "cdb-push-installation-v1";
     private static NoticeManager instance;
     private final Context context;
@@ -120,6 +120,8 @@ public final class NoticeManager {
     }
     public void refresh(Callback callback) { refresh(callback, true); }
     public void refresh(Callback callback, boolean foreground) {
+        // #3114: avisos por push são da distribuição oficial; a homologação não tem Firebase nem registra o aparelho.
+        if (!Ambiente.ATUAL.distribuicaoOficial()) { if (callback != null) callback.complete(status(), false); return; }
         if (android.os.SystemClock.elapsedRealtime() < retryAfter) { if (callback != null) callback.complete(status(), false); return; }
         if (!checking.compareAndSet(false, true)) { if (callback != null) callback.complete(status(), false); return; }
         changed();
