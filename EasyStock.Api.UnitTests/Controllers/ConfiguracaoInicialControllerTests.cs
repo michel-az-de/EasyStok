@@ -102,6 +102,7 @@ public class ConfiguracaoInicialControllerTests
                 .Which.Error.Message.Should().Be("EmpresaId é obrigatório.");
         await _passos.DidNotReceiveWithAnyArgs().MarcarAsync(default!, default);
         await _unitOfWork.DidNotReceive().CommitAsync();
+        await _empresas.DidNotReceiveWithAnyArgs().ConcluirConfiguracaoInicialAsync(default, default, default, default);
     }
 
     [Fact]
@@ -136,6 +137,7 @@ public class ConfiguracaoInicialControllerTests
             recusa.Value.Should().BeOfType<ApiErrorResponse>().Which.Error.Code.Should().Be(AutoridadeNaConfiguracaoInicial.CodigoHierarquia);
         }
         await _unitOfWork.DidNotReceive().CommitAsync();
+        await _empresas.DidNotReceiveWithAnyArgs().ConcluirConfiguracaoInicialAsync(default, default, default, default);
     }
 
     [Fact]

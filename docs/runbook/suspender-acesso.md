@@ -15,7 +15,7 @@ Quem errar a senha de outra pessoa de propósito só atrasa o login por senha de
 
 | Quero | Faço | Efeito |
 |---|---|---|
-| Tirar a pessoa da casa | Console, Configurações, Usuários, **Desativar** | Desativa o vínculo com a empresa, derruba as sessões (`RevogadorSessoes`), revoga convite e código de acesso abertos. Nenhum login entra, nem pelo Google |
+| Tirar a pessoa da casa | Console, Configurações, Usuários, **Desativar** | Desativa o vínculo com a empresa, derruba as sessões (`RevogadorSessoes`), revoga convite e código de acesso abertos. Nenhum login entra nesta empresa, nem pelo Google. Quem tem vínculo com outra empresa continua entrando lá |
 | Derrubar as sessões sem tirar o acesso | Trocar o perfil da pessoa ou redefinir a senha | Grava o corte `SessoesValidasDesde`: os tokens emitidos antes param de valer e a pessoa entra de novo |
 
 A dona só é desativada depois de perder a marca de dona, e a última dona ativa não perde a marca (ADR-0038). Nesses casos quem resolve é o suporte.

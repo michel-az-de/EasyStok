@@ -40,8 +40,9 @@ public sealed class ConcluirConfiguracaoInicialUseCase(
 internal static class EmpresaDeQuemDecide
 {
     /// <summary>
-    /// Empresa do JWT, rastreada, depois de conferir quem decide. Sem <c>UpdateAsync</c>: o commit grava só as colunas
-    /// que o método de domínio mudou, e uma alteração paralela de outro campo da empresa não é sobrescrita.
+    /// Empresa do JWT, rastreada, depois de conferir quem decide. Sem <c>UpdateAsync</c>: no adiar, o commit grava só as
+    /// colunas que o método de domínio mudou, e uma alteração paralela de outro campo da empresa não é sobrescrita. O
+    /// concluir usa a leitura só para saber que a empresa existe; quem grava é o UPDATE condicional (#3185).
     /// </summary>
     public static async Task<Empresa> ObterAsync(
         IEmpresaRepository empresas, AutoridadeNaConfiguracaoInicial autoridade, ICurrentUserAccessor usuario,
