@@ -25,7 +25,7 @@ fontes.set(urlSeletor.href, (await transformWithOxc(fonteSeletor, urlSeletor.pat
 let host
 const hookRef = valor => host.valores[host.indice++] ??= { current: valor }
 const hooks = {
-  useRef: hookRef, useId: () => `prova-${host.indice++}`,
+  useRef: hookRef, useMemo: (fn) => fn(), useId: () => `prova-${host.indice++}`,
   useState(valor) {
     const atual = host, indice = atual.indice++
     if (!(indice in atual.valores)) atual.valores[indice] = typeof valor === 'function' ? valor() : valor
@@ -38,18 +38,20 @@ globalThis.__provaSuperbancaAcessibilidade = { hooks }
 const dados = codigo => 'data:text/javascript,' + encodeURIComponent(codigo)
 registerHooks({
   resolve(spec, contexto, proximo) {
-    if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
+    if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useMemo=h.useMemo,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
     // #2185: `BotaoIcone` e `Pilula` entram como componentes transparentes: viram o próprio elemento, com o nome em
     // `aria-label`, para a árvore continuar sendo a do que o leitor de tela encontra.
     if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>type&&type.transparente?type(props):({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
     if (/(^|\/)BotaoIcone(\.jsx)?$/.test(spec)) return { url: dados('export const BotaoIcone=Object.assign(({rotulo,icone,tom,pressionado,dica,tamanhoIcone,...resto})=>({type:"button",props:{...resto,"aria-label":rotulo,"aria-pressed":pressionado}}),{transparente:true});'), shortCircuit: true }
     if (/(^|\/)Pilula(\.jsx)?$/.test(spec)) return { url: dados('export const Pilula=Object.assign(({contagem,children,className,titulo})=>({type:"span",props:{className,title:titulo,children:contagem??children}}),{transparente:true});'), shortCircuit: true }
+    // #3208: o formulário de editar dentro do painel tem prova própria; aqui a lista é o que importa.
+    if (/(^|\/)FormResposta(\.jsx)?$/.test(spec)) return { url: dados('export const FormResposta=()=>null;'), shortCircuit: true }
     if (spec === 'react-dom') return { url: dados('export const createPortal=(elemento)=>elemento;'), shortCircuit: true }
     if (spec === '../hooks/useTema') return { url: dados('export const useTema=()=>["light", globalThis.__provaSuperbancaAcessibilidade.trocarTema];'), shortCircuit: true }
     // #2145: o Icone virou fachada do lucide-react (CJS que pede o React real); aqui basta o svg decorativo.
     if (/(^|\/)Icone(\.jsx)?$/.test(spec)) return { url: dados('export const Icone=({rotulo})=>({type:"svg",props:{role:rotulo?"img":"presentation","aria-label":rotulo,"aria-hidden":rotulo?undefined:"true"}});'), shortCircuit: true }
     // #2185: o SeletorRespostas pergunta quem pode editar; a acessibilidade dele não depende da resposta.
-    if (/aplicacao\/contextos$/.test(spec)) return { url: dados('export const useAtendimento=()=>({fonteApi:false});'), shortCircuit: true }
+    if (/aplicacao\/contextos$/.test(spec)) return { url: dados('export const useAtendimento=()=>({fonteApi:false});export const useAcoes=()=>({});export const useCatalogo=()=>({respostasProntas:[]});'), shortCircuit: true }
     if (/aplicacao\/acessoModulos$/.test(spec)) return { url: dados('export const useAcessoModulos=()=>({acoes:{}});'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: dados('export default new Proxy({}, {get:(_,k)=>k});'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {

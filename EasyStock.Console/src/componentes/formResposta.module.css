@@ -1,0 +1,18 @@
+/* Formulário de resposta pronta, compartilhado entre a Gestão e o painel do chat (#3208). */
+.form { display: grid; gap: var(--e-3); padding: var(--e-2) 0; min-width: 0; }
+.duas { display: grid; gap: var(--e-3); grid-template-columns: 2fr 1fr; }
+.acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+/* Recusa do servidor: contorno uniforme de 1px, sem barra de um lado só. */
+.erro { margin: 0; padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--erro); border-radius: var(--r-1); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); }
+
+/* Pergunta de descarte do formulário em linha: mesma cara da do Modal (confirmarDescarte). */
+.descarte {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); color: var(--tinta);
+}
+.descarte p { margin: 0; font-weight: 600; }
+
+@media (max-width: 759px) {
+  .duas { grid-template-columns: minmax(0, 1fr); }
+}

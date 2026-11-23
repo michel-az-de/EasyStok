@@ -10,7 +10,7 @@
 // ALTERNAR_REGRA), então editar uma automática na biblioteca É editar a
 // mesma que a outra tela mostra.
 import { primeiroNome } from './mensagem.js'
-import { VARIAVEIS, sugestaoDeVariavel } from './automacao.js'
+import { VARIAVEIS, VARIAVEIS_DA_API, sugestaoDeVariavel } from './automacao.js'
 
 const semAcento = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -18,6 +18,25 @@ export const normalizarBusca = (texto) => semAcento(String(texto ?? '').toLowerC
 
 // Teto do servidor para o atalho (RespostaPronta.AtalhoTamanhoMaximo).
 export const ATALHO_MAXIMO = 40
+
+// #3208 (S83): teto do servidor para a categoria (RespostaPronta.CategoriaTamanhoMaximo). Texto livre, opcional.
+export const CATEGORIA_MAXIMA = 40
+export const ROTULO_SEM_CATEGORIA = 'Sem categoria'
+
+export const normalizarCategoria = (texto) => String(texto ?? '').trim().replace(/\s+/g, ' ') || null
+
+export const motivoDaCategoria = (texto) =>
+  (normalizarCategoria(texto)?.length ?? 0) > CATEGORIA_MAXIMA ? `A categoria passa de ${CATEGORIA_MAXIMA} caracteres.` : null
+
+// Categorias já usadas, para sugerir no campo: uma por grafia (sem repetir por caixa ou acento), ordem pt-BR.
+export function categoriasUsadas(lista) {
+  const vistas = new Map()
+  for (const r of lista ?? []) {
+    const categoria = normalizarCategoria(r.categoria)
+    if (categoria && !vistas.has(normalizarBusca(categoria))) vistas.set(normalizarBusca(categoria), categoria)
+  }
+  return [...vistas.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
 
 // Atalho de barra a partir do título: "Enviar cardápio" -> "/enviar-cardapio".
 // #2792: o atalho gerado é sugestão do sistema, não texto da pessoa, então já nasce dentro do teto: um título
@@ -38,6 +57,9 @@ function idLivre(lista, base) {
   while (lista.some((r) => r.id === id)) { id = `${base}-${n}`; n += 1 }
   return id
 }
+
+// #3208: o que o formulário compartilhado (componentes/FormResposta) precisa do domínio, num objeto só.
+export const REGRAS_DO_FORM = { atalhoMaximo: ATALHO_MAXIMO, categoriaMaxima: CATEGORIA_MAXIMA, gerarAtalho, normalizarCategoria, variaveis: VARIAVEIS_DA_API }
 
 // ---------------------------------------------------------------------------
 // Semente: uma linha por resposta rápida e por texto interno (infra/catalogo.js
@@ -222,7 +244,7 @@ function pesoNoSeletor(resposta, alvo) {
   if (!alvo) return 0
   if (normalizarBusca(semBarra(resposta.atalho)).startsWith(alvo)) return 0
   if (normalizarBusca(resposta.titulo).startsWith(alvo)) return 1
-  if ([resposta.atalho, resposta.titulo, resposta.texto].some((c) => normalizarBusca(c).includes(alvo))) return 2
+  if ([resposta.atalho, resposta.titulo, resposta.texto, resposta.categoria].some((c) => normalizarBusca(c).includes(alvo))) return 2
   return null
 }
 
@@ -235,6 +257,35 @@ export function respostasDoSeletor({ respostasProntas, termo = '', limite = 8 })
     .sort((a, b) => a.peso - b.peso || a.r.titulo.localeCompare(b.r.titulo, 'pt-BR'))
     .slice(0, limite)
     .map(({ r }) => r)
+    .sort(porGrupo)
+}
+
+// #3208: com alguma categoria, o seletor sai em grupos: categorias em ordem alfabética e "Sem categoria" por
+// último. O sort é estável, então dentro do grupo vale a relevância da busca. Sem categoria nenhuma, nada muda.
+const chaveDoGrupo = (r) => { const c = normalizarCategoria(r.categoria); return c ? normalizarBusca(c) : null }
+function porGrupo(a, b) {
+  const ka = chaveDoGrupo(a)
+  const kb = chaveDoGrupo(b)
+  if (ka === kb) return 0
+  if (ka === null) return 1
+  if (kb === null) return -1
+  return ka.localeCompare(kb, 'pt-BR')
+}
+
+// Grupos para desenhar a lista já ordenada por `respostasDoSeletor`. `indice` é a posição na lista plana, a mesma
+// do destaque e do aria-activedescendant: o teclado anda pelos grupos sem pular nem repetir.
+export function agruparRespostasDoSeletor(itens) {
+  const grupos = []
+  itens.forEach((resposta, indice) => {
+    const chave = chaveDoGrupo(resposta)
+    let grupo = grupos.find((g) => g.chave === chave)
+    if (!grupo) {
+      grupo = { chave, rotulo: chave === null ? ROTULO_SEM_CATEGORIA : normalizarCategoria(resposta.categoria), itens: [] }
+      grupos.push(grupo)
+    }
+    grupo.itens.push({ resposta, indice })
+  })
+  return { agrupado: grupos.some((g) => g.chave !== null), grupos }
 }
 
 // "/" no começo do campo e um token sem espaço: o resto é o termo da busca.
