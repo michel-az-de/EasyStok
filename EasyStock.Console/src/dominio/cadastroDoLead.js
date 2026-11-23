@@ -27,10 +27,10 @@ export function acoesDoCartao(conversa, { fonteApi = false } = {}) {
 const digitos = (valor) => String(valor ?? '').replace(/\D/g, '')
 
 // O que a conversa já captou, na ordem de confiança: cadastro da conversa, contato informado pelo
-// visitante do site, número do canal (só no WhatsApp, onde o id do contato é o telefone; nos outros
-// canais é um id externo, como no cadastrarEndereco). Nada sobrescreve o que a dona digitar.
+// visitante do site, número do canal (`telefoneCanal`, só no WhatsApp: o id do contato pode ser um @lid
+// da ponte, que não é telefone, e nos outros canais é um id externo). Nada sobrescreve o que a dona digitar.
 function telefoneDaConversa(conversa) {
-  const doCanal = conversa.canal === 'WhatsApp' ? conversa.contato : null
+  const doCanal = conversa.canal === 'WhatsApp' ? conversa.cliente?.telefoneCanal : null
   const candidatos = [conversa.cliente?.telefone, conversa.contatoInformado?.telefone, doCanal]
   const achado = candidatos.find((c) => digitos(c).length >= 10)
   return achado ? telefoneNaTela(achado) : ''

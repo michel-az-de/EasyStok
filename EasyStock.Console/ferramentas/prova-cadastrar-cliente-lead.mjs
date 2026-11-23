@@ -51,7 +51,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const LEAD = {
   id: 'c1', nome: 'Marina Souza', canal: 'WhatsApp', estado: 'Aberto', conta: 'lead', clienteId: null,
   contato: '5511987654321', mensagens: [], pedido: null, passagem: null, ultimaEm: new Date(agora).toISOString(),
-  cliente: { tags: [], notas: [], pedidos: 0, telefone: '', endereco: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
+  cliente: { tags: [], notas: [], pedidos: 0, telefone: '', telefoneCanal: '5511987654321', endereco: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
 }
 // Variantes da conversa pela consulta: informado=1 (lead do chat do site que deixou nome, telefone e e-mail)
 // e vazio=1 (lead sem nada captado, que abre o formulário pelo nome).
@@ -71,6 +71,8 @@ function Cena() {
     salvarCadastroRapido: async (id, dados) => {
       ordem.push('salvar:' + JSON.stringify(dados))
       await espera(150)
+      // #1430: o telefone já é de outro cadastro; só liga com a confirmação da dona.
+      if (q.get('dono') === '1' && !dados.confirmarVinculoExistente) return { erro: 'Esse telefone já é de Ana Lima. Ligar a conversa a esse cadastro?', jaCadastrado: { nome: 'Ana Lima' } }
       if (q.get('erro') === '1') return { erro: 'Esse telefone já pertence a outro cadastro. Confira em Cadastros antes de criar outro.' }
       setConversa(CADASTRADO)
       return {}
@@ -218,6 +220,29 @@ try {
       await p.getByRole('button', { name: 'Salvar cadastro' }).click()
       await p.getByRole('dialog').waitFor({ state: 'hidden', ...T })
       assert.match(await p.evaluate(() => window.ordem.join('|')), /"email":"marina@exemplo.com"/, 'o e-mail informado se perdeu no cadastro forçado')
+      await p.context().close()
+      // (g) telefone já cadastrado: a dona liga ao cadastro existente sem fechar a Ficha (achado da revisão 2)
+      p = await abrir(tela, 'dono=1')
+      await p.getByRole('button', { name: 'Cadastrar cliente', exact: true }).click()
+      await p.getByRole('dialog').getByLabel('Celular').waitFor(T)
+      await p.getByRole('button', { name: 'Salvar cadastro' }).click()
+      const ligar = p.getByRole('button', { name: 'Ligar ao cadastro de Ana Lima' })
+      await ligar.waitFor(T)
+      assert.equal(await p.getByRole('dialog').count(), 1, 'a Ficha deve continuar aberta na pergunta do vínculo')
+      await p.waitForTimeout(300)
+      // O botão do vínculo fica inteiro à vista, acima do rodapé fixo com "Salvar cadastro".
+      const ligarInteiro = await ligar.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return [r.top + 2, r.bottom - 2].every((y) => el.contains(document.elementFromPoint(r.left + r.width / 2, y)))
+      })
+      assert.ok(ligarInteiro, 'Ligar ao cadastro coberto pelo rodapé')
+      await foto(p, `depois-g-ligar-${tela}`)
+      await ligar.click()
+      await p.getByRole('dialog').waitFor({ state: 'hidden', ...T })
+      const acoesDoDono = await p.evaluate(() => window.ordem.slice())
+      assert.equal(acoesDoDono.length, 2, 'esperava salvar e ligar')
+      assert.doesNotMatch(acoesDoDono[0], /confirmarVinculoExistente/)
+      assert.match(acoesDoDono[1], /"confirmarVinculoExistente":true/, 'o vínculo saiu sem confirmarVinculoExistente')
       await p.context().close()
       // (f) aberta pelo nome (não pelo botão): salvar não fecha a Ficha (achado 3)
       p = await abrir(tela, 'vazio=1')

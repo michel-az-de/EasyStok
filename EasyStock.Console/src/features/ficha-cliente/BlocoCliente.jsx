@@ -92,7 +92,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const setForm = mudar => guardarRapido({ form: typeof mudar === 'function' ? mudar(form) : mudar, identidade: identidadeForm })
   // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
   // conversa sem remontar este bloco). A ref trava o segundo toque.
-  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
+  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null, dono: null })
   const cadastrando = useRef(false)
   // #2258 (auditoria T12 a T14, T17, T18): campos que já saíram do foco ou foram conferidos ao salvar
   // (só eles mostram erro), a base dos ids para focar o primeiro erro e o aviso de texto digitado.
@@ -177,35 +177,43 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   useLayoutEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
   const salvandoCadastro = cadastro.salvando && cadastro.id === conversa.id
   const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
+  const donoDoTelefone = cadastro.id === conversa.id && cadastro.dono?.telefone === form.telefone ? cadastro.dono : null
   // #3207: no celular o rodapé fica fixo e o erro nasce no corpo rolável; leva o aviso à vista.
   const erroRef = useRef(null)
   useEffect(() => { if (erroCadastro) erroRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [erroCadastro])
+  // O botão do vínculo nasce abaixo do erro; sem isto o rodapé fixo o cobre a 390 px.
+  const vinculoRef = useRef(null)
+  const temVinculoAOferecer = Boolean(donoDoTelefone)
+  useEffect(() => { if (temVinculoAOferecer) vinculoRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [temVinculoAOferecer])
   // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
   const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
   const { acoes: capacidades } = useAcessoModulos()
   const podeBloquear = !fonteApi || capacidades?.controlarLoja === true
 
   // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
-  async function aoSalvarCadastro() {
+  async function aoSalvarCadastro(opcoes = {}) {
     if (cadastrando.current) return
     cadastrando.current = true
     const id = conversa.id
     const endereco = [form.enderecoSemCep.trim(), form.cep ? mascaraCep(form.cep) : '']
       .filter(Boolean).join(', ') || null
-    setCadastro({ id, salvando: true, erro: null })
+    setCadastro({ id, salvando: true, erro: null, dono: null })
     let erro = null
+    let dono = null
     try {
       // #3207: no cadastro forçado o cartão "Informado pelo visitante" some; o e-mail que ele informou segue junto.
       const email = cadastroForcado ? informado?.email : null
-      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco, ...(email ? { email } : {}) }, agora, identidadeForm)
+      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco, ...(email ? { email } : {}), ...opcoes }, agora, identidadeForm)
       erro = resultado?.erro ?? null
+      // #1430: telefone que já é de um cadastro; no cadastro forçado o cartão do visitante some, então a pergunta vem aqui.
+      if (resultado?.jaCadastrado) dono = { nome: resultado.jaCadastrado.nome, telefone: form.telefone }
       if (!erro) { guardarRapido(null); aoCadastrado?.() }
     } catch (falha) {
       erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
     } finally {
       cadastrando.current = false
     }
-    setCadastro({ id, salvando: false, erro })
+    setCadastro({ id, salvando: false, erro, dono })
   }
 
   const validarNome = (v) => erroDoNome(v)
@@ -371,6 +379,13 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               </div>
             )}
             {erroCadastro && <p ref={erroRef} className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
+            {donoDoTelefone && (
+              <div ref={vinculoRef}>
+                <Botao largo disabled={cadastro.salvando} onClick={() => aoSalvarCadastro({ confirmarVinculoExistente: true })}>
+                  {salvandoCadastro ? 'Ligando…' : donoDoTelefone.nome ? `Ligar ao cadastro de ${donoDoTelefone.nome}` : 'Ligar ao cadastro'}
+                </Botao>
+              </div>
+            )}
             {rodapeDoCadastro ? createPortal(botaoSalvarCadastro, rodapeDoCadastro) : botaoSalvarCadastro}
           </div>
         ) : (

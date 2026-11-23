@@ -214,7 +214,9 @@ await confere('#1686-9 o motivo que segura a barra é link: abre a seção e foc
   const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
   assert.match(barra, /<button type="button" className=\{css\.linkMotivo\} data-alvo-motivo=\{alvoDoPrerequisito\}\s+onClick=\{\(\) => aoIrParaMotivo\(alvoDoPrerequisito\)\}>\{info\.motivo\}<\/button>/)
   const ficha = fonte('features/ficha-cliente/PainelFicha.jsx')
-  assert.match(ficha, /abrirSecao\('contato'\)\s+setSecao\('cliente'\)\s+focarCampoDaFicha\(alvo\)/)
+  // #3207: a abertura passa por abrirFicha, que abre a seção e zera o cadastro forçado do lead.
+  assert.match(ficha, /abrirSecao\('contato'\)\s+abrirFicha\(\)\s+focarCampoDaFicha\(alvo\)/)
+  assert.match(ficha, /const abrirFicha = \(\) => \{ setCadastrarLead\(false\); setSecao\('cliente'\) \}/)
   assert.match(ficha, /abrirComanda\(\); focarCampoDaFicha\('janela'\)/)
   assert.doesNotMatch(ficha, /setSecao\('pedido'\)/, 'a comanda móvel substitui a seção antiga')
   const cliente = fonte('features/ficha-cliente/BlocoCliente.jsx')
