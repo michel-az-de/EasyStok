@@ -125,7 +125,7 @@ Aplicar exige GO do Felipe, porque recria a sessão; os volumes ficam, então n�
 
 Rollback: volte o `image:` do `compose.wppconnect.yaml` para
 `wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8`, tire
-`build:` e `pull_policy:` e rode `docker compose up -d wppconnect`. Os volumes `easystok-wppconnect-tokens` e
+`build:` e rode `docker compose up -d wppconnect`. Os volumes `easystok-wppconnect-tokens` e
 `easystok-wppconnect-user-data` não mudam. Quando uma release oficial trouxer wa-js 4.8.2 ou maior no `yarn.lock`,
 volte para ela e apague a pasta `imagem`.
 

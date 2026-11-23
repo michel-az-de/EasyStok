@@ -11,7 +11,8 @@ ARG WA_JS_SHA512=3xMNZt/rCrJKZBmfD428LsaGakYGvq4vNmH+AzKM2uf7x3/XL4tpyqKO/MtB7NF
 
 RUN set -eu; \
     cd /tmp; \
-    npm pack --silent "@wppconnect/wa-js@${WA_JS}" >/dev/null; \
+    npm pack --silent --cache /tmp/npm-cache "@wppconnect/wa-js@${WA_JS}" >/dev/null; \
+    rm -rf /tmp/npm-cache; \
     f="wppconnect-wa-js-${WA_JS}.tgz"; \
     hash="$(node -e "process.stdout.write(require('crypto').createHash('sha512').update(require('fs').readFileSync('${f}')).digest('base64'))")"; \
     if [ "$hash" != "$WA_JS_SHA512" ]; then echo "sha512 do wa-js ${WA_JS} nao confere: ${hash}" >&2; exit 1; fi; \
@@ -21,5 +22,7 @@ RUN set -eu; \
     rm -f "$f"; \
     v="$(node -p "require('${d}/package.json').version")"; \
     if [ "$v" != "$WA_JS" ]; then echo "wa-js instalado ${v}, esperado ${WA_JS}" >&2; exit 1; fi; \
-    if grep -Eq 'getMyUserLid=function\(\)\{return [A-Za-z_$]+\.UserPrefs\.getMeLidUserOrThrow\(\)\}' "$d/dist/wppconnect-wa.js"; then \
+    js="$d/dist/wppconnect-wa.js"; \
+    test -f "$js"; \
+    if ! grep -Eq 'getMyUserLid=function\(\)\{[^}]*getMaybeMeLidUser' "$js"; then \
       echo "wa-js ${WA_JS} ainda chama getMeLidUserOrThrow sem alternativa" >&2; exit 1; fi
