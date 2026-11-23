@@ -119,9 +119,21 @@ Aplicar exige GO do Felipe, porque recria a sessão; os volumes ficam, então n�
 
 1. Na VPS, copie `scripts/deploy/wppconnect/compose.yaml` para `/opt/stacks/easystok/compose.wppconnect.yaml` e
    `scripts/deploy/wppconnect/imagem/Dockerfile` para `/opt/stacks/easystok/wppconnect/imagem/Dockerfile`.
-2. `cd /opt/stacks/easystok && docker compose build wppconnect && docker compose up -d wppconnect`.
-3. Confira no log da ponte `WA-JS version: 4.8.2` e `State Change CONNECTED`, e o estado na tela de integração.
-4. Faça um envio de teste para um número de teste e confira o eco `fromMe`.
+2. Sob a trava `/tmp/easystok-deploy.lock`: `docker compose config -q`, `docker compose build wppconnect` e
+   `docker compose up -d --no-deps wppconnect`.
+3. Aceite em até 5 min, sem depender de `State Change CONNECTED`. Essa linha só sai quando dispara o evento
+   `onStateChange` (`dist/util/createSessionUtil.js`) e não apareceu na tentativa de 23/11, mesmo com a ponte
+   entregando callbacks 23 s após a partida. O que vale:
+   - contêiner `healthy`;
+   - `WA-JS version: 4.8.2` e `Started Session` no log. Essa linha só sai depois de `client.isConnected()`,
+     quando o servidor marca `status: CONNECTED`;
+   - nenhum `notLogged`, `Waiting for QRCode` ou `qrcode` no log;
+   - `GET /api/integracoes/whatsapp/wppconnect` com `conectado: true`, que soma `status-session` e
+     `check-connection-session`;
+   - `POST /api/webhooks/wppconnect` com 200 no log da API, sem 401.
+4. Antes de QUALQUER rollback, salve `docker logs --timestamps easystok-wppconnect-1` em arquivo na VPS, porque o
+   contêiner substituído perde o log. Em 23/11 isso não foi feito, e a causa ficou sem medida.
+5. O envio de teste é do Felipe, para um número de teste. Confira o eco `fromMe`.
 
 Rollback: volte o `image:` do `compose.wppconnect.yaml` para
 `wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8`, tire
