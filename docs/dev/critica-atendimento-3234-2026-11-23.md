@@ -2,11 +2,13 @@
 
 **Status: proposta, aguardando aprovação do Felipe.** Nenhuma PR de interface sai antes da aprovação desta lista.
 
+**Escopo: só desktop**, a pedido do Felipe em 23/11. O celular fica para outra rodada.
+
 Data: 23/11/2026. Código analisado: `master` em `726ddcfc5`.
 
 ## Método
 
-- Os prints deste documento vêm do Console em modo demonstração, rodando a partir do worktree, em 1440x900 e 390x844, nos temas claro e escuro. Estão na pasta [`critica-atendimento-3234/`](critica-atendimento-3234/).
+- Os prints deste documento vêm do Console em modo demonstração, rodando a partir do worktree, em 1440x900 e 1920x1080, nos temas claro e escuro. Estão na pasta [`critica-atendimento-3234/`](critica-atendimento-3234/).
 - A produção foi medida só pelo layout em 23/11, numa tela de 1912x867. A medida cobre quantidade de blocos, alturas, tamanhos de fonte, cores e avisos repetidos, sem nenhum dado de cliente. O print de produção mostra contato real e ficou só com o Felipe.
 - O modo demonstração não tem conversa com a janela fechada nem mensagem com falha de envio. Para esses dois casos, a evidência é a medida de produção.
 - Os princípios de referência são gerais. No painel de contato dos apps de mensagem, vêm primeiro a identidade, depois as ações rápidas e, por último, a mídia trocada. Nos painéis de atendimento, o estado da conversa fica numa faixa só, com o tempo restante da janela, e as seções laterais podem ser recolhidas.
@@ -17,23 +19,24 @@ Data: 23/11/2026. Código analisado: `master` em `726ddcfc5`.
 |---|---|
 | ![Atendimento 1440 claro](critica-atendimento-3234/atendimento-1440-light.png) | ![Atendimento 1440 escuro](critica-atendimento-3234/atendimento-1440-dark.png) |
 
-| 390 claro | 390 escuro |
+| 1920 claro | 1920 escuro |
 |---|---|
-| ![Atendimento 390 claro](critica-atendimento-3234/atendimento-390-light.png) | ![Atendimento 390 escuro](critica-atendimento-3234/atendimento-390-dark.png) |
+| ![Atendimento 1920 claro](critica-atendimento-3234/atendimento-1920-light.png) | ![Atendimento 1920 escuro](critica-atendimento-3234/atendimento-1920-dark.png) |
 
 ## Medidas
 
-| Métrica | Produção 1912x867 | Demo 1440x900 | Demo 390x844 |
+| Métrica | Produção 1912x867 | Demo 1440x900 | Demo 1920x1080 |
 |---|---|---|---|
-| Altura útil da conversa | 560 px (65%) | 581 px (65%) | 435 px (52%) |
-| Compositor (com a faixa da janela) | 203 px | 165 px | 181 px, mais 70 px da barra de abas e 50 px da faixa de notificações |
-| Tamanhos de fonte visíveis | 6 (12, 13, 14, 15, 17, 20) | 6 | 5 |
-| Cores de fundo distintas | 9 | 9 (10 no escuro) | 6 |
-| Blocos na coluna do cliente | 7, somando 774 px (a coluna rola até 933 px) | 4 visíveis no print | n/a |
+| Largura da conversa | 812 px | 748 px | 1176 px (61% da tela) |
+| Altura útil da conversa | 560 px (65%) | 581 px (65%) | 759 px (70%) |
+| Compositor (com a faixa da janela) | 203 px | 165 px | 167 px |
+| Tamanhos de fonte visíveis | 6 (12, 13, 14, 15, 17, 20) | 6 | 6 |
+| Cores de fundo distintas | 9 | 9 (10 no escuro) | 9 (10 no escuro) |
+| Blocos na coluna do cliente | 7, somando 774 px (a coluna rola até 933 px) | 4 visíveis no print | 4 visíveis no print |
 | Lugares que dizem "Janela fechada" | 3: cabeçalho, faixa e campo | n/a | n/a |
 | Aviso de falha igual em sequência | 4, um por mensagem | n/a | n/a |
-| Selos por cartão da lista | até 4 (ex.: Sem nome, nome da atendente, Lead, Só modelo) | 1 | n/a |
-| Botões visíveis / menores que 24 px | 50 / 0 | 43 / 0 | 13 / 0 |
+| Selos por cartão da lista | até 4 (ex.: Sem nome, nome da atendente, Lead, Só modelo) | 1 ou 2 | 1 ou 2 |
+| Botões visíveis / menores que 24 px | 50 / 0 | 43 / 0 | 43 / 0 |
 
 ## Achados e proposta
 
@@ -46,8 +49,9 @@ Legenda: **Ação** pode ser manter, agrupar, recolher ou remover. **P1** pesa n
 | C1 | Cada envio que falhou repete o balão e o aviso "O WhatsApp demorou a responder. Pode ter chegado…" | produção: 4 avisos iguais seguidos | Falhas seguidas do mesmo texto viram um bloco só ("4 tentativas não saíram", com "Ver detalhes"). O texto segue o status que a #3229 definir. | agrupar | P1 | A |
 | C2 | "Janela fechada" aparece em 3 lugares | produção: cabeçalho, faixa e campo | Uma faixa só, compacta e com a ação. Tirar do campo e do cabeçalho. Com a janela aberta, o cabeçalho mostra o tempo restante ("Janela aberta · 3 h"). | remover duplicata | P1 | A |
 | C3 | Duas entradas para a mesma lista de mensagens padrão: "Escolher modelo" na faixa e "Respostas" no compositor | `Composer.jsx:266-269`; as duas chamam `aoAbrirModelos` | Desde a #3206, "Respostas" já é a lista. Manter só uma entrada. Isso revê a decisão da #2420 e precisa do aceite do Felipe. | remover | P1 | A |
-| C4 | O compositor toma 23% da altura, e no celular a conversa fica com 52% da tela | medidas acima | Faixa da janela numa linha só. "Só texto neste canal" vira dica dentro do campo. A faixa de notificações bloqueadas pode ser dispensada de vez. | recolher | P2 | A |
-| C5 | O estado "Assistente respondendo" ou "Você respondendo" ocupa uma linha própria de 40 px abaixo do cabeçalho | prints 1440 e 390 | Estado como selo no cabeçalho, mantendo o botão "Assumir conversa" | agrupar | P2 | A |
+| C4 | O compositor com a faixa da janela toma 23% da altura na produção (203 de 867 px) | medidas acima | Faixa da janela numa linha só. "Só texto neste canal" vira dica dentro do campo. A faixa de notificações bloqueadas pode ser dispensada de vez. | recolher | P2 | A |
+| C6 | Em tela larga a conversa estica: em 1920 px ela fica com 1176 px, a borda esquerda do balão do cliente fica a cerca de 1.130 px da borda direita do balão da loja, e a lista, com cerca de 300 px, corta a prévia | print 1920 e medidas | Largura de leitura da conversa limitada (por volta de 880 px). A sobra vai para a lista e para o cartão do cliente. | manter com ajuste | P2 | A |
+| C5 | O estado "Assistente respondendo" ou "Você respondendo" ocupa uma linha própria de 40 px abaixo do cabeçalho | prints 1440 e 1920 | Estado como selo no cabeçalho, mantendo o botão "Assumir conversa" | agrupar | P2 | A |
 
 ### Lista de conversas
 
@@ -80,18 +84,18 @@ Legenda: **Ação** pode ser manter, agrupar, recolher ou remover. **P1** pesa n
 
 | Grupo | Achados | Por que nessa ordem |
 |---|---|---|
-| A Conversa | C1, C2, C3, C4, C5 | É onde a atendente passa o tempo; ganha altura útil e fica sem aviso repetido |
+| A Conversa | C1, C2, C3, C4, C5, C6 | É onde a atendente passa o tempo; ganha altura útil e fica sem aviso repetido |
 | B Cartão do cliente | R1, R2, R3, R4, R5 | Abre espaço para a #3232 e a #3233 |
 | C Lista | L1, L2 | Menos selos por cartão, com leitura mais rápida da fila |
 | D Tipografia, cor e avisos | G1, G2, G3, G4 | Mexe no Console inteiro: PR própria com prova de contraste, por último |
 
-Cada PR traz print antes e depois (1440 e 390, nos dois temas), prova visual e print em produção enviado só ao Felipe.
+Cada PR traz print antes e depois (1440 e 1920, nos dois temas), prova visual e print em produção enviado só ao Felipe.
 
 **Relação com a #3229:** o C1 muda só o desenho, agrupando as falhas. O texto ("pode ter chegado" ou "não saiu") vem do status que a #3229 corrigir no servidor. Não há sobreposição.
 
 ## Fora
 
-Navegação lateral, telas fora do Atendimento e a mudança de dados de distância e mídia (#3232 e #3233).
+Versão celular (foco no desktop, pedido do Felipe), navegação lateral, telas fora do Atendimento e a mudança de dados de distância e mídia (#3232 e #3233).
 
 ## Para aprovar
 
