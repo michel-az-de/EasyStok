@@ -56,7 +56,9 @@ ok('cliente cadastrado: sem "Cadastrar cliente"; continua "Conferir identidade" 
 // 2. Valores iniciais do formulário
 const captado = {
   ...lead,
-  cliente: { telefone: '', telefoneCanal: '5511987654321', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
+  // Formato do modo API (traducaoConversas): o número do canal é o `contato`; `cliente` não traz `telefoneCanal`.
+  contato: '5511987654321',
+  cliente: { telefone: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
 }
 const v = valoresIniciaisDoCadastro(captado)
 assert.equal(v.nome, 'Marina (perfil)')
@@ -69,7 +71,9 @@ assert.equal(v.telefone, '(11) 98765-4321')
 ok('sem telefone no cadastro, usa o número do contato do canal, no formato da tela')
 
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: 'maria@canal', cliente: {} }).telefone, '')
-// Ponte WppConnect: o contato @lid tem 15 dígitos e não é telefone; só `telefoneCanal` é o número do canal.
+// Um id com "@" (o @lid da ponte, 15 dígitos) não é telefone; na demonstração o número vem em `telefoneCanal`.
+assert.equal(valoresIniciaisDoCadastro({ ...lead, canal: 'WhatsApp', contato: '5511987654321', cliente: {} }).telefone, '(11) 98765-4321')
+assert.equal(valoresIniciaisDoCadastro({ ...lead, canal: 'Instagram', contato: '5511987654321', cliente: {} }).telefone, '')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123456789012345@lid', cliente: {} }).telefone, '')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123456789012345@lid', cliente: { telefoneCanal: '5511987654321' } }).telefone, '(11) 98765-4321')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123', cliente: {} }).telefone, '')

@@ -51,7 +51,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const LEAD = {
   id: 'c1', nome: 'Marina Souza', canal: 'WhatsApp', estado: 'Aberto', conta: 'lead', clienteId: null,
   contato: '5511987654321', mensagens: [], pedido: null, passagem: null, ultimaEm: new Date(agora).toISOString(),
-  cliente: { tags: [], notas: [], pedidos: 0, telefone: '', telefoneCanal: '5511987654321', endereco: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
+  // Formato do modo API: o número do canal é o contato; cliente não traz telefoneCanal.
+  cliente: { tags: [], notas: [], pedidos: 0, telefone: '', endereco: '', enderecoCapturado: 'Rua das Flores, 412, apto 71, Centro, 01310-100' },
 }
 // Variantes da conversa pela consulta: informado=1 (lead do chat do site que deixou nome, telefone e e-mail)
 // e vazio=1 (lead sem nada captado, que abre o formulário pelo nome).
