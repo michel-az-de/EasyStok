@@ -14,7 +14,7 @@ const { configWeb } = require('./ambiente.cjs');
 const bundleVersion = process.env.CDB_BUNDLE_VERSION || version.version;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(bundleVersion)) throw new Error('Versão do conteúdo inválida.');
 const ambiente = configWeb({ ambiente: process.env.CDB_AMBIENTE || 'oficial', apiBaseUrl: process.env.CDB_API_BASE_URL });
-for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot.css']) {
+for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot-ambiente.js', 'pilot.css']) {
   if (!fs.existsSync(path.join(root, name))) throw new Error('Arquivo obrigatório ausente: ' + name);
 }
 if (!fs.existsSync(path.join(source, 'index.html'))) throw new Error('PWA fonte ausente.');
@@ -25,7 +25,7 @@ if (path.dirname(target) !== root || path.basename(target) !== 'web') throw new 
 fs.rmSync(target, { recursive: true, force: true });
 fs.cpSync(source, target, { recursive: true });
 fs.cpSync(fonts, path.join(target, 'fonts'), { recursive: true });
-for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot.css']) fs.copyFileSync(path.join(root, name), path.join(target, name));
+for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot-ambiente.js', 'pilot.css']) fs.copyFileSync(path.join(root, name), path.join(target, name));
 fs.cpSync(path.join(root, 'assets/guia'), path.join(target, 'guia'), { recursive: true });
 fs.copyFileSync(path.resolve(root, '../../EasyStock.Console/src/assets/casa-da-baba.png'), path.join(target, 'casa-da-baba.png'));
 const config = {

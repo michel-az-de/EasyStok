@@ -5,7 +5,7 @@
 
 const TROCAS = [
   // A configuração precisa existir antes do onboarding inline do PWA.
-  { de: '<head>', para: '<head>\n<script src="config.js"></script>' },
+  { de: '<head>', para: '<head>\n<script src="config.js"></script>\n<script src="pilot-ambiente.js"></script>' },
   { de: '<title>Easy Stock Mobile</title>', para: '<title>Casa da Baba Piloto</title>' },
   { de: '<h2>Registrar lote</h2>', para: '<h2>Produção</h2>' },
   {
