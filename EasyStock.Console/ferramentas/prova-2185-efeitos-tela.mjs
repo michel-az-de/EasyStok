@@ -653,6 +653,14 @@ try {
     const log = p.getByRole('log')
     assert.equal(await log.getByRole('button', { name: 'Reenviar' }).count(), 1, 'Reenviar fora da mais recente')
     assert.equal(await log.getByRole('button', { name: 'Mais opções da mensagem' }).count(), 5, 'as tentativas perderam o menu da mensagem')
+    // A mais recente do grupo, reenviada e esgotada de novo, continua a cabeça: o grupo não se parte em dois avisos.
+    await log.getByRole('button', { name: 'Reenviar' }).click()
+    await p.getByText('Tentei de novo e o WhatsApp demorou outra vez', { exact: false }).waitFor()
+    const reenviado = await contar()
+    assert.equal(reenviado.alertas.length, 1, `reenviar a mais recente partiu o grupo (${reenviado.alertas.length} avisos)`)
+    assert.deepEqual(reenviado.rotulos, ['Tentativa 1 de 4', 'Tentativa 2 de 4', 'Tentativa 3 de 4'], 'o grupo perdeu a mais recente')
+    await p.getByRole('button', { name: 'Ocultar as tentativas' }).click()
+    assert.equal((await contar()).baloes, 1, 'fechado, o grupo reenviado não voltou a 1 balão')
     await ctx.close()
 
     // O Reenviar de uma falha solta que esgota o tempo de novo deixa a falha igual à vizinha: o balão clicado fica à
