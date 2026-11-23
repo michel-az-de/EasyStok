@@ -13,6 +13,7 @@ O `.env` da VPS define
 | `compose.yaml` | `scripts/deploy/producao/compose.yaml` |
 | `compose.override.yaml` | `scripts/deploy/producao/compose.override.yaml` |
 | `compose.wppconnect.yaml` | `scripts/deploy/wppconnect/compose.yaml` |
+| `wppconnect/imagem/Dockerfile` | `scripts/deploy/wppconnect/imagem/Dockerfile` (#3228) |
 | `compose.observabilidade.yaml` | `scripts/deploy/observabilidade/compose.easystok.yaml` |
 
 Os dois últimos já eram a origem dos arquivos da VPS e conferiam em 14/11/2026.

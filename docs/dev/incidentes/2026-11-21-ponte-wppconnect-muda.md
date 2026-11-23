@@ -106,4 +106,27 @@ produção: exige GO do Felipe) e acompanhe por um dia o log `Ponte WPPConnect m
 5. Se a ponte está conectada e nada chega, o remédio usado em 21/11 foi `docker restart easystok-wppconnect-1`.
    Reiniciar sessão de WhatsApp arrisca QR e bloqueio do número: só com GO do Felipe, nunca pelo deploy.
 
+## Envio quebrado com `getMeLidUserOrThrow is not a function` (#3228)
+
+Outro modo de falha, medido em 23/11/2026. A ponte segue `CONNECTED`, mas todo `send-message` responde erro, e o
+log da ponte (não o da API, ver #3229) mostra `TypeError: n.UserPrefs.getMeLidUserOrThrow is not a function` em
+`getMyUserLid`. O WhatsApp Web tirou a função e o wa-js 4.7.2 da imagem 2.10.81 a chama em todo envio. O wa-js
+4.8.2 tem alternativa (wppconnect-team/wa-js#3794). Até a v2.10.89 o wppconnect-server ainda traz o 4.7.2, por isso
+`scripts/deploy/wppconnect/imagem/Dockerfile` monta a 2.10.81, no mesmo digest, com o wa-js 4.8.2 conferido por sha512.
+O build falha se o pacote ainda chamar a função sem alternativa.
+
+Aplicar exige GO do Felipe, porque recria a sessão; os volumes ficam, então não deve pedir QR:
+
+1. Na VPS, copie `scripts/deploy/wppconnect/compose.yaml` para `/opt/stacks/easystok/compose.wppconnect.yaml` e
+   `scripts/deploy/wppconnect/imagem/Dockerfile` para `/opt/stacks/easystok/wppconnect/imagem/Dockerfile`.
+2. `cd /opt/stacks/easystok && docker compose build wppconnect && docker compose up -d wppconnect`.
+3. Confira no log da ponte `WA-JS version: 4.8.2` e `State Change CONNECTED`, e o estado na tela de integração.
+4. Faça um envio de teste para um número de teste e confira o eco `fromMe`.
+
+Rollback: volte o `image:` do `compose.wppconnect.yaml` para
+`wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8`, tire
+`build:` e rode `docker compose up -d wppconnect`. Os volumes `easystok-wppconnect-tokens` e
+`easystok-wppconnect-user-data` não mudam. Quando uma release oficial trouxer wa-js 4.8.2 ou maior no `yarn.lock`,
+volte para ela e apague a pasta `imagem`.
+
 Nunca cole telefone, texto de mensagem ou token em issue, PR ou log (#2590).
