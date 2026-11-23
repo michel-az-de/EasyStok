@@ -147,6 +147,12 @@ function Cena() {
   window.esconder = setOculto
   window.filtrar = (chave, valor) => despachar({ tipo: A.MUDAR_FILTRO, chave, valor })
   window.chegou = () => despachar({ tipo: A.ENVIAR_MENSAGEM, id: estado.selecionadaId, texto: 'Mensagem que chegou com a aba escondida', mensagemId: 'esc-' + Date.now(), agora: Date.now() })
+  // #3234 (E32): a atendente manda o mesmo texto de novo e ele esgota o tempo igual.
+  window.falhouIgual = () => {
+    const mensagemId = 'mf-mais-' + Date.now()
+    despachar({ tipo: A.ENVIAR_MENSAGEM, id: estado.selecionadaId, texto: 'Tem sim, separo uma?', mensagemId, agora: Date.now() })
+    despachar({ tipo: A.FALHAR_ENVIO_API, id: estado.selecionadaId, mensagemId, erro: 'The operation was canceled. Envio incerto.' })
+  }
   window.estadoCena = () => estado
   const acoes = useMemo(() => ({
     descarregarRascunho: (d) => despachar({ tipo: A.DEFINIR_RASCUNHO, ...d, doCampo: true }),
@@ -634,7 +640,7 @@ try {
       alertas: [...document.querySelectorAll('[role=log] [role=alert]')].map((e) => e.textContent.trim()),
       // Na tela (não só para o leitor): a frase da falha aparece uma vez, aberto ou fechado.
       frases: (document.querySelector('[role=log]').textContent.match(/Pode ter chegado/g) ?? []).length,
-      rotulos: [...document.querySelector('[role=log]').textContent.matchAll(/Tentativa \d de 4/g)].map((m) => m[0]),
+      rotulos: [...document.querySelector('[role=log]').textContent.matchAll(/Tentativa \d de \d/g)].map((m) => m[0]),
     }))
     const fechado = await contar()
     assert.equal(fechado.baloes, 1, `${fechado.baloes} balões iguais à vista`)
@@ -661,6 +667,17 @@ try {
     assert.deepEqual(reenviado.rotulos, ['Tentativa 1 de 4', 'Tentativa 2 de 4', 'Tentativa 3 de 4'], 'o grupo perdeu a mais recente')
     await p.getByRole('button', { name: 'Ocultar as tentativas' }).click()
     assert.equal((await contar()).baloes, 1, 'fechado, o grupo reenviado não voltou a 1 balão')
+    // Aberto, o grupo continua aberto quando chega outra falha igual: a nova vira a cabeça e as 4 viram tentativas.
+    await p.getByRole('button', { name: 'Ver as 4 tentativas' }).click()
+    await p.evaluate(() => window.falhouIgual())
+    await p.getByText('5 tentativas sem resposta do WhatsApp', { exact: false }).waitFor()
+    const alternar = log.getByRole('button', { name: /tentativas$/ })
+    const cresceu = {
+      aberto: await alternar.getAttribute('aria-expanded'),
+      rotulos: (await contar()).rotulos,
+    }
+    assert.deepEqual(cresceu, { aberto: 'true', rotulos: ['Tentativa 1 de 5', 'Tentativa 2 de 5', 'Tentativa 3 de 5', 'Tentativa 4 de 5'] },
+      'o grupo aberto fechou quando chegou outra falha igual')
     await ctx.close()
 
     // O Reenviar de uma falha solta que esgota o tempo de novo deixa a falha igual à vizinha: o balão clicado fica à

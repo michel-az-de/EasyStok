@@ -12,8 +12,8 @@ const assinaturaDaFalha = (linha, soltas) => {
   const m = linha.tipo === 'mensagem' ? linha.mensagem : null
   if (!m || m.dir !== 'out' || m.status !== 'falhou' || soltas.has(m.id)) return null
   if (m.midia || m.modelo || m.formato || m.arte) return null
-  // Saiu por SMS, espera o cliente responder ou ainda não tem id no servidor: cada uma tem estado e ação próprios.
-  if (m.porSms || m.aguardaCliente || m.semIdServidor) return null
+  // Saiu por SMS, espera o cliente responder, ainda não tem id no servidor ou foi apagada: estado e ação próprios.
+  if (m.porSms || m.aguardaCliente || m.semIdServidor || m.apagadaEm) return null
   const falha = falhaDeEnvio(m.erro)
   return `${falha.tipo}\u0000${falha.texto}\u0000${m.texto ?? ''}`
 }
