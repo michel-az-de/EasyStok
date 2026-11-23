@@ -140,3 +140,14 @@ Reverter a PR da fase: o botão volta ao fluxo atual pelo Atendimento e a fila v
 1. ~~A conversa criada por baixo pode aparecer na fila do Atendimento, ou fica escondida até a cliente responder?~~ Respondida 19/11, 22:08: **fica escondida** (seção 8).
 2. ~~Fechar a janela no meio da montagem: perde tudo (com confirmação) ou guarda rascunho para retomar?~~ Respondida 19/11, 23:05: **guarda rascunho** (seção 5).
 3. ~~O resumo continua saindo pelo WhatsApp da loja no Registrar (escolha desta spec). No futuro, prefere pedido sem conversa por `POST /api/pedidos` mais um aviso novo de "pedido recebido"?~~ Respondida 20/11, 00:58: **mantém a conversa** (seção 4). Não há aviso de "pedido recebido" a criar.
+
+## 14. Emenda (#3238, 23/11/2026)
+
+A spec `docs/plan/relacionamento-cliente-3237.md` (issue mãe #3237) muda uma peça desta:
+
+- A coluna Itens da janela passa a usar o cardápio compartilhado com o Atendimento, extraído na S5 e aplicado na S6 daquela spec. A lista de texto com "+" sai.
+- O tier alto das fases desta spec continua. A S6 também é tier alto e a PR fica aberta até a label `aprovado`.
+- O momento de abrir a conversa (#3158) não muda.
+- O critério de abandono da seção 9 continua valendo.
+
+O resto desta spec segue como está.
