@@ -11,6 +11,7 @@ import { acoesDoCartao, ROTULO_CADASTRAR_CLIENTE } from '../../dominio/cadastroD
 import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
+import { QuemEDoCliente } from './QuemEDoCliente'
 import { copiarTexto, linkDoMapa } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 import notasCss from './NotasDoCliente.module.css'
@@ -79,6 +80,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, aoCadastrar, foto
           <span><strong>Cadastro desativado.</strong> Não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a></span>
         </p>
       )}
+      <QuemEDoCliente conversa={conversa} />
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
       {/* #3207: lead tem UM botão principal; vincular a um cadastro que já existe fica como ação discreta. */}
       {acoes.cadastrar && aoCadastrar && <Botao largo variante="primario" icone="user-plus" data-cadastrar-cliente onClick={aoCadastrar}>{ROTULO_CADASTRAR_CLIENTE}</Botao>}
