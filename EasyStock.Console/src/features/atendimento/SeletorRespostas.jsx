@@ -48,7 +48,8 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
     if (!pelaBarra || !editavel || editando !== null || !itemAtivo) return undefined
     const aoTeclar = (e) => {
       if (e.key !== 'F2' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return
-      e.preventDefault(); setRecusou(false); setEditando(itemAtivo.id)
+      // stopPropagation: na demonstração a Moldura escuta F2 na janela (Simular) e abriria junto.
+      e.preventDefault(); e.stopPropagation(); setRecusou(false); setEditando(itemAtivo.id)
     }
     document.addEventListener('keydown', aoTeclar)
     return () => document.removeEventListener('keydown', aoTeclar)
@@ -129,7 +130,7 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
                 aria-keyshortcuts={editavel ? 'F2' : undefined}
                 onKeyDown={(e) => {
                   // F2 edita a resposta ativa (o botão Editar fica fora da lista de opções).
-                  if (e.key === 'F2' && editavel && itens[destaque]) { e.preventDefault(); abrirForm(itens[destaque].id); return }
+                  if (e.key === 'F2' && editavel && itens[destaque]) { e.preventDefault(); e.stopPropagation(); abrirForm(itens[destaque].id); return }
                   seletor.aoTeclar(e, aoInserido)
                 }}
               />

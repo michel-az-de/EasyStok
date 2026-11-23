@@ -442,8 +442,10 @@ try {
         const busca = p.getByRole('combobox', { name: 'Buscar resposta pronta' })
         assert.equal(await busca.getAttribute('aria-keyshortcuts'), 'F2')
         await busca.press('ArrowDown') // Prazo -> Taxa de frete
+        await escutarF2NaJanela(p)
         await busca.press('F2')
         assert.equal(await painel(p).getByLabel('Título').inputValue(), 'Taxa de frete', 'F2 não abriu a edição do item ativo')
+        assert.equal(await p.evaluate(() => window.__f2NaJanela), 0, 'F2 do seletor vazou para a janela: na demonstração abriria Simulações junto')
       })
       await cenario(`o2-f2-pela-barra-${tela}`, async () => {
         const p = await abrir(tela)
@@ -453,9 +455,15 @@ try {
         assert.equal(await p.getByRole('combobox', { name: 'Buscar resposta pronta' }).count(), 0, 'pela barra não há campo de busca')
         assert.equal(await p.getByRole('listbox', { name: 'Respostas prontas' }).getAttribute('aria-keyshortcuts'), 'F2')
         await campo.press('ArrowDown') // Prazo -> Taxa de frete
+        await escutarF2NaJanela(p)
         await campo.press('F2')
         assert.equal(await painel(p).getByLabel('Título').inputValue(), 'Taxa de frete', 'F2 pela barra não abriu a edição')
+        assert.equal(await p.evaluate(() => window.__f2NaJanela), 0, 'F2 pela barra vazou para a janela: na demonstração abriria Simulações junto')
       })
+      // A Moldura escuta F2 na janela (Simular, na demonstração): o F2 do seletor não pode chegar lá.
+      async function escutarF2NaJanela(p) {
+        await p.evaluate(() => { window.__f2NaJanela = 0; window.addEventListener('keydown', (e) => { if (e.key === 'F2') window.__f2NaJanela += 1 }) })
+      }
       const sujar = async (p) => {
         await abrirPainel(p)
         await p.getByRole('button', { name: 'Nova resposta' }).click()
