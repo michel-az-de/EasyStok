@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useCatalogo } from './contextos'
 import { faixaDoPedido, faixaParaCliente } from '../dominio/entrega'
 import { moverDestaque, resolverVariaveis, respostasDoSeletor, termoDaBarra } from '../dominio/respostas'
@@ -19,6 +19,12 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   // A busca aberta pelo botão vale só para a conversa em que abriu; o destaque, só
   // para o termo em que foi escolhido (termo novo volta ao primeiro da lista).
   const [aberturaPeloBotao, setAberturaPeloBotao] = useState(null)
+  // Formulário do painel com algo digitado (#3208): `travar(true)` faz `fechar` recusar (devolve false) e pedir o
+  // "Descartar?" ao formulário (`pedidoDescarte`). Ref, não estado: o valor vale já no gesto seguinte (o Esc chega antes de o
+  // Popover reassinar o `fechar` novo). Trocar de conversa remonta o Composer (key), então o rascunho do form não sobrevive a isso.
+  const travada = useRef(false)
+  const travar = useCallback((v) => { travada.current = v }, [])
+  const [pedidoDescarte, setPedidoDescarte] = useState(0)
   const busca = aberturaPeloBotao?.conversaId === conversa?.id ? aberturaPeloBotao.texto : null
   const setBusca = (texto) => setAberturaPeloBotao(texto === null ? null : { conversaId: conversa?.id, texto })
 
@@ -35,8 +41,10 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   const temRespostas = useMemo(() => (respostasProntas ?? []).some((r) => !r.arquivada), [respostasProntas])
 
   function fechar() {
+    if (travada.current) { setPedidoDescarte((n) => n + 1); return false }
     setBusca(null)
     if (pelaBarra) aoInserir('')
+    return true
   }
 
   // Pela barra, o texto substitui o "/termo"; pelo botão, entra depois do que já estava escrito.
@@ -86,6 +94,8 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
     destacar: setDestaque,
     abrir: () => setBusca(''),
     fechar,
+    travar,
+    pedidoDescarte,
     inserir,
     aoTeclar,
   }

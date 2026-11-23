@@ -59,7 +59,7 @@ await confere('3. toque fora fecha: pointerdown no documento, fora da caixa', ()
   assert.match(popover, /if \(!caixaRef\.current\?\.contains\(evento\.target\)\) aoFechar\(\)/)
 })
 await confere('3. Escape no documento fecha com o foco em qualquer lugar e devolve o foco ao gatilho', () => {
-  assert.match(popover, /useEscape\(true, \(evento\) => \{[\s\S]*?aoFechar\(\)\s*\n\s*if \(origemRef\.current\?\.isConnected\) origemRef\.current\.focus\(\)/)
+  assert.match(popover, /useEscape\(true, \(evento\) => \{[\s\S]*?if \(aoFechar\(\) === false\) return\s*\n\s*if \(origemRef\.current\?\.isConnected\) origemRef\.current\.focus\(\)/)
   assert.match(popover, /\{ capturar: true \}\)/)
   assert.match(fonte('hooks/useEscape.js'), /document\.addEventListener\('keydown', aoTeclar, capturar\)/)
 })

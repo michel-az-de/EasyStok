@@ -79,6 +79,20 @@ public class AtendimentoEscritaPermissaoTests
     }
 
     [Fact]
+    public async Task GerenteCriaRespostaComCategoriaQueEntraESai()
+    {
+        ComoPerfil("Atendimento");
+        var corpo = new RespostaProntaBody("Oi", "oi", "Olá!", "Entrega");
+
+        var resultado = await Respostas().Criar(corpo, default);
+
+        await _respostas.Received(1).AddAsync(Arg.Is<RespostaPronta>(r => r.Categoria == "Entrega"), Arg.Any<CancellationToken>());
+        System.Text.Json.JsonSerializer.Serialize(resultado.Should().BeAssignableTo<ObjectResult>().Which.Value,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))
+            .Should().Contain("\"categoria\":\"Entrega\"");
+    }
+
+    [Fact]
     public async Task CozinhaContinuaLendo()
     {
         ComoPerfil("Cozinha");

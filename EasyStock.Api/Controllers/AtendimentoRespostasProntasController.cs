@@ -65,7 +65,7 @@ public class AtendimentoRespostasProntasController(
         Executar(async () => DataOk(await useCases.RenderizarAsync(currentUser.EmpresaId, id, conversaId, ct)));
 
     private SalvarRespostaProntaCommand Comando(RespostaProntaBody body) =>
-        new(currentUser.EmpresaId, body.Titulo ?? string.Empty, body.Atalho ?? string.Empty, body.Texto ?? string.Empty);
+        new(currentUser.EmpresaId, body.Titulo ?? string.Empty, body.Atalho ?? string.Empty, body.Texto ?? string.Empty, body.Categoria);
 
     /// <summary>#1781: escrita na biblioteca é ação de atendimento, como no <c>AtendimentoConversasController</c>.</summary>
     private Task<IActionResult> Atendendo(Func<Task<IActionResult>> acao)
@@ -96,4 +96,9 @@ public class AtendimentoRespostasProntasController(
     }
 }
 
-public sealed record RespostaProntaBody(string? Titulo, string? Atalho, string? Texto);
+/// <summary>
+/// Corpo de POST/PUT. <c>Categoria</c>: no PUT, ausente ou <c>null</c> mantém a categoria atual (compatível com
+/// clientes antigos), string vazia ou só espaços limpa e texto grava (aparado, até 40, uma linha). No POST,
+/// ausente, nula ou vazia deixa a resposta sem categoria.
+/// </summary>
+public sealed record RespostaProntaBody(string? Titulo, string? Atalho, string? Texto, string? Categoria = null);

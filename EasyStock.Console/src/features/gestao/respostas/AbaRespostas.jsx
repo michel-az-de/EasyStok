@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
-import { CampoArea, CampoTexto } from '../../../componentes/Campo'
+import { FormResposta } from '../../../componentes/FormResposta'
+import { CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
@@ -10,8 +11,7 @@ import {
 } from '../../../dominio/automacao'
 import { EditorDeAutomatica, SelosDeVariaveis, TextoDaPrevia } from '../../../componentes/EditorDeAutomatica'
 import { plural } from '../../../dominio/formato'
-import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
-import { ATALHO_MAXIMO, gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
+import { REGRAS_DO_FORM, categoriasUsadas, normalizarBusca } from '../../../dominio/respostas'
 import { hashDoModulo, NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
 import { SecaoMensagensPadrao } from './SecaoMensagensPadrao'
 import css from './abaRespostas.module.css'
@@ -22,83 +22,10 @@ import css from './abaRespostas.module.css'
 // a da demonstração não devolve nada. Nos dois casos sem `false`, o formulário fecha.
 const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { if (ok !== false) fechar() })
 
-// Limites do servidor (RespostaPronta.*TamanhoMaximo): o campo não corta, avisa (`limite`) e trava o salvar.
-// #2792: Atalho e Texto também avisam; antes só o Título, e os outros dois só falhavam no servidor.
-const TITULO_MAXIMO = 120
-const TEXTO_MAXIMO = 4096
-
 // #2783: o editor da automática e as peças da prévia vivem em componentes/EditorDeAutomatica; daqui saem como sempre.
 export { SelosDeVariaveis }
 export function TextoPreenchido({ texto, exemplo, fonteApi, ...resto }) {
   return <TextoDaPrevia partes={previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)} {...resto} />
-}
-
-// #2792: o motivo do Salvar pede só o que falta.
-function faltando(titulo, texto) {
-  const semTitulo = !titulo.trim()
-  const semTexto = !texto.trim()
-  if (semTitulo && semTexto) return 'Preencha o título e o texto.'
-  return semTitulo ? 'Preencha o título.' : semTexto ? 'Preencha o texto.' : undefined
-}
-
-function FormResposta({ inicial, aoSalvar, aoCancelar }) {
-  const [titulo, setTitulo] = useState(inicial?.titulo ?? '')
-  const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
-  const [texto, setTexto] = useState(inicial?.texto ?? '')
-  const [salvando, setSalvando] = useState(false)
-  const [descartando, setDescartando] = useState(false)
-  // #2792: sem atalho digitado, o servidor recebe o gerado do título, que já nasce dentro de 40 (gerarAtalho) e
-  // aparece no placeholder: a pessoa vê o atalho exato antes de salvar.
-  const atalhoGerado = gerarAtalho(titulo)
-  const passaDoLimite = algumPassaDoLimite([titulo, TITULO_MAXIMO], [atalho, ATALHO_MAXIMO], [texto, TEXTO_MAXIMO])
-  const pronto = titulo.trim() && texto.trim() && !passaDoLimite
-  // Mesma pergunta do Modal (`confirmarDescarte`): com algo digitado, Cancelar não descarta calado.
-  const alterado = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '') || texto !== (inicial?.texto ?? '')
-
-  function salvar(evento) {
-    evento.preventDefault()
-    if (salvando || !pronto) return
-    setSalvando(true)
-    const dados = { titulo: titulo.trim(), atalho: atalho.trim() || atalhoGerado, texto: texto.trim() }
-    Promise.resolve(aoSalvar(dados)).finally(() => setSalvando(false))
-  }
-
-  return (
-    <form className={css.form} onSubmit={salvar}>
-      <div className={css.duas}>
-        <CampoTexto
-          disabled={salvando} rotulo="Título" value={titulo} limite={TITULO_MAXIMO}
-          onChange={(e) => setTitulo(e.target.value)} autoFocus
-        />
-        <CampoTexto
-          rotulo="Atalho"
-          value={atalho}
-          disabled={salvando}
-          limite={ATALHO_MAXIMO}
-          dica="Sem preencher, o atalho é criado a partir do título."
-          placeholder={titulo ? atalhoGerado : '/pix'}
-          onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
-        />
-      </div>
-      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} />
-      <SelosDeVariaveis variaveis={VARIAVEIS_DA_API} />
-      {descartando && (
-        <div className={css.descarte} role="alert">
-          <p>Descartar o que foi digitado?</p>
-          <div className={css.acoes}>
-            {/* eslint-disable-next-line jsx-a11y/no-autofocus -- o foco vai para a opção que não perde nada */}
-            <Botao autoFocus onClick={() => setDescartando(false)}>Continuar editando</Botao>
-            <Botao variante="perigo" onClick={aoCancelar}>Descartar</Botao>
-          </div>
-        </div>
-      )}
-      <div className={css.acoes}>
-        <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}
-          motivo={passaDoLimite ? 'Algum campo passa do limite de caracteres.' : faltando(titulo, texto)}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-        <Botao variante="texto" disabled={salvando || descartando} onClick={() => (alterado ? setDescartando(true) : aoCancelar())}>Cancelar</Botao>
-      </div>
-    </form>
-  )
 }
 
 function SecaoRespostas() {
@@ -155,9 +82,10 @@ function SecaoRespostas() {
     const alvo = normalizarBusca(busca)
     return (respostasProntas ?? [])
       .filter((r) => verArquivadas || !r.arquivada)
-      .filter((r) => !alvo || [r.titulo, r.atalho, r.texto].some((c) => normalizarBusca(c).includes(alvo)))
+      .filter((r) => !alvo || [r.titulo, r.atalho, r.texto, r.categoria].some((c) => normalizarBusca(c).includes(alvo)))
       .sort((a, b) => Number(a.arquivada) - Number(b.arquivada) || a.titulo.localeCompare(b.titulo, 'pt-BR'))
   }, [respostasProntas, busca, verArquivadas])
+  const categorias = useMemo(() => categoriasUsadas(respostasProntas), [respostasProntas])
   const ativas = (respostasProntas ?? []).filter((r) => !r.arquivada).length
 
   return (
@@ -189,6 +117,7 @@ function SecaoRespostas() {
 
       {editando === 'nova' && (
         <FormResposta
+          className={css.form} regras={REGRAS_DO_FORM} categorias={categorias}
           aoSalvar={(dados) => depois(incluirRespostaPronta(dados), () => fechar('nova'))}
           aoCancelar={() => fechar('nova')}
         />
@@ -204,6 +133,7 @@ function SecaoRespostas() {
             <li key={r.id} className={`${css.linha} ${r.arquivada ? css.arquivada : ''}`}>
               {editando === r.id ? (
                 <FormResposta
+                  className={css.form} regras={REGRAS_DO_FORM} categorias={categorias}
                   inicial={r}
                   aoSalvar={(dados) => depois(editarRespostaPronta(r.id, dados), () => fechar(r.id))}
                   aoCancelar={() => fechar(r.id)}
@@ -213,6 +143,7 @@ function SecaoRespostas() {
                   <div className={css.resumo}>
                     <span className={css.titulo}>{r.titulo}</span>
                     <span className={css.atalho}>{r.atalho}</span>
+                    {r.categoria && <span className={css.selo}>{r.categoria}</span>}
                     {r.arquivada && <span className={css.marca}>arquivada</span>}
                     <span className={css.texto}>{r.texto}</span>
                   </div>

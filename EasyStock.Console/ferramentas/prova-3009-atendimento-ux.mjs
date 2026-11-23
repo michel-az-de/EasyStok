@@ -49,7 +49,7 @@ async function abrirSeletor(pagina) {
   await pagina.locator('[class*=contextoLinha]').nth(2).click()
   await pagina.waitForTimeout(600)
   await pagina.locator('button[aria-haspopup=listbox]').first().click()
-  await pagina.waitForSelector('ul[role=listbox][aria-label="Respostas prontas"]', { timeout: 10_000 })
+  await pagina.waitForSelector('ul[data-rolagem] [role=option]', { timeout: 10_000 })
   return pagina.locator('input[aria-label="Buscar resposta pronta"]')
 }
 
@@ -78,13 +78,13 @@ for (const [nome, tela] of TELAS) {
     const { contexto, pagina } = await abrir(tela, tema)
     const campo = await abrirSeletor(pagina)
     const lido = () => pagina.evaluate(() => {
-      const lista = document.querySelector('ul[role=listbox][aria-label="Respostas prontas"]')
+      const lista = document.querySelector('[role=option]').closest('[data-rolagem]')
       const r = lista.getBoundingClientRect()
       const ativa = lista.querySelector('[aria-selected=true]')
       const a = ativa?.getBoundingClientRect()
       return {
-        itens: lista.children.length, alturaLista: r.height, rolagem: lista.scrollHeight, visivel: lista.clientHeight, teto: Math.min(innerHeight * 0.32, 240),
-        previas: [...lista.children].map((li) => {
+        itens: lista.querySelectorAll('[role=option]').length, alturaLista: r.height, rolagem: lista.scrollHeight, visivel: lista.clientHeight, teto: Math.min(innerHeight * 0.32, 240),
+        previas: [...lista.querySelectorAll('[role=option]')].map((li) => {
           const previa = li.querySelector('[class*=previa]'), e = getComputedStyle(previa)
           const linha = parseFloat(e.lineHeight) || parseFloat(e.fontSize) * 1.2
           return { altura: previa.getBoundingClientRect().height, linha, texto: previa.textContent.trim().length }

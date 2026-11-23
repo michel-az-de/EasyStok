@@ -58,7 +58,7 @@ async function opcaoVisivel(page, campo) {
   const medida = await page.evaluate(id => {
     const opcao = document.getElementById(id)
     if (!opcao) return null
-    const caixa = opcao.closest('[role="group"]')
+    const caixa = opcao.closest('[data-rolagem]')
     const item = opcao.getBoundingClientRect(), janela = caixa.getBoundingClientRect()
     return { id, selecionada: opcao.getAttribute('aria-selected'), top: item.top, bottom: item.bottom, limiteTop: janela.top, limiteBottom: janela.bottom, scrollTop: caixa.scrollTop, rola: caixa.scrollHeight > caixa.clientHeight + 1 }
   }, id)
@@ -80,10 +80,10 @@ try {
   const campo = page.getByRole('textbox', { name: 'Mensagem para o cliente', exact: true })
   await campo.fill('/')
   const lista = page.getByRole('listbox', { name: 'Respostas prontas' })
-  await lista.waitFor()
+  await lista.waitFor({ state: 'attached' }) // #3208: o listbox é um elemento vazio (aria-owns), sem caixa visível
   assert.equal(await lista.getAttribute('id'), await campo.getAttribute('aria-controls'))
   assert.equal(await campo.evaluate(el => el.tagName), 'TEXTAREA')
-  const quantidade = await lista.getByRole('option').count()
+  const quantidade = await page.getByRole('option').count()
   assert.equal(quantidade, 8, 'a demonstração precisa oferecer uma lista maior que a área visível')
   const percurso = [await opcaoVisivel(page, campo)]
   for (let i = 1; i < quantidade; i++) {
@@ -112,9 +112,12 @@ try {
   assert.equal(await esperarFoco(respostas), true)
   assert.equal(await campo.inputValue(), 'Rascunho antes.')
   await respostas.click()
+  // #3208: com categorias a lista sai em grupos; o primeiro item não é mais o primeiro da demonstração, é o primeiro da tela.
+  const primeiro = (await page.locator('[role="option"]').first().locator('[class*=previa]').textContent()).trim()
+  assert.ok(primeiro.length > 0)
   await busca.press('Enter')
   await lista.waitFor({ state: 'detached' })
-  assert.match(await campo.inputValue(), /^Rascunho antes\. Obrigada pela preferência!/)
+  assert.equal(await campo.inputValue(), `Rascunho antes. ${primeiro}`)
   assert.equal(await esperarFoco(campo), true)
   registrar('App: botão Respostas abre busca acessível; Escape volta ao botão e Enter insere sem enviar')
 
@@ -124,14 +127,14 @@ try {
   assert.equal(await campo.inputValue(), 'Mensagem de composição 1653')
   assert.equal(await page.getByRole('log', { name: 'Mensagens da conversa' }).getByText('Mensagem de composição 1653', { exact: true }).count(), 0, 'a composição não pode gerar mensagem no fio')
   await campo.fill('/')
-  await lista.waitFor()
+  await lista.waitFor({ state: 'attached' }) // #3208: o listbox é um elemento vazio (aria-owns), sem caixa visível
   const ativaAntes = await campo.getAttribute('aria-activedescendant')
   for (const key of ['ArrowDown', 'Enter', 'Escape']) {
     await campo.dispatchEvent('keydown', { key, isComposing: true, keyCode: 229, bubbles: true, cancelable: true })
     await repousar(page)
     assert.equal(await campo.inputValue(), '/')
     assert.equal(await campo.getAttribute('aria-activedescendant'), ativaAntes)
-    assert.equal(await lista.isVisible(), true)
+    assert.equal(await page.getByRole('option').first().isVisible(), true)
   }
   await foto(page, '02-ime-preserva-rascunho')
   await campo.press('Escape')

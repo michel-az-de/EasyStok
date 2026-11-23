@@ -11,36 +11,41 @@ public partial class RespostaPronta
     public const int TituloTamanhoMaximo = 120;
     public const int AtalhoTamanhoMaximo = 40;
     public const int TextoTamanhoMaximo = 4096;
+    public const int CategoriaTamanhoMaximo = 40;
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public string Titulo { get; private set; } = null!;
     public string Atalho { get; private set; } = null!;
     public string Texto { get; private set; } = null!;
+    /// <summary>S83: agrupa o seletor do chat; opcional, uma linha só. Registro antigo fica nulo.</summary>
+    public string? Categoria { get; private set; }
     public bool Arquivada { get; private set; }
     public DateTime CriadaEm { get; private set; }
     public DateTime AlteradaEm { get; private set; }
 
     private RespostaPronta() { }
 
-    public static RespostaPronta Criar(Guid empresaId, string titulo, string atalho, string texto, DateTime agora)
+    public static RespostaPronta Criar(Guid empresaId, string titulo, string atalho, string texto, DateTime agora, string? categoria = null)
     {
         if (empresaId == Guid.Empty) throw new RegraDeDominioVioladaException("EmpresaId é obrigatório.");
         var resposta = new RespostaPronta { Id = Guid.NewGuid(), EmpresaId = empresaId, CriadaEm = agora };
-        resposta.Editar(titulo, atalho, texto, agora);
+        resposta.Editar(titulo, atalho, texto, agora, categoria);
         return resposta;
     }
 
-    public void Editar(string titulo, string atalho, string texto, DateTime agora)
+    public void Editar(string titulo, string atalho, string texto, DateTime agora, string? categoria = null)
     {
         var novoTitulo = Obrigatorio(titulo, "Título", TituloTamanhoMaximo);
         var novoAtalho = NormalizarAtalho(atalho);
         var novoTexto = Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        var novaCategoria = NormalizarCategoria(categoria);
         if (novoTexto != Texto && ModeloTextoAtendimento.ChavesDesconhecidas(novoTexto) is { } desconhecidas)
             throw new RegraDeDominioVioladaException(desconhecidas);
         Titulo = novoTitulo;
         Atalho = novoAtalho;
         Texto = novoTexto;
+        Categoria = novaCategoria;
         AlteradaEm = agora;
     }
 
@@ -69,6 +74,17 @@ public partial class RespostaPronta
         if (!AtalhoValido().IsMatch(limpo))
             throw new RegraDeDominioVioladaException("Atalho só aceita letras, números, '/', '-' e '_', sem espaço.");
         return limpo;
+    }
+
+    private static string? NormalizarCategoria(string? categoria)
+    {
+        var limpa = categoria?.Trim();
+        if (string.IsNullOrEmpty(limpa)) return null;
+        if (limpa.Length > CategoriaTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"Categoria acima de {CategoriaTamanhoMaximo} caracteres.");
+        if (limpa.AsSpan().ContainsAny('\r', '\n'))
+            throw new RegraDeDominioVioladaException("Categoria deve ter uma linha só.");
+        return limpa;
     }
 
     internal static string Obrigatorio(string? valor, string campo, int maximo)

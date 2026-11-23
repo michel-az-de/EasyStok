@@ -1,6 +1,8 @@
 /* Seletor rápido de respostas (#1441): lista densa, uma linha por resposta, sem
    cartão nem botão por item. Mesmo vidro do Popover; o destaque é o fundo suave. */
-.seletor { display: grid; gap: var(--e-1); }
+/* O painel tem teto de min(340px, 50dvh) com padding --e-2: o seletor se limita a ele por dentro, a lista (ou os campos
+   do formulário) encolhe e rola, e o rodapé (ou a barra Salvar/Cancelar) fica sempre inteiro à vista (#3208). */
+.seletor { display: flex; flex-direction: column; gap: var(--e-1); max-height: calc(min(340px, 50dvh) - 2 * var(--e-2)); }
 
 .busca {
   width: 100%; min-height: var(--toque); padding: 0 var(--e-3);
@@ -10,7 +12,7 @@
 .busca:focus-visible { outline: 2px solid var(--halo); outline-offset: 0; border-color: var(--marca); }
 
 /* #3009: linhas implícitas em max-content; sem isso, com 6+ respostas a grade as espreme em --toque e a prévia some. */
-.lista { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: max-content; max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: max-content; flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 .linha {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--e-3);
@@ -19,6 +21,14 @@
 /* #2762: além do fundo, um sinal na marca: o item ativo se acha sem depender do tom do fundo.
    #2734 (regra do dono): contorno uniforme de 1 px, não régua de um lado só. */
 .ativa { background: var(--preenchimento-forte); box-shadow: inset 0 0 0 var(--b-1) var(--marca); }
+
+/* #3208: cabeçalho de grupo discreto (peso e cor, sem barra lateral) e a ação de editar ao lado do atalho. */
+.grupo { margin: 0; padding: var(--e-2) var(--e-3) var(--e-1); font-size: var(--t-micro); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-2); }
+.grupoLista { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: max-content; }
+/* Linha compacta como a do master: título e atalho na primeira linha, prévia na segunda; o Editar é irmão da opção, à direita. */
+.itemResposta { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-2); border-radius: var(--r-1); }
+.opcaoResposta { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--e-3); align-content: center; min-width: 0; min-height: var(--toque); padding: var(--e-1) var(--e-3); cursor: pointer; }
+.editar { white-space: nowrap; }
 
 .titulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .atalho { font-family: var(--f-papel); font-size: var(--t-micro); color: var(--tinta-2); align-self: center; }
@@ -30,10 +40,11 @@
 .vazio { margin: 0; padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
 
 .rodape {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex: none;
   border-top: var(--b-1) solid var(--linha); padding: var(--e-2) var(--e-2) 0; margin-top: var(--e-1);
 }
 .dica { font-size: var(--t-micro); color: var(--tinta-2); }
+.rodape button { white-space: nowrap; }
 .gerenciar {
   background: none; border: 0; min-height: var(--toque); padding: var(--e-1) var(--e-2); border-radius: var(--r-1);
   font: inherit; font-size: var(--t-apoio); font-weight: 600; color: var(--marca); cursor: pointer;
@@ -61,3 +72,16 @@
 .conferirOpcao input { margin-top: 2px; }
 
 .modeloCampos.modeloCamposComErro { max-height: min(20dvh, 150px); }
+
+/* #3208: no painel os campos rolam; a sombra nas bordas avisa que há mais (ex.: Categoria) abaixo ou acima. Só aparece com rolagem. */
+.formNoPainel > :first-child {
+  background:
+    linear-gradient(var(--elevado) 30%, transparent) center top / 100% 16px local no-repeat,
+    linear-gradient(transparent, var(--elevado) 70%) center bottom / 100% 16px local no-repeat,
+    linear-gradient(rgb(0 0 0 / .16), transparent) center top / 100% 8px scroll no-repeat,
+    linear-gradient(transparent, rgb(0 0 0 / .16)) center bottom / 100% 8px scroll no-repeat;
+}
+
+/* Elementos vazios que só existem para a árvore de acessibilidade (listbox e grupos assumem as opções por aria-owns). */
+.posse { position: absolute; width: 1px; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
+.posse > div { height: 1px; }

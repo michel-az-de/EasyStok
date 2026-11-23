@@ -34,7 +34,8 @@ const caso = (nome, fn) => {
 
 const ficha = semComentario(ler('features/gestao/cadastros/FichaCliente.jsx'))
 const editor = semComentario(ler('features/gestao/cadastros/EditorCadastro.jsx'))
-const respostas = semComentario(ler('features/gestao/respostas/AbaRespostas.jsx'))
+// #3208: o formulário saiu da Gestão para o componente compartilhado (a Gestão e o painel do chat usam o mesmo).
+const respostas = semComentario(ler('componentes/FormResposta.jsx'))
 const notas = semComentario(ler('features/ficha-cliente/NotasDoCliente.jsx'))
 let dominioRespostas = {}
 try { dominioRespostas = await import(pathToFileURL(join(raiz, 'dominio/respostas.js')).href) } catch { /* falha no caso */ }
@@ -62,7 +63,18 @@ caso('EditorCadastro só marca carregando até o primeiro dossiê (em releitura 
 
 caso('Atalho e Texto usam limite 40 e 4096 e o Título migra para a mesma primitiva', () => {
   // O teto do atalho mora no domínio, junto do gerarAtalho que o respeita.
-  assert.match(respostas, /import \{ ATALHO_MAXIMO, [^}]*\} from '[./]*dominio\/respostas'/)
+  assert.match(respostas, /atalhoMaximo: ATALHO_MAXIMO[^}]*\} = regras/)
+  // #2792: o teto e as variáveis exibidas vêm do domínio, nunca de literal no formulário.
+  assert.doesNotMatch(respostas, /ATALHO_MAXIMO\s*=\s*\d|(?:atalhoMaximo|variaveis)\s*[:=]\s*(?:\d|\[)/, 'o formulário tem literal próprio de teto ou de variáveis')
+  assert.doesNotMatch(respostas, /from '[./]*dominio\//, 'componentes não importa dominio')
+  const regras = semComentario(ler('dominio/respostas.js'))
+  assert.match(regras, /REGRAS_DO_FORM = \{[^}]*atalhoMaximo: ATALHO_MAXIMO[^}]*variaveis: VARIAVEIS_DA_API[^}]*\}/, 'REGRAS_DO_FORM não deriva do teto e de VARIAVEIS_DA_API')
+  assert.match(regras, /ATALHO_MAXIMO = 40/)
+  for (const chamador of ['features/gestao/respostas/AbaRespostas.jsx', 'features/atendimento/SeletorRespostas.jsx']) {
+    const fonte = semComentario(ler(chamador))
+    assert.match(fonte, /import \{[^}]*REGRAS_DO_FORM[^}]*\} from '[./]*dominio\/respostas'/, `${chamador} não importa REGRAS_DO_FORM do domínio`)
+    assert.match(fonte, /<FormResposta[\s\S]*?regras=\{REGRAS_DO_FORM\}/, `${chamador} não passa REGRAS_DO_FORM ao formulário`)
+  }
   assert.match(respostas, /TEXTO_MAXIMO = 4096/)
   assert.match(respostas, /rotulo="Título"[^>]*limite=\{TITULO_MAXIMO\}/)
   assert.match(respostas, /rotulo="Atalho"[\s\S]{0,200}limite=\{ATALHO_MAXIMO\}/)
@@ -70,14 +82,14 @@ caso('Atalho e Texto usam limite 40 e 4096 e o Título migra para a mesma primit
 })
 
 caso('o salvar trava pelos três limites, e o botão diz o motivo', () => {
-  assert.match(respostas, /algumPassaDoLimite\(\[titulo, TITULO_MAXIMO\], \[atalho, ATALHO_MAXIMO\], \[texto, TEXTO_MAXIMO\]\)/)
+  assert.match(respostas, /algumPassaDoLimite\(\[titulo, TITULO_MAXIMO\], \[atalho, ATALHO_MAXIMO\], \[texto, TEXTO_MAXIMO\][^)]*\)/)
   assert.match(respostas, /pronto = [^\n]*!passaDoLimite/)
   assert.match(respostas, /motivo=\{/)
 })
 
 caso('a dica de variáveis do Texto continua à vista', () => {
   // #3010: a dica virou selos legíveis, logo abaixo do campo.
-  assert.match(respostas, /rotulo="Texto"[\s\S]{0,200}<SelosDeVariaveis variaveis=\{VARIAVEIS_DA_API\} \/>/)
+  assert.match(respostas, /rotulo="Texto"[\s\S]{0,200}<SelosDeVariaveis variaveis=\{variaveis\} \/>/)
 })
 
 caso('cabeçalho Notas sem o que abrir é título (h3), sem aria-disabled nem botão inerte', () => {
