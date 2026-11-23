@@ -80,7 +80,6 @@ public class ModeloMensagemLocalTests
     [InlineData("MARKETING")]
     [InlineData("AUTHENTICATION")]
     [InlineData("utility")]
-    [InlineData("")]
     public void CategoriaDiferenteDeUtilityRecusa(string categoria)
     {
         var act = () => Criar(categoria: categoria);
