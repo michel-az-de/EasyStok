@@ -5,7 +5,7 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Domain.Entities.Atendimento;
 
 /// <summary>Modelo aprovado (template da Meta) para envio fora da janela, com os parâmetros do corpo.</summary>
-public sealed record ModeloMensagem(string Nome, string Idioma, IReadOnlyList<string> Parametros);
+public sealed record ModeloMensagem(string Nome, string Idioma, IReadOnlyList<string> Parametros, OrigemModelo Origem = OrigemModelo.Meta);
 
 /// <summary>
 /// Mensagem ao cliente agendada pela dona (S39, ADR-0051), em qualquer canal. As regras do canal são

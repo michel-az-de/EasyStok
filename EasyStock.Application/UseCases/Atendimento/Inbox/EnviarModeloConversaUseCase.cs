@@ -31,6 +31,8 @@ public sealed partial class EnviarModeloConversaUseCase(
 
         // Aprovação é conferida novamente no envio, sem o cache curto da listagem da tela.
         var aprovado = await ModeloAprovadoAsync(catalogo, command.EmpresaId, modelo, ct);
+        // #3205: a origem vem do catálogo da empresa, nunca do pedido; ela segue na mensagem gravada e na idempotência.
+        modelo = modelo with { Origem = aprovado.Origem };
         var texto = string.Join("\n", new[] { aprovado.Cabecalho,
             Parametro().Replace(aprovado.Corpo, m => modelo.Parametros[int.Parse(m.Groups[1].Value) - 1]), aprovado.Rodape }
             .Where(p => !string.IsNullOrEmpty(p)));
@@ -44,11 +46,12 @@ public sealed partial class EnviarModeloConversaUseCase(
             mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
             {
                 conversa = ValidarConversa(await conversas.ObterPorIdComLockAsync(command.EmpresaId, command.ConversaId, token), command);
-                existente = await ObterTentativaAsync(command, modelo, token);
+                existente = await ObterTentativaAsync(command, modelo, token, compararOrigem: true);
                 if (existente is not null) return existente;
                 GarantirAbertaComModelo(conversa);
-                await GarantirClienteAsync(conversa, aprovado.Categoria, token);
                 var agora = relogio.GetUtcNow().UtcDateTime;
+                if (modelo.Origem == OrigemModelo.Local) await GarantirDestinoDoModeloLocalAsync(conversa, aprovado.Categoria, agora, token);
+                else await GarantirClienteAsync(conversa, aprovado.Categoria, token);
                 var intencao = Mensagem.SaidaModelo(command.TentativaId, command.EmpresaId, conversa.Id, command.UsuarioId, agora, modelo, texto);
                 conversa.Assumir(agora, command.UsuarioId);
                 conversa.RegistrarSaida(agora);
@@ -71,8 +74,11 @@ public sealed partial class EnviarModeloConversaUseCase(
         Exception? falha = null;
         try
         {
-            externoId = await canais.Obter(conversa.Canal).EnviarModeloAsync(
-                conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, modelo.Parametros, ct);
+            var canal = canais.Obter(conversa.Canal);
+            // #3205: a ponte não tem modelo; o local sai como o texto renderizado, gravado como modelo.
+            externoId = modelo.Origem == OrigemModelo.Local
+                ? await canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct)
+                : await canal.EnviarModeloAsync(conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, modelo.Parametros, ct);
         }
         catch (Exception ex)
         {
@@ -143,13 +149,14 @@ public sealed partial class EnviarModeloConversaUseCase(
     internal static FinalidadeContato FinalidadeDaCategoria(string categoria) =>
         categoria == "MARKETING" ? FinalidadeContato.Marketing : FinalidadeContato.Transacional;
 
-    private async Task<Mensagem?> ObterTentativaAsync(EnviarModeloConversaCommand command, ModeloMensagem modelo, CancellationToken ct)
+    private async Task<Mensagem?> ObterTentativaAsync(
+        EnviarModeloConversaCommand command, ModeloMensagem modelo, CancellationToken ct, bool compararOrigem = false)
     {
         var m = await conversas.ObterMensagemAsync(command.EmpresaId, command.ConversaId, command.TentativaId, ct);
         if (m is null) return null;
         if (m.EmpresaId != command.EmpresaId || m.ConversaId != command.ConversaId || m.EnviadaPorUsuarioId != command.UsuarioId
             || m.Modelo is not { } anterior || anterior.Nome != modelo.Nome || anterior.Idioma != modelo.Idioma
-            || !anterior.Parametros.SequenceEqual(modelo.Parametros))
+            || !anterior.Parametros.SequenceEqual(modelo.Parametros) || compararOrigem && anterior.Origem != modelo.Origem)
             throw new RegraDeDominioVioladaException("Esta tentativa já foi usada com outro conteúdo ou autor.");
         return m;
     }
@@ -165,6 +172,30 @@ public sealed partial class EnviarModeloConversaUseCase(
         var finalidade = FinalidadeDaCategoria(categoria);
         if (!await politica.PodeEnviarAsync(conversa.EmpresaId, clienteId, conversa.Canal, finalidade, ct))
             throw new RegraDeDominioVioladaException("O cliente não autorizou esta finalidade neste canal. Confira os consentimentos na Ficha.");
+    }
+
+    /// <summary>Dias, a contar da última mensagem do cliente, em que a mensagem padrão local pode sair (S80).</summary>
+    public const int DiasDaJanelaDoModeloLocal = 7;
+
+    /// <summary>
+    /// Mensagem padrão local (#3205): só por conversa em que o cliente escreveu até 7 dias atrás. Com cliente cadastrado valem
+    /// bloqueio e consentimento; o lead sem cadastro recebe, salvo se pediu para parar (SAIR, PARAR ou STOP).
+    /// </summary>
+    private async Task GarantirDestinoDoModeloLocalAsync(Conversa conversa, string categoria, DateTime agora, CancellationToken ct)
+    {
+        if (conversa.UltimaMensagemEntradaEm is not { } entrada)
+            throw new RegraDeDominioVioladaException("A mensagem padrão só sai depois que o cliente escreve. Este contato ainda não escreveu.");
+        if (entrada < agora.AddDays(-DiasDaJanelaDoModeloLocal))
+            throw new RegraDeDominioVioladaException(
+                $"O cliente escreveu há mais de {DiasDaJanelaDoModeloLocal} dias: a mensagem padrão não pode mais ser enviada. Aguarde ele escrever de novo.");
+        if (conversa.ClienteId is not null)
+        {
+            await GarantirClienteAsync(conversa, categoria, ct);
+            return;
+        }
+        var recentes = await conversas.ListarMensagensAsync(conversa.EmpresaId, conversa.Id, null, 100, ct);
+        if (recentes.Any(m => m.Direcao == DirecaoMensagem.Entrada && PoliticaConsentimento.EhPedidoDeOptOut(m.Texto)))
+            throw new RegraDeDominioVioladaException("O contato pediu para parar de receber mensagens: a mensagem padrão não foi enviada.");
     }
 
     private static void GarantirAbertaComModelo(Conversa conversa)
