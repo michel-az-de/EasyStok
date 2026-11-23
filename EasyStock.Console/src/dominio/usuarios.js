@@ -245,7 +245,7 @@ const CONFIRA_A_CONTA = 'Confira se escolheu a conta Google do e-mail que recebe
 const comPonto = (frase) => (/[.!?]$/.test(frase) ? frase : `${frase}.`)
 export function fraseDaFalhaDoGoogleNoConvite(falha) {
   if (falha?.codigo !== 'INVALID_CREDENTIALS') return falha?.message ?? 'Não deu para entrar com o Google. Tente de novo.'
-  const frase = comPonto(falha.message)
+  const frase = comPonto(falha.message?.trim() || 'Não deu para entrar com o Google')
   return /convite/i.test(frase) ? frase : `${frase} ${CONFIRA_A_CONTA}`
 }
 

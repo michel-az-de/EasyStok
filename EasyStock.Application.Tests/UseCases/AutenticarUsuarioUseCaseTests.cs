@@ -198,17 +198,19 @@ public class AutenticarUsuarioUseCaseTests
     [Fact]
     public async Task LoginGoogleNativo_ContaBloqueadaPorSenhaEntra()
     {
-        var usuario = SuperAdmin();
+        // #3185: conta comum da casa, não a do suporte; a sessão sai na empresa e no nível do perfil dela.
+        var empresaId = Guid.NewGuid();
+        var usuario = ContaComum(empresaId, NivelAcesso.Operador);
         for (var falha = 1; falha <= 5; falha++) usuario.RegistrarFalhaDeSenha();
         usuario.EstaBloqueado().Should().BeTrue();
         var repo = Substitute.For<IUsuarioRepository>();
         repo.GetByEmailAsync(usuario.Email).Returns(usuario);
-        var empresaPadrao = Guid.NewGuid();
 
         var result = await CriarUseCase(repo)
-            .RevalidarLoginGoogleNativoAsync(usuario, null, empresaPadrao, DateTime.UtcNow.AddMinutes(-1));
+            .RevalidarLoginGoogleNativoAsync(usuario, null, null, DateTime.UtcNow.AddMinutes(-1));
 
-        Assert.Equal(empresaPadrao, result.EmpresaId);
+        Assert.Equal(empresaId, result.EmpresaId);
+        Assert.Equal(NivelAcesso.Operador, result.Nivel);
     }
 
     [Fact]
@@ -219,6 +221,26 @@ public class AutenticarUsuarioUseCaseTests
 
         Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
         Assert.Null(result.EmpresaId);
+    }
+
+    private static Usuario ContaComum(Guid empresaId, NivelAcesso nivel)
+    {
+        var usuarioId = Guid.NewGuid();
+        var perfilId = Guid.NewGuid();
+        return new Usuario
+        {
+            Id = usuarioId, Nome = "Bia", Email = "bia@exemplo.test", SenhaHash = "x", Ativo = true,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+            Empresas = new List<UsuarioEmpresa> { new() { Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = empresaId, Ativo = true } },
+            Perfis = new List<UsuarioPerfil>
+            {
+                new UsuarioPerfil
+                {
+                    Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = empresaId, PerfilId = perfilId, AtribuidoEm = DateTime.UtcNow,
+                    Perfil = new Perfil { Id = perfilId, Nome = "Balcão", EmpresaId = empresaId, Nivel = nivel, Permissoes = new List<PerfilPermissao>() }
+                }
+            }
+        };
     }
 
     private static Usuario SuperAdmin()

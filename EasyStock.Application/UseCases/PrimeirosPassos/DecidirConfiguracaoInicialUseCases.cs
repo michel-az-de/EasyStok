@@ -21,20 +21,19 @@ public sealed class AdiarConfiguracaoInicialUseCase(
 
 /// <summary>
 /// <c>POST api/configuracao-inicial/concluir</c> (#2070): conclui mesmo com passos "depois". Só a dona ativa ou o
-/// suporte global; concluir de novo não muda a primeira conclusão.
+/// suporte global; concluir de novo não muda a primeira conclusão, nem com dois pedidos ao mesmo tempo (#3185): quem
+/// grava é o UPDATE condicional do repositório, não a entidade lida antes.
 /// </summary>
 public sealed class ConcluirConfiguracaoInicialUseCase(
     IEmpresaRepository empresas,
     AutoridadeNaConfiguracaoInicial autoridade,
     ICurrentUserAccessor usuario,
-    IUnitOfWork unitOfWork,
     TimeProvider relogio)
 {
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var empresa = await EmpresaDeQuemDecide.ObterAsync(empresas, autoridade, usuario, "concluir", ct);
-        empresa.ConcluirConfiguracaoInicial(usuario.UsuarioId, relogio.GetUtcNow().UtcDateTime);
-        await unitOfWork.CommitAsync();
+        await empresas.ConcluirConfiguracaoInicialAsync(empresa.Id, usuario.UsuarioId, relogio.GetUtcNow().UtcDateTime, ct);
     }
 }
 

@@ -303,8 +303,9 @@ public class ConfiguracaoInicialUseCasesTests
         var marcar = () => new MarcarPassoConfiguracaoInicialUseCase(_passos, Sessao(Pessoa()), _relogio)
             .ExecuteAsync(passo, "conferido");
 
-        (await marcar.Should().ThrowAsync<UseCaseValidationException>())
-            .Which.Code.Should().Be(MarcarPassoConfiguracaoInicialUseCase.CodigoPassoDesconhecido);
+        var recusa = (await marcar.Should().ThrowAsync<UseCaseValidationException>()).Which;
+        recusa.Code.Should().Be(MarcarPassoConfiguracaoInicialUseCase.CodigoPassoDesconhecido);
+        recusa.Message.Should().Be("Passo desconhecido.", "a 400 não devolve o que veio na rota (#3185)");
         await _passos.DidNotReceiveWithAnyArgs().MarcarAsync(default!, default);
     }
 
@@ -338,7 +339,7 @@ public class ConfiguracaoInicialUseCasesTests
         new(_empresas, Autoridade(), sessao, _unitOfWork, _relogio);
 
     private ConcluirConfiguracaoInicialUseCase Concluir(ICurrentUserAccessor sessao) =>
-        new(_empresas, Autoridade(), sessao, _unitOfWork, _relogio);
+        new(_empresas, Autoridade(), sessao, _relogio);
 
     [Fact]
     public async Task AdministracaoRecebeHierarquiaAoAdiarSemGravar()
@@ -358,8 +359,7 @@ public class ConfiguracaoInicialUseCasesTests
 
         (await concluir.Should().ThrowAsync<UseCaseValidationException>())
             .Which.Code.Should().Be(AutoridadeNaConfiguracaoInicial.CodigoHierarquia);
-        _empresa.ConfiguracaoInicialConcluidaEm.Should().BeNull();
-        await _unitOfWork.DidNotReceive().CommitAsync();
+        await _empresas.DidNotReceiveWithAnyArgs().ConcluirConfiguracaoInicialAsync(default, default, default, default);
     }
 
     [Fact]
@@ -382,8 +382,9 @@ public class ConfiguracaoInicialUseCasesTests
 
         await Concluir(Sessao(dona)).ExecuteAsync();
 
-        (_empresa.ConfiguracaoInicialConcluidaEm, _empresa.ConfiguracaoInicialConcluidaPorId).Should().Be(((DateTime?)Agora, (Guid?)dona.Id));
-        await _unitOfWork.Received(1).CommitAsync();
+        // #3185: quem grava é o UPDATE condicional, com quem e quando; a entidade lida antes não é gravada por cima.
+        await _empresas.Received(1).ConcluirConfiguracaoInicialAsync(EmpresaId, dona.Id, Agora, Arg.Any<CancellationToken>());
+        await _unitOfWork.DidNotReceive().CommitAsync();
     }
 
     [Fact]
@@ -393,7 +394,7 @@ public class ConfiguracaoInicialUseCasesTests
 
         await Concluir(Sessao(suporte, NivelAcesso.SuperAdmin)).ExecuteAsync();
 
-        _empresa.ConfiguracaoInicialConcluidaPorId.Should().Be(suporte.Id);
+        await _empresas.Received(1).ConcluirConfiguracaoInicialAsync(EmpresaId, suporte.Id, Agora, Arg.Any<CancellationToken>());
     }
 
     [Fact]

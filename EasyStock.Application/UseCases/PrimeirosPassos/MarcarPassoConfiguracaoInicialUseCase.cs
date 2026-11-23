@@ -18,7 +18,7 @@ public sealed class MarcarPassoConfiguracaoInicialUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(usuario.EmpresaId);
         if (ConfiguracaoInicial.Encontrar(passo) is null)
-            throw new UseCaseValidationException(CodigoPassoDesconhecido, $"Passo desconhecido: '{passo}'.");
+            throw new UseCaseValidationException(CodigoPassoDesconhecido, "Passo desconhecido.");
         var lida = SituacoesDoPasso.Ler(situacao)
             ?? throw new UseCaseValidationException(CodigoSituacaoInvalida,
                 $"Situação inválida: use '{SituacoesDoPasso.TextoConferido}' ou '{SituacoesDoPasso.TextoDepois}'.");
