@@ -57,7 +57,7 @@ const { FORMATO_DO_ENDERECO, recusaDoEndereco } = await import('../src/dominio/c
 const { encaixeNaJanela, tempoDoItem } = await import('../src/dominio/lembrete.js')
 const { podeVerAvisosDoCliente, podeVerItensFora } = await import('../src/dominio/acessoModulos.js')
 const { pedidoAcabouDeNascer, porcaoForaDoNome, tituloDaComanda } = await import('../src/dominio/pedido.js')
-const { estadoDaJanela, modelosAVista, prazoNoCabecalho } = await import('../src/dominio/janela.js')
+const { estadoDaJanela, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } = await import('../src/dominio/janela.js')
 const { automaticoDesligadoNaConversa } = await import('../src/dominio/motivoDeEscalada.js')
 const { mostraHistorico, resumoDasTags } = await import('../src/dominio/ficha.js')
 const { mostraChipDoCanal } = await import('../src/dominio/conversa.js')
@@ -314,14 +314,24 @@ const SITE = { nome: 'Chat do site', temJanela: false }
 const janelaCom = (minutosRestantes) => estadoDaJanela(
   { janelaExpiraEm: new Date(AGORA + minutosRestantes * 60000).toISOString(), mensagens: [] }, AGORA, WHATSAPP,
 )
-await confere('J  prazo no cabeçalho só com menos de 2 h, ou com a janela fechada', () => {
-  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), null)
-  assert.equal(prazoNoCabecalho(janelaCom(120)), null)
-  assert.equal(prazoNoCabecalho(janelaCom(119)), 'escreve livre por 1 h 59 min')
-  assert.equal(prazoNoCabecalho(janelaCom(20)), 'escreve livre por 20 min')
-  assert.equal(prazoNoCabecalho(janelaCom(-5)), 'Janela fechada')
+// #3234 (C2) muda a regra da #1761 (L4): com a janela aberta o prazo fica sempre no cabeçalho (no desktop a linha
+// cabe, prova-2185 E31); fechada, não iniciada ou sem regra, quem diz é a faixa junto do campo, uma vez só.
+await confere('J  prazo no cabeçalho com a janela aberta; fechada ou sem regra, diz uma vez só (a faixa, se ela disser)', () => {
+  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'Janela aberta por 23 h 55 min')
+  assert.equal(prazoNoCabecalho(janelaCom(119)), 'Janela aberta por 1 h 59 min')
+  assert.equal(prazoNoCabecalho(janelaCom(20)), 'Janela aberta por 20 min')
   assert.equal(prazoNoCabecalho(estadoDaJanela({ mensagens: [] }, AGORA, SITE)), null)
-  assert.equal(prazoNoCabecalho(estadoDaJanela({ mensagens: [] }, AGORA, null)), 'Canal sem regra cadastrada')
+  // Cada caso fechado: a faixa da janela diz, o cabeçalho cala. Concluída ou bloqueada, a faixa fala de
+  // outra coisa e o cabeçalho segue dizendo a janela (senão ela some da tela).
+  const fechada = { janelaExpiraEm: new Date(AGORA - 5 * 60000).toISOString(), mensagens: [], canal: 'X' }
+  for (const [canal, conversa, rotulo] of [[WHATSAPP, fechada, 'Janela fechada'], [WHATSAPP, { mensagens: [], canal: 'X' }, undefined], [null, { mensagens: [], canal: 'X' }, 'Canal sem regra cadastrada']]) {
+    const { janela, motivo } = permissaoDeEscrita(conversa, AGORA, canal)
+    assert.ok(motivo?.titulo, 'janela sem texto livre precisa da faixa')
+    assert.equal(prazoNoCabecalho(janela, motivo), null, `${motivo.titulo}: o cabeçalho repete a faixa`)
+    if (rotulo) assert.equal(prazoNoCabecalho(janela), rotulo)
+  }
+  const concluida = permissaoDeEscrita({ ...fechada, estado: 'Encerrado' }, AGORA, WHATSAPP)
+  assert.equal(prazoNoCabecalho(concluida.janela, concluida.motivo), 'Janela fechada', 'concluída: a janela some da tela')
 })
 await confere('J  "Modelos aprovados" fixo só com menos de 1 h de janela, ou com ela fechada', () => {
   assert.equal(modelosAVista(janelaCom(23 * 60)), false)

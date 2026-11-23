@@ -222,21 +222,20 @@
   background: var(--papel); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
 }
 
-/* Aviso junto do campo (#2420): ícone, título em cima, explicação embaixo e, com a janela fechada,
-   "Escolher modelo" à direita. Quebra para baixo em coluna estreita. */
+/* Aviso junto do campo (#2420): ícone e frase. #3234 (C4): título e explicação correm na mesma linha
+   (antes, título em cima e explicação embaixo); frase longa, como a do bloqueio, quebra como texto. */
 .bloqueio {
-  display: flex; gap: var(--e-2) var(--e-3); align-items: center; flex-wrap: wrap;
-  padding: var(--e-3); margin: 0;
+  display: flex; gap: var(--e-2); align-items: center;
+  padding: var(--e-2) var(--e-3); margin: 0;
   background: var(--alerta-pastel); color: var(--alerta);
   border: 0; border-radius: var(--r-2); font-size: var(--t-apoio);
 }
-.bloqueioIcone { flex: none; align-self: flex-start; margin-top: 2px; }
+.bloqueioIcone { flex: none; }
 .bloqueioTexto {
-  flex: 1 1 24ch; min-width: 0; margin: 0; display: grid; gap: 2px;
+  flex: 1 1 auto; min-width: 0; margin: 0;
   color: var(--tinta-2); line-height: var(--lh-compacto); overflow-wrap: anywhere;
 }
 .bloqueio strong { color: var(--tinta); font-weight: 600; }
-.escolherModelo { flex: none; margin-left: auto; }
 
 @media (max-width: 759px) {
   .balao { max-width: 90%; }

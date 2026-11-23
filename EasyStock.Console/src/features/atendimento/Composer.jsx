@@ -256,24 +256,19 @@ export function Composer({
 
   return (
     <div className={css.composer} data-area-envio>
-      {/* #2420: a explicação fica junto do campo, com a saída direta quando a janela fechou. */}
+      {/* #2420: a explicação fica junto do campo. #3234 (C3): a saída é Respostas, a única entrada da lista
+          de mensagens padrão; o campo diz onde ela está. */}
       {motivo && (
         <div className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
           <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : motivo.acao === 'janela' ? 'lock' : 'alerta'} className={css.bloqueioIcone} />
           <p className={css.bloqueioTexto}>
             <strong>{motivo.titulo}</strong> <span>{motivo.detalhe}</span>
           </p>
-          {motivo.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && (
-            <Botao className={css.escolherModelo} aria-haspopup="true" onClick={aoAbrirModelos}>
-              <Icone nome="modelo" /> Escolher modelo
-            </Botao>
-          )}
         </div>
       )}
 
       {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
-      {/* #1839: perto do fim da janela, quando ainda dá para escrever, o botão à parte fica aqui.
-          #2420: com a janela fechada, o Escolher modelo mora no aviso junto do campo, além de Respostas. */}
+      {/* #1839: perto do fim da janela, quando ainda dá para escrever, o botão à parte fica aqui. */}
       {modelosFixos && podeEnviarModelo && podeEscrever && <Botao className={css.abrirModelos} aria-haspopup="true" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
@@ -323,7 +318,8 @@ export function Composer({
                 aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
-                  ? (podeEnviarModelo ? 'Janela fechada: escolha uma mensagem padrão do WhatsApp em Respostas' : 'Mensagem indisponível nesta conversa')
+                  // #3234 (C2): "Janela fechada" fica só na faixa acima; aqui, só o caminho.
+                  ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa')
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão

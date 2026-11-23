@@ -98,7 +98,8 @@ const LISTA = [
   conversa('bloq0', { bloqueio: { motivo: 'Calote', em: h(500) } }),
 ]
 const CONVERSAS = [
-  conversa('robo'), conversa('meu'), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
+  // #3234 (E31): cabecalhoCheio=1 dá a 'meu' nome longo e comanda, o pior caso da linha do cabeçalho.
+  conversa('robo'), conversa('meu', q.get('cabecalhoCheio') === '1' ? { nome: 'Maria Aparecida dos Santos Albuquerque', numeroComanda: 4821 } : {}), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('lead', { conta: 'lead', clienteId: null }),
   conversa('leadjanela', { conta: 'lead', clienteId: null, mensagens: [{ id: 'mlj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('insta', { canal: 'Instagram' }),
@@ -558,12 +559,55 @@ try {
   await confere('E19. (#3206) conversa sem cadastro com a janela fechada também oferece a mensagem padrão; o servidor decide', async () => {
     const { ctx, p } = await abrir('inicial=leadjanela')
     await campo(p).waitFor()
-    assert.ok((await campo(p).getAttribute('placeholder')).startsWith('Janela fechada'), 'lead sem cadastro deve oferecer a mensagem padrão')
-    assert.equal(await p.getByRole('button', { name: /Respostas/ }).first().isEnabled(), true, 'o botão Respostas fica habilitado para o lead sem cadastro')
+    // #3234 (C2): o campo deixou de repetir "Janela fechada"; o sinal da oferta é a frase que leva a Respostas.
+    assert.ok((await campo(p).getAttribute('placeholder')).startsWith('Escolha uma mensagem padrão'), 'lead sem cadastro deve oferecer a mensagem padrão')
+    const respostas = p.getByRole('button', { name: /Respostas/ }).first()
+    assert.equal(await respostas.isEnabled(), true, 'o botão Respostas fica habilitado para o lead sem cadastro')
+    assert.equal(await respostas.getAttribute('aria-haspopup'), 'true', 'com a janela fechada, Respostas abre a lista de mensagens padrão')
     await p.evaluate(() => window.trocar('janela'))
-    await p.waitForFunction(() => document.querySelector('textarea[id]')?.placeholder?.startsWith('Janela fechada'))
+    await p.waitForFunction(() => document.querySelector('textarea[id]')?.placeholder?.startsWith('Escolha uma mensagem padrão'))
     await ctx.close()
   })
+
+  // --- E30/E31 (#3234, grupo A1) ---------------------------------------------------------------------------------------------------
+  for (const width of [1440, 1920]) {
+    await confere(`E30. (#3234 C2-C4) ${width}: "Janela fechada" uma vez só, sem Escolher modelo, faixa numa linha e o campo apontando Respostas`, async () => {
+      const { ctx, p } = await abrir('inicial=janela', { width, height: 900 })
+      await campo(p).waitFor()
+      const m = await p.evaluate(() => {
+        const area = document.querySelector('[data-area-envio]')
+        const faixa = area.querySelector('[class*=bloqueio]')
+        const texto = faixa.querySelector('p')
+        return {
+          cabecalho: document.querySelector('[data-cabecalho-conversa]').innerText,
+          naArea: (area.innerText.match(/Janela fechada/g) ?? []).length,
+          placeholder: document.querySelector('textarea[id]').placeholder,
+          faixa: faixa.innerText.replace(/\s+/g, ' ').trim(),
+          altura: texto.getBoundingClientRect().height,
+          linha: parseFloat(getComputedStyle(texto).lineHeight),
+        }
+      })
+      assert.doesNotMatch(m.cabecalho, /Janela fechada/, 'o cabeçalho repete o que a faixa diz')
+      assert.equal(m.naArea, 1, `"Janela fechada" aparece ${m.naArea} vezes junto do campo`)
+      assert.doesNotMatch(m.placeholder, /Janela fechada/, 'o campo repete o que a faixa diz')
+      assert.equal(await p.getByRole('button', { name: /Escolher modelo/ }).count(), 0, 'a faixa ainda tem a segunda entrada para a mesma lista')
+      assert.match(m.faixa, /^Janela fechada\. Só mensagem padrão do WhatsApp sai até ele responder\.$/, 'a faixa perdeu o porquê')
+      assert.match(m.placeholder, /Respostas/, 'o campo não diz onde está a mensagem padrão')
+      assert.ok(m.altura <= m.linha * 1.5, `a faixa quebrou: ${m.altura} px para uma linha de ${m.linha} px`)
+      await ctx.close()
+    })
+  }
+  for (const width of [1280, 1440]) {
+    await confere(`E31. (#3234 C2) ${width}: com a janela aberta o cabeçalho mostra o prazo numa linha, com nome longo e comanda`, async () => {
+      const { ctx, p } = await abrir('inicial=meu&cabecalhoCheio=1', { width, height: 900 })
+      await campo(p).waitFor()
+      const linha = p.locator('[data-cabecalho-conversa] h2 small')
+      assert.match(await linha.innerText(), /4821 ·\s+WhatsApp · Janela aberta por \d+ h \d+ min/)
+      const { altura, alturaLinha } = await linha.evaluate((el) => ({ altura: el.getBoundingClientRect().height, alturaLinha: parseFloat(getComputedStyle(el).lineHeight) }))
+      assert.ok(altura <= alturaLinha * 1.5, `a linha do cabeçalho quebrou: ${altura} px para ${alturaLinha} px`)
+      await ctx.close()
+    })
+  }
 
   // --- E18 --------------------------------------------------------------------------------------------------------------------------
   await confere('E18. sugestão proativa não roda com o Assistente respondendo; roda quando a conversa é dela', async () => {
