@@ -27,6 +27,21 @@ namespace EasyStock.Application.Ports.Output.Persistence
             string? order = "asc",
             string? relacionamento = null);
 
+        /// <summary>
+        /// #3244: a lista de Cadastros com a relação de cada cliente (compras, gasto, ocorrências, notas, tags, risco)
+        /// e o gasto da carteira inteira da empresa, em poucas consultas em lote, sem consulta por linha.
+        /// </summary>
+        Task<ListaDeClientes> ListarComRelacaoAsync(
+            Guid empresaId,
+            int page,
+            int pageSize,
+            bool? ativo = null,
+            string? search = null,
+            string? sort = "nome",
+            string? order = "asc",
+            string? relacionamento = null,
+            CancellationToken ct = default);
+
         Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20, bool incluirInativos = false);
         Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone);
         Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
@@ -47,4 +62,24 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddAlteracaoAsync(ClienteAlteracao alteracao);
         Task<IEnumerable<ClienteAlteracao>> GetAlteracoesAsync(Guid clienteId, int max = 100);
     }
+
+    /// <summary>#3244: uma linha da lista. Compra é a <c>RegraDeCompra</c>; risco é o predicado de <c>relacionamento=recompra</c>.</summary>
+    public sealed record ClienteRelacao(
+        Cliente Cliente,
+        int Compras,
+        decimal Gasto,
+        DateTime? PrimeiraCompraEm,
+        DateTime? UltimaCompraEm,
+        int OcorrenciasAbertas,
+        int OcorrenciasTotal,
+        int NotasTotal,
+        string? UltimaNota,
+        IReadOnlyList<string> Tags,
+        bool EmRisco)
+    {
+        public const int TamanhoDaNotaCurta = 80;
+        public const int MaximoDeTags = 3;
+    }
+
+    public sealed record ListaDeClientes(IReadOnlyList<ClienteRelacao> Itens, int Total, decimal GastoTotalDaCarteira);
 }
