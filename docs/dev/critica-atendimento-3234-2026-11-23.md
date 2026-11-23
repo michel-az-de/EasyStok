@@ -1,6 +1,6 @@
 # Crítica da tela do Atendimento: coerência e poluição visual (#3234)
 
-**Status: proposta, aguardando aprovação do Felipe.** Nenhuma PR de interface sai antes da aprovação desta lista.
+**Status: aprovada pelo Felipe em 23/11/2026, às 12:27.** A execução segue na seção "Execução do grupo A".
 
 **Escopo: só desktop**, a pedido do Felipe em 23/11. O celular fica para outra rodada.
 
@@ -99,6 +99,30 @@ Versão celular (foco no desktop, pedido do Felipe), navegação lateral, telas 
 
 ## Para aprovar
 
-- [ ] Lista e prioridades aprovadas, ou ajustadas, pelo Felipe
-- [ ] C3: manter só "Respostas" como entrada da lista (revê a #2420)
-- [ ] Ordem dos grupos A, B, C e D
+- [x] Lista e prioridades aprovadas, ou ajustadas, pelo Felipe
+- [x] C3: manter só "Respostas" como entrada da lista (revê a #2420)
+- [x] Ordem dos grupos A, B, C e D
+
+Aprovado pelo Felipe em 23/11/2026 às 12:27: "Aprovo, começa o A".
+
+## Execução do grupo A
+
+A revisão do plano dividiu o grupo A em três PRs, para cada uma caber numa revisão:
+
+| PR | Itens | Situação |
+|---|---|---|
+| A1 | C2, C3 e C4 (faixa da janela e compositor) | esta |
+| A2 | C1 (falhas seguidas agrupadas) | a seguir |
+| A3 | C5 (modo como selo no cabeçalho) | a seguir |
+
+Ficam fora do grupo A, com motivo:
+
+- **C6 (largura de leitura) vai para o grupo B.** Limitar a conversa sem redistribuir a sobra para a lista e para o cartão só abre margem vazia.
+- **Do C4, "Só texto neste canal" e a faixa de notificações bloqueadas vão para o grupo D (avisos).** O WhatsApp da demonstração aceita todos os formatos, então a frase não aparece nela e não dá para provar a mudança na tela. Além disso, mudar a frase de lugar mexe nos três desenhos do compositor e na decisão da #2706.
+
+Decisões da A1:
+
+- Com a janela aberta, o cabeçalho mostra o prazo ("Janela aberta por 3 h 10 min") sempre que a tela tem 1280 px ou mais. A prova mede, em 1280 e 1440 px, que a linha cabe mesmo com nome longo e comanda. Isso revê a regra L4 da #1761 só no desktop largo. Abaixo de 1280 px a regra antiga continua: o prazo só aparece quando falta menos de 2 h, porque ali a linha quebra.
+- Com a janela fechada, "Janela fechada" aparece uma vez só. Quando o assunto da faixa junto do campo é a janela, quem avisa é a faixa. Quando a conversa está concluída ou bloqueada, a faixa fala de outra coisa e quem avisa é o cabeçalho.
+- Os prints de antes e depois, tirados da demonstração, estão em `critica-atendimento-3234/a1/`.
+- O botão "Escolher modelo" sai. A lista de mensagens padrão passa a ter uma entrada só, Respostas, e o campo diz onde ela está. Ficam como estão o "Modelos aprovados" perto do fim da janela (#1839) e o da bolha que falhou fora da janela.

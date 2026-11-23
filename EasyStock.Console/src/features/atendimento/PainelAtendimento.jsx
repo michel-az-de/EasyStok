@@ -11,7 +11,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
-import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
@@ -174,7 +174,7 @@ function PainelDaConversa({
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   // #3206: lead sem cadastro também envia; o servidor decide.
   const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
-  const prazo = prazoNoCabecalho(janela)
+  const prazo = prazoNoCabecalho(janela, motivo)
 
   return (
     <>
@@ -189,13 +189,14 @@ function PainelDaConversa({
             <span className={css.nomeCliente}>
               <NomeDoContato completo={apresentacao.completo} curto={apresentacao.curto} capsula={apresentacao.capsula} titulo={apresentacao.titulo} />
             </span>
-            {/* Comanda, canal e, quando pede atenção, o prazo da janela, em uma linha.
-                #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
-                perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
+            {/* Comanda, canal e, com a janela aberta, o prazo, em uma linha. #1761 (L4): a quantidade de
+                pedidos saiu (está em Histórico). #3234 (C2): fechada, quem diz é a faixa junto do campo. */}
             <small>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
-              {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
+              {prazo && <span className={prazoFolgado(janela) ? css.prazoFolgado : undefined}>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></span>}
+              {/* O foco vai a este título ao trocar de conversa: o leitor de tela ouve a janela que só a faixa mostra. */}
+              {!prazo && janela && !janela.textoLivre && <span className="sr"> · {janela.rotulo}</span>}
             </small>
           </h2>
         </span>

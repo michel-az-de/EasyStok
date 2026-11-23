@@ -58,16 +58,20 @@ export function estadoDaJanela(conversa, agora, canal) {
   }
 }
 
-// #1761 (L4): o prazo da janela de 24 h só vai para o cabeçalho da conversa quando pede atenção,
-// faltando menos de 2 h ou já fechada. Longe do fim era uma conta a mais na linha, que quebrava
-// em duas. Canal sem janela não mostra nada; canal sem regra segue avisando.
-export const MINUTOS_PARA_MOSTRAR_PRAZO = 120
-export function prazoNoCabecalho(janela) {
+// #3234 (C2) revê a #1761 (L4): no desktop a linha do cabeçalho cabe, e o prazo da janela aberta fica
+// sempre à vista. Fechada, não iniciada ou sem regra, a janela é dita uma vez só: pela faixa junto do
+// campo (`motivo` de `permissaoDeEscrita`) quando é ela o assunto; concluída ou bloqueada, a faixa fala
+// de outra coisa e o cabeçalho segue dizendo. Canal sem janela não mostra nada.
+// Bloqueada com a janela aberta, o prazo promete uma escrita que o bloqueio impede: não aparece.
+const FAIXA_DE_OUTRO_ASSUNTO = new Set(['bloqueio', 'reabrir'])
+export function prazoNoCabecalho(janela, motivo = null) {
   if (!janela) return null
-  if (!janela.textoLivre) return janela.rotulo
-  if (janela.restam == null || janela.restam >= MINUTOS_PARA_MOSTRAR_PRAZO) return null
-  return `escreve livre por ${janela.rotuloCurto}`
+  if (janela.textoLivre) return janela.restam == null || motivo?.acao === 'bloqueio' ? null : `Janela aberta por ${janela.rotuloCurto}`
+  return motivo && !FAIXA_DE_OUTRO_ASSUNTO.has(motivo.acao) ? null : janela.rotulo
 }
+// Abaixo de 1280 px a linha do cabeçalho volta a quebrar: lá o prazo só aparece perto do fim (#1761 L4).
+export const MINUTOS_PARA_MOSTRAR_PRAZO = 120
+export const prazoFolgado = (janela) => Boolean(janela?.textoLivre) && janela.restam != null && janela.restam >= MINUTOS_PARA_MOSTRAR_PRAZO
 
 // #1761 (L9): "Modelos aprovados" só ocupa a linha acima do campo quando a janela fechou ou falta
 // menos de 1 h. Antes disso o texto livre resolve; a recusa fora da janela leva ao modelo pela bolha.

@@ -169,13 +169,14 @@ confere('4  restrição de formato permanece acessível e problemas de envio con
   const composer = fonte('features/atendimento/Composer.jsx')
   // #2706: canal só de texto volta a mostrar o curto "Só texto neste canal"; a frase inteira segue no leitor de tela.
   assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className=\{css\.restricao\} title=\{restricao\}><span aria-hidden="true">Só texto neste canal<\/span><span className="sr">\{restricao\}<\/span><\/p>\)\}/)
-  // #2420: o aviso virou <div> para levar o botão Escolher modelo ao lado da explicação.
   // #2185: Anexar e Fotos são itens do MenuDeAcoes; o motivo vai escrito no item (aria-describedby no componente).
   assert.match(composer, /motivo: motivoDeFormato\(canal, 'foto'\)/)
   assert.match(composer, /motivo: !podeAnexar \? restricao : null/)
   assert.match(composer, /\{motivo && \([\s\S]*?<(?:p|div) className=\{`\$\{css\.bloqueio\}[^`]*`\}>[\s\S]*?<strong>\{motivo\.titulo\}<\/strong>\s*<span>\{motivo\.detalhe\}<\/span>/, 'bloqueio e janela fora do prazo não ficam só no leitor de tela')
-  // #2427: com a janela fechada, Escolher modelo fica no aviso, e só quando o modelo pode sair.
-  assert.match(composer, /\{motivo\.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && \(\s*<Botao className=\{css\.escolherModelo\} aria-haspopup="true" onClick=\{aoAbrirModelos\}>\s*<Icone nome="modelo" \/> Escolher modelo/)
+  // #3234 (C3) revê a #2420 e a #2427, com o aceite do Felipe (23/11): a lista de mensagens padrão tem uma entrada
+  // só, Respostas. A faixa diz por quê; o campo diz onde ela está, e só quando o modelo pode sair.
+  assert.doesNotMatch(composer, /Escolher modelo|css\.escolherModelo/)
+  assert.match(composer, /podeEnviarModelo \? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa'/)
   for (const erro of ['erroAnexo', 'variavelSobrando']) assert.match(composer, new RegExp(`\\{${erro} && <p className=\\{css\\.restricao\\} role="alert">\\{${erro}\\}`))
   assert.match(composer, /\{erroAssumir && <p className=\{css\.erroAssumir\} role="alert">\{erroAssumir\}/)
   const css = fonte('features/atendimento/atendimento.module.css')
