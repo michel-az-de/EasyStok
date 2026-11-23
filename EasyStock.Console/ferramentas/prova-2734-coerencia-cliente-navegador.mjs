@@ -128,6 +128,7 @@ try {
   await secaoPedidos.getByText('Valor total R$ 412,50 · Costuma pedir Feijoada').waitFor()
 
   // Telefones: o principal primeiro, com selo e sem Remover.
+  await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba
   const secaoTelefones = editor.getByRole('region', { name: 'Telefones', exact: true })
   const linhasTelefone = secaoTelefones.getByRole('listitem')
   assert.equal(await linhasTelefone.count(), 2)
@@ -136,6 +137,7 @@ try {
   assert.equal(await secaoTelefones.getByRole('button', { name: 'Remover telefone (11) 95555-4444', exact: true }).count(), 1)
 
   // Conversas recentes: só a que está carregada no Atendimento abre daqui.
+  await editor.getByRole('tab', { name: /^Conversas/ }).click() // #3249: cada parte da ficha é uma aba
   const secaoConversas = editor.getByRole('region', { name: 'Conversas recentes', exact: true })
   await secaoConversas.getByText('Chat do site · Aberto · 12/11, 18:05').waitFor()
   await secaoConversas.getByText('WhatsApp · Encerrado · 01/11, 10:00').waitFor()
@@ -145,6 +147,7 @@ try {
   await pagina.screenshot({ path: resolve(pasta, 'relacionamento-1280.png'), fullPage: true })
 
   // A14: no Novo telefone o número ganha a máscara enquanto a pessoa digita; sair com texto pergunta antes.
+  await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba
   await secaoTelefones.getByRole('button', { name: 'Adicionar telefone', exact: true }).click()
   let modal = pagina.getByRole('dialog', { name: 'Novo telefone', exact: true }); await modal.waitFor()
   const campoTelefone = modal.getByRole('textbox', { name: 'Telefone', exact: true })
@@ -158,6 +161,7 @@ try {
   await modal.getByRole('button', { name: 'Descartar', exact: true }).click()
   await modal.waitFor({ state: 'detached' })
   // No Novo endereço o CEP ganha o hífen e o número da casa fica como foi digitado (não vira telefone).
+  await editor.getByRole('tab', { name: /^Endereços/ }).click() // #3249: cada parte da ficha é uma aba
   await editor.getByRole('button', { name: 'Adicionar endereço', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Novo endereço', exact: true }); await modal.waitFor()
   await modal.getByRole('textbox', { name: 'CEP', exact: true }).pressSequentially('01001000')
@@ -230,6 +234,7 @@ try {
   await pagina.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Adicionar tag', undefined, { timeout: 4000 })
 
   // Telefone removido: a Ficha do Atendimento relê a pessoa e o foco fica na seção de telefones.
+  await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba
   await secaoTelefones.getByRole('button', { name: 'Remover telefone (11) 95555-4444', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Remover telefone?', exact: true }); await modal.waitFor()
   await modal.getByRole('button', { name: 'Remover', exact: true }).click()
@@ -244,6 +249,7 @@ try {
   assert.equal(await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).isDisabled(), true, 'o relacionamento não marca o formulário como alterado')
 
   // Abrir a conversa carregada fecha o cadastro e seleciona a conversa.
+  await editor.getByRole('tab', { name: /^Conversas/ }).click() // #3249: cada parte da ficha é uma aba
   await secaoConversas.getByRole('button', { name: /^Abrir conversa/ }).click()
   await editor.waitFor({ state: 'detached' })
   assert.equal(await pagina.evaluate(() => window.__selecionada), 'C1')

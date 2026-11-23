@@ -126,9 +126,14 @@ try {
   await pagina.getByRole('button', { name: 'Abrir ficha de Fixo Silva', exact: true }).click()
   ficha = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await ficha.waitFor()
   const selo = ficha.getByText('Sem Novo pedido', { exact: true }); await selo.waitFor()
+  // #3249: cada parte da ficha é uma aba; o selo fica no cartão e também no item da aba Telefones.
+  await ficha.getByRole('tab', { name: /^Telefones/ }).click()
   await ficha.getByLabel('Telefones').getByText(AVISO).waitFor()
-  const bordas = await selo.evaluate(el => { const s = getComputedStyle(el); return [s.borderLeftWidth, s.borderRightWidth, s.borderTopWidth, s.borderBottomWidth] })
-  assert.equal(new Set(bordas).size, 1, `Selo sem borda de um lado só: ${bordas}`)
+  assert.equal(await selo.count(), 2, 'Selo no cartão e no telefone principal')
+  for (const umSelo of await selo.all()) {
+    const bordas = await umSelo.evaluate(el => { const s = getComputedStyle(el); return [s.borderLeftWidth, s.borderRightWidth, s.borderTopWidth, s.borderBottomWidth] })
+    assert.equal(new Set(bordas).size, 1, `Selo sem borda de um lado só: ${bordas}`)
+  }
   await pagina.screenshot({ path: resolve(pasta, 'ficha-1440.png'), fullPage: true })
   await pagina.keyboard.press('Escape')
   await ficha.waitFor({ state: 'detached' })

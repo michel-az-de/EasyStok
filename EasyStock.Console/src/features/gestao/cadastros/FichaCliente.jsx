@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { adicionarEnderecoCliente, adicionarTelefoneCliente, obterCadastro, removerEnderecoCliente, removerTelefoneCliente } from '../../../aplicacao/cadastros'
 import { listarPedidosDoCliente, obterPedido } from '../../../aplicacao/pedidosCadastro'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
@@ -9,11 +10,12 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { telefoneNaTela } from '../../../dominio/cadastros'
 import { AVISO_NAO_CELULAR, avisoDeCelularBr } from '../../../dominio/validacaoDoCadastro'
-import { aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, numerosDoRelacionamento, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
+import { abasDaFicha, aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, numerosDoRelacionamento, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
 import { dataHora, mascaraCep, moeda } from '../../../dominio/formato'
 import { rotuloDaSituacao, tituloDoPedido } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
 import css from './cadastros.module.css'
+import perfil from './perfilDoCliente.module.css'
 
 // #2495 (S6, I4): ficha do cliente existente no editor de Cadastros. Grava sozinha, fora do formulário: adicionar
 // ou remover endereço e telefone não mexe no que a pessoa digitou acima nem marca o cadastro como alterado.
@@ -54,7 +56,10 @@ function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
 // #2792: `carregandoRelacionamento` vale só até o primeiro dossiê chegar; em releitura o valor anterior fica na tela.
 // `aoGravar` avisa quem mostra a mesma pessoa (a Ficha do Atendimento) de que endereço ou telefone mudou.
 export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, carregandoRelacionamento = false, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
-  const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId() }
+  const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId(), abas: useId() }
+  // #3249: Pedidos, Endereços, Telefones e Conversas em abas, um painel por vez (padrão do ModalHistorico). Os ids são
+  // desta ficha: o `painel-da-aba` padrão da BarraDeAbas já é o da Moldura no celular.
+  const [abaEscolhida, escolherAba] = useState('pedidos')
   const { acoes } = useAcessoModulos()
   const vePedidos = acoes.verPedidos === true
   const pedidos = usePedidosDoCliente(cliente.id, contexto, vePedidos)
@@ -88,6 +93,9 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
   const numeros = numerosDoRelacionamento(relacionamento)
   const telefones = telefonesDaFicha(listas.telefones)
   const recentes = relacionamento?.conversas ?? []
+  const abas = abasDaFicha({ pedidos: cliente.orderCount, enderecos: listas.enderecos.length, telefones: telefones.length, comConversas: Boolean(relacionamento) })
+  const ativa = abas.some(a => a.id === abaEscolhida) ? abaEscolhida : 'pedidos'
+  const idPainel = `${ids.abas}painel`, prefixoAba = `${ids.abas}aba`
   // Só abre daqui a conversa que o Atendimento já carregou; as outras ficam como registro.
   const noAtendimento = new Set(conversasNoAtendimento ?? [])
   const digitando = Boolean(intencao) && !intencao.acao.startsWith('remover')
@@ -148,7 +156,9 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
     {/* #2734: a região de aviso fica sempre na tela; o leitor de tela só anuncia o que muda dentro dela. */}
     <div role="status" className={css.vivo}>{sucesso && <p className={css.sucesso}>{sucesso}</p>}</div>
     {!intencao && erro && <p className={css.erro} role="alert">{erro}</p>}
-    <section aria-labelledby={ids.pedidos}>
+    <BarraDeAbas abas={abas} ativa={ativa} aoTrocar={escolherAba} idPainel={idPainel} prefixoId={prefixoAba} rotulo="Partes da ficha" rolavel className={perfil.abas} />
+    <div role="tabpanel" id={idPainel} aria-labelledby={`${prefixoAba}-${ativa}`} className={perfil.painelDaAba}>
+    {ativa === 'pedidos' && <section aria-labelledby={ids.pedidos}>
       <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
       <p><strong>{resumo.contagem}</strong>{resumo.ultimo && <> · {resumo.ultimo}</>}</p>
       {/* #2792: sem o dossiê, "Valor total" e "Costuma pedir" não aparecem e a ficha parece sem histórico: diz que está lendo. */}
@@ -160,16 +170,16 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
           <span><strong>{tituloDoPedido(p)}</strong><small>{[p.criadoEm && dataHora(p.criadoEm), rotuloDaSituacao(p.status), moeda(p.total)].filter(Boolean).join(' · ')}</small></span>
           <Botao disabled={Boolean(abrindo)} onClick={() => verPedido(p)} aria-label={`Abrir ${tituloDoPedido(p)}`}>{abrindo === p.id ? 'Abrindo…' : 'Abrir'}</Botao>
         </li>)}</ul>)}
-    </section>
-    <section aria-labelledby={ids.enderecos}>
+    </section>}
+    {ativa === 'enderecos' && <section aria-labelledby={ids.enderecos}>
       <div className={css.barra}><h3 id={ids.enderecos}>Endereços</h3>{podeEditar && <Botao ref={botaoEndereco} icone="mais" onClick={() => abrir('endereco')}>Adicionar endereço</Botao>}</div>
       {listas.enderecos.length === 0 ? <Vazio variante="linha" titulo="Nenhum endereço cadastrado." />
         : <ul className={css.itensFicha}>{listas.enderecos.map(e => { const linha = linhaDoEndereco(e); return <li key={e.id}>
           <span><strong>{linha.principal}</strong>{linha.detalhe && <small>{linha.detalhe}</small>}</span>
           <span className={css.acoes}>{e.padrao && <Pilula fina>Padrão</Pilula>}{podeEditar && <Botao variante="texto" aria-label={`Remover endereço ${linha.principal}`} onClick={() => abrir('removerEndereco', e)}>Remover</Botao>}</span>
         </li> })}</ul>}
-    </section>
-    <section aria-labelledby={ids.telefones}>
+    </section>}
+    {ativa === 'telefones' && <section aria-labelledby={ids.telefones}>
       <div className={css.barra}><h3 id={ids.telefones}>Telefones</h3>{podeEditar && <Botao ref={botaoTelefone} icone="mais" onClick={() => abrir('telefone')}>Adicionar telefone</Botao>}</div>
       {telefones.length === 0 ? <Vazio variante="linha" titulo="Nenhum telefone extra." />
         : <ul className={css.itensFicha}>{telefones.map(t => { const numero = telefoneNaTela(t.numero) || t.numero; return <li key={t.id}>
@@ -179,8 +189,8 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
       {telefones.some(t => t.principal) && <p className={css.legenda}>O telefone principal identifica a pessoa no Atendimento e não sai por esta lista.</p>}
       {/* #3155: o principal que o Novo pedido recusa (fixo, de outro país) ganha selo e a frase do motivo. */}
       {telefones.some(t => t.principal && avisoDeCelularBr(t.numero)) && <p className={css.legenda}>{AVISO_NAO_CELULAR}</p>}
-    </section>
-    {relacionamento && <section aria-labelledby={ids.conversas}>
+    </section>}
+    {ativa === 'conversas' && relacionamento && <section aria-labelledby={ids.conversas}>
       <div className={css.barra}><h3 id={ids.conversas}>Conversas recentes</h3></div>
       {recentes.length === 0 ? <Vazio variante="linha" titulo="Nenhuma conversa ainda." />
         : <ul className={css.itensFicha}>{recentes.map(c => <li key={c.id}>
@@ -193,6 +203,7 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
         : 'Aqui as conversas ficam como registro. Para abrir uma, use o Atendimento.'}</p>}
       {!aoAbrirConversa && recentes.some(c => noAtendimento.has(c.id)) && <p className={css.legenda}>Salve ou descarte as mudanças do cadastro para abrir uma conversa.</p>}
     </section>}
+    </div>
     {intencao && <Modal titulo={TITULO[intencao.acao]} largura={intencao.acao === 'endereco' ? 'md' : 'sm'} focarCampo={digitando} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado} confirmarDescarte={comTexto && !ocupado}
       rodape={<><Botao disabled={ocupado} onClick={digitando ? pedirFechamento : fechar}>Cancelar</Botao><Botao variante={intencao.acao.startsWith('remover') ? 'perigo' : 'primario'} disabled={ocupado} {...(intencao.acao.startsWith('remover') ? { onClick: confirmar } : { tipo: 'submit', form: ids.form })}>{ocupado ? 'Salvando…' : CONFIRMAR[intencao.acao]}</Botao></>}>
       {intencao.acao === 'endereco' && <form id={ids.form} ref={formRef} onSubmit={confirmar} className={css.formulario} noValidate>

@@ -1,0 +1,35 @@
+/* #3249: a ficha do cliente como perfil. Na tela larga, duas colunas: o cartão de quem é a pessoa (identidade,
+   números, contatos, foto e PDF) à esquerda e o resto à direita (notas, tags, formulário, abas e histórico).
+   Abaixo de 760 px, no mesmo corte da folha do Modal, as colunas empilham. Destaque por contorno uniforme de
+   1px e fundo, nunca por barra de um lado só. */
+.perfil { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); gap: var(--e-5); align-items: start; }
+/* Fora da ficha (cliente novo, produto, fornecedor, conta) os invólucros não contam para o layout. */
+.semColunas { display: contents; }
+.colunaCartao, .colunaConteudo { min-width: 0; }
+
+.cartao { padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-3); background: var(--papel); }
+.colunaCartao > .cartao { margin: 0; }
+.cartao > header { flex-direction: column; text-align: center; }
+.cartao > header > div { flex: none; width: 100%; justify-items: center; }
+/* Os números viram lista, rótulo à esquerda e valor à direita; o markup (dt e dd) e o quadro de três colunas
+   de cadastros.module.css continuam os mesmos. */
+.cartao .quadro { grid-template-columns: minmax(0, 1fr); gap: 0; padding: var(--e-1) var(--e-3); }
+.cartao .quadro > div { flex-direction: row; justify-content: space-between; align-items: baseline; gap: var(--e-3); padding-block: var(--e-2); }
+.cartao .quadro > div + div { border-block-start: 1px solid var(--linha); }
+.cartao .quadro dt::first-letter { text-transform: uppercase; }
+.cartao .quadro dd { font-size: var(--t-forte); }
+.cartao .contatos { grid-template-columns: minmax(0, 1fr); }
+.selo { justify-self: start; }
+.cartao .acoes { justify-content: center; gap: 0 var(--e-1); margin-block-start: calc(var(--e-2) * -1); }
+
+/* As abas da ficha: contorno uniforme; a aba ativa já vem tingida pela BarraDeAbas. */
+nav.abas { padding-bottom: 0; border: 1px solid var(--linha); border-radius: var(--r-2); overflow: hidden; }
+.painelDaAba { display: grid; gap: var(--e-5); min-width: 0; }
+
+@media (min-width: 760px) {
+  /* Com o miolo rolando, quem é a pessoa continua à vista. */
+  .colunaCartao { position: sticky; top: 0; }
+}
+@media (max-width: 759px) {
+  .perfil { grid-template-columns: minmax(0, 1fr); gap: var(--e-4); }
+}

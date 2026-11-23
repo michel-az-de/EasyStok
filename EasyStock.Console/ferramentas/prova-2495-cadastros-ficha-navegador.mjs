@@ -103,6 +103,7 @@ try {
   await editor.waitFor()
 
   // Endereço: CEP inválido não envia; válido envia bairro e CEP, e o primeiro vai como padrão.
+  await editor.getByRole('tab', { name: /^Endereços/ }).click() // #3249: cada parte da ficha é uma aba
   const secaoEnderecos = editor.getByRole('region', { name: 'Endereços' })
   await secaoEnderecos.getByText('Nenhum endereço cadastrado.').waitFor()
   await secaoEnderecos.getByRole('button', { name: 'Adicionar endereço', exact: true }).click()
@@ -131,6 +132,7 @@ try {
 
   // Telefone extra: com DDD; WhatsApp sim ou não.
   // #2734: a seção passou a listar também o telefone principal, então o nome é só "Telefones".
+  await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba
   const secaoTelefones = editor.getByRole('region', { name: 'Telefones', exact: true })
   await secaoTelefones.getByText('(11) 95555-4444').waitFor()
   await secaoTelefones.getByRole('button', { name: 'Adicionar telefone', exact: true }).click()
@@ -143,6 +145,7 @@ try {
   await secaoTelefones.getByText('(11) 3333-2222').waitFor()
 
   // Remover pede confirmação e envia DELETE; Cancelar não envia.
+  await editor.getByRole('tab', { name: /^Endereços/ }).click() // #3249: cada parte da ficha é uma aba
   const escritasAntes = escritas.length
   await secaoEnderecos.getByRole('button', { name: 'Remover endereço Rua das Flores, 10', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Remover endereço?', exact: true }); await modal.waitFor()
@@ -157,6 +160,7 @@ try {
   await secaoEnderecos.getByText('Nenhum endereço cadastrado.').waitFor()
 
   falharDetalhe = true
+  await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba
   await secaoTelefones.getByRole('button', { name: 'Remover telefone (11) 95555-4444', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Remover telefone?', exact: true }); await modal.waitFor()
   await modal.getByRole('button', { name: 'Remover', exact: true }).click()
