@@ -4,7 +4,7 @@
 - Base medida: `origin/master` `1aa58acbe` (inclui a #3234, PR #3236)
 - Issue mãe: #3237. Esta spec é o S0, issue #3238.
 - Relacionadas: #2921 (Novo pedido na tela, spec `novo-pedido-na-tela-2921.md`, emendada aqui), #3158 (momento de abrir a conversa, aberta), #3234 (crítica do Atendimento, aberta; só C2 e C3 entraram, pela PR #3236), #3193 (vocabulário "Sem pedido"), #3076 e #2777 (Cadastros e regra de compra).
-- Status: proposta revisada pela banca independente, que aprovou com ajustes em 23/11/2026 (seção 4); aguarda a aprovação do Felipe deste plano. O Felipe deu GO no S0 (esta spec) em 23/11/2026 e validou o protótipo clicável no mesmo dia, com dados fictícios; isso não aprova o escopo, o aceite nem o tier das fatias. O protótipo é um artifact privado e não é citado por link.
+- Status: plano aprovado pelo Felipe em 23/11/2026 às 18:14, com as palavras "Aprovo o plano"; antes disso, a banca independente aprovou com ajustes em 23/11/2026 (seção 4). O Felipe deu GO no S0 (esta spec) em 23/11/2026 e validou o protótipo clicável no mesmo dia, com dados fictícios. O protótipo é um artifact privado e não é citado por link.
 - Tier desta PR: baixo (docs, ADR-0055). As fatias têm tier próprio na seção 5.
 - Atlas: busca por EasyStok voltou vazia (lacuna declarada). Fonte usada: repositório, issues e leitura somente de produção (contagens e índices).
 
@@ -74,7 +74,7 @@ Outras decisões:
 - O nome `RelacionamentoCliente.jsx` já existe (notas e tags do editor). O módulo novo de domínio é `dominio/relacionamento.js` (puro: barras, rótulos), com nome distinto para não confundir.
 - O Atendimento não muda visualmente com S5. A prova de regressão é obrigatória.
 - Não se mexe no momento de abrir a conversa do Novo pedido (#3158), nem em tier ou critérios da #2921.
-- Título da tela (`TITULOS_CADASTROS.clientes` = "Leads e clientes", `EasyStock.Console/src/dominio/cadastros.js`, linha 258): decidir fora do caminho crítico (questões abertas).
+- Título da tela (`TITULOS_CADASTROS.clientes` = "Leads e clientes", `EasyStock.Console/src/dominio/cadastros.js`, linha 258): continua "Leads e clientes", por decisão do Felipe em 23/11/2026 (seção 11).
 
 ## 5. Fatias
 
@@ -104,7 +104,7 @@ Condições do S4b (todas):
 2. Canal fora da janela de 24 h: `wa.me` (a equipe envia pelo próprio aparelho) ou modelo aprovado no WhatsApp. Sem isso a mensagem para cliente inativa não sai.
 3. Teto de uso (custo e latência controlados, ação sob demanda, uma cliente por vez).
 
-Tier: F e S1 a S5 serão tier baixo pela ADR-0055 (spec de plano aprovado em `docs/plan/**`, merge no verde) SÓ depois que o Felipe aprovar este plano; até lá cada fatia segue como tier alto pela ADR-0070. F é fatia desta spec, sem número S, e segue o mesmo regime das fatias S. S6 é tier alto por herdar a spec 2921 (feat na janela Novo pedido): a PR fica aberta até a label `aprovado`, nas condições da ADR-0070.
+Tier: com o plano aprovado pelo Felipe em 23/11/2026 às 18:14 ("Aprovo o plano"), F e S1 a S5 são tier baixo pela ADR-0055 (spec de plano aprovado em `docs/plan/**`, merge no verde). F é fatia desta spec, sem número S, e segue o mesmo regime das fatias S. S6 segue em tier alto, por herdar a spec 2921 (feat na janela Novo pedido): a PR fica aberta até a label `aprovado`, nas condições da ADR-0070.
 
 ## 6. Ordem e paralelismo
 
@@ -145,11 +145,11 @@ API antes do Console: `scripts/deploy/vps-deploy.sh`, depois `scripts/deploy/con
 - Interesse de item na lista (endpoint `Admin`).
 - Mensagem da IA a partir da lista (S4b), até as três condições.
 
-## 11. Questões abertas
+## 11. Questões decididas
 
-1. Trocar o cliente no Novo pedido, com itens já montados: mantém os itens ou zera? Decidir antes de abrir a PR do S6. Sugestão provisória: manter os itens e refazer a cotação, avisando na janela; a decisão é do Felipe.
-2. Título da tela "Leads e clientes": manter, ou trocar (por exemplo "Clientes") agora que o estágio "Sem pedido" substitui "Lead" na lista? Não bloqueia nenhuma fatia.
-3. Critérios do S4a que não vêm de regra existente: "cadastro incompleto" = sem telefone; "sem pedido parado" = 0 compras e cadastro com mais de 30 dias; e a ordem de prioridade da tabela. São proposta da revisão; decidir antes de abrir a PR do S4a.
+1. Trocar o cliente no Novo pedido, com itens já montados: decidido pelo Felipe em 23/11/2026, 18:22: mantém os itens e refaz a cotação.
+2. Título da tela: decidido pelo Felipe em 23/11/2026, 18:23: continua "Leads e clientes".
+3. Critérios do S4a: aprovados pelo Felipe em 23/11/2026, 18:25. Cadastro incompleto = sem telefone. Sem pedido parado = 0 compras e cadastro com mais de 30 dias. Vale a ordem de prioridade da tabela.
 
 ## 12. Referências
 

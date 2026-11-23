@@ -30,6 +30,7 @@
 .clicavel { cursor: pointer; }
 .clicavel:hover td, .clicavel:focus-within td { background: var(--elevado); }
 .identidade { display: flex; gap: var(--e-3); align-items: center; }
+.fotoDaLinha { flex: none; display: inline-flex; }
 .icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: var(--r-1); background: var(--preenchimento); color: var(--marca-forte); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
 @media (min-width: 701px) { .lista .acoes button { white-space: nowrap; } }
