@@ -31,6 +31,10 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 720 
 await context.addInitScript(({ empresa, usuario }) => {
   sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'prova-controlada', expiraEm: Date.now() + 3600000,
     empresa: { id: empresa, nome: 'Empresa de teste' }, usuario: { id: usuario, nome: 'Dona de teste' } }))
+  // #3221: a sugestão proativa do Assistente faz POST .../sugestao sozinha, 1,2 s depois de a conversa parar. Em
+  // máquina lenta a espera vencia no meio da prova e a asserção de escrita via esse POST. A prova é do pedido:
+  // a preferência do complemento fica desligada, e nenhuma escrita além de marcar-lida passa.
+  localStorage.setItem(`easystok.complementoTab.v1:${encodeURIComponent(empresa)}:${encodeURIComponent(usuario)}`, 'false')
 }, { empresa, usuario })
 const chamadas = [], erros = []
 let pedidoCriado = false
@@ -100,8 +104,9 @@ try {
   await page.getByText('Joana · Sem janela', { exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: /^Anotação para Prato / }).count(), 5, 'F5 conserva os cinco itens na conversa de Joana')
   await page.getByText('Molho à parte', { exact: true }).waitFor()
-  assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida')), true,
-    'Montar e recarregar não envia pedido nem inicia conversa na API')
+  const escritas = chamadas.filter(c => c.metodo !== 'GET' && !c.path.endsWith('/marcar-lida'))
+  assert.equal(escritas.length, 0,
+    'Montar e recarregar não envia pedido nem inicia conversa na API; escritas vistas: ' + JSON.stringify(escritas))
   assert.equal(await totalVisivel(page), true)
   await foto(page, '03-apos-f5')
   writeFileSync(join(pasta, 'apos-f5.txt'), await page.locator('body').innerText())
