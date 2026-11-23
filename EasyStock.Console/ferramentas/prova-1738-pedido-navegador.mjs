@@ -56,7 +56,8 @@ await context.route('**/api/**', async route => {
   if (path === '/api/atendimento/agenda') return ok({ lojaDisponivel: true, dias: [] })
   return ok([])
 })
-const page = await context.newPage()page.on('pageerror', erro => erros.push(erro.message))
+const page = await context.newPage()
+page.on('pageerror', erro => erros.push(erro.message))
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   // #2437: a Caixa de entrada abre em "Precisa de você"; as conversas da prova já estão assumidas, então ela abre em "Todas".
