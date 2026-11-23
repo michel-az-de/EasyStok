@@ -52,19 +52,33 @@ Limites conhecidos:
 
 ## Ligar o vigia (nasce DESLIGADO)
 
-O formato do `list-chats` da ponte foi lido no código do `wppconnect-server` 2.10.81, não na ponte real.
-Antes de ligar, confira na VPS, com a sessão de uma loja, sem colar a saída em lugar nenhum (ela tem telefone):
+Medido na ponte real (2.10.81) em 22/11: `lastReceivedKey` vem sem `_serialized`, com `fromMe`, `remote`, `id` e
+`$1`. O cliente aceita as duas formas e, na real, monta `fromMe_remote_id` (#3138, item i). O que NÃO foi medido é
+se esse valor montado é o id que o webhook grava, nem o formato do `id` no `get-messages`. Antes de ligar, confira
+na VPS, com a sessão de uma loja. Os comandos imprimem só nomes de campo e booleanos, nunca o conteúdo:
 
 ```bash
-# imprime só tipos e nomes de campo, nunca o conteúdo
+# 1. forma da chave: nomes de campo
 curl -s -X POST "http://localhost:21465/api/<sessao>/list-chats" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"count":1,"onlyUsers":true}' \
   | jq 'if type=="array" then .[0] else .response[0] end | {id: (.id|type), ultima: (.lastReceivedKey|keys?)}'
+
+# 2. o id montado é o serializado da ponte? (true ou false por conversa)
+curl -s -X POST "http://localhost:21465/api/<sessao>/list-chats" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"count":5,"onlyUsers":true}' \
+  | jq '(if type=="array" then . else .response end)[] | .lastReceivedKey | select(. != null)
+        | (._serialized // ."$1") == "\(.fromMe)_\(.remote._serialized? // .remote)_\(.id)"'
+
+# 3. o get-messages devolve o id como texto ou com _serialized? (<chat> é o id de uma conversa; não cole)
+curl -s "http://localhost:21465/api/<sessao>/get-messages/<chat>?count=1" -H "Authorization: Bearer $TOKEN" \
+  | jq '.response[0].id | if type=="object" then has("_serialized") else type=="string" end'
 ```
 
-Esperado: `ultima` contém `_serialized` e `fromMe`. Se não contiver, NÃO ligue: o cliente devolve lista vazia e o
-vigia nunca abriria incidente (falso verde). Abra issue com os nomes de campo vistos.
+Esperado: no 1, `ultima` contém `_serialized`, ou então `fromMe`, `remote` e `id`; no 2 e no 3, só `true`. Qualquer
+`false`, ou campo faltando no 1, NÃO ligue: o vigia não acharia a mensagem (falso verde) ou acusaria toda conversa
+(falso alarme). Abra issue com os nomes de campo vistos.
 
 O Worker precisa da configuração da ponte. O `scripts/deploy/wppconnect/compose.yaml` versionado já a entrega ao
 `api` e ao `worker` pela âncora `x-wppconnect-cliente`; confira na VPS, contando sem imprimir valor:
