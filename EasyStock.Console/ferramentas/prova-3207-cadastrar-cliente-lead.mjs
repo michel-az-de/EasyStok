@@ -75,6 +75,8 @@ assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: 'maria@canal', client
 assert.equal(valoresIniciaisDoCadastro({ ...lead, canal: 'WhatsApp', contato: '5511987654321', cliente: {} }).telefone, '(11) 98765-4321')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, canal: 'Instagram', contato: '5511987654321', cliente: {} }).telefone, '')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123456789012345@lid', cliente: {} }).telefone, '')
+// A ponte WAHA grava o lid sem "@": 15 dígitos não são telefone (o maior celular do Brasil com DDI tem 13).
+assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123456789012345', cliente: {} }).telefone, '')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123456789012345@lid', cliente: { telefoneCanal: '5511987654321' } }).telefone, '(11) 98765-4321')
 assert.equal(valoresIniciaisDoCadastro({ ...lead, contato: '123', cliente: {} }).telefone, '')
 ok('contato que não parece telefone não vira telefone')
