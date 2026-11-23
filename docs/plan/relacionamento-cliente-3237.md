@@ -149,6 +149,7 @@ API antes do Console: `scripts/deploy/vps-deploy.sh`, depois `scripts/deploy/con
 
 1. Trocar o cliente no Novo pedido, com itens já montados: mantém os itens ou zera? Decidir antes de abrir a PR do S6. Sugestão provisória: manter os itens e refazer a cotação, avisando na janela; a decisão é do Felipe.
 2. Título da tela "Leads e clientes": manter, ou trocar (por exemplo "Clientes") agora que o estágio "Sem pedido" substitui "Lead" na lista? Não bloqueia nenhuma fatia.
+3. Critérios do S4a que não vêm de regra existente: "cadastro incompleto" = sem telefone; "sem pedido parado" = 0 compras e cadastro com mais de 30 dias; e a ordem de prioridade da tabela. São proposta da revisão; decidir antes de abrir a PR do S4a.
 
 ## 12. Referências
 
