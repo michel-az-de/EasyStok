@@ -11,7 +11,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
-import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
@@ -194,7 +194,9 @@ function PainelDaConversa({
             <small>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
-              {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
+              {prazo && <span className={prazoFolgado(janela) ? css.prazoFolgado : undefined}>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></span>}
+              {/* O foco vai a este título ao trocar de conversa: o leitor de tela ouve a janela que só a faixa mostra. */}
+              {!prazo && janela && !janela.textoLivre && <span className="sr"> · {janela.rotulo}</span>}
             </small>
           </h2>
         </span>

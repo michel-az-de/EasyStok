@@ -579,7 +579,9 @@ try {
         const faixa = area.querySelector('[class*=bloqueio]')
         const texto = faixa.querySelector('p')
         return {
-          cabecalho: document.querySelector('[data-cabecalho-conversa]').innerText,
+          // O que se vê (sem o texto de leitor de tela) e o que o leitor ouve ao focar o título.
+          cabecalho: (() => { const c = document.querySelector('[data-cabecalho-conversa]').cloneNode(true); c.querySelectorAll('.sr').forEach((e) => e.remove()); return c.textContent })(),
+          tituloLido: document.querySelector('[data-cabecalho-conversa] h2').textContent,
           naArea: (area.innerText.match(/Janela fechada/g) ?? []).length,
           placeholder: document.querySelector('textarea[id]').placeholder,
           faixa: faixa.innerText.replace(/\s+/g, ' ').trim(),
@@ -588,6 +590,7 @@ try {
         }
       })
       assert.doesNotMatch(m.cabecalho, /Janela fechada/, 'o cabeçalho repete o que a faixa diz')
+      assert.match(m.tituloLido, /Janela fechada/, 'o foco vai ao título ao trocar de conversa: o leitor de tela precisa ouvir a janela')
       assert.equal(m.naArea, 1, `"Janela fechada" aparece ${m.naArea} vezes junto do campo`)
       assert.doesNotMatch(m.placeholder, /Janela fechada/, 'o campo repete o que a faixa diz')
       assert.equal(await p.getByRole('button', { name: /Escolher modelo/ }).count(), 0, 'a faixa ainda tem a segunda entrada para a mesma lista')
@@ -608,6 +611,13 @@ try {
       await ctx.close()
     })
   }
+  await confere('E31. (#3234 C2) 1024: abaixo de 1280 px o prazo folgado sai do cabeçalho (#1761 L4), e a linha não quebra', async () => {
+    const { ctx, p } = await abrir('inicial=meu&cabecalhoCheio=1', { width: 1024, height: 768 })
+    await campo(p).waitFor()
+    const linha = p.locator('[data-cabecalho-conversa] h2 small')
+    assert.doesNotMatch(await linha.innerText(), /Janela aberta/)
+    await ctx.close()
+  })
 
   // --- E18 --------------------------------------------------------------------------------------------------------------------------
   await confere('E18. sugestão proativa não roda com o Assistente respondendo; roda quando a conversa é dela', async () => {

@@ -57,7 +57,7 @@ const { FORMATO_DO_ENDERECO, recusaDoEndereco } = await import('../src/dominio/c
 const { encaixeNaJanela, tempoDoItem } = await import('../src/dominio/lembrete.js')
 const { podeVerAvisosDoCliente, podeVerItensFora } = await import('../src/dominio/acessoModulos.js')
 const { pedidoAcabouDeNascer, porcaoForaDoNome, tituloDaComanda } = await import('../src/dominio/pedido.js')
-const { estadoDaJanela, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } = await import('../src/dominio/janela.js')
+const { estadoDaJanela, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } = await import('../src/dominio/janela.js')
 const { automaticoDesligadoNaConversa } = await import('../src/dominio/motivoDeEscalada.js')
 const { mostraHistorico, resumoDasTags } = await import('../src/dominio/ficha.js')
 const { mostraChipDoCanal } = await import('../src/dominio/conversa.js')
@@ -332,6 +332,18 @@ await confere('J  prazo no cabeçalho com a janela aberta; fechada ou sem regra,
   }
   const concluida = permissaoDeEscrita({ ...fechada, estado: 'Encerrado' }, AGORA, WHATSAPP)
   assert.equal(prazoNoCabecalho(concluida.janela, concluida.motivo), 'Janela fechada', 'concluída: a janela some da tela')
+  const bloqueio = { motivo: 'Calote', em: new Date(AGORA - 60000).toISOString() }
+  const bloqueada = permissaoDeEscrita({ ...fechada, bloqueio }, AGORA, WHATSAPP)
+  assert.equal(bloqueada.motivo.acao, 'bloqueio')
+  assert.equal(prazoNoCabecalho(bloqueada.janela, bloqueada.motivo), 'Janela fechada', 'bloqueada: a janela some da tela')
+  // Bloqueada com a janela aberta: o prazo promete uma escrita que o bloqueio impede.
+  const aberta = { janelaExpiraEm: new Date(AGORA + 300 * 60000).toISOString(), mensagens: [], canal: 'X' }
+  const bloqueadaAberta = permissaoDeEscrita({ ...aberta, bloqueio }, AGORA, WHATSAPP)
+  assert.equal(prazoNoCabecalho(bloqueadaAberta.janela, bloqueadaAberta.motivo), null, 'bloqueada: o prazo da janela aberta não vale')
+  // Abaixo de 1280 px a linha volta a quebrar: o prazo folgado (2 h ou mais) fica só no desktop largo (#1761 L4).
+  assert.equal(prazoFolgado(janelaCom(120)), true)
+  assert.equal(prazoFolgado(janelaCom(119)), false)
+  assert.equal(prazoFolgado(janelaCom(-5)), false)
 })
 await confere('J  "Modelos aprovados" fixo só com menos de 1 h de janela, ou com ela fechada', () => {
   assert.equal(modelosAVista(janelaCom(23 * 60)), false)

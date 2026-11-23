@@ -230,7 +230,7 @@
   background: var(--alerta-pastel); color: var(--alerta);
   border: 0; border-radius: var(--r-2); font-size: var(--t-apoio);
 }
-.bloqueioIcone { flex: none; }
+.bloqueioIcone { flex: none; align-self: flex-start; margin-top: 1px; }
 .bloqueioTexto {
   flex: 1 1 auto; min-width: 0; margin: 0;
   color: var(--tinta-2); line-height: var(--lh-compacto); overflow-wrap: anywhere;
@@ -345,6 +345,10 @@
    pedaços ao lado do Encerrar. O texto inteiro fica no title do navegador. */
 .cabecalho h2 small {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* #3234 (C2): o prazo longe do fim cabe só no desktop largo; abaixo disso a linha quebrava (#1761 L4). */
+@media (max-width: 1279px) {
+  .prazoFolgado { display: none; }
 }
 .cabecalho .identidade { min-width: 0; }
 
