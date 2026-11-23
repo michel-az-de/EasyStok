@@ -1,6 +1,6 @@
 import { chamarApi } from './cliente'
 import { identidadeDaSessao, lerSessao } from './sessao'
-import { notaDaApi, relacionamentoDoDossie } from './traducaoCliente'
+import { gastoDaCarteiraDoMeta, notaDaApi, relacaoDoCliente, relacionamentoDoDossie } from './traducaoCliente'
 import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, parametrosDaOrdem, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
 
 const rotas = { clientes: '/api/clientes', produtos: '/api/produtos', fornecedores: '/api/fornecedores', bancos: '/api/cadastros/contas-bancarias', pagamentos: '/api/cadastros/metodos-pagamento', modelos: '/api/notificacoes/templates', etiquetas: '/api/etiquetas/templates' }
@@ -22,7 +22,9 @@ export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = ''
   let itens = r?.data ?? []
   if (!Array.isArray(itens)) throw new Error('A lista não foi recebida. Tente carregar novamente.')
   if (simples && busca) itens = itens.filter(x => `${x.nome} ${x.instituicao ?? ''}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))
-  return { itens, total: r?.meta?.totalCount ?? r?.meta?.total ?? itens.length, pagina, busca, pesquisaLimitada: Boolean(pesquisaProduto) }
+  // #3254: na lista de clientes cada linha ganha `relacao` e a lista traz o gasto da carteira (denominador da barra).
+  if (tela === 'clientes') itens = itens.map(x => ({ ...x, relacao: relacaoDoCliente(x) }))
+  return { itens, gastoTotalDaCarteira: gastoDaCarteiraDoMeta(r?.meta), total: r?.meta?.totalCount ?? r?.meta?.total ?? itens.length, pagina, busca, pesquisaLimitada: Boolean(pesquisaProduto) }
 }
 // #2495 (S5): a API acha por "contém" em nome, telefone e documento; quem compara os dígitos é o domínio.
 export async function buscarClientesParecidos(termo, contexto, sinal) {
