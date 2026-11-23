@@ -97,10 +97,12 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   function teclar(e, modo = 'posicao') {
     const setas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
     if (e.key === 'Escape') {
+      // Só consome o Esc quando há o que desfazer; sem nada a desfazer ele segue para quem usa o painel (fechar).
+      const antes = gesto.current?.antes ?? origemTeclado.current, a = atual.current
+      if (!antes || (!gesto.current && antes.x === a.x && antes.y === a.y && antes.largura === a.largura && antes.altura === a.altura)) return
       e.preventDefault(); e.stopPropagation()
-      const antes = gesto.current?.antes ?? origemTeclado.current
       gesto.current = null; setArrastando(false)
-      if (antes) mover(antes, true)
+      mover(antes, true)
     } else if (setas[e.key] && !e.altKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault(); e.stopPropagation()
       const [dx, dy] = setas[e.key], passo = e.shiftKey ? 24 : 8, antes = atual.current, r = tamanho()

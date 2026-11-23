@@ -41,6 +41,11 @@ const tudo = emojis('')
 assert.equal(tudo.length, new Set(todos).size, 'sem termo, todos, uma vez cada')
 for (const t of ['a', 'o', 'e', ':a']) assert.equal(new Set(emojis(t)).size, emojis(t).length, `"${t}" sem repetição`)
 assert.deepEqual(buscarEmTodasAsCategorias('xyzxyz'), [], 'nada casa, nada volta')
+// A busca olha todos os nomes, também os de quem repete na categoria "Mais usados" (que tem o nome curto).
+assert.ok(emojis('positivo').includes('👍'), '"positivo" acha 👍')
+assert.ok(emojis('acenando').includes('👋'), '"acenando" acha 👋')
+assert.ok(emojis('maos juntas').includes('🙏'), '"maos juntas" acha 🙏')
+assert.ok(emojis('por favor').includes('🙏') && emojis('por favor').includes('🥺'), '"por favor" acha 🙏 e 🥺')
 // A busca da loja não mudou.
 assert.equal(EMOJIS_DA_LOJA.length, 24)
 assert.deepEqual(buscarEmojis(':mas').map((e) => e.emoji), ['🍝'])

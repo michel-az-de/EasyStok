@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { ModalConfirmar } from '../../componentes/ModalConfirmar'
@@ -29,17 +29,20 @@ export function ModalAssistente({ conversa, aoFechar, escopoMovel = 'assistente:
     campo.focus({ preventScroll: true }); return true
   }
   const fechar = () => { focarCampo(); aoFechar() }
-  // Captura no painel, para o Esc valer também com o foco na alça. Um diálogo aberto por cima (a confirmação) ou o arraste
-  // em curso ficam com o Esc. Com o foco no corpo da página (clique em texto do painel), o ouvinte do documento fecha.
+  // Esc na fase de bolha: a alça e o redimensionar do painel consomem o Esc que desfaz um movimento (defaultPrevented); sem nada a
+  // desfazer ele chega aqui e fecha. Um diálogo aberto por cima (a confirmação) fica com o Esc. Com o foco no corpo da página
+  // (clique em texto do painel), o ouvinte do documento fecha.
   const aoTeclar = (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('dialog') || e.target.dataset?.arrastando) return
+    if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('dialog')) return
     e.stopPropagation(); fechar()
   }
+  const fecharRef = useRef(fechar)
+  useEffect(() => { fecharRef.current = fechar })
   useEffect(() => {
-    const ouvir = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && e.target === document.body && !document.querySelector('dialog[open]')) fechar() }
+    const ouvir = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && e.target === document.body && !document.querySelector('dialog[open]')) fecharRef.current() }
     document.addEventListener('keydown', ouvir)
     return () => document.removeEventListener('keydown', ouvir)
-  })
+  }, [])
   const { acoes } = useAcessoModulos()
   const { carregando, checagem, erro, salvandoChave, erroChave, checarDeNovo, mudarChave } = useChecagemAssistente(conversa.id)
   const [sinalRecarregar, setSinalRecarregar] = useState(0)
@@ -145,7 +148,7 @@ export function ModalAssistente({ conversa, aoFechar, escopoMovel = 'assistente:
     <PainelMovel
       controle={{ ...movel, devolverFoco: focarCampo }} titulo="Assistente nesta conversa" alinharDireita
       larguraInicial={renderizarPainel ? 560 : 440} alturaInicial={560} aoRecolher={aoFechar}
-      atributos={{ role: 'dialog', onKeyDownCapture: aoTeclar }}
+      atributos={{ role: 'dialog', onKeyDown: aoTeclar }}
     >
       <p className={css.checagemNota}>{`O que decide se o Assistente responde ${primeiroNomeDaConversa(conversa)}.`}</p>
       {renderizarPainel

@@ -79,10 +79,10 @@ export const CATEGORIAS_DE_EMOJI = [
   },
 ]
 
-// A busca olha todas as categorias, com as regras do `buscarEmojis` (sem acento, `:` na frente), e não repete o emoji
-// que mora em duas categorias. Sem termo, devolve todos, uma vez cada.
+// A busca olha todas as categorias e todos os nomes (um emoji de "Mais usados" também tem o nome mais rico da outra),
+// com as regras do `buscarEmojis` (sem acento, `:` na frente), e só depois tira o emoji que mora em duas categorias.
+// Sem termo, devolve todos, uma vez cada.
 export function buscarEmTodasAsCategorias(termo) {
   const vistos = new Set()
-  const todos = CATEGORIAS_DE_EMOJI.flatMap((c) => c.emojis).filter((x) => !vistos.has(x.emoji) && vistos.add(x.emoji))
-  return buscarEmojis(termo, todos)
+  return buscarEmojis(termo, CATEGORIAS_DE_EMOJI.flatMap((c) => c.emojis)).filter((x) => !vistos.has(x.emoji) && vistos.add(x.emoji))
 }
