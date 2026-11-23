@@ -52,19 +52,37 @@ Limites conhecidos:
 
 ## Ligar o vigia (nasce DESLIGADO)
 
-O formato do `list-chats` da ponte foi lido no código do `wppconnect-server` 2.10.81, não na ponte real.
-Antes de ligar, confira na VPS, com a sessão de uma loja, sem colar a saída em lugar nenhum (ela tem telefone):
+Medido na ponte real (2.10.81) em 22/11: `lastReceivedKey` vem sem `_serialized`, com `fromMe`, `remote`, `id` e
+`$1`. O cliente aceita as duas formas e, na real, monta `fromMe_remote_id` (#3138, item i). O que NÃO foi medido é
+se esse valor montado é o id que o webhook grava, nem o formato do `id` no `get-messages`. Antes de ligar, confira
+na VPS, com a sessão de uma loja. Os comandos imprimem só nomes de campo e booleanos, nunca o conteúdo:
 
 ```bash
-# imprime só tipos e nomes de campo, nunca o conteúdo
+# 1. forma da chave: nomes de campo
 curl -s -X POST "http://localhost:21465/api/<sessao>/list-chats" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"count":1,"onlyUsers":true}' \
   | jq 'if type=="array" then .[0] else .response[0] end | {id: (.id|type), ultima: (.lastReceivedKey|keys?)}'
+
+# 2. o id montado é o id da mensagem na ponte, o mesmo que vai no evento do webhook? (só true ou false)
+chats=$(curl -s -X POST "http://localhost:21465/api/<sessao>/list-chats" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"count":5,"onlyUsers":true}')
+com_chave='[(if type=="array" then . else .response end)[]? | select(.lastReceivedKey != null)][0]'
+chat=$(printf '%s' "$chats" | jq -r "$com_chave"' | .id | (._serialized? // .)' 2>/dev/null)
+montado=$(printf '%s' "$chats" | jq -r "$com_chave"' | .lastReceivedKey
+  | ._serialized // "\(.fromMe)_\(.remote | (._serialized? // .))_\(.id)"' 2>/dev/null)
+curl -s "http://localhost:21465/api/<sessao>/get-messages/$chat?count=20" -H "Authorization: Bearer $TOKEN" \
+  | jq --arg m "$montado" '[(.response | if type=="object" then [.[]] else . end)[]? | .id | (._serialized? // .)]
+      | index($m) != null' 2>/dev/null
 ```
 
-Esperado: `ultima` contém `_serialized` e `fromMe`. Se não contiver, NÃO ligue: o cliente devolve lista vazia e o
-vigia nunca abriria incidente (falso verde). Abra issue com os nomes de campo vistos.
+Esperado: no 1, `ultima` contém `_serialized`, ou então `fromMe`, `remote` e `id`; no 2, `true`. O 2 não imprime o
+telefone (fica em variável) e mede de uma vez a forma do id montado e a do `get-messages`, que é a fonte do
+`id._serialized` do evento. Não mede a marca já gravada em `webhook_recebidos` (`EventIdExterno` =
+`wpp:<sessao>:<id>`), nem conversa `@lid` cujo evento chegue com `remote` em `@c.us`. `false` no 2 pode ser só a
+última recebida fora das 20 mais recentes: repita trocando o `[0]` de `com_chave`. `false` de novo, saída vazia ou
+campo faltando no 1: NÃO ligue, o vigia não acharia a mensagem (falso verde) ou acusaria toda conversa (falso
+alarme). Abra issue com os nomes de campo vistos.
 
 O Worker precisa da configuração da ponte. O `scripts/deploy/wppconnect/compose.yaml` versionado já a entrega ao
 `api` e ao `worker` pela âncora `x-wppconnect-cliente`; confira na VPS, contando sem imprimir valor:

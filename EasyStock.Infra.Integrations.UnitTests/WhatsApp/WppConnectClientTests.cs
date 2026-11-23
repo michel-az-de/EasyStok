@@ -191,6 +191,48 @@ public class WppConnectClientTests
         (await Client.ListarUltimasRecebidasAsync(_sessao, 20)).Should().HaveCount(esperadas);
     }
 
+    /// <summary>
+    /// #3138 (i): a ponte real (wppconnect-server 2.10.81) devolve <c>lastReceivedKey</c> sem <c>_serialized</c>:
+    /// <c>fromMe</c>, <c>remote</c> (objeto), <c>id</c> e <c>$1</c>. Grupo e mensagem da loja seguem fora (guarda de regressão).
+    /// </summary>
+    [Fact]
+    public async Task Lista_a_ultima_recebida_no_formato_real_da_ponte_sem_serialized()
+    {
+        const string Individual = """{"id":{"server":"c.us","user":"5511999999999","_serialized":"5511999999999@c.us"},"lastReceivedKey":{"fromMe":false,"remote":{"server":"c.us","user":"5511999999999","_serialized":"5511999999999@c.us"},"id":"ABC","$1":"opaco"}}""";
+        const string Lid = """{"id":{"server":"lid","user":"123","_serialized":"123@lid"},"lastReceivedKey":{"fromMe":false,"remote":"123@lid","id":"DEF","$1":"opaco"}}""";
+        const string Grupo = """{"id":{"server":"g.us","user":"120363000000000000","_serialized":"120363000000000000@g.us"},"lastReceivedKey":{"fromMe":false,"remote":{"_serialized":"120363000000000000@g.us"},"id":"G","participant":{"_serialized":"5511666666666@c.us"},"$1":"opaco"}}""";
+        const string DaLoja = """{"id":{"_serialized":"5511777777777@c.us"},"lastReceivedKey":{"fromMe":true,"remote":{"_serialized":"5511777777777@c.us"},"id":"X","$1":"opaco"}}""";
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/list-chats")
+            .Responde(HttpStatusCode.OK, $"[{Individual},{Lid},{Grupo},{DaLoja}]");
+
+        var ultimas = await Client.ListarUltimasRecebidasAsync(_sessao, 20);
+
+        ultimas.Should().Equal(
+            new UltimaRecebidaWppConnect("5511999999999@c.us", "false_5511999999999@c.us_ABC"),
+            new UltimaRecebidaWppConnect("123@lid", "false_123@lid_DEF"));
+        // Forma ESPERADA do evento da mesma mensagem, não medida na ponte real: o webhook lê id._serialized, e o
+        // id montado só serve ao vigia se tiver essa forma. A prova na ponte é a conferência 2 do runbook.
+        using var evento = System.Text.Json.JsonDocument.Parse(
+            """{"event":"onmessage","id":{"fromMe":false,"remote":"5511999999999@c.us","id":"ABC","_serialized":"false_5511999999999@c.us_ABC"}}""");
+        ultimas[0].MensagemId.Should().Be(
+            EasyStock.Application.UseCases.Atendimento.Webhook.WppConnectWebhookParser.Id(evento.RootElement));
+    }
+
+    [Theory]
+    [InlineData("""{"remote":{"_serialized":"5511999999999@c.us"},"id":"ABC"}""")]
+    [InlineData("""{"fromMe":"false","remote":{"_serialized":"5511999999999@c.us"},"id":"ABC"}""")]
+    [InlineData("""{"fromMe":false,"id":"ABC"}""")]
+    [InlineData("""{"fromMe":false,"remote":{"server":"c.us","user":"5511999999999"},"id":"ABC"}""")]
+    [InlineData("""{"fromMe":false,"remote":{"_serialized":"5511999999999@c.us"},"id":""}""")]
+    [InlineData("""{"fromMe":false,"remote":{"_serialized":"5511999999999@c.us"},"$1":"false_5511999999999@c.us_ABC"}""")]
+    public async Task Chave_incompleta_no_formato_real_nao_inventa_mensagem(string chave)
+    {
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/list-chats")
+            .Responde(HttpStatusCode.OK, $$"""[{"id":{"_serialized":"5511999999999@c.us"},"lastReceivedKey":{{chave}}}]""");
+
+        (await Client.ListarUltimasRecebidasAsync(_sessao, 20)).Should().BeEmpty();
+    }
+
     /// <summary>#2833: a reação vai pelo id serializado da mensagem; reação vazia sai como <c>false</c>, que retira.</summary>
     [Fact]
     public async Task Reacao_vai_pelo_id_da_mensagem_e_vazia_retira()

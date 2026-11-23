@@ -115,7 +115,8 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
 
     /// <summary>
     /// #3117: as conversas individuais mais recentes e a última mensagem recebida de cada uma (<c>lastReceivedKey</c>).
-    /// O servidor responde a lista direta; a forma com <c>response</c> também é aceita. Conversa sem a chave, de grupo,
+    /// O servidor responde a lista direta; a forma com <c>response</c> também é aceita. A chave vem serializada ou em
+    /// partes (<see cref="ChaveDeMensagem"/>). Conversa sem a chave, de grupo,
     /// de transmissão ou cuja última recebida é da própria loja fica de fora. Formato inesperado vira lista vazia.
     /// </summary>
     public async Task<IReadOnlyList<UltimaRecebidaWppConnect>> ListarUltimasRecebidasAsync(CredencialWppConnect sessao, int maximo,
@@ -136,9 +137,23 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
             || chat.EndsWith("@g.us", StringComparison.Ordinal) || chat.EndsWith("@broadcast", StringComparison.Ordinal)
             || !conversa.TryGetProperty("lastReceivedKey", out var chave) || chave.ValueKind != JsonValueKind.Object
             || (chave.TryGetProperty("fromMe", out var deMim) && deMim.ValueKind == JsonValueKind.True)
-            || Identificador(chave) is not { Length: > 0 } mensagem)
+            || ChaveDeMensagem(chave) is not { Length: > 0 } mensagem)
             return null;
         return new(chat, mensagem);
+    }
+
+    /// <summary>
+    /// #3138: a ponte real (2.10.81) devolve a chave sem <c>_serialized</c>, só com <c>fromMe</c>, <c>remote</c> e
+    /// <c>id</c>. O serializado é <c>fromMe_remote_id</c>, a mesma forma que o webhook grava. Parte ausente não é inventada.
+    /// </summary>
+    private static string? ChaveDeMensagem(JsonElement chave)
+    {
+        if (Identificador(chave) is { Length: > 0 } serializado) return serializado;
+        if (!chave.TryGetProperty("fromMe", out var deMim) || deMim.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || !chave.TryGetProperty("remote", out var remoto) || Identificador(remoto) is not { Length: > 0 } conversa
+            || LerTexto(chave, "id") is not { Length: > 0 } id)
+            return null;
+        return $"{(deMim.ValueKind == JsonValueKind.True ? "true" : "false")}_{conversa}_{id}";
     }
 
     private static MensagemRecenteWppConnect? Recente(JsonElement m) =>
