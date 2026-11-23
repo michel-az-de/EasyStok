@@ -106,7 +106,8 @@ const CONVERSAS = [
     // falhas=2: uma recusa seguida de um tempo esgotado com o mesmo texto; reenviar a recusa a deixa igual à vizinha.
     ...(q.get('falhas') === '2' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, { id: 'rf0', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'Não enviada: Sem conexão', em: h(9) }, { id: 'rf1', dir: 'out', texto: 'Tem sim, separo uma?', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(8) }] } : {}),
     // falhas=3 (A2b): o caso da produção, quatro envios do mesmo modelo, com o mesmo texto, que esgotaram o tempo.
-    ...(q.get('falhas') === '3' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mm' + i, dir: 'out', texto: 'Oi Ana, seu pedido 21 está pronto para retirar.', modelo: true, modeloNome: 'pedido_pronto', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
+    // O texto é o que o servidor grava: cabeçalho, corpo e rodapé por quebra de linha.
+    ...(q.get('falhas') === '3' ? { mensagens: [{ id: 'm0-meu', dir: 'in', texto: 'Oi, tem lasanha hoje?', em: h(10) }, ...[9, 8, 7, 6].map((min, i) => ({ id: 'mm' + i, dir: 'out', texto: 'Pedido 21 pronto\\nOi Ana, seu pedido 21 está pronto para retirar.\\nEasyStok', modelo: true, modeloNome: 'pedido_pronto', status: 'falhou', erro: 'The operation was canceled. Envio incerto.', em: h(min) }))] } : {}),
   }), conversa('janela', { mensagens: [{ id: 'mj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
   conversa('lead', { conta: 'lead', clienteId: null }),
   conversa('leadjanela', { conta: 'lead', clienteId: null, mensagens: [{ id: 'mlj', dir: 'in', texto: 'Oi', em: h(60 * 72) }], ultimaEm: h(60 * 72) }),
@@ -701,7 +702,7 @@ try {
     const { ctx, p } = await abrir('inicial=meu&falhas=3', { width: 1440, height: 900 })
     await campo(p).waitFor()
     const contar = () => p.evaluate(() => ({
-      baloes: [...document.querySelectorAll('[role=log] *')].filter((e) => e.childElementCount === 0 && e.textContent === 'Oi Ana, seu pedido 21 está pronto para retirar.').length,
+      baloes: [...document.querySelectorAll('[role=log] *')].filter((e) => e.childElementCount === 0 && e.textContent === 'Pedido 21 pronto\nOi Ana, seu pedido 21 está pronto para retirar.\nEasyStok').length,
       alertas: [...document.querySelectorAll('[role=log] [role=alert]')].map((e) => e.textContent.trim()),
       selos: document.querySelectorAll('[role=log] [title=pedido_pronto]').length,
       frases: (document.querySelector('[role=log]').textContent.match(/Pode ter chegado/g) ?? []).length,

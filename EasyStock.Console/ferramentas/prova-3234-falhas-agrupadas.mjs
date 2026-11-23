@@ -112,15 +112,16 @@ confere('h  abertas e soltas são de cada conversa: ir a outra e voltar não per
 
 confere('j  o mesmo modelo com o mesmo texto agrupa; nome diferente, texto livre igual ou modelo sem texto não', () => {
   // O formato da API (MensagemAtendimentoResult), traduzido como a tela traduz: a produção tinha 4 destes seguidos.
-  const PRONTO = 'Oi Ana, seu pedido 21 está pronto para retirar.'
+  // Como EnviarModeloConversaUseCase grava: tipo Modelo, cabeçalho, corpo e rodapé numa string só, por quebra de linha.
+  const PRONTO = 'Pedido 21 pronto\nOi Ana, seu pedido 21 está pronto para retirar.\nEasyStok'
   const daApi = (id, extra = {}) => linha(mensagemDaApi({
-    id, direcao: 'Saida', autor: 'Usuario', tipoConteudo: 'Texto', texto: PRONTO, status: 'Falhou', erro: TIMEOUT,
+    id, direcao: 'Saida', autor: 'Usuario', tipoConteudo: 'Modelo', texto: PRONTO, status: 'Falhou', erro: TIMEOUT,
     enviadaEm: '2026-11-23T15:00:00', modelo: { nome: 'pedido_pronto', idioma: 'pt_BR' }, ...extra,
   }, 'c1'))
   assert.deepEqual(ids(agruparFalhasSeguidas([daApi('p1'), daApi('p2'), daApi('p3'), daApi('p4')])), ['p4+p1+p2+p3'], 'o mesmo modelo repetido não agrupou')
   const outroModelo = daApi('o1', { modelo: { nome: 'retomada', idioma: 'pt_BR' } })
   assert.deepEqual(ids(agruparFalhasSeguidas([daApi('p1'), outroModelo])), ['p1', 'o1'], 'modelos diferentes com o mesmo texto agruparam')
-  const textoLivre = daApi('t1', { modelo: null })
+  const textoLivre = daApi('t1', { modelo: null, tipoConteudo: 'Texto' })
   assert.deepEqual(ids(agruparFalhasSeguidas([textoLivre, daApi('p1')])), ['t1', 'p1'], 'texto livre e modelo com o mesmo texto agruparam')
   assert.deepEqual(ids(agruparFalhasSeguidas([daApi('p1'), textoLivre])), ['p1', 't1'], 'modelo e texto livre com o mesmo texto agruparam')
   // Sem texto, a tradução põe o rótulo no lugar: dois envios do mesmo modelo podem ter parâmetros diferentes.
@@ -129,17 +130,18 @@ confere('j  o mesmo modelo com o mesmo texto agrupa; nome diferente, texto livre
   assert.deepEqual(ids(agruparFalhasSeguidas([semTexto('s1'), semTexto('s2')])), ['s1', 's2'], 'modelo sem texto agrupou pelo rótulo')
   const emBranco = (id) => daApi(id, { texto: '   ' })
   assert.deepEqual(ids(agruparFalhasSeguidas([emBranco('b1'), emBranco('b2')])), ['b1', 'b2'], 'modelo com texto em branco agrupou pelo rótulo')
-  // Banca A2b: a programada tem selo próprio e quase sempre é modelo; não se junta ao envio feito na hora.
-  const programada = daApi('g1', { programada: true })
-  assert.deepEqual(ids(agruparFalhasSeguidas([programada, daApi('p1')])), ['g1', 'p1'], 'programada e envio na hora do mesmo modelo agruparam')
-  assert.deepEqual(ids(agruparFalhasSeguidas([daApi('p1'), programada])), ['p1', 'g1'], 'envio na hora e programada do mesmo modelo agruparam')
+  // Banca A2b: a programada tem selo próprio e não se junta ao envio feito na hora. O disparo
+  // (DisparoMensagensProgramadas) a grava como Texto, sem modelo; por isso o par é contra o texto livre igual.
+  const programada = daApi('g1', { modelo: null, tipoConteudo: 'Texto', programada: true })
+  assert.deepEqual(ids(agruparFalhasSeguidas([programada, textoLivre])), ['g1', 't1'], 'programada e texto igual feito na hora agruparam')
+  assert.deepEqual(ids(agruparFalhasSeguidas([textoLivre, programada])), ['t1', 'g1'], 'texto feito na hora e programada igual agruparam')
   // Retomada (espera o cliente), saída por SMS, cabeçalho com mídia e outra falha têm estado próprio.
   for (const [extra, motivo] of [[{ aguardaClienteDesde: '2026-11-23T15:00:00' }, 'retomada'], [{ reservaSmsEm: '2026-11-23T15:00:00' }, 'SMS'],
     [{ midiaChave: 'midia/x.jpg', midiaMime: 'image/jpeg' }, 'cabeçalho com mídia'], [{ erro: 'Não enviada: Sem conexão' }, 'outra falha']]) {
     assert.deepEqual(ids(agruparFalhasSeguidas([daApi('p1'), daApi('x1', extra), daApi('p2')])), ['p1', 'x1', 'p2'], `${motivo} entrou num grupo de modelo`)
   }
   // O texto livre continua agrupando pelo mesmo caminho da API.
-  assert.deepEqual(ids(agruparFalhasSeguidas([daApi('a1', { modelo: null }), daApi('a2', { modelo: null })])), ['a2+a1'])
+  assert.deepEqual(ids(agruparFalhasSeguidas([daApi('a1', { modelo: null, tipoConteudo: 'Texto' }), daApi('a2', { modelo: null, tipoConteudo: 'Texto' })])), ['a2+a1'])
 })
 
 confere('c  o aviso do grupo sai do tipo: tempo esgotado pode ter chegado; os outros não saíram', () => {

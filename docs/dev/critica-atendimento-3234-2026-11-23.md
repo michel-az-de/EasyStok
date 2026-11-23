@@ -146,6 +146,9 @@ Decisões da A2b:
 - Modelo sem texto continua fora do grupo. O balão mostra só o rótulo "Mensagem de modelo sem texto", e dois envios podem ter parâmetros diferentes. A tradução da API marca esse caso.
 - O modelo continua sem Reenviar, no grupo e fora dele.
 - Os prints de antes e depois, tirados do harness da prova-2185 com 4 modelos que esgotaram o tempo, estão em `critica-atendimento-3234/a2b/`.
+- Ficam para o grupo D, achados da revisão da PR #3245:
+  - o aviso do grupo de modelo termina em "antes de reenviar", mas modelo não tem Reenviar. A frase vem de `falhaDeEnvio.js`, que está com a #3229, e o balão sozinho já dizia isso;
+  - a programada sai gravada como texto, e uma programada de modelo sem texto vira "[modelo X]". Duas assim seguidas, com parâmetros diferentes, agrupam por esse rótulo. Já acontecia na A2 e é raro.
 
 Por que a A3 (C5) foi para o grupo B:
 
