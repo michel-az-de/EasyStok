@@ -134,13 +134,18 @@ async function rodar(nome, largura, altura) {
       await abrir()
     }
     // 5. Esc (foco na alça, o de quando abre) fecha e o foco volta ao campo de mensagem.
-    await campo.focus(); await alca.focus() // refoca: o Esc logo depois de um arraste desfaz o arraste (4b); sem nada a desfazer, fecha
+    // Um arraste de mouse já concluído não tem o que desfazer: o Esc seguinte fecha e a posição lembrada é a do arraste.
+    const b = await alca.boundingBox()
+    await pagina.mouse.move(b.x + 20, b.y + b.height / 2); await pagina.mouse.down()
+    await pagina.mouse.move(b.x + 50, b.y + 30, { steps: 4 }); await pagina.mouse.up()
+    const arrastado = await painel.boundingBox()
+    if (largura >= 1000) assert.ok(Math.abs(arrastado.x - movido.x) > 5 || Math.abs(arrastado.y - movido.y) > 5, `${nome}: o segundo arraste muda a posição`)
     await pagina.keyboard.press('Escape')
     await painel.waitFor({ state: 'detached' })
     assert.equal(await focoNoCampo(), true, `${nome}: Esc devolve o foco ao campo de mensagem`)
     await abrir()
     const reaberto = await painel.boundingBox()
-    assert.ok(Math.abs(reaberto.x - movido.x) < 2 && Math.abs(reaberto.y - movido.y) < 2, `${nome}: reabre onde estava (${movido.x},${movido.y}) -> (${reaberto.x},${reaberto.y})`)
+    assert.ok(Math.abs(reaberto.x - arrastado.x) < 2 && Math.abs(reaberto.y - arrastado.y) < 2, `${nome}: reabre onde o arraste deixou (${arrastado.x},${arrastado.y}) -> (${reaberto.x},${reaberto.y})`)
     // 6. Esc com o foco no conteúdo.
     await painel.getByText('O Assistente responde a próxima mensagem.').click(); await pagina.keyboard.press('Escape')
     await painel.waitFor({ state: 'detached' })
