@@ -121,7 +121,7 @@ await confereAsync('F1  enquanto o PDF prepara, o gatilho "Ações" diz e anunci
 
 confere('F2  o endereço mostra ícone de local, "Copiar" e "Abrir no mapa" em nova aba, sem opener', () => {
   const html = renderizarFicha()
-  const bloco = trecho(html, '<div class="enderecoCliente"', '</div></div>|</div>')
+  const bloco = trecho(html, '<div class="enderecoCliente"', '(?:</div></div>|</div>)')
   assert.match(html, /enderecoCliente/, 'bloco do endereço')
   assert.match(bloco, /Rua Fernão Dias, 220, Pinheiros/)
   assert.match(bloco, /lucide-map-pin|map-pin/i, 'ícone de local')

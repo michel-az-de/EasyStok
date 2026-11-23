@@ -35,7 +35,7 @@ const numeroDoContato = (contato) => {
   const texto = String(contato ?? '')
   return texto.includes('@') || texto.replace(/\D/g, '').length > 13 ? null : contato
 }
-function telefoneDaConversa(conversa) {
+export function telefoneDaConversa(conversa) {
   const doCanal = conversa.canal === 'WhatsApp' ? conversa.cliente?.telefoneCanal || numeroDoContato(conversa.contato) : null
   const candidatos = [conversa.cliente?.telefone, conversa.contatoInformado?.telefone, doCanal]
   const achado = candidatos.find((c) => digitos(c).length >= 10)
