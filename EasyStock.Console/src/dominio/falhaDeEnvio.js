@@ -90,3 +90,7 @@ export function assinaturaDeFalhas(conversas) {
 }
 export const falhaNovaNaTela = (antes, depois) => Boolean(depois) && depois !== antes
   && depois.split(',').some((id) => !(antes ?? '').split(',').includes(id))
+
+// #3229: falha definitiva é a que o servidor gravou como Falhou e nada saiu (recusa, falha temporária ou permanente).
+// A incerta (tempo esgotado) pode ter saído e segue exigindo a conferência; a tentativa só se libera nas definitivas.
+export const falhaDefinitiva = (m) => m?.status === 'Falhou' && falhaDeEnvio(m.erro).tipo !== TIPOS_DE_FALHA.TEMPO_ESGOTADO

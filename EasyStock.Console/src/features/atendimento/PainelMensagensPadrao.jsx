@@ -6,7 +6,7 @@ import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { useAcoes } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeEditarRespostas, podeVerIntegracoes } from '../../dominio/acessoModulos'
-import { erroDoModelo } from '../../dominio/falhaDeEnvio'
+import { erroDoModelo, falhaDefinitiva } from '../../dominio/falhaDeEnvio'
 import { hashDoModulo } from '../../dominio/modulos'
 import { nomeLegivel, numerosDosParametros, parametrosCompletos, previaDoModelo } from '../../dominio/mensagensPadrao'
 import css from './seletorRespostas.module.css'
@@ -90,7 +90,7 @@ export function PainelMensagensPadrao({ conversa, aoFechar, janelaFechada = fals
       if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) {
         aoFechar()
         if (origem.current?.isConnected) origem.current.focus()
-      } else { setSemConfirmacao(true); setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de enviar de novo.') }
+      } else { if (!falhaDefinitiva(m)) setSemConfirmacao(true); setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de enviar de novo.') }
     } catch (e) { setErro(erroDoModelo(e, { envio: true, podeIntegrar }).texto) }
     finally { ocupado.current = false; setEnviando(false) }
   }
