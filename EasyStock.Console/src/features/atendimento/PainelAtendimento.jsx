@@ -10,6 +10,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
+import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
@@ -171,9 +172,8 @@ function PainelDaConversa({
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
-  // #2185 (E19): o modelo aprovado vai para um cliente cadastrado (o EasyStok exige o `clienteId`); sem
-  // cadastro o botão abria uma janela com tudo desligado.
-  const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada && Boolean(selecionada.clienteId)
+  // #3206: lead sem cadastro também envia; o servidor decide.
+  const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
   const prazo = prazoNoCabecalho(janela)
 
   return (

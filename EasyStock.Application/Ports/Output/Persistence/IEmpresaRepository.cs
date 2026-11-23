@@ -18,5 +18,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         IAsyncEnumerable<Empresa> StreamAllAsync(CancellationToken ct = default);
         Task AddAsync(Empresa empresa);
         Task UpdateAsync(Empresa empresa);
+
+        /// <summary>
+        /// Conclui a configuração inicial (#2070) num UPDATE condicional (<c>ConfiguracaoInicialConcluidaEm IS NULL</c>):
+        /// de dois pedidos ao mesmo tempo, só o primeiro grava quem e quando (#3185). Imediato, sem esperar o
+        /// <c>CommitAsync</c>. Devolve se foi este pedido que concluiu.
+        /// </summary>
+        Task<bool> ConcluirConfiguracaoInicialAsync(Guid empresaId, Guid porUsuarioId, DateTime agoraUtc, CancellationToken ct = default);
     }
 }

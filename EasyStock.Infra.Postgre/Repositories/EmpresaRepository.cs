@@ -40,6 +40,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task AddAsync(Empresa empresa) =>
             dbContext.Empresas.AddAsync(empresa).AsTask();
 
+        public async Task<bool> ConcluirConfiguracaoInicialAsync(Guid empresaId, Guid porUsuarioId, DateTime agoraUtc, CancellationToken ct = default) =>
+            await dbContext.Empresas
+                .Where(e => e.Id == empresaId && e.ConfiguracaoInicialConcluidaEm == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(e => e.ConfiguracaoInicialConcluidaEm, (DateTime?)agoraUtc)
+                    .SetProperty(e => e.ConfiguracaoInicialConcluidaPorId, (Guid?)porUsuarioId)
+                    .SetProperty(e => e.AlteradoEm, agoraUtc), ct) > 0;
+
         public Task UpdateAsync(Empresa empresa)
         {
             dbContext.Empresas.Update(empresa);

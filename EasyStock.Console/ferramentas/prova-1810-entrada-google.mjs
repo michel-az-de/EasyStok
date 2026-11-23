@@ -96,6 +96,9 @@ assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(invalida('Esta cont
 // Convite vencido não é conta errada: trocar de conta não adianta, então a frase não manda conferir a conta.
 assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(invalida('Seu convite venceu: peça um novo'))), 'Seu convite venceu: peça um novo.')
 assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(async () => { throw new TypeError('rede') })), 'Sem conexão com o EasyStok.')
+// #3185: a recusa sem frase (o código veio, a mensagem não) cai na frase padrão, nunca em "undefined.".
+assert.equal(fraseDaFalhaDoGoogleNoConvite({ codigo: 'INVALID_CREDENTIALS' }), `Não deu para entrar com o Google. ${CONFIRA}`)
+assert.equal(fraseDaFalhaDoGoogleNoConvite({ codigo: 'INVALID_CREDENTIALS', message: '  ' }), `Não deu para entrar com o Google. ${CONFIRA}`)
 ok('recusa do Google no convite: a frase da API e, quando é conta errada, o que conferir; sem rede, a frase da rede')
 
 // ---------------------------------------------------------------- o convite no App montado
@@ -230,6 +233,35 @@ assert.equal(janela.location.hash, '#/convite', 'sem mexer na tela: ela ainda co
 assert.match(textoDe(tela), /Você entrou como Bia Lima/)
 tela.desmontar()
 ok('com outra pessoa logada no aparelho, entrar pelo Google no convite encerra a sessão dela e leva os rascunhos e a visita dela')
+
+// #3185: Ana tinha os avisos ligados neste aparelho. A troca de sessão pelo Google no convite desliga a inscrição
+// dela (`abrirSessao` prepara o push para a identidade nova): o aparelho não avisa a convidada com o endpoint da Ana.
+let desinscricoes = 0
+let assinatura = { endpoint: 'https://push/ana', unsubscribe: async () => { desinscricoes += 1; assinatura = null; return true } }
+const registro = {
+  active: { scriptURL: new URL('sw-avisos.js', janela.location.href).href },
+  getNotifications: async () => [], pushManager: { getSubscription: async () => assinatura },
+}
+const navegadorAntes = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+const janelaAntes = { PushManager: janela.PushManager, Notification: janela.Notification }
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'teste', serviceWorker: { getRegistration: async () => registro } } })
+Object.assign(janela, { PushManager: {}, Notification: {} })
+api.google = async () => resposta(200, { data: SESSAO_DA_CONVIDADA })
+tela = await abrirLink('token-6', {
+  'easystok.sessao': SESSAO_GUARDADA_DA_ANA,
+  'easystok.push.dono': JSON.stringify({ identidade: 'empresa-1:ana', endpoint: 'https://push/ana' }),
+})
+assert.equal(desinscricoes, 0, 'abrir o link não mexe nos avisos de quem estava no aparelho')
+await google.escolherConta('id-token-da-convidada')
+await esperar()
+assert.equal(JSON.parse(guardado.get('easystok.sessao')).refreshToken, 'refresh-da-convidada')
+assert.equal(desinscricoes, 1, 'a inscrição de push da Ana é desligada no navegador')
+assert.equal(assinatura, null)
+assert.equal(guardado.has('easystok.push.dono'), false, 'e o vínculo do endpoint com a Ana sai do aparelho')
+tela.desmontar()
+if (navegadorAntes) Object.defineProperty(globalThis, 'navigator', navegadorAntes); else delete globalThis.navigator
+Object.assign(janela, janelaAntes)
+ok('com os avisos da outra pessoa ligados no aparelho, entrar pelo Google no convite desinscreve o push dela')
 
 const aceite = adiada()
 api.aceite = () => aceite.promessa

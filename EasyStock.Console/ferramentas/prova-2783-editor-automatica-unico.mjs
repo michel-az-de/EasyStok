@@ -125,7 +125,7 @@ try {
   await seletor.waitFor()
   assert.deepEqual(await seletor.locator('option').allInnerTexts(), ['Selecione um modelo', 'lembrete_pedido · pt_BR', 'promo_cor · pt_BR'])
   await seletor.selectOption({ label: 'lembrete_pedido · pt_BR' })
-  await prog.getByRole('textbox', { name: /Campo 1/ }).fill('123')
+  await prog.getByRole('textbox', { name: /1º campo/ }).fill('123')
   await prog.getByText('Oi, seu pedido 123 sai hoje.').waitFor()
   await prog.getByRole('button', { name: 'Programar', exact: true }).click()
   await pagina.waitForFunction(() => window.__programadas.length === 1)

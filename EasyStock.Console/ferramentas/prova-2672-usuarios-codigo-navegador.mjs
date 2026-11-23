@@ -25,7 +25,9 @@ const pessoa = (n, extra = {}) => ({
 })
 // Doze pessoas: a última fica bem abaixo da dobra numa janela de 700 px.
 const USUARIOS = [
-  ...Array.from({ length: 11 }, (_, i) => pessoa(i + 1)),
+  // #3185: a primeira pode ser marcada como dona (a confirmação ocupa a linha inteira).
+  pessoa(1, { nivel: 'Admin', perfilId: 'p-admin', perfil: 'Admin', convite: { estado: 'aceito', aceitoEm: '2026-11-16T12:00:00Z', via: 'google' }, acoes: { trocarPerfil: true, desativar: true, marcarDona: true } }),
+  ...Array.from({ length: 10 }, (_, i) => pessoa(i + 2)),
   pessoa(12, { ativo: false, convite: { estado: 'nenhum', aceitoEm: null, via: null }, acoes: { reativar: true } }),
 ]
 
@@ -37,8 +39,8 @@ const confere = async (descricao, fn) => {
   catch (erro) { falhas.push(descricao); console.log(`FALHA ${descricao}\n      ${erro.message.split('\n').slice(0, 3).join(' ')}`) }
 }
 
-async function abrir({ falhaNoCodigo = false } = {}) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 700 }, reducedMotion: 'reduce' })
+async function abrir({ falhaNoCodigo = false, largura = 1280 } = {}) {
+  const context = await browser.newContext({ viewport: { width: largura, height: 700 }, reducedMotion: 'reduce' })
   await context.grantPermissions(['local-network-access'], { origin: origem })
   await context.addInitScript(({ empresaId }) => sessionStorage.setItem('easystok.sessao', JSON.stringify({
     token: 'teste-ui-controlado', expiraEm: Date.now() + 3600000,
@@ -79,7 +81,7 @@ try {
   const { context, page } = await abrir()
   try {
     await confere('C1: os botões da linha nomeiam a pessoa', async () => {
-      for (const nome of ['Reenviar convite para Pessoa 11', 'Gerar código de acesso de Pessoa 11', 'Desativar Pessoa 11', 'Reativar Pessoa 12']) {
+      for (const nome of ['Reenviar convite para Pessoa 11', 'Gerar código de acesso de Pessoa 11', 'Desativar Pessoa 11', 'Reativar Pessoa 12', 'Marcar Pessoa 01 como dona']) {
         assert.equal(await page.getByRole('button', { name: nome, exact: true }).count(), 1, `sem botão "${nome}"`)
       }
     })
@@ -117,6 +119,31 @@ try {
       assert.equal(await falha.page.getByRole('textbox', { name: /^Código de acesso de/ }).count(), 0)
     })
   } finally { await falha.context.close() }
+
+  // #3185: com a confirmação da marca aberta, a área de ações da linha ficava vazia e ainda ocupava a altura de um
+  // botão: sobrava um vão de 60 a 80 px entre os dados da pessoa e a confirmação.
+  for (const largura of [360, 768, 1280]) {
+    const marca = await abrir({ largura })
+    try {
+      await confere(`a ${largura} px, a confirmação da marca de dona fica junto dos dados da pessoa`, async () => {
+        const linha = marca.page.locator('li[data-usuario="u-01"]')
+        await linha.getByRole('button', { name: 'Marcar Pessoa 01 como dona', exact: true }).click()
+        await linha.getByRole('group', { name: 'Marcar Pessoa como dona' }).waitFor()
+        const medida = await linha.evaluate((li) => {
+          const grupo = li.querySelector('fieldset')
+          const antes = [...li.children].filter((no) => no !== grupo)
+          const comTexto = antes.filter((no) => no.textContent.trim() !== '' || no.querySelector('select'))
+          return {
+            vao: Math.round(grupo.getBoundingClientRect().top - Math.max(...comTexto.map((no) => no.getBoundingClientRect().bottom))),
+            vazias: antes.filter((no) => no.textContent.trim() === '' && !no.querySelector('select') && no.getBoundingClientRect().height > 0).length,
+          }
+        })
+        console.log(`      ${largura} px: vão de ${medida.vao} px, áreas vazias com altura: ${medida.vazias}`)
+        assert.equal(medida.vazias, 0, 'há uma área vazia ocupando altura na linha')
+        assert.ok(medida.vao <= 32, `vão de ${medida.vao} px entre os dados e a confirmação`)
+      })
+    } finally { await marca.context.close() }
+  }
 } finally {
   await browser.close()
 }

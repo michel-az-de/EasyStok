@@ -116,7 +116,8 @@ const composer = semComentarios(ler('features/atendimento/Composer.jsx'))
 confere('"Modelos aprovados" exige a fonte API', () => {
   assert.ok(
     // #1761: a conta saiu da tag porque a bolha recusada fora da janela usa a mesma.
-    painelAtendimento.includes('const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada')
+    painelAtendimento.includes('const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })')
+      && /fonteApi && podeReabrir && aceitaModelo && !encerrada && !bloqueada/.test(semComentarios(ler('dominio/mensagensPadrao.js')))
       && tagDe(painelAtendimento, 'Composer').includes('podeEnviarModelo={podeEnviarModelo}'),
     'podeEnviarModelo sem exigir fonteApi',
   )
@@ -127,8 +128,8 @@ confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica n�
   assert.match(composer, /\{modelosFixos && podeEnviarModelo && podeEscrever && <Botao className=\{css\.abrirModelos\}/)
   assert.match(composer, /podeEnviarModelo \? 'Janela fechada: escolha uma mensagem padrão do WhatsApp em Respostas' : 'Mensagem indisponível nesta conversa'/)
   assert.match(composer, /disabled=\{!podeEscrever && !podeEnviarModelo\}/)
-  assert.match(composer, /onClick=\{podeEscrever \? \(barra\.aberto \? barra\.fechar : barra\.abrir\) : aoAbrirModelos\}/)
-  assert.match(composer, /aria-expanded=\{podeEscrever \? barra\.aberto : undefined\}/)
+  assert.match(composer, /onClick=\{podeEscrever \? \(barra\.aberto \? barra\.fechar : barra\.abrir\) : \(modeloAberto \? aoFecharModelos : aoAbrirModelos\)\}/)
+  assert.match(composer, /aria-expanded=\{podeEscrever \? barra\.aberto : modeloAberto\}/)
   assert.match(composer, /<SeletorRespostas seletor=\{barra\} aoInserido=\{\(\) => campoRef\.current\?\.querySelector\('textarea'\)\?\.focus\(\)\}/)
 })
 confere('na demonstração a ação continua recusando, sem fingir envio', () => {

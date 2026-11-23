@@ -15,7 +15,7 @@ import { BlocoCliente } from './BlocoCliente'
 import { ModalHistorico } from './ModalHistorico'
 import css from './ModalCliente.module.css'
 
-export function ModalCliente({ conversa, aoFechar, children }) {
+export function ModalCliente({ conversa, aoFechar, children, forcarCadastro = false }) {
   const { fonteApi, historico = [], agora } = useAtendimento()
   const { relerClienteDaConversa } = useAcoes()
   const { permite } = useAcessoModulos()
@@ -99,7 +99,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
       <input ref={arquivoFoto} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="Foto do cliente"
         onChange={(e) => { const arquivo = e.target.files?.[0]; e.target.value = ''; if (arquivo) alterarFoto(arquivo) }} />
       {children}
-      <div className={css.cadastro}><BlocoCliente conversa={conversa} integrado aoMudarSujo={setCadastroSujo} rodapeDoCadastro={rodapeDoCadastro} resumoIa={resumo.texto} fotoCadastro={foto.url}
+      <div className={css.cadastro}><BlocoCliente conversa={conversa} integrado aoMudarSujo={setCadastroSujo} rodapeDoCadastro={rodapeDoCadastro} forcarCadastro={forcarCadastro} aoCadastrado={forcarCadastro ? fechar : undefined} resumoIa={resumo.texto} fotoCadastro={foto.url}
         aoEscolherFoto={fonteApi && conversa.clienteId ? () => arquivoFoto.current?.click() : undefined}
         aoRemoverFoto={fonteApi && conversa.clienteId && cliente.fotoUrl ? () => alterarFoto() : undefined}
         alterandoFoto={alterandoFoto} /></div>

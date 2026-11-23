@@ -19,9 +19,10 @@ import {
 import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import {
-  listaEmPortugues, mascaraCep, partesDoEndereco, moeda,
+  listaEmPortugues, mascaraCep, moeda,
 } from '../../dominio/formato'
 import { telefoneNaTela } from '../../dominio/cadastros'
+import { valoresIniciaisDoCadastro } from '../../dominio/cadastroDoLead'
 import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
@@ -48,23 +49,6 @@ import { ROTULOS } from '../../dominio/rotulos'
 const dataCurta = (iso) =>
   new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 
-// Estado inicial do formulário de cadastro rápido (seção 2): nome vem do
-// perfil do canal, telefone e endereço vêm do que a conversa já capturou.
-// "Endereço" é um campo só na tela (rua, número, complemento e bairro juntos,
-// sem o CEP): `partesDoEndereco` separa porque o CEP precisa da própria
-// validação de área, o resto não.
-function estadoInicialDoForm(conversa) {
-  const partes = partesDoEndereco(conversa.cliente.enderecoCapturado ?? '')
-  const enderecoSemCep = [partes.rua, partes.numero, partes.complemento, partes.bairro]
-    .filter(Boolean).join(', ')
-  return {
-    nome: conversa.nome,
-    telefone: conversa.cliente.telefone ?? '',
-    enderecoSemCep,
-    cep: partes.cep ? mascaraCep(partes.cep) : '',
-  }
-}
-
 // Rodada 11 (issue #8, registro 92): selo do campo que o automático captou
 // da conversa. A dona vê de onde veio o dado sem abrir a conversa (US-017),
 // e confere antes de usar (o campo continua editável ao lado).
@@ -84,7 +68,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
   return <section data-secao-cliente={chave}>{chave !== 'cliente' && <h3>{titulo}</h3>}{children}</section>
 }
 
-export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo, rodapeDoCadastro }) {
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo, rodapeDoCadastro, forcarCadastro = false, aoCadastrado }) {
   const { cliente } = conversa
   const chaveCadastro = `cadastro-conversa:${conversa.id}`
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
@@ -98,7 +82,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
 
   const [modal, setModal] = useState(null)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
-  const [baseForm, setBaseForm] = useState(() => estadoInicialDoForm(conversa))
+  const [baseForm, setBaseForm] = useState(() => valoresIniciaisDoCadastro(conversa))
   const [identidadeInicial, definirIdentidadeInicial] = useState(() => identidadeDaEdicao(conversa))
   const [rascunhoRapido, guardarRapido] = useRascunhoDoAjuste(`${chaveCadastro}:rapido`)
   const [edicaoTelefone] = useRascunhoDoAjuste(`${chaveCadastro}:telefone`)
@@ -108,7 +92,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const setForm = mudar => guardarRapido({ form: typeof mudar === 'function' ? mudar(form) : mudar, identidade: identidadeForm })
   // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
   // conversa sem remontar este bloco). A ref trava o segundo toque.
-  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
+  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null, dono: null })
   const cadastrando = useRef(false)
   // #2258 (auditoria T12 a T14, T17, T18): campos que já saíram do foco ou foram conferidos ao salvar
   // (só eles mostram erro), a base dos ids para focar o primeiro erro e o aviso de texto digitado.
@@ -122,7 +106,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   // pode disparar este reset a cada tecla.
   const formCarregado = useRef(form)
   useEffect(() => {
-    const inicial = estadoInicialDoForm(conversa)
+    const inicial = valoresIniciaisDoCadastro(conversa)
     formCarregado.current = inicial
     setBaseForm(inicial)
     definirIdentidadeInicial(identidadeDaEdicao(conversa))
@@ -153,7 +137,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const automaticoCaptando = automaticoConduzindo(conversa, automaticoPausado[conversa.id])
   // #1430: o visitante do chat do site já informou nome e contato; a confirmação toma o lugar do formulário.
   const informado = lead ? conversa.contatoInformado : null
-  const precisaCadastro = Boolean(rascunhoRapido) || (!edicaoTelefone && !edicaoEndereco && lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
+  // #3207: "Cadastrar cliente" abre o formulário mesmo com captura ou contato informado: um caminho só.
+  const cadastroForcado = forcarCadastro && lead
+  const precisaCadastro = Boolean(rascunhoRapido) || cadastroForcado || (!edicaoTelefone && !edicaoEndereco && lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
     && !conversa.captura && !informado)
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
@@ -174,7 +160,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const situacaoCep = form.cep ? situacaoDoCep(form.cep, prefixosCepAtendidos) : SITUACOES.SEM_CEP
   const cepForaDaArea = situacaoCep === SITUACOES.FORA || situacaoCep === SITUACOES.LIMITE
   // #2258 (T12, T14): as regras são do domínio; o botão nunca fica mudo, o erro aparece no próprio campo.
-  const camposDoCadastro = ['nome', ...(cliente.telefone ? [] : ['telefone']), ...(cliente.endereco ? [] : ['cep'])]
+  const camposDoCadastro = ['nome', ...(cliente.telefone && !cadastroForcado ? [] : ['telefone']), ...(cliente.endereco && !cadastroForcado ? [] : ['cep'])]
   const { erros: errosConferidos } = validarCadastro({ campos: camposDoCadastro, nome: conversa.nome, telefone: form.telefone, cep: form.cep })
   const errosDoCadastro = Object.fromEntries(Object.entries(errosConferidos).filter(([campo]) => tocados[campo]))
   // Um só mecanismo de "texto digitado e não salvo" (#2185 F16, #2258 T17): o formulário e os campos em linha
@@ -191,30 +177,43 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   useLayoutEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
   const salvandoCadastro = cadastro.salvando && cadastro.id === conversa.id
   const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
+  const donoDoTelefone = cadastro.id === conversa.id && cadastro.dono?.telefone === form.telefone ? cadastro.dono : null
+  // #3207: no celular o rodapé fica fixo e o erro nasce no corpo rolável; leva o aviso à vista.
+  const erroRef = useRef(null)
+  useEffect(() => { if (erroCadastro) erroRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [erroCadastro])
+  // O botão do vínculo nasce abaixo do erro; sem isto o rodapé fixo o cobre a 390 px.
+  const vinculoRef = useRef(null)
+  const temVinculoAOferecer = Boolean(donoDoTelefone)
+  useEffect(() => { if (temVinculoAOferecer) vinculoRef.current?.scrollIntoView?.({ block: 'nearest' }) }, [temVinculoAOferecer])
   // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
   const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
   const { acoes: capacidades } = useAcessoModulos()
   const podeBloquear = !fonteApi || capacidades?.controlarLoja === true
 
   // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
-  async function aoSalvarCadastro() {
+  async function aoSalvarCadastro(opcoes = {}) {
     if (cadastrando.current) return
     cadastrando.current = true
     const id = conversa.id
     const endereco = [form.enderecoSemCep.trim(), form.cep ? mascaraCep(form.cep) : '']
       .filter(Boolean).join(', ') || null
-    setCadastro({ id, salvando: true, erro: null })
+    setCadastro({ id, salvando: true, erro: null, dono: null })
     let erro = null
+    let dono = null
     try {
-      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco }, agora, identidadeForm)
+      // #3207: no cadastro forçado o cartão "Informado pelo visitante" some; o e-mail que ele informou segue junto.
+      const email = cadastroForcado ? informado?.email : null
+      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco, ...(email ? { email } : {}), ...opcoes }, agora, identidadeForm)
       erro = resultado?.erro ?? null
-      if (!erro) guardarRapido(null)
+      // #1430: telefone que já é de um cadastro; no cadastro forçado o cartão do visitante some, então a pergunta vem aqui.
+      if (resultado?.jaCadastrado) dono = { nome: resultado.jaCadastrado.nome, telefone: form.telefone }
+      if (!erro) { guardarRapido(null); aoCadastrado?.() }
     } catch (falha) {
       erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
     } finally {
       cadastrando.current = false
     }
-    setCadastro({ id, salvando: false, erro })
+    setCadastro({ id, salvando: false, erro, dono })
   }
 
   const validarNome = (v) => erroDoNome(v)
@@ -330,7 +329,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           ele e, recolhida, o resumo diz que ele está ali. */}
       <SecaoCliente integrado={integrado} titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco && !informado}
         resumo={resumoDoContato(cliente, informado)}>
-        {informado && (
+        {informado && !cadastroForcado && (
           <div data-campo-ficha="cadastro" className={css.contents}>
           <ContatoInformado
             key={conversa.id}
@@ -346,7 +345,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
         {precisaCadastro ? (
           <div className={css.cadastroRapido} data-campo-ficha="cadastro">
             {fonteApi && <ConferirDestinoDaEdicao identidade={identidadeForm} conversa={conversa} aoConferir={identidade => guardarRapido({ form, identidade })} />}
-            {(!cliente.telefone || rascunhoRapido) && (
+            {(!cliente.telefone || rascunhoRapido || cadastroForcado) && (
               <CampoMascarado
                 tipo="telefone" rotulo={ROTULOS.CELULAR}
                 valor={form.telefone}
@@ -358,7 +357,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
                 onBlur={() => marcarTocado('telefone')}
               />
             )}
-            {(!cliente.endereco || rascunhoRapido) && (
+            {(!cliente.endereco || rascunhoRapido || cadastroForcado) && (
               <div data-campo-ficha="endereco" className={css.contents}>
                 <CampoTexto
                   rotulo="Endereço"
@@ -379,7 +378,14 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
                 />
               </div>
             )}
-            {erroCadastro && <p className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
+            {erroCadastro && <p ref={erroRef} className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
+            {donoDoTelefone && (
+              <div ref={vinculoRef}>
+                <Botao largo disabled={cadastro.salvando} onClick={() => aoSalvarCadastro({ confirmarVinculoExistente: true })}>
+                  {salvandoCadastro ? 'Ligando…' : donoDoTelefone.nome ? `Ligar ao cadastro de ${donoDoTelefone.nome}` : 'Ligar ao cadastro'}
+                </Botao>
+              </div>
+            )}
             {rodapeDoCadastro ? createPortal(botaoSalvarCadastro, rodapeDoCadastro) : botaoSalvarCadastro}
           </div>
         ) : (

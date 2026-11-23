@@ -11,6 +11,11 @@ public sealed record DisponibilidadeDoPasso(bool Disponivel, string? Motivo)
 /// <summary>
 /// <c>disponivel</c> de cada passo da configuração inicial (#2070), pela mesma regra das <c>acoes</c> de
 /// <c>GET api/auth/me/modulos</c>: o console não oferece passo que a rota do passo recusaria. Sem ler banco.
+/// <para>
+/// O ramo da Gerência (cardápio, produção, respostas) repete a regra das <c>acoes</c> e hoje não é alcançado pela API: o
+/// <c>ConfiguracaoInicialController</c> exige a policy <c>Admin</c> (#3185). Fica para o dia em que a Gerência ler o
+/// assistente; até lá, quem o mantém vivo são os testes desta classe.
+/// </para>
 /// </summary>
 public static class DisponibilidadeDosPassos
 {

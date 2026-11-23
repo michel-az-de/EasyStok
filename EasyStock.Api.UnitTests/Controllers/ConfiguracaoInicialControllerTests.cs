@@ -62,7 +62,7 @@ public class ConfiguracaoInicialControllerTests
             new ObterConfiguracaoInicialUseCase(_empresas, _passos, _retratos, autoridade, sessao),
             new MarcarPassoConfiguracaoInicialUseCase(_passos, sessao, relogio),
             new AdiarConfiguracaoInicialUseCase(_empresas, autoridade, sessao, _unitOfWork, relogio),
-            new ConcluirConfiguracaoInicialUseCase(_empresas, autoridade, sessao, _unitOfWork, relogio),
+            new ConcluirConfiguracaoInicialUseCase(_empresas, autoridade, sessao, relogio),
             sessao);
     }
 
@@ -102,6 +102,7 @@ public class ConfiguracaoInicialControllerTests
                 .Which.Error.Message.Should().Be("EmpresaId é obrigatório.");
         await _passos.DidNotReceiveWithAnyArgs().MarcarAsync(default!, default);
         await _unitOfWork.DidNotReceive().CommitAsync();
+        await _empresas.DidNotReceiveWithAnyArgs().ConcluirConfiguracaoInicialAsync(default, default, default, default);
     }
 
     [Fact]
@@ -136,6 +137,7 @@ public class ConfiguracaoInicialControllerTests
             recusa.Value.Should().BeOfType<ApiErrorResponse>().Which.Error.Code.Should().Be(AutoridadeNaConfiguracaoInicial.CodigoHierarquia);
         }
         await _unitOfWork.DidNotReceive().CommitAsync();
+        await _empresas.DidNotReceiveWithAnyArgs().ConcluirConfiguracaoInicialAsync(default, default, default, default);
     }
 
     [Fact]
@@ -145,7 +147,8 @@ public class ConfiguracaoInicialControllerTests
 
         (await controller.Adiar(CancellationToken.None)).Should().BeOfType<NoContentResult>();
         (await controller.Concluir(CancellationToken.None)).Should().BeOfType<NoContentResult>();
-        _empresa.ConfiguracaoInicialConcluidaEm.Should().NotBeNull();
-        await _unitOfWork.Received(2).CommitAsync();
+        // #3185: adiar grava pela entidade (um commit); concluir vai pelo UPDATE condicional do repositório.
+        await _empresas.Received(1).ConcluirConfiguracaoInicialAsync(EmpresaId, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
     }
 }
