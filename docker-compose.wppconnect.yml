@@ -8,7 +8,10 @@ services:
       Atendimento__WppConnect__WebhookToken: '${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
       FileStorage__PublicBaseUrl: '${WPP_PUBLIC_FILES_URL:?Informe a URL HTTP(S) dos arquivos terminada em /files}'
   wppconnect:
-    image: wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8
+    # #3228: mesma imagem da producao (2.10.81 com wa-js 4.8.2).
+    image: easystok-wppconnect:2.10.81-wa-js-4.8.2
+    build:
+      context: ./scripts/deploy/wppconnect/imagem
     restart: unless-stopped
     init: true
     shm_size: 512mb

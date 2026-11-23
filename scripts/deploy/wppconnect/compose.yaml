@@ -16,7 +16,13 @@ services:
     networks:
       whatsapp:
   wppconnect:
-    image: wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8
+    # #3228: 2.10.81 (mesmo digest) com wa-js 4.8.2; ver wppconnect/imagem/Dockerfile. Rollback: volte o image para
+    # wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8,
+    # apague o build e rode docker compose up -d wppconnect (volumes da sessao intactos). Recriar exige GO do Felipe.
+    image: easystok-wppconnect:2.10.81-wa-js-4.8.2
+    build:
+      context: ./wppconnect/imagem
+    pull_policy: build
     restart: unless-stopped
     init: true
     shm_size: 512mb
