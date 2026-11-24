@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoReais } from '../../componentes/CampoReais'
 import { centavosDoTexto, lerMoeda, textoDosCentavos } from '../../dominio/formato'
 import { erroDoLimite } from '../../componentes/limiteDoCampo'
+import { AnuncioDoLimite } from '../../componentes/Campo'
 import { LIMITE_NOME, LIMITE_PESO } from './limitesDaPorcao'
 import { comPadrao, porcaoNova } from '../../dominio/porcoes'
 import css from './editorItem.module.css'
@@ -14,7 +15,8 @@ function CampoDaPorcao({ id, rotulo, limite, valor, ...resto }) {
     <div className={css.campo}>
       <label htmlFor={id}>{rotulo}</label>
       <input id={id} value={valor} aria-invalid={erro ? true : undefined} aria-describedby={erro ? `${id}-erro` : undefined} {...resto} />
-      {erro && <small id={`${id}-erro`} className={css.limite} role="status">{erro}</small>}
+      {erro && <small id={`${id}-erro`} className={css.limite}>{erro}</small>}
+      <AnuncioDoLimite limite={limite} passou={Boolean(erro)} />
     </div>
   )
 }

@@ -212,6 +212,8 @@
 
 /* --- Anel pequeno (44 px, seção 6) --------------------------------------- */
 .anelNumero { font-family: var(--f-dado); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--t-micro); }
+/* #2810: anel sem horário diz "Sem hora" em duas linhas curtas, dentro do aro de 44 px. */
+.anelSemHora { display: block; width: 4ch; font-size: var(--t-micro); font-weight: 600; line-height: 1.1; text-align: center; color: var(--tinta-2); }
 
 .confirmacaoInline {
   display: grid; gap: var(--e-2); padding: var(--e-2) var(--e-3); background: var(--elevado);

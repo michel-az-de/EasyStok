@@ -160,10 +160,10 @@ export function PainelViagem({
       <div className={css.cabecaViagem}>
         {!saiu && (
           <Anel tamanho={44} traco={5} fracao={Math.max(0, Math.min(1, (minutosParaSair ?? 0) / 60))} tom="ok">
-            {/* #2792: sem horário de saída o anel fica sem número (nada de travessão), com o rótulo para o leitor de tela. */}
-            <span className={css.anelNumero} aria-label={minutosParaSair == null ? 'Sem horário de saída' : undefined}>
-              {minutosParaSair == null ? '' : Math.round(minutosParaSair)}
-            </span>
+            {/* #2810: sem horário de saída, "Sem hora" na tela (nada de travessão; aria-label em span sem role não é lido). */}
+            {minutosParaSair == null
+              ? <span className={css.anelSemHora}>Sem hora</span>
+              : <span className={css.anelNumero}>{Math.round(minutosParaSair)}</span>}
           </Anel>
         )}
         <h3>Viagem {indice}</h3>

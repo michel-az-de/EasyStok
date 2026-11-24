@@ -45,7 +45,8 @@ caso('o editor carrega o catálogo pelo tipo de evento e cancela ao trocar', () 
   assert.match(editor, /variaveisDoModeloCadastro\(dados\.tipoEvento/)
   assert.match(editor, /AbortController/)
 })
-caso('erro ou 403 não quebra o editor (rejeição vira catálogo vazio)', () => assert.match(editor, /variaveisDoModeloCadastro\([^\n]*\.then\(catalogar, \(\) => catalogar\(\[\]\)\)/))
+// #2810: a rejeição só zera o catálogo quando a requisição não foi cancelada (troca de evento no meio do voo).
+caso('erro ou 403 não quebra o editor (rejeição vira catálogo vazio)', () => assert.match(editor, /variaveisDoModeloCadastro\([^\n]*\.then\(catalogar, \(\) => \{ if \(!controle\.signal\.aborted\) catalogar\(\[\]\) \}\)/))
 caso('a dica vai no campo Mensagem', () => assert.match(editor, /<CampoArea rotulo="Mensagem" dica=\{[^}]*dicaDasVariaveis\(catalogo\)/))
 
 console.log(`\n${ok} ok, ${falhas.length} falha(s)`)

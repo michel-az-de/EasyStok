@@ -102,7 +102,7 @@ function EditorModelo({ contexto, editor, aoMudar, aoFechar, aoSalvo }) {
   useEffect(() => {
     if (!dados.tipoEvento) return undefined
     const controle = new AbortController()
-    variaveisDoModeloCadastro(dados.tipoEvento, { empresaId, identidade }, controle.signal).then(catalogar, () => catalogar([]))
+    variaveisDoModeloCadastro(dados.tipoEvento, { empresaId, identidade }, controle.signal).then(catalogar, () => { if (!controle.signal.aborted) catalogar([]) })
     return () => controle.abort()
   }, [dados.tipoEvento, empresaId, identidade])
   const nomeLongo = dados.nome?.length > LIMITE_NOME
