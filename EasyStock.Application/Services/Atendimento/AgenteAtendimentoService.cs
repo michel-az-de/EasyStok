@@ -268,7 +268,8 @@ public sealed class AgenteAtendimentoService(
                     : contexto.FerramentaFalhou ? LogsDoAssistente.CategoriaFerramentaFalhou
                     : GuardaRespostaAgente.Avaliar(geracao.Texto,
                         contexto.ResultadosDasFerramentas,
-                        _ferramentas.Keys);
+                        _ferramentas.Keys,
+                        configuracao.NomeDona);
                 if (concluiu && motivoEscalada is null && barrada is null)
                     respondeu = await EnviarRespostaAsync(gravacao, conversa, geracao.Texto!, ct) || respondeu;
                 else

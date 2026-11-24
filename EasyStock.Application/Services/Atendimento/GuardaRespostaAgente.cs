@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -12,7 +13,9 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public static partial class GuardaRespostaAgente
 {
-    public static string? Avaliar(string? texto, IEnumerable<string> fontes, IEnumerable<string> nomesDeFerramentas)
+    /// <param name="nomeDaDona">#3278 (R4): <c>ConfiguracaoAtendimento.NomeDona</c>. Promessa feita em nome dela ("a Fulana vai
+    /// combinar com você") conta como promessa da equipe. Sem nome, valem só os papéis (dona, equipe, responsável, atendente, ela).</param>
+    public static string? Avaliar(string? texto, IEnumerable<string> fontes, IEnumerable<string> nomesDeFerramentas, string? nomeDaDona = null)
     {
         if (string.IsNullOrWhiteSpace(texto)) return "o agente não produziu resposta";
 
@@ -25,11 +28,12 @@ public static partial class GuardaRespostaAgente
         var originais = fontes.ToList();
         var conhecidas = originais.Select(SemAcento).ToList();
         // #2516: "frete combinado" só passa quando a ferramenta mostra o frete combinado.
+        var acaoDaEquipe = AcaoDaEquipeDe(nomeDaDona);
         var freteCombinadoNaFonte = conhecidas.Any(f => f.Contains("fretecombinado", StringComparison.Ordinal) || FreteCombinado().IsMatch(f));
 
         foreach (var frase in Frases().Split(plano))
         {
-            if (Encaminhamento().IsMatch(frase) || AfirmaSemNegacao(frase, AcaoDaEquipe()))
+            if (Encaminhamento().IsMatch(frase) || AfirmaSemNegacao(frase, acaoDaEquipe))
                 return "promete encaminhamento sem acionar a equipe";
             if (AfirmaSemCondicao(frase, PedidoFeito()) || AfirmaSemCondicao(frase, FizPedido()))
                 return "afirma situação do pedido sem a ferramenta confirmar";
@@ -105,9 +109,45 @@ public static partial class GuardaRespostaAgente
     [GeneratedRegex(@"\b(vou|irei|ja)\s+(pedir|chamar|avisar|encaminhar|passar|transferir|verificar|conferir)\b.{0,60}\b(dona|equipe|atendente|humano)\b")]
     private static partial Regex Encaminhamento();
 
-    // #2516: "a Baba vai combinar com você a entrega e o frete" sem escalar_para_dona.
-    [GeneratedRegex(@"\b(dona|equipe|responsavel|atendente|baba|ela)\b.{0,20}\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar)\b")]
+    // #2516: "a dona vai combinar com você a entrega e o frete" sem escalar_para_dona. #3278: o nome da dona vem da configuração
+    // da loja (AcaoDaEquipeDe); aqui os papéis. "baba" fica porque é a marca da Casa da Baba e o modelo a usa como sujeito
+    // ("a Baba vai combinar...", frase real da #2516) mesmo com NomeDona vazio ou diferente.
+    private const string Acoes = "combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar";
+    private const string PapeisDaEquipe = "dona|equipe|responsavel|atendente|ela|baba";
+    private const string VerboDaAcao = @"\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(" + Acoes + @")\b";
+
+    [GeneratedRegex(@"\b(" + PapeisDaEquipe + @")\b.{0,20}" + VerboDaAcao)]
     private static partial Regex AcaoDaEquipe();
+
+    private const int LimiteDoCacheDeNomes = 256;
+    private static readonly ConcurrentDictionary<string, Regex> AcoesPorNome = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// #3278: a regra dos papéis com o nome da dona na alternância. O nome vem sem acento e sem caixa, escapado, e só casa como
+    /// palavra inteira ("Ana" não casa em "banana"). O primeiro nome também conta ("Maria Silva" -> "a Maria vai te chamar").
+    /// </summary>
+    private static Regex AcaoDaEquipeDe(string? nomeDaDona)
+    {
+        var nomes = NomesDaDona(nomeDaDona);
+        if (nomes.Count == 0) return AcaoDaEquipe();
+        var chave = string.Join('|', nomes);
+        if (AcoesPorNome.TryGetValue(chave, out var pronta)) return pronta;
+        var alternancia = string.Join('|', nomes.Select(Regex.Escape));
+        var regex = new Regex(@"(?:\b(?:" + PapeisDaEquipe + @")\b|(?<!\w)(?:" + alternancia + @")(?!\w)).{0,20}" + VerboDaAcao,
+            RegexOptions.CultureInvariant);
+        if (AcoesPorNome.Count < LimiteDoCacheDeNomes) AcoesPorNome.TryAdd(chave, regex);
+        return regex;
+    }
+
+    private static List<string> NomesDaDona(string? nomeDaDona)
+    {
+        if (string.IsNullOrWhiteSpace(nomeDaDona)) return [];
+        var nome = string.Join(' ', SemAcento(nomeDaDona).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var nomes = new List<string> { nome };
+        var primeiro = nome.Split(' ')[0];
+        if (primeiro.Length >= 2 && primeiro != nome) nomes.Add(primeiro);
+        return nomes;
+    }
 
     // Só frete ou taxa acordados: "a entrega está definida para amanhã" e "a taxa é definida pelo CEP" são conversa.
     [GeneratedRegex(@"\b(frete|taxa)\b.{0,25}\b(combinad[oa]|acertad[oa])\b")]

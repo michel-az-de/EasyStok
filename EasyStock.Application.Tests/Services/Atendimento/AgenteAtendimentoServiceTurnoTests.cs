@@ -97,6 +97,25 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task PromessaComONomeDaDonaDaLojaEBarradaNoTurno()
+    {
+        // #3278 (R4): a guarda conhece o nome configurado da dona; loja que não é a Casa da Baba também escala.
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.Ativo = true;
+        configuracao.DefinirAssistente("Fulana", null, null, null, null);
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(Texto("A Fulana vai combinar com você a entrega e o frete."));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(t => t.Contains("Fulana vai combinar")),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        TurnoGravado().Motivo.Should().Be("guarda:promete_encaminhar");
+    }
+
+    [Fact]
     public async Task FerramentaQueFalhaFicaMarcadaSemOk()
     {
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
