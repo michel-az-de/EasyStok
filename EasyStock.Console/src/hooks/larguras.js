@@ -16,7 +16,7 @@ const NOTEBOOK = 1400
 // cliente a ~1.130 px do da loja. A conversa para na largura de leitura e a sobra vai, metade para cada lado, ao
 // Balcão e à Ficha até o máximo das alças (`Moldura.jsx`). Acima disso (~1980 px), o `max-width` da thread segura.
 export const LEITURA = 880
-const MAXIMO = { balcao: 480, ficha: 520 }
+export const MAXIMO = { balcao: 480, ficha: 520 }
 // Trilho e as duas alças da moldura de três colunas (`dominio/paineis.js`: TRILHO + 2 * VAO; `.palcoTres` não tem
 // padding). Hooks não importam do domínio (`verificar-camadas.mjs`); a `prova-1697` confere que é o mesmo número.
 export const TRILHO_E_VAOS = 100
@@ -53,3 +53,12 @@ export const balcaoComCardapio = ({ balcao, cardapio }) => Math.max(balcao, Math
 export const fichaComCardapio = ({ ficha, cardapio }) => Math.max(ficha, Math.max(cardapio, 440) - 12)
 
 export const largurasDaTela = (escolhidas, larguraDaTela) => ({ ...padraoPorTela(larguraDaTela), ...escolhidas })
+
+// #3265 (revisão da PR #3266): `null` é restaurar. A escolha sai e a coluna volta a acompanhar a tela; gravar o
+// padrão da tela de agora levava o 450/490 de 1920 para o notebook. Arrastar, mesmo até o padrão, é escolha.
+export function escolher(escolhidas, chave, valor) {
+  const novo = { ...escolhidas }
+  if (valor == null) delete novo[chave]
+  else novo[chave] = valor
+  return novo
+}

@@ -180,6 +180,8 @@
   background: transparent; border: 0; padding: var(--e-3) var(--e-4);
   position: sticky; bottom: 0; z-index: 10;
   flex: 0 0 auto; min-height: 0;
+  /* #3265 (C6): o campo acompanha a leitura do fio (`.thread`), centrado, para não ficar mais largo que ele. */
+  width: 100%; max-width: 880px; margin-inline: auto;
   /* Sem overflow próprio: ele recortava todo Popover ancorado no composer
      (achado da rodada 7). O campo já tem teto de altura e rola por dentro. */
   overflow: visible;

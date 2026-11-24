@@ -136,12 +136,17 @@ confere('3  telas médias usam as proporções aprovadas sem encolher a conversa
 const conversaNaTela = (vw) => { const p = larguras.padraoPorTela(vw); return vw - larguras.TRILHO_E_VAOS - p.balcao - p.ficha }
 confere('3  em tela larga a conversa para na largura de leitura e a sobra vai para o Balcão e a Ficha', () => {
   assert.equal(larguras.LEITURA, 880)
-  assert.equal(larguras.TRILHO_E_VAOS, paineis.TRILHO + 2 * paineis.VAO, 'a geometria do hook é a do domínio')
+  // Trilho e duas alças. O TRILHO + 3 * VAO de cima é o modelo conservador da #1697: `paineis.js` supõe uma folga à
+  // direita que `.palcoTres { padding: 0 }` não tem mais. A prova-2185 (C6) mede 880 na tela com o 100.
+  assert.equal(larguras.TRILHO_E_VAOS, paineis.TRILHO + 2 * paineis.VAO, 'trilho mais as duas alças de paineis.js')
   assert.deepEqual(larguras.padraoPorTela(1920), { balcao: 450, ficha: 490, cardapio: 460 })
   assert.equal(conversaNaTela(1920), 880)
-  const maximo = { balcao: 480, ficha: 520 }
-  assert.match(fonte('app/Moldura.jsx'), /max=\{480\}/, 'o máximo da alça do Balcão é o da regra')
-  assert.match(fonte('app/Moldura.jsx'), /max=\{520\}/, 'o máximo da alça da Ficha é o da regra')
+  const maximo = larguras.MAXIMO
+  assert.deepEqual(maximo, { balcao: 480, ficha: 520 })
+  const moldura = fonte('app/Moldura.jsx')
+  for (const chave of ['balcao', 'ficha']) {
+    assert.equal((moldura.match(new RegExp(`max=\\{MAXIMO\\.${chave}\\}`, 'g')) ?? []).length, 2, `as duas alças de ${chave} (coluna e Disposição) usam o máximo da regra`)
+  }
   for (const vw of [1600, 1700, 1920, 2560]) {
     const p = larguras.padraoPorTela(vw)
     const antes = vw >= 1700 ? { balcao: 304, ficha: 340 } : { balcao: 276, ficha: 316 }
@@ -157,7 +162,29 @@ confere('3  em tela larga a conversa para na largura de leitura e a sobra vai pa
     assert.ok(passo >= 0 && passo <= 1, `${vw}→${vw + 1}: a conversa mudou ${passo} px`)
   }
   // Acima de ~1980 px as alças chegam ao máximo e a conversa volta a crescer: o CSS segura a leitura.
-  assert.match(fonte('features/atendimento/atendimento.module.css'), /\.thread \{[^}]*max-width: 880px; margin-inline: auto;/)
+  // `width: 100%` segura o fio na largura toda: só com as margens automáticas ele encolheria ao conteúdo, no meio.
+  // O campo de escrever acompanha a leitura, para não ficar mais largo que o fio.
+  const css = fonte('features/atendimento/atendimento.module.css')
+  assert.match(css, /\.thread \{[^}]*width: 100%; max-width: 880px; margin-inline: auto;/)
+  assert.match(css, /\.composer \{[^}]*width: 100%; max-width: 880px; margin-inline: auto;/)
+})
+// Revisão da PR #3266: Enter, duplo clique e "Restaurar disposição" gravavam o padrão DA TELA ATUAL como escolha.
+// Restaurado em 1920 (450/490), o notebook de 1366 abria com a conversa de 326 px. Restaurar agora desfaz a
+// escolha e a coluna volta a acompanhar a tela; arrastar, mesmo até o valor do padrão, continua sendo escolha.
+confere('3  restaurar a largura desfaz a escolha: a coluna volta a acompanhar a tela', () => {
+  assert.deepEqual(larguras.escolher({ balcao: 300, ficha: 400 }, 'balcao', null), { ficha: 400 })
+  assert.deepEqual(larguras.escolher({ ficha: 400 }, 'balcao', 276), { balcao: 276, ficha: 400 }, 'arraste até o padrão é escolha')
+  const restaurada = larguras.escolher(larguras.escolher({ balcao: 450, ficha: 490 }, 'balcao', null), 'ficha', null)
+  assert.deepEqual(larguras.largurasDaTela(restaurada, 1366), larguras.padraoPorTela(1366))
+  assert.equal(conversaNaTela(1366), 714, 'restaurado em 1920 e aberto no notebook')
+  assert.match(fonte('hooks/useLarguras.js'), /const novo = escolher\(atual, chave, valor\)/)
+  const alca = fonte('componentes/AlcaLargura.jsx')
+  assert.match(alca, /evento\.key === 'Enter'\) \{\s*restaurar\(\)/, 'Enter restaura')
+  assert.match(alca, /onDoubleClick=\{restaurar\}/, 'duplo clique restaura')
+  assert.match(alca, /const restaurar = \(\) => \(aoRestaurar \? aoRestaurar\(\) : aoMudar\(limitar\(padrao, min, max\)\)\)/)
+  const moldura = fonte('app/Moldura.jsx')
+  for (const chave of ['balcao', 'ficha']) assert.match(moldura, new RegExp(`aoRestaurar=\\{\\(\\) => aoRedimensionar\\('${chave}', null\\)\\}`))
+  assert.match(moldura, /onClick=\{\(\) => \{ aoRedimensionar\('balcao', null\); aoRedimensionar\('ficha', null\) \}\}>Restaurar disposição/)
 })
 confere('3  só a migração v1 descarta os padrões antigos gravados sem arraste', () => {
   assert.deepEqual(larguras.migrarLargurasAntigas({ balcao: 360, ficha: 420, cardapio: 460 }), {})

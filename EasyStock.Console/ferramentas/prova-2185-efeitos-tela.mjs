@@ -946,17 +946,23 @@ try {
       await p.locator('[role=log]').waitFor()
       const m = await p.evaluate(() => {
         const log = document.querySelector('[role=log]')
-        const caixa = log.getBoundingClientRect(), pai = log.parentElement.getBoundingClientRect()
+        // A área útil do pai (sem a barra de rolagem) é a referência do centro e da largura esperada.
+        const caixa = log.getBoundingClientRect(), elPai = log.parentElement, paiR = elPai.getBoundingClientRect()
+        const pai = { left: paiR.left + elPai.clientLeft, right: paiR.left + elPai.clientLeft + elPai.clientWidth }
+        const campo = document.querySelector('[class*=composer][data-area-envio]').getBoundingClientRect()
         const estilo = getComputedStyle(log)
         const util = caixa.width - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight)
         const baloes = [...log.querySelectorAll('[class*=balao]')].filter((b) => /entrada|saida/.test(b.className))
         const esquerda = Math.min(...baloes.filter((b) => /entrada/.test(b.className)).map((b) => b.getBoundingClientRect().left))
         const direita = Math.max(...baloes.filter((b) => /saida/.test(b.className)).map((b) => b.getBoundingClientRect().right))
-        return { coluna: Math.round(document.querySelector('section[aria-label=Conversa]').getBoundingClientRect().width), caixa: Math.round(caixa.width), util: Math.round(util), sobraEsq: Math.round(caixa.left - pai.left), sobraDir: Math.round(pai.right - caixa.right), vao: Math.round(direita - esquerda), baloes: baloes.length }
+        return { coluna: Math.round(document.querySelector('section[aria-label=Conversa]').getBoundingClientRect().width), paiUtil: elPai.clientWidth, caixa: Math.round(caixa.width), campo: Math.round(campo.width), centroDoCampo: Math.round(campo.left + campo.width / 2 - (caixa.left + caixa.width / 2)), util: Math.round(util), sobraEsq: Math.round(caixa.left - pai.left), sobraDir: Math.round(pai.right - caixa.right), vao: Math.round(direita - esquerda), baloes: baloes.length }
       })
       assert.ok(m.baloes >= 2, `a massa tem balões dos dois lados (${m.baloes})`)
       assert.equal(m.coluna, coluna, 'coluna da conversa')
       assert.ok(m.caixa <= 880 && m.util <= 880, `leitura: caixa ${m.caixa} px, texto ${m.util} px`)
+      assert.equal(m.caixa, Math.min(m.paiUtil, 880), 'o fio ocupa a leitura toda, não encolhe ao conteúdo')
+      assert.equal(m.campo, m.caixa, 'o campo de escrever tem a largura do fio')
+      assert.ok(Math.abs(m.centroDoCampo) <= 1, `o campo fica alinhado ao fio (${m.centroDoCampo} px)`)
       assert.ok(m.vao <= 880, `do balão do cliente ao da loja: ${m.vao} px`)
       assert.ok(Math.abs(m.sobraEsq - m.sobraDir) <= 1, `centrada (${m.sobraEsq} e ${m.sobraDir})`)
       await ctx.close()
