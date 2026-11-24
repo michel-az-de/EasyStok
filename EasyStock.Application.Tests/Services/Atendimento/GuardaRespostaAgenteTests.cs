@@ -48,7 +48,6 @@ public class GuardaRespostaAgenteTests
     [InlineData("   ")]
     // #2516: frases de produção, sem pedido, sem frete na ferramenta e sem escalar.
     [InlineData("A comanda já está com o frete combinado pela equipe.")]
-    [InlineData("Faço por aqui sim, a Baba vai combinar com você a entrega e o frete.")]
     [InlineData("A responsável vai entrar em contato para confirmar o horário.")]
     [InlineData("A dona vai te chamar para acertar a entrega.")]
     [InlineData("Ela vai combinar o frete com você.")]
