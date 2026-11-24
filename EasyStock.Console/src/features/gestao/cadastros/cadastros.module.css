@@ -157,18 +157,26 @@
 .lista .comRelacao td:first-child small { margin-top: 0; }
 .lista .comRelacao td { overflow-wrap: normal; }
 .lista .comRelacao td:first-child { overflow-wrap: anywhere; }
-.lista .comRelacao th:nth-child(1) { width: 17%; }
-.lista .comRelacao th:nth-child(2) { width: 11%; }
-.lista .comRelacao th:nth-child(3) { width: 11%; }
-.lista .comRelacao th:nth-child(4) { width: 9%; }
-.lista .comRelacao th:nth-child(5) { width: 7%; }
-.lista .comRelacao th:nth-child(6) { width: 8%; }
-.lista .comRelacao th:nth-child(7) { width: 10%; }
-.lista .comRelacao th:nth-child(8) { width: 10%; }
-.lista .comRelacao th:nth-child(9) { width: 17%; }
-/* Ações compactas: lado a lado quando cabem, e o link do convite quebra dentro da célula em vez de sair dela. */
+/* #3281: 6 colunas (Nome, Estágio, Gasto, Última compra, Sinais, Ações), somando 100%. */
+.lista .comRelacao th:nth-child(1) { width: 28%; }
+.lista .comRelacao th:nth-child(2) { width: 13%; }
+.lista .comRelacao th:nth-child(3) { width: 16%; }
+.lista .comRelacao th:nth-child(4) { width: 14%; }
+.lista .comRelacao th:nth-child(5) { width: 16%; }
+.lista .comRelacao th:nth-child(6) { width: 13%; }
+/* Ações compactas: lado a lado quando cabem, e o link do convite quebra dentro da célula em vez de sair dela.
+   #3281: alvo do token de toque (40 no mouse, 48 no toque), não 32. */
 .lista .comRelacao .acoes { gap: var(--e-1); }
-.lista .comRelacao .acoes button, .lista .comRelacao .acoes .chamar { min-height: 32px; padding-inline: var(--e-2); }
+.lista .comRelacao .acoes button, .lista .comRelacao .acoes .chamar { min-height: var(--toque); padding-inline: var(--e-2); }
+/* #3281: o nome é o botão da ficha. Parece o nome (peso, cor), sublinha no hover e tem foco visível. */
+.nomeDaLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
+.nomeFicha { padding: 0; border: 0; background: none; color: var(--tinta); font: inherit; font-weight: 700; text-align: start; overflow-wrap: anywhere; cursor: pointer; text-underline-offset: 3px; }
+.nomeFicha:hover:not(:disabled) { text-decoration: underline; }
+.nomeFicha:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.nomeFicha:disabled { color: var(--tinta-2); cursor: progress; }
+.legendaDaLista { padding: 0 var(--e-4) var(--e-3); }
+/* #3281: as tags moram em Sinais; a lista ocupa a célula inteira para a tag longa cortar com reticência, sem sair dela. */
+.sinais > .tagsDaLinha { justify-self: stretch; min-width: 0; }
 .lista .comRelacao .acoes .chamar { white-space: normal; text-align: center; max-width: 100%; }
 .lista .comRelacao .contatoMovel { display: block; }
 .situacaoNoNome { display: block; margin-top: 2px; }
