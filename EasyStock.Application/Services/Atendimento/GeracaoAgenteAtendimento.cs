@@ -140,7 +140,8 @@ public static class GeracaoAgenteAtendimento
                 var requisicao = new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
                 { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento };
                 resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, ct);
-                if (resposta.StopReason == RespostaLlm.StopMaxTokens)
+                // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
+                if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)
                 {
                     // #3273 (R1): o teto acabou antes do modelo terminar (com modelo que raciocina, o pensamento come o teto).
                     // A chamada cortada foi paga: entra na conta. Uma nova tentativa com teto maior; texto cortado nunca segue.
@@ -148,8 +149,8 @@ public static class GeracaoAgenteAtendimento
                         contexto.Conversa.Id, MaxTokensNovaTentativa);
                     tokens += TotalDeTokens(resposta);
                     consumo.Somar(resposta);
-                    resposta = await EnviarComUmaNovaTentativaAsync(
-                        llm, requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, contexto.Conversa.Id, logger, ct);
+                    // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o mesmo pedido o estouraria de novo.
+                    resposta = await llm.EnviarAsync(requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, ct);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)

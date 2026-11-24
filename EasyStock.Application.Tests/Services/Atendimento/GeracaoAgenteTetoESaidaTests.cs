@@ -81,6 +81,34 @@ public class GeracaoAgenteTetoESaidaTests
         MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha!, geracao.Consumo!.FalhaLlm).Should().Be(MotivoDoTurno.TetoSaida);
     }
 
+    [Fact]
+    public async Task TetoJaNoMaximoNaoRepeteECaiNoMotivoProprio()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var llm = Llm(capturadas, () => new RespostaLlm(RespostaLlm.StopMaxTokens, [new BlocoTextoLlm("corta")], 10,
+            GeracaoAgenteAtendimento.MaxTokensNovaTentativa));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(1, "repetir com o mesmo teto só dobraria o custo");
+        geracao.Concluiu.Should().BeFalse();
+        geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida);
+    }
+
+    [Fact]
+    public async Task ChamadaDeTetoMaiorQueFalhaNaoRepete()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var chamadas = 0;
+        var llm = Llm(capturadas, () => ++chamadas == 1 ? Cortada("") : throw new HttpRequestException("prazo", null, HttpStatusCode.GatewayTimeout));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(2, "a de teto maior não se repete: o prazo seria estourado de novo");
+        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Tokens.Should().Be(10 + 4096, "a chamada cortada foi paga");
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]
