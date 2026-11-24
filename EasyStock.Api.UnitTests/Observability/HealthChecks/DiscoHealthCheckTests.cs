@@ -6,7 +6,7 @@ namespace EasyStock.Api.UnitTests.Observability.HealthChecks;
 
 /// <summary>
 /// #2376: o disco da VPS é dividido pelo Postgres e pelo OpenObserve, que só tem limite por tempo (30 dias). Um pico de
-/// erros pode enchê-lo. O /health/disco responde 503 abaixo do mínimo livre, e o vigia externo (F1) abre a issue.
+/// erros pode enchê-lo. O /health/disco responde 503 abaixo do mínimo livre, e o vigia externo (UptimeRobot) avisa o Felipe.
 /// </summary>
 public class DiscoHealthCheckTests
 {
