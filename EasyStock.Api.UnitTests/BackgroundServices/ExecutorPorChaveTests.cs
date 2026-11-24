@@ -5,7 +5,8 @@ using FluentAssertions;
 namespace EasyStock.Api.UnitTests.BackgroundServices;
 
 /// <summary>
-/// Testes determinísticos do <see cref="ExecutorPorChave"/>: sincronização só por <see cref="TaskCompletionSource"/>.
+/// Testes determinísticos do <see cref="ExecutorPorChave"/>: sincronização só por <see cref="TaskCompletionSource"/>
+/// e, no teste do limite, por uma <see cref="FilaManual"/> que leva o trabalho barrado até o semáforo.
 /// O <c>WaitAsync</c> com teto existe apenas para um teste travado falhar em vez de pendurar a suíte.
 /// </summary>
 public class ExecutorPorChaveTests
@@ -14,6 +15,25 @@ public class ExecutorPorChaveTests
 
     private static TaskCompletionSource Sinal() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Guarda o que o executor posta (a volta do <c>Task.Yield</c>) e só roda quando o teste esvazia a fila, na
+    /// thread do teste. Quando <see cref="Esvaziar"/> volta, o trabalho já parou no semáforo ou já rodou.
+    /// </summary>
+    private sealed class FilaManual : SynchronizationContext
+    {
+        private readonly ConcurrentQueue<(SendOrPostCallback Acao, object? Estado)> _fila = new();
+
+        public override void Post(SendOrPostCallback d, object? state) => _fila.Enqueue((d, state));
+
+        public void Esvaziar()
+        {
+            while (_fila.TryDequeue(out var item))
+            {
+                item.Acao(item.Estado);
+            }
+        }
+    }
 
     [Fact]
     public async Task Conversas_diferentes_rodam_ao_mesmo_tempo()
@@ -79,13 +99,30 @@ public class ExecutorPorChaveTests
             await liberar.Task;
             registro.Enqueue("A fim");
         });
-        executor.Agendar(Guid.NewGuid(), _ =>
-        {
-            registro.Enqueue("B inicio");
-            return Task.CompletedTask;
-        });
-
+        // #3250: B só é agendado com A já na única vaga. Agendados juntos, os dois disputavam a vaga e B às vezes
+        // começava primeiro, o que o contrato permite: ele só ordena trabalhos da mesma chave.
         await primeiroIniciou.Task.WaitAsync(Teto);
+
+        var fila = new FilaManual();
+        var contexto = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(fila);
+        try
+        {
+            executor.Agendar(Guid.NewGuid(), _ =>
+            {
+                registro.Enqueue("B inicio");
+                return Task.CompletedTask;
+            });
+        }
+        finally
+        {
+            // Volta antes de qualquer await: a continuação do próprio teste não pode ficar presa na fila.
+            SynchronizationContext.SetSynchronizationContext(contexto);
+        }
+
+        // B anda até o semáforo aqui, na thread do teste, e para ali enquanto A ocupa a vaga. Se o limite deixasse
+        // duas chaves rodarem juntas, B rodaria agora e "B inicio" entraria antes de "A fim".
+        fila.Esvaziar();
         liberar.SetResult();
         await executor.AguardarTudoAsync().WaitAsync(Teto);
 

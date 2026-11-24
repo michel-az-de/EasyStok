@@ -10,6 +10,28 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#3250): `ExecutorPorChaveTests` fixava qual de duas chaves pega a vaga primeiro
+
+Falhou 1 vez no job "Unidade, arquitetura e Inventario" da PR #3247 (run 45286414101, tentativa 1, commit
+`8ec22604c`), que não tocava em `.cs`: `O_limite_de_paralelismo_faz_chaves_diferentes_rodarem_uma_por_vez` esperava
+`A inicio, A fim, B inicio` e viu `B inicio, A inicio, A fim`.
+
+- **Por que era flaky:** `ExecutorPorChave.ExecutarAsync` começa com `await Task.Yield()`, então A e B, agendados
+  juntos, voltam em ordem não garantida e disputam o `SemaphoreSlim(1)`. O contrato só promete ordem dentro da mesma
+  chave. A exclusão mútua se manteve; o teste fixava a mais quem começa.
+- **Como se confirmou:** o teste antigo falhou 39 vezes em 2000 repetições em sequência no mesmo processo, sempre com a
+  mensagem do CI. Com um contexto de teste que roda B antes de A, falhou sempre.
+- **Correção (#3250):** B só é agendado com A já na única vaga, sob uma `FilaManual` (contexto de sincronização do
+  teste) que leva B até o semáforo na thread do teste antes de liberar A. Com o limite certo, B para no `WaitAsync`; se
+  o limite deixasse duas chaves juntas, B rodaria ali e o teste falharia sempre (com `paralelismo: 2`, 200 de 200
+  falhas). Sem espera de tempo e sem mudar o `ExecutorPorChave`. O teste novo passou em 2000 de 2000 em sequência,
+  2000 de 2000 juntas (`Task.WhenAll`) e com B antes de A.
+- **Lição:** teste de concorrência não fixa a ordem entre trabalhos que o contrato deixa livres. Quem precisa começar
+  primeiro entra antes de o outro existir, e o "não começou" se prova parando o outro num ponto conhecido, não com
+  espera de tempo.
+
+---
+
 ## ⚠️ TOLERADO (#3221): três provas de navegador do Console estouram 10 s na primeira tentativa do CI
 
 Três falhas em três execuções do job `qualidade` (workflow `console`), em 23/11/2026, cada uma numa prova
