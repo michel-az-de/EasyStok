@@ -26,12 +26,17 @@ public class ExecutorPorChaveTests
 
         public override void Post(SendOrPostCallback d, object? state) => _fila.Enqueue((d, state));
 
-        public void Esvaziar()
+        /// <summary>Roda o que está na fila e devolve quantos callbacks rodou.</summary>
+        public int Esvaziar()
         {
+            var rodados = 0;
             while (_fila.TryDequeue(out var item))
             {
                 item.Acao(item.Estado);
+                rodados++;
             }
+
+            return rodados;
         }
     }
 
@@ -122,7 +127,8 @@ public class ExecutorPorChaveTests
 
         // B anda até o semáforo aqui, na thread do teste, e para ali enquanto A ocupa a vaga. Se o limite deixasse
         // duas chaves rodarem juntas, B rodaria agora e "B inicio" entraria antes de "A fim".
-        fila.Esvaziar();
+        // Sem a volta do Task.Yield pela fila, B correria noutra thread e o Red dependeria de corrida.
+        fila.Esvaziar().Should().Be(1, "a volta do Task.Yield de B passa pela fila");
         liberar.SetResult();
         await executor.AguardarTudoAsync().WaitAsync(Teto);
 

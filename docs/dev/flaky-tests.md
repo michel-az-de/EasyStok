@@ -25,7 +25,7 @@ Falhou 1 vez no job "Unidade, arquitetura e Inventario" da PR #3247 (run 4528641
   teste) que leva B até o semáforo na thread do teste antes de liberar A. Com o limite certo, B para no `WaitAsync`; se
   o limite deixasse duas chaves juntas, B rodaria ali e o teste falharia sempre (com `paralelismo: 2`, 200 de 200
   falhas). Sem espera de tempo e sem mudar o `ExecutorPorChave`. O teste novo passou em 2000 de 2000 em sequência,
-  2000 de 2000 juntas (`Task.WhenAll`) e com B antes de A.
+  2000 de 2000 juntas (`Task.WhenAll`) e sob o contexto que, no teste antigo, rodava B antes de A.
 - **Lição:** teste de concorrência não fixa a ordem entre trabalhos que o contrato deixa livres. Quem precisa começar
   primeiro entra antes de o outro existir, e o "não começou" se prova parando o outro num ponto conhecido, não com
   espera de tempo.
