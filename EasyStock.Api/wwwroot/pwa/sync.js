@@ -1996,15 +1996,58 @@
   // Min 60s entre escritas pra nao martelar IO em rajadas de operacao.
   var _localBackupTimer = null;
   var LOCAL_BACKUP_MIN_INTERVAL = 60 * 1000;
-  function scheduleLocalBackup(reason) {
+  function scheduleLocalBackup(reason, espera) {
     if (_localBackupTimer) return;
     _localBackupTimer = setTimeout(function () {
       _localBackupTimer = null;
       var last = 0;
       try { last = parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0; } catch (e) {}
-      if (Date.now() - last < LOCAL_BACKUP_MIN_INTERVAL) return;
+      var falta = LOCAL_BACKUP_MIN_INTERVAL - (Date.now() - last);
+      // #3257: dentro do intervalo mínimo, reagenda para o fim dele. Antes a última ação da
+      // rajada ficava fora do arquivo até a próxima ação.
+      if (falta > 0) { scheduleLocalBackup(reason, falta); return; }
       localBackupToFile(reason || 'mutation').catch(function () {});
-    }, 5000);
+    }, espera || 5000);
+  }
+
+  // ---- Dado só neste aparelho (#3257) ----
+  // Dado sem cópia no servidor: o health check avisa. Produtos e clientes não contam (o PWA
+  // semeia exemplos); pedido, caixa, lote ou fila contam.
+  var FILA_ANTIGA_MS = 24 * 60 * 60 * 1000;
+  function dadoSoNoAparelho(e) {
+    var fila = e.fila || [];
+    var n = fila.length;
+    function plural(q, um, varios) { return q + ' ' + (q === 1 ? um : varios); }
+    if (!e.pareado && (n > 0 || e.pedidos > 0 || e.caixa > 0 || e.lotes > 0))
+      return { motivo: 'sem-pareamento', mensagem: 'Estes dados existem só neste aparelho: ele não está conectado ao servidor. Em Diagnóstico, exporte um backup ou conecte o aparelho.' };
+    if (e.pareamentoInvalido && n > 0)
+      return { motivo: 'pareamento-invalido', mensagem: 'O servidor não reconhece mais este aparelho. ' + plural(n, 'alteração está', 'alterações estão') + ' só aqui. Conecte o aparelho de novo.' };
+    if (e.retidoPorImportacao && n > 0)
+      return { motivo: 'importacao-retida', mensagem: 'O envio está parado até você conferir a loja dos dados importados. ' + plural(n, 'alteração está', 'alterações estão') + ' só neste aparelho.' };
+    if (e.deadletter > 0)
+      return { motivo: 'recusadas', mensagem: plural(e.deadletter, 'alteração recusada', 'alterações recusadas') + ' pelo servidor ' + (e.deadletter === 1 ? 'existe' : 'existem') + ' só neste aparelho.' };
+    if (e.conflitos > 0)
+      return { motivo: 'conflitos', mensagem: plural(e.conflitos, 'alteração em conflito', 'alterações em conflito') + ' ' + (e.conflitos === 1 ? 'existe' : 'existem') + ' só neste aparelho.' };
+    var antiga = fila.some(function (m) { var t = m && (m.createdAt || m.ts); return t && e.agora - t > FILA_ANTIGA_MS; });
+    if (antiga)
+      return { motivo: 'fila-antiga', mensagem: plural(n, 'alteração está', 'alterações estão') + ' só neste aparelho há mais de um dia. Conecte à internet para enviar.' };
+    return null;
+  }
+
+  async function avaliarDadoSoNoAparelho() {
+    try { await localReady; } catch (e) {}
+    var stats = {};
+    try { if (window.cdbQueueStore && window.cdbQueueStore.ready) stats = await window.cdbQueueStore.getStats(); } catch (e) {}
+    function conta(chave) {
+      try { var v = JSON.parse(localStorage.getItem(chave) || '[]'); return Array.isArray(v) ? v.length : 0; } catch (e) { return 0; }
+    }
+    var pairing = loadPairing();
+    return dadoSoNoAparelho({
+      agora: Date.now(), pareado: !!(pairing && pairing.apiKey), pareamentoInvalido: _pairingInvalid,
+      retidoPorImportacao: syncHeldForImport(), fila: loadQueue(),
+      deadletter: stats.deadletterCount || 0, conflitos: stats.conflictCount || 0,
+      pedidos: conta('cdb-orders'), caixa: conta('cdb-cash'), lotes: conta('cdb-batches')
+    });
   }
 
   // ---- Multi-loja (Onda 6) ----
@@ -3182,6 +3225,7 @@
     atualizarRegraImpressao, esquecerRegraImpressao,
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
+    dadoSoNoAparelho, avaliarDadoSoNoAparelho, // #3257
     pickBackupViaSAF,
     // A5: restore-on-reinstall — index.html chama applyBackupSnapshot
     // depois de o operador confirmar no modal disparado por cdb-restore-prompt.
@@ -3193,6 +3237,7 @@
     // B/C/D: hooks de inspecao pra testes e diagnostico runtime. Nao parte
     // do contrato publico — uso em UI deve ser raro/justificado.
     _internal: {
+      cancelarBackupLocalAgendado: () => { clearTimeout(_localBackupTimer); _localBackupTimer = null; }, // #3257
       nowSafe: nowSafe,                                   // B3
       getServerTimeOffsetMs: () => _serverTimeOffsetMs,   // B3
       getLastSeenServerTs: () => _lastSeenServerTs,       // B3

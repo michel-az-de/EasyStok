@@ -952,6 +952,16 @@ async function runHealthCheck() {
       }
     }
 
+    // #3257: dado sem cópia no servidor. Depois da impressora (problema passageiro) e antes da
+    // idade do backup. A ação abre o Diagnóstico, onde ficam a fila, o backup e a exportação.
+    if (window.cdbSync && typeof window.cdbSync.avaliarDadoSoNoAparelho === 'function') {
+      var soLocal = await window.cdbSync.avaliarDadoSoNoAparelho();
+      if (soLocal) {
+        showHealthBanner('warn', soLocal.mensagem, 'Diagnóstico');
+        return;
+      }
+    }
+
     // 2. Backup local — quanto tempo desde ultimo?
     var lastBackup = 0;
     try {
