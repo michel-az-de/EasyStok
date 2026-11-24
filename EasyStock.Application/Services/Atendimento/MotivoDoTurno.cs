@@ -11,6 +11,7 @@ public static class MotivoDoTurno
     public const string Iteracoes = "iteracoes";
     public const string Menu = "menu";
     public const string FalhaLlm = "falha_llm";
+    public const string TetoSaida = "teto_saida";
     public const string EscaladaModelo = "escalada_modelo";
     public const string Interrompido = "interrompido";
 
@@ -38,6 +39,7 @@ public static class MotivoDoTurno
     /// <summary>Motivo que a geração devolve quando não chegou a uma resposta; o texto dele não é gravado.</summary>
     public static string DaFalhaDaGeracao(string motivoDaGeracao, bool falhaLlm) =>
         falhaLlm ? FalhaLlm
+        : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida, StringComparison.Ordinal) ? TetoSaida
         : Slugs.FirstOrDefault(par => motivoDaGeracao.StartsWith(par.Key, StringComparison.Ordinal)) is { Value: { } slug } ? slug
         : GuardaOutro;
 }

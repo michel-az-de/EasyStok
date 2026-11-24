@@ -185,6 +185,22 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task Motivo_TetoDeSaidaEstouradoEscalaSemEnviarTextoCortado()
+    {
+        // #3273 (R1): max_tokens com texto cortado nunca chega ao cliente; a equipe recebe a conversa, com motivo próprio.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm(RespostaLlm.StopMaxTokens, [new BlocoTextoLlm("A entrega de amanhã fica combi")], 10, 4096));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Is<string>(t => t.Contains("combi")),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        var turno = TurnoGravado();
+        turno.Motivo.Should().Be(MotivoDoTurno.TetoSaida);
+    }
+
+    [Fact]
     public async Task Motivo_TurnoInterrompidoGravaInterrompido()
     {
         var aguardando = new TaskCompletionSource<RespostaLlm>(TaskCreationOptions.RunContinuationsAsynchronously);
