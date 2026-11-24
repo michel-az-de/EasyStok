@@ -293,6 +293,45 @@ public class AnthropicMessagesClientTests
         resposta.TokensCacheLido.Should().Be(0);
     }
 
+    [Fact]
+    public async Task PisoDaRequisicaoSobeOTetoDeSaidaMasNuncaOBaixa()
+    {
+        // #3273 (R1): a nova tentativa depois de max_tokens pede teto maior; configuração maior que o piso vale.
+        var handler = new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}""");
+        var cliente = Criar(handler, new AnthropicAgenteOptions { Enabled = true, ApiKey = "k", MaxTokensAgente = 4096 });
+
+        await cliente.EnviarAsync(RequisicaoSimples() with { MaxTokensMinimo = 16384 });
+        using (var corpo = JsonDocument.Parse(handler.Corpo!))
+            corpo.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(16384);
+
+        await cliente.EnviarAsync(RequisicaoSimples());
+        using (var corpo = JsonDocument.Parse(handler.Corpo!))
+            corpo.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(4096);
+
+        var grande = Criar(handler, new AnthropicAgenteOptions { Enabled = true, ApiKey = "k", MaxTokensAgente = 32000 });
+        await grande.EnviarAsync(RequisicaoSimples() with { MaxTokensMinimo = 16384 });
+        using (var corpo = JsonDocument.Parse(handler.Corpo!))
+            corpo.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(32000);
+    }
+
+    [Fact]
+    public async Task CorpoDeErroNaoLevaAChaveParaOLog()
+    {
+        // #3273 (R12): o provedor do agente pode ecoar a chave; o log sai sanitizado, como no caminho por loja.
+        var logger = new CapturaLogger();
+        var http = new HttpClient(new CapturaHandler(HttpStatusCode.Unauthorized, """{"error":"chave invalida: chave-secreta-xyz"}"""))
+        { BaseAddress = new Uri("https://anthropic.test/") };
+        var client = new AnthropicMessagesClient(http,
+            Options.Create(new AnthropicAgenteOptions { Enabled = true, ApiKey = "chave-secreta-xyz", ModeloAgente = "claude-sonnet-5" }),
+            PipelinesDeTeste.Reais(), logger);
+
+        var act = () => client.EnviarAsync(RequisicaoSimples());
+
+        var erro = await act.Should().ThrowAsync<HttpRequestException>();
+        erro.Which.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        logger.Mensagens.Should().NotBeEmpty().And.OnlyContain(m => !m.Contains("chave-secreta-xyz"));
+    }
+
     private sealed class CapturaHandler(HttpStatusCode status, string resposta) : HttpMessageHandler
     {
         public HttpRequestMessage? Requisicao { get; private set; }

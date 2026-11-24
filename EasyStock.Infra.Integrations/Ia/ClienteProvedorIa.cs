@@ -47,7 +47,7 @@ public sealed class ClienteProvedorIa(
         else
             request.Headers.Add("x-api-key", destino.Chave);
         request.Headers.Add("anthropic-version", AnthropicMessagesClient.AnthropicVersion);
-        request.Content = new ByteArrayContent(AnthropicMessagesClient.MontarCorpo(requisicao, destino.Modelo, config.MaxTokensAgente));
+        request.Content = new ByteArrayContent(AnthropicMessagesClient.MontarCorpo(requisicao, destino.Modelo, AnthropicMessagesClient.TetoDeSaida(requisicao, config.MaxTokensAgente)));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
         var http = fabrica.CreateClient(NomeHttp);

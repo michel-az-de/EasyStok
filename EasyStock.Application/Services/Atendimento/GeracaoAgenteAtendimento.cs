@@ -137,10 +137,21 @@ public static class GeracaoAgenteAtendimento
             RespostaLlm resposta;
             try
             {
-                resposta = await EnviarComUmaNovaTentativaAsync(
-                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
-                    { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento },
-                    contexto.Conversa.Id, logger, ct);
+                var requisicao = new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
+                { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento };
+                resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, ct);
+                // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
+                if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)
+                {
+                    // #3273 (R1): o teto acabou antes do modelo terminar (com modelo que raciocina, o pensamento come o teto).
+                    // A chamada cortada foi paga: entra na conta. Uma nova tentativa com teto maior; texto cortado nunca segue.
+                    logger.LogWarning("Agente de atendimento: o modelo estourou o teto de saída na conversa {ConversaId}; tenta com {Teto} tokens.",
+                        contexto.Conversa.Id, MaxTokensNovaTentativa);
+                    tokens += TotalDeTokens(resposta);
+                    consumo.Somar(resposta);
+                    // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o mesmo pedido o estouraria de novo.
+                    resposta = await llm.EnviarAsync(requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, ct);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -150,9 +161,17 @@ public static class GeracaoAgenteAtendimento
                 return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);
             }
 
-            // #2862: cache lido e escrito contam no total da cota (UsoIa); sem eles o número cai com o cache ligado.
-            tokens += resposta.TokensEntrada + resposta.TokensSaida + resposta.TokensCacheLido + resposta.TokensCacheEscrito;
+            tokens += TotalDeTokens(resposta);
             consumo.Somar(resposta);
+
+            if (resposta.StopReason == RespostaLlm.StopMaxTokens)
+            {
+                // Estourou de novo: o texto, se veio, está cortado e não vai ao cliente. A conversa vai para a equipe.
+                contexto.LimparRespostaVerificada();
+                logger.LogWarning("Agente de atendimento: o teto de saída estourou também na nova tentativa, conversa {ConversaId}.",
+                    contexto.Conversa.Id);
+                return new GeracaoAgente(null, tokens, false, MotivoTetoDeSaida + " (max_tokens)", consumo);
+            }
 
             if (resposta.StopReason != RespostaLlm.StopToolUse)
             {
@@ -183,6 +202,22 @@ public static class GeracaoAgenteAtendimento
         return new GeracaoAgente(null, tokens, false, null, consumo);
     }
 
+    /// <summary>#3273 (R1): teto da chamada que repete depois de <c>max_tokens</c>; sobe só o piso, nunca baixa o configurado.</summary>
+    public const int MaxTokensNovaTentativa = 16384;
+
+    /// <summary>#3273 (R1): começo do motivo quando o teto de saída estoura na nova tentativa também.</summary>
+    public const string MotivoTetoDeSaida = "o agente atingiu o teto de saída do modelo";
+
+    // #2862: cache lido e escrito contam no total da cota (UsoIa); sem eles o número cai com o cache ligado.
+    private static int TotalDeTokens(RespostaLlm r) => r.TokensEntrada + r.TokensSaida + r.TokensCacheLido + r.TokensCacheEscrito;
+
+    /// <summary>
+    /// #3273 (R2): só o que pode mudar em 300 ms se repete (rede, prazo, 5xx, 408, 429). 400, 401, 402 e afins são definitivos.
+    /// </summary>
+    internal static bool FalhaTransitoria(Exception ex) =>
+        ex is not HttpRequestException { StatusCode: { } status } || (int)status >= 500
+            || status is System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests;
+
     /// <summary>
     /// #2285: um blip do LLM (reset de conexão, 5xx, timeout) não manda a conversa para a dona: 1 nova tentativa da mesma
     /// chamada. Só a chamada ao LLM se repete: a ferramenta que o turno já executou não roda de novo, porque o laço segue
@@ -196,7 +231,7 @@ public static class GeracaoAgenteAtendimento
             return await llm.EnviarAsync(requisicao, ct);
         }
         // #3064: o que nem saiu (disjuntor aberto, cota estourada, sem chave) não se repete: daria outra linha de cota_estourada.
-        catch (Exception ex) when (ex is not ProvedorIaIndisponivelException
+        catch (Exception ex) when (ex is not ProvedorIaIndisponivelException && FalhaTransitoria(ex)
                                    && (ex is not OperationCanceledException || !ct.IsCancellationRequested))
         {
             logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);

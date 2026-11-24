@@ -43,6 +43,12 @@ public sealed record RequisicaoLlm(
     /// <summary>#3063: loja que paga a chamada. Vazio não grava <c>chamada_ia</c> (só testes antigos).</summary>
     public Guid EmpresaId { get; init; }
 
+    /// <summary>
+    /// #3273 (R1): piso do teto de saída desta chamada, para a nova tentativa depois de <c>max_tokens</c>. Nulo usa só o teto
+    /// configurado; o cliente nunca baixa o configurado por causa dele.
+    /// </summary>
+    public int? MaxTokensMinimo { get; init; }
+
     /// <summary>#3063: para que a chamada serve, no registro de uso.</summary>
     public EasyStock.Domain.Enums.Ia.FinalidadeIa Finalidade { get; init; } = EasyStock.Domain.Enums.Ia.FinalidadeIa.Outra;
 }
@@ -85,4 +91,7 @@ public sealed record RespostaLlm(
     int TokensCacheEscrito = 0)
 {
     public const string StopToolUse = "tool_use";
+
+    /// <summary>#3273 (R1): o modelo parou porque o teto de saída acabou; o texto, se houver, está cortado.</summary>
+    public const string StopMaxTokens = "max_tokens";
 }

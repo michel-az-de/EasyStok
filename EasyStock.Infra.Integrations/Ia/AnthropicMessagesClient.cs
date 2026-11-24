@@ -63,9 +63,10 @@ public sealed class AnthropicMessagesClient(
 
         if (!response.IsSuccessStatusCode)
         {
-            // O corpo de erro da Anthropic não contém a chave; a chave nunca vai para o log.
+            // #3273 (R12): o provedor pode ser outro que a Anthropic (Fireworks) e ecoar a chave; sanitiza antes de cortar.
+            var limpo = ClienteProvedorIa.Sanitizar(corpo, _opcoes.ChaveDoAgente ?? string.Empty);
             logger.LogWarning("Anthropic retornou {StatusCode} para o agente de atendimento: {Erro}",
-                (int)response.StatusCode, corpo.Length > 500 ? corpo[..500] : corpo);
+                (int)response.StatusCode, limpo.Length > 500 ? limpo[..500] : limpo);
             throw new HttpRequestException($"Anthropic respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
@@ -77,7 +78,11 @@ public sealed class AnthropicMessagesClient(
     }
 
     internal byte[] MontarCorpo(RequisicaoLlm requisicao) =>
-        MontarCorpo(requisicao, ModeloDe(requisicao.Modelo), _opcoes.MaxTokensAgente);
+        MontarCorpo(requisicao, ModeloDe(requisicao.Modelo), TetoDeSaida(requisicao, _opcoes.MaxTokensAgente));
+
+    /// <summary>#3273: o teto configurado, ou o piso da requisição quando for maior (nova tentativa depois de <c>max_tokens</c>).</summary>
+    internal static int TetoDeSaida(RequisicaoLlm requisicao, int configurado) =>
+        Math.Max(configurado, requisicao.MaxTokensMinimo ?? 0);
 
     /// <summary>#3064: o mesmo corpo para o cliente do <c>.env</c> e para o provedor da loja.</summary>
     internal static byte[] MontarCorpo(RequisicaoLlm requisicao, string modelo, int maxTokens)
