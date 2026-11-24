@@ -21,6 +21,10 @@ export const moeda = (v) => {
   return v < 0 && /[1-9]/.test(texto) ? SINAL_NEGATIVO + texto : texto
 }
 
+// #3254: tabela estreita. Reais cheios a partir de R$ 1 ("R$ 1.029"); abaixo disso com centavos, para R$ 0,40 não virar R$ 0.
+const REAIS_CHEIOS = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+export const moedaCheia = (v) => (v == null || Math.abs(v) < 1 ? moeda(v) : REAIS_CHEIOS.format(v))
+
 // #2853: custo do Assistente, que o provedor cobra em dólar ("US$ 1,23"). Só para esse custo; o resto é real.
 const DOLARES = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' })
 export const dolar = (v) => (v == null ? 'Sem valor' : DOLARES.format(v))

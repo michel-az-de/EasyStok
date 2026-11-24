@@ -72,6 +72,18 @@ export function relacionamentoDoDossie(dossie) {
   }
 }
 
+// #3254 (S2): a relação que a lista de clientes traz por linha (#3244). A API pode ainda não ter
+// os campos: ausente vira null (tags, lista vazia; emRisco, falso), nunca erro.
+const ou = (v) => v ?? null
+export const relacaoDoCliente = (c) => ({
+  gastoTotal: ou(c?.gastoTotal), compras: ou(c?.compras), ticketMedio: ou(c?.ticketMedio),
+  criadoEm: ou(c?.criadoEm), primeiraCompraEm: ou(c?.primeiraCompraEm), ultimaCompraEm: ou(c?.ultimaCompraEm),
+  ocorrenciasAbertas: ou(c?.ocorrenciasAbertas), ocorrenciasTotal: ou(c?.ocorrenciasTotal),
+  notasTotal: ou(c?.notasTotal), ultimaNota: ou(c?.ultimaNota),
+  tags: Array.isArray(c?.tags) ? c.tags : [], estagio: ou(c?.estagio), emRisco: c?.emRisco === true,
+})
+export const gastoDaCarteiraDoMeta = (meta) => (Number.isFinite(meta?.gastoTotalDaCarteira) ? meta.gastoTotalDaCarteira : null)
+
 // #1430: o que o visitante do chat do site escreveu no formulário antes de conversar. Vem só no
 // dossiê de lead e não é cadastro: a Ficha mostra com selo até a dona confirmar.
 export function contatoInformadoDoDossie(dossie) {

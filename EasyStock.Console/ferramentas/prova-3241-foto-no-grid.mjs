@@ -18,14 +18,14 @@ const clientes = Array.from({ length: 60 }, (_, i) => {
 })
 const browser = await chromium.launch({ headless: true })
 const erros = []
-const fotosBaixadas = []
 
+// Cada largura roda em paralelo (contexto próprio), então cada uma guarda as próprias fotos baixadas.
 async function preparar(largura) {
+  const fotosBaixadas = []
   const movel = largura < 700
   const contexto = await browser.newContext({ viewport: { width: largura, height: movel ? 844 : 1080 }, isMobile: movel, hasTouch: movel, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' })
   await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja' }, usuario: { id: 'dona', nome: 'Dona de teste' } })))
   const acoes = Object.fromEntries(['verPedidos', 'atenderConversas', 'editarAtendimento', 'verCadastrosClientes', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros'].map((n) => [n, true]))
-  fotosBaixadas.length = 0
   await contexto.route('**/api/**', async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname
     const ok = (data, extra = {}) => route.fulfill({ json: { data, ...extra } })
@@ -40,10 +40,12 @@ async function preparar(largura) {
   })
   const page = await contexto.newPage()
   page.setDefaultTimeout(12000)
+  // A subida do app no Vite frio, com o job do CI carregado, passou de 12 s (run 45316855628). Só a navegação ganha folga; as asserções seguem em 12 s.
+  page.setDefaultNavigationTimeout(60000)
   page.on('pageerror', (e) => erros.push(e.message))
   await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
   await page.getByText('Cliente Ficticio 01', { exact: true }).waitFor()
-  return { contexto, page }
+  return { contexto, page, fotosBaixadas }
 }
 const linha = (page, n) => page.locator('tbody tr').filter({ hasText: `Cliente Ficticio ${String(n).padStart(2, '0')}` })
 const falhas = []
@@ -51,9 +53,9 @@ const item = async (nome, corpo) => {
   try { await corpo(); console.log(`ok    ${nome}`) } catch (e) { const motivo = e.message.split('\n').slice(0, 4).join(' | '); falhas.push(`${nome}: ${motivo}`); console.log(`FALHA ${nome}: ${motivo}`) }
 }
 
-for (const largura of [1920, 1440, 390]) {
-  await item(`${largura}: foto na linha com fotoUrl, iniciais na sem foto, carga só da linha visível`, async () => {
-    const { contexto, page } = await preparar(largura)
+await Promise.all([1920, 1440, 390].map((largura) =>
+  item(`${largura}: foto na linha com fotoUrl, iniciais na sem foto, carga só da linha visível`, async () => {
+    const { contexto, page, fotosBaixadas } = await preparar(largura)
     const foto = linha(page, 1).locator('img[alt="Foto de Cliente Ficticio 01"]')
     await foto.waitFor()
     await page.waitForFunction(() => { const i = document.querySelector('tbody tr img'); return i && i.complete && i.naturalWidth > 0 })
@@ -61,6 +63,14 @@ for (const largura of [1920, 1440, 390]) {
     assert.equal(await linha(page, 4).locator('img').count(), 0, 'sem foto, sem imagem')
     assert.equal((await linha(page, 4).locator('[aria-hidden="true"]').filter({ hasText: 'CF' }).count()), 1, 'sem foto, iniciais CF')
     assert.deepEqual([...new Set(fotosBaixadas)].sort(), [idDe(1), idDe(2), idDe(3)], 'só as linhas visíveis baixam a foto')
+    // #3254: cada foto visível baixa 1 vez na carga; sair da lista e voltar remonta as linhas e não baixa de novo.
+    assert.deepEqual([...fotosBaixadas].sort(), [idDe(1), idDe(2), idDe(3)], 'carga: 1 download por foto visível')
+    await page.goto(`${URL_CONSOLE}/#/m/cadastros/produtos`)
+    await linha(page, 1).waitFor({ state: 'detached' })
+    await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
+    await linha(page, 1).locator('img[alt="Foto de Cliente Ficticio 01"]').waitFor()
+    assert.match(await linha(page, 1).locator('img').getAttribute('src'), /^data:image\/png/, 'a foto volta do cache, sem esperar')
+    assert.deepEqual([...fotosBaixadas].sort(), [idDe(1), idDe(2), idDe(3)], 'voltar à lista não baixa de novo')
     const caixa = await foto.boundingBox()
     assert.ok(caixa.width >= 32 && Math.abs(caixa.width - caixa.height) < 1, 'avatar redondo de 32 px ou mais')
     const rolagem = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
@@ -72,8 +82,7 @@ for (const largura of [1920, 1440, 390]) {
     await page.locator('tbody tr').filter({ hasText: 'Cliente Ficticio 60' }).locator('img[alt="Foto de Cliente Ficticio 60"]').waitFor()
     assert.ok(fotosBaixadas.includes(idDe(60)), 'a linha 60 baixou ao chegar')
     await contexto.close()
-  })
-}
+  })))
 await browser.close()
 if (erros.length) falhas.push(`erros de página: ${erros.slice(0, 3).join(' | ')}`)
 if (falhas.length) { console.log(`\n${falhas.length} falha(s)`); process.exit(1) }
