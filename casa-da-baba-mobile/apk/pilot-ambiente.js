@@ -7,12 +7,19 @@
     if (!config || !config.ambiente || config.ambiente === 'oficial' || !config.apiBaseUrl || typeof alvo.fetch !== 'function') return false;
     const origem = new URL(config.apiBaseUrl).origin;
     const original = alvo.fetch;
+    const base = alvo.location && alvo.location.href;
     alvo.fetch = function (input, init) {
-      const pedido = new Request(input, init);
-      if (new URL(pedido.url).origin !== origem) return original.call(alvo, input, init);
-      const cabecalhos = new Headers(pedido.headers);
-      cabecalhos.set('X-Cdb-Ambiente', config.ambiente);
-      return original.call(alvo, new Request(pedido, { headers: cabecalhos }));
+      // Decide pela URL sem montar Request: fora da API o fetch recebe exatamente o que o chamador passou.
+      let url;
+      try { url = new URL(input instanceof Request ? input.url : String(input), base); } catch (_) { url = null; }
+      if (!url || url.origin !== origem) return original.call(alvo, input, init);
+      try {
+        const cabecalhos = new Headers(init && init.headers !== undefined ? init.headers : input instanceof Request ? input.headers : undefined);
+        cabecalhos.set('X-Cdb-Ambiente', config.ambiente);
+        return original.call(alvo, input, Object.assign({}, init, { headers: cabecalhos }));
+      } catch (erro) {
+        return Promise.reject(erro);
+      }
     };
     return true;
   }

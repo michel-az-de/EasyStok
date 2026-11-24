@@ -7,7 +7,7 @@ Fase de prevenção separada da #2813. A produção recebeu massa de homologaç�
 | Fatia | Itens | Entrega | Prova |
 |---|---|---|---|
 | S1 | B9, P1 | Variante `homologacao` do APK, instalável ao lado do oficial e sem caminho para a produção | Varredura dos fontes, teste nativo de rede, empacotador real, APK montado e inspecionado |
-| S2 | P2 | Trava na API contra massa de teste na produção | Teste do middleware com CORS, teste de arquitetura do pipeline, teste nativo de rede e teste do conteúdo web |
+| S2 | P2 | Trava na API contra massa de teste na produção | Teste de integração da API (trava ligada: 403 antes de autenticar, parear e sincronizar), teste do middleware com CORS, teste de arquitetura do pipeline, teste nativo de rede e teste do conteúdo web |
 | S3 | P3 | Backup automático do aparelho e alerta de dado que só existe nele | Teste do PWA e do APK |
 
 Cada fatia é uma PR. S1 não depende de S2 nem de S3.
@@ -61,17 +61,17 @@ Issue #3251. Defesa em profundidade: depois da S1 o APK de homologação já nã
 ### Desenho
 
 - O APK de homologação declara o ambiente em todo pedido à API com o cabeçalho `X-Cdb-Ambiente: homologacao`.
-  - Nativo: `SessionHttpClient` (login, pareamento, avisos).
+  - Nativo: `SessionHttpClient` (login, pareamento, sessão). Os avisos (`NoticeManager`) só rodam na distribuição oficial.
   - Web: `pilot-ambiente.js`, carregado no `<head>` logo depois do `config.js` e antes do PWA, troca o `fetch` por um que acrescenta o cabeçalho só nos pedidos para a origem da `apiBaseUrl`. Pedido para outra origem sai intocado.
   - O oficial não muda: não manda o cabeçalho e fica com o `fetch` original.
-- `TravaDeAmbienteMiddleware` roda logo depois do `UseCors` e antes de PWA, CSRF, autenticação, pareamento e sync. Quem manda o cabeçalho com qualquer valor que não seja exatamente um `oficial` (vazio, maiúscula, espaço, repetido) recebe 403 `application/problem+json` com `codigo` `AMBIENTE_RECUSADO`, e a recusa vai para o log. Quem não manda o cabeçalho (APK oficial, Console, Web, PWA) segue como antes.
+- `TravaDeAmbienteMiddleware` roda logo depois do `UseCors` e antes de PWA, CSRF, autenticação, pareamento e sync. Quem manda o cabeçalho com qualquer valor que não seja exatamente um `oficial` (vazio, maiúscula, espaço interno, repetido; o espaço nas pontas o servidor já tira) recebe 403 `application/problem+json` com `codigo` `AMBIENTE_RECUSADO`, e a recusa vai para o log. Quem não manda o cabeçalho (APK oficial, Console, Web, PWA) segue como antes.
 - Depois do `UseCors` para que o preflight com o cabeçalho responda 204 e o 403 leve `Access-Control-Allow-Origin`: sem ele o WebView esconde o motivo da recusa. A política de CORS já aceita qualquer cabeçalho.
 - Ligada por padrão. Desliga só com `Ambiente:AceitaClienteDeHomologacao=true`, que está no `appsettings.Development.json` (desenvolvimento, laboratório de `scripts/homologacao` e testes de integração rodam em Development). A chave em vez de `IsProduction()` porque a imagem sobe como `Production` por padrão (`Dockerfile`, `docker-compose.yml`): esquecer a variável deixa a trava ligada, nunca desligada. `appsettings.json` e `appsettings.Production.json` não podem ter a chave (teste de arquitetura).
 - Uma homologação hospedada, quando existir, precisa da chave no próprio ambiente.
 
 ### Fora de S2
 
-- Workspace (Console no WebView): o Console é servido pelo `-PcdbHomologacaoApp`, que a S1 já obriga a ser de teste, e o pedido sai do JavaScript do Console, que não é do APK.
+- Workspace (Console no WebView): o pedido sai do JavaScript do Console, que não é do APK. A S1 obriga a origem do Console (`-PcdbHomologacaoApp`) a ser de teste, mas não a API por trás dela: um Console local com `API_ALVO` da produção (proxy do Vite) grava na produção sem o cabeçalho. O mesmo vale para esse Console aberto no navegador, sem APK nenhum, então o lugar da correção é o Console e não o WebView. Risco residual registrado na #3251 para decisão do Owner.
 - `EventSource` do sync (`/operation/stream`): não aceita cabeçalho e só lê. Ele exige aparelho pareado, e o pareamento e o `sse-token` saem por pedidos que já levam o cabeçalho.
 - APK oficial usado para teste na produção: a trava não pega, porque o oficial não se declara. É o caminho da #2813 (C4: a massa entrou pelo Console e pelo Atendimento do APK oficial). Fica para decisão do Owner na #3251.
 

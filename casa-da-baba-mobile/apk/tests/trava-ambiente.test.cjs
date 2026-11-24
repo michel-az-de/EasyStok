@@ -11,7 +11,12 @@ const API = 'https://api-teste.example';
 
 function alvo() {
   const chamadas = [];
-  const original = (input, init) => { chamadas.push({ input, init }); return Promise.resolve(new Response('{}')); };
+  // `pedido` é o que o fetch real montaria com (input, init); input e init crus ficam para o caso intocado.
+  // Como o fetch real: erro de URL ou cabeçalho vira promessa rejeitada, nunca exceção síncrona.
+  const original = (input, init) => {
+    try { chamadas.push({ input, init, pedido: new Request(input, init) }); } catch (erro) { return Promise.reject(erro); }
+    return Promise.resolve(new Response('{}'));
+  };
   return { fetch: original, original, chamadas };
 }
 
@@ -28,8 +33,7 @@ test('homologação declara o ambiente em todo pedido à API, preservando corpo,
   assert.equal(instalarAmbiente(janela, { ambiente: 'homologacao', apiBaseUrl: API }), true);
   const controle = new AbortController();
   await janela.fetch(API + '/api/mobile/sync', { method: 'POST', body: '{"a":1}', headers: { 'X-Mobile-Api-Key': 'k' }, signal: controle.signal });
-  const pedido = janela.chamadas[0].input;
-  assert.ok(pedido instanceof Request);
+  const pedido = janela.chamadas[0].pedido;
   assert.equal(pedido.headers.get('X-Cdb-Ambiente'), 'homologacao');
   assert.equal(pedido.headers.get('X-Mobile-Api-Key'), 'k');
   assert.equal(pedido.method, 'POST');
@@ -38,9 +42,25 @@ test('homologação declara o ambiente em todo pedido à API, preservando corpo,
   assert.equal(pedido.signal.aborted, true, 'cancelamento do chamador chega ao pedido');
 
   await janela.fetch(new Request(API + '/api/mobile/sync/pull', { headers: { Accept: 'application/json' } }));
-  const doRequest = janela.chamadas[1].input;
+  const doRequest = janela.chamadas[1].pedido;
   assert.equal(doRequest.headers.get('X-Cdb-Ambiente'), 'homologacao');
   assert.equal(doRequest.headers.get('Accept'), 'application/json');
+
+  await janela.fetch(API + '/api/mobile/sync', { referrerPolicy: 'no-referrer' });
+  assert.equal(janela.chamadas[2].pedido.referrerPolicy, 'no-referrer', 'opções do chamador seguem no pedido à API');
+});
+
+test('o wrapper não muda o fetch fora da API nem lança exceção síncrona', async () => {
+  const janela = alvo();
+  instalarAmbiente(janela, { ambiente: 'homologacao', apiBaseUrl: API });
+  const comCorpo = new Request('https://outro.example/upload', { method: 'POST', body: 'x' });
+  await janela.fetch(comCorpo);
+  assert.equal(janela.chamadas[0].input, comCorpo, 'Request com corpo para outra origem chega intacto');
+  assert.equal(await janela.chamadas[0].pedido.text(), 'x');
+
+  let promessa;
+  assert.doesNotThrow(() => { promessa = janela.fetch('http://[invalida'); }, 'fetch real rejeita, não lança');
+  await assert.rejects(promessa, TypeError);
 });
 
 test('pedido para outra origem sai intocado', async () => {

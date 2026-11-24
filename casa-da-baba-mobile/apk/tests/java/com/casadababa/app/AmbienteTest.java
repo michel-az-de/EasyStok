@@ -37,7 +37,7 @@ public final class AmbienteTest {
         new SessionHttpClient(hml).request("/api/mobile/session", null, "token-teste");
         check(abertas.equals(List.of("https://api-teste.example/api/mobile/pairing", "https://api-teste.example/api/mobile/session")),
             "login e pareamento da homologação abrem só a API de teste: " + abertas);
-        check(conexoes.stream().allMatch(c -> "homologacao".equals(c.getRequestProperty("X-Cdb-Ambiente"))),
+        check(conexoes.size() == 2 && conexoes.stream().allMatch(c -> "homologacao".equals(c.getRequestProperty("X-Cdb-Ambiente"))),
             "homologação declara o ambiente em todo pedido, e a API da produção recusa (#3251)");
         abertas.clear();
         conexoes.clear();

@@ -25,12 +25,13 @@ public class TravaDeAmbientePipelineTests
 
         var cors = linhas.FindIndex(l => l == "app.UseCors();");
         var trava = linhas.FindIndex(l => l == "app.UseMiddleware<TravaDeAmbienteMiddleware>();");
-        var autenticacao = linhas.FindIndex(l => l == "app.UseAuthentication();");
+        // A chamada no pipeline, não a definição do auxiliar (onde mora o UseAuthentication).
+        var autenticacao = linhas.FindIndex(l => l == "app.UseAutenticacaoELimiteDeTaxa();");
 
         cors.Should().BeGreaterThanOrEqualTo(0, "UseCors sumiu de " + PipelinePath + "; atualize este teste.");
         trava.Should().Be(cors + 1,
             "a recusa vem logo depois do CORS (para levar a origem) e antes de PWA, login, pareamento e sync (#3251).");
-        autenticacao.Should().BeGreaterThan(trava);
+        autenticacao.Should().BeGreaterThan(trava, "a homologação é recusada antes de autenticar");
     }
 
     [Theory]

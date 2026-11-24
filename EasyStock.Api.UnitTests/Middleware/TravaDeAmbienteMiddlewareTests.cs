@@ -49,7 +49,7 @@ public class TravaDeAmbienteMiddlewareTests
     [InlineData("homologacao")]
     [InlineData("")]
     [InlineData("OFICIAL")]
-    [InlineData("oficial ")]
+    [InlineData("ofi cial")]
     [InlineData("producao")]
     public async Task Cliente_que_se_declara_outro_ambiente_e_recusado_por_padrao(string valor)
     {
