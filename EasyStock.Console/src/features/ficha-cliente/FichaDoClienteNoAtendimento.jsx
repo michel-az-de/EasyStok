@@ -32,7 +32,7 @@ export function FichaDoClienteNoAtendimento({ conversa, aoFechar, editarAoAbrir 
   }, [unica, clienteId, contexto])
 
   if (!unica || falhou) return <ModalCliente conversa={conversa} aoFechar={aoFechar} forcarCadastro={cadastrarLead}>{children}</ModalCliente>
-  if (!editor) return <Modal titulo="Ficha do cliente" largura="md" aoFechar={aoFechar}><p role="status">Abrindo a ficha…</p></Modal>
+  if (!editor) return <Modal titulo="Ficha do cliente" largura="lg" aoFechar={aoFechar}><p role="status">Abrindo a ficha…</p></Modal>
   return renderizar({
     tela: 'clientes', editor, aoMudar: editar, contexto, conversa, podeEditar: true, editarAoAbrir,
     complemento: <ComplementoDoAtendimento conversa={conversa}>{children}</ComplementoDoAtendimento>,

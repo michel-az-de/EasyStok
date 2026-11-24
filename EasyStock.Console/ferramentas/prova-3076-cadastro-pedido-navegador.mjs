@@ -50,6 +50,8 @@ await page.getByText('Cadastro salvo.', { exact: true }).waitFor()
 const t1 = medir()
 await page.getByText('Cadastro salvo.', { exact: true }).waitFor({ state: 'detached', timeout: 8000 })
 await page.getByRole('button', { name: `Abrir ficha de ${nome}` }).first().click()
+// #3249: os endereços ficam na aba Endereços da ficha.
+await page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }).getByRole('tab', { name: /^Endereços/ }).click()
 await page.getByText('Rua das Flores, 100', { exact: false }).first().waitFor()
 assert.equal(await page.getByText('Nenhum endereço cadastrado.').count(), 0, 'C1: o endereço do cadastro aparece na Ficha')
 await page.screenshot({ path: resolve(pasta, 't1-ficha.png') })

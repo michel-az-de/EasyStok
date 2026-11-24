@@ -123,6 +123,22 @@ export function quadroDoCliente(relacionamento) {
   return quadro
 }
 
+// #3249: as abas da ficha (Pedidos, Endereços, Telefones e Conversas). O número é sempre um total conhecido: pedidos
+// pelo cadastro (orderCount; a lista da aba traz só os 5 últimos), endereços e telefones pela lista completa do detalhe.
+// As conversas do dossiê têm teto, então a aba não leva número; sem dossiê lido não há aba de conversas.
+const totalConhecido = (valor) => {
+  const n = typeof valor === 'number' ? valor : typeof valor === 'string' && valor.trim() ? Number(valor) : NaN
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+export function abasDaFicha({ pedidos, enderecos, telefones, comConversas = false }) {
+  const aba = (id, rotulo, valor) => {
+    const total = totalConhecido(valor)
+    return total == null ? { id, rotulo } : { id, rotulo, contador: total, nome: `${rotulo}, ${total}` }
+  }
+  return [aba('pedidos', 'Pedidos', pedidos), aba('enderecos', 'Endereços', enderecos), aba('telefones', 'Telefones', telefones),
+    comConversas && { id: 'conversas', rotulo: 'Conversas' }].filter(Boolean)
+}
+
 export const avisoDasNotas =(quantas) => (quantas >= NOTAS_DO_DOSSIE
   ? `Aqui aparecem as ${NOTAS_DO_DOSSIE} notas mais recentes. As anteriores estão na Ficha do Atendimento.` : null)
 

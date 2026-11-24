@@ -17,6 +17,7 @@ import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
 import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, motivoDoCadastroVazio, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
+import perfil from './perfilDoCliente.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
 const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisico', rotulo: 'Produto físico' }, { valor: 'Servico', rotulo: 'Serviço' }]
@@ -200,12 +201,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   }
   const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
   const titulo = ehFicha ? 'Ficha do cliente' : `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
-  return <Modal titulo={titulo} largura="md" focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+  return <Modal titulo={titulo} largura={ehFicha ? 'lg' : 'md'} focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
     {/* #2871: o pedido que o cliente fez pelo WhatsApp pessoal da dona nasce na conversa dele, no Atendimento. */}
-    {novoPedido && id && emAtividadeCadastro(dados) && <Botao icone="mais" disabled={salvando || alterado || Boolean(novoPedido.abrindo || novoPedido.motivo)} motivo={novoPedido.motivo ?? 'Salve ou descarte as alterações antes de registrar um pedido.'} onClick={() => novoPedido.iniciar(id)}>{novoPedido.abrindo ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}
+    {/* #3249: na ficha em leitura, o Novo pedido é a ação principal; com o formulário aberto, é o Salvar. */}
+    {novoPedido && id && emAtividadeCadastro(dados) && <Botao icone="mais" variante={formularioAberto ? undefined : 'primario'} disabled={salvando || alterado || Boolean(novoPedido.abrindo || novoPedido.motivo)} motivo={novoPedido.motivo ?? 'Salve ou descarte as alterações antes de registrar um pedido.'} onClick={() => novoPedido.iniciar(id)}>{novoPedido.abrindo ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}
     <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar && formularioAberto ? 'Cancelar' : 'Fechar'}</Botao>
     {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado || Boolean(erroDoEmailNaTela || erroDoDocumentoNaTela)} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : erroDoEmailNaTela ? 'Corrija o e-mail para salvar.' : erroDoDocumentoNaTela ? 'Corrija o documento para salvar.' : !alterado ? id ? 'Nada mudou para salvar.' : motivoDoCadastroVazio(tela) : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
@@ -223,9 +225,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     </section>}
     {editor.reconferido && !editor.conflito && <p role="status">Versão atual conferida. Revise os campos e use Salvar cadastro para confirmar sua edição.</p>}
     {editor.semConfirmacao && <div className={css.erro} role="alert"><p>A resposta não chegou. O cadastro pode ter sido salvo. Feche e confira a lista antes de criar outro.</p></div>}
-    {ehFicha && <ResumoDoCliente key={`resumo:${id}`} dados={dados} relacionamento={relacionamento.dados} carregando={relacionamento.carregando && !relacionamento.dados}
+    {/* #3249: a ficha é um perfil em duas colunas, o cartão do cliente à esquerda e o resto à direita; os alertas acima
+        ficam em largura total. Fora da ficha (cliente novo, produto, fornecedor, conta) os invólucros somem. */}
+    <div className={ehFicha ? perfil.perfil : perfil.semColunas}>
+    {ehFicha && <div className={perfil.colunaCartao}><ResumoDoCliente key={`resumo:${id}`} dados={dados} relacionamento={relacionamento.dados} carregando={relacionamento.carregando && !relacionamento.dados}
       editando={formularioAberto} aoEditar={podeEditar ? abrirFormulario : undefined}
-      aoMudarFoto={podeEditar ? () => { relacionamento.recarregar(); aoGravarRelacionamento?.() } : undefined} />}
+      aoMudarFoto={podeEditar ? () => { relacionamento.recarregar(); aoGravarRelacionamento?.() } : undefined} /></div>}
+    <div className={ehFicha ? perfil.colunaConteudo : perfil.semColunas}>
     {/* #2849: o que só a tela que abriu sabe (no Atendimento: apontamentos, avisos, endereço da conversa). */}
     {ehFicha && complemento}
     {/* `key`: o atalho por endereço troca a pessoa sem desmontar o editor; modal, aviso e notas abertas não passam adiante. */}
@@ -280,6 +286,9 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     </form>
     {comRelacionamento && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento}
       relacionamento={relacionamento.dados} carregandoRelacionamento={relacionamento.carregando && !relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
+    {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
+    </div>
+    </div>
     {atividade && <Modal titulo={atividade.titulo} aoFechar={alternando ? undefined : () => confirmarAtividade(null)} segurarFechamento={alternando}
       rodape={<><Botao disabled={alternando} onClick={() => confirmarAtividade(null)}>Cancelar</Botao><Botao variante={atividade.ativar ? 'primario' : 'perigo'} disabled={alternando} onClick={concluirAtividade}>{alternando ? atividade.ativar ? 'Reativando…' : 'Inativando…' : atividade.botao}</Botao></>}>
       <p>{atividade.texto}</p>
@@ -289,6 +298,5 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       rodape={<><Botao onClick={() => confirmarAbrirOutro(null)}>Continuar aqui</Botao><Botao variante="primario" onClick={() => aoAbrirCadastro(abrirOutro)}>Abrir cadastro</Botao></>}>
       <p>O que você digitou aqui não será salvo.</p>
     </Modal>}
-    {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
   </Modal>
 }
