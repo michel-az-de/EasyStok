@@ -110,9 +110,10 @@ public static partial class GuardaRespostaAgente
     private static partial Regex Encaminhamento();
 
     // #2516: "a dona vai combinar com você a entrega e o frete" sem escalar_para_dona. #3278: o nome da dona vem da configuração
-    // da loja (AcaoDaEquipeDe); aqui só os papéis.
+    // da loja (AcaoDaEquipeDe); aqui os papéis. "baba" fica porque é a marca da Casa da Baba e o modelo a usa como sujeito
+    // ("a Baba vai combinar...", frase real da #2516) mesmo com NomeDona vazio ou diferente.
     private const string Acoes = "combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar";
-    private const string PapeisDaEquipe = "dona|equipe|responsavel|atendente|ela";
+    private const string PapeisDaEquipe = "dona|equipe|responsavel|atendente|ela|baba";
     private const string VerboDaAcao = @"\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(" + Acoes + @")\b";
 
     [GeneratedRegex(@"\b(" + PapeisDaEquipe + @")\b.{0,20}" + VerboDaAcao)]
@@ -144,7 +145,7 @@ public static partial class GuardaRespostaAgente
         var nome = string.Join(' ', SemAcento(nomeDaDona).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         var nomes = new List<string> { nome };
         var primeiro = nome.Split(' ')[0];
-        if (primeiro.Length >= 3 && primeiro != nome) nomes.Add(primeiro);
+        if (primeiro.Length >= 2 && primeiro != nome) nomes.Add(primeiro);
         return nomes;
     }
 

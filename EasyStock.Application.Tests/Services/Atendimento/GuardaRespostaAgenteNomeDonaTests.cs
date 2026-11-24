@@ -11,12 +11,13 @@ public class GuardaRespostaAgenteNomeDonaTests
         GuardaRespostaAgente.Avaliar(texto, [], Ferramentas, nomeDaDona);
 
     [Theory]
-    [InlineData("Baba", "Faço por aqui sim, a Baba vai combinar com você a entrega e o frete.")]
+    [InlineData("Michele", "Faço por aqui sim, a Baba vai combinar com você a entrega e o frete.")]
     [InlineData("Fulana", "A Fulana vai combinar com você a entrega.")]
     [InlineData("Maria Silva", "A Maria Silva vai te chamar para acertar a entrega.")]
     [InlineData("Maria Silva", "A Maria vai te chamar para acertar a entrega.")]
     [InlineData("Júlia", "A JULIA vai ligar para confirmar o horário.")]
     [InlineData("Zé", "O Zé vai entrar em contato com você.")]
+    [InlineData("Zé Carlos", "O Zé vai te chamar.")]
     public void PromessaComONomeDaDonaConfiguradaEBarrada(string nome, string texto) =>
         Avaliar(texto, nome).Should().Be("promete encaminhamento sem acionar a equipe");
 
@@ -30,8 +31,8 @@ public class GuardaRespostaAgenteNomeDonaTests
     [Fact]
     public void NomeNaoConfiguradoNaoEBarrado()
     {
-        // O nome é o da loja. A guarda não adivinha o de outra: só os papéis (dona, equipe, responsável, atendente, ela).
-        Avaliar("A Baba vai combinar com você a entrega.", "Fulana").Should().BeNull();
+        // O nome é o da loja. A guarda não adivinha o de outra: só os papéis (dona, equipe, responsável, atendente, ela, baba).
+        Avaliar("A Beltrana vai combinar com você a entrega.", "Fulana").Should().BeNull();
         Avaliar("A Fulana vai combinar com você a entrega.", null).Should().BeNull();
     }
 
@@ -54,9 +55,9 @@ public class GuardaRespostaAgenteNomeDonaTests
     [InlineData("a|b")]
     public void NomeComCaractereDeRegexNaoQuebraENaoCasaTudo(string nome)
     {
-        var act = () => Avaliar("Oi! Me conta o que você quer pedir hoje.", nome);
+        var act = () => Avaliar("O bolo vai combinar com o café.", nome);
 
         act.Should().NotThrow();
-        Avaliar("Oi! Me conta o que você quer pedir hoje.", nome).Should().BeNull();
+        Avaliar("O bolo vai combinar com o café.", nome).Should().BeNull();
     }
 }
