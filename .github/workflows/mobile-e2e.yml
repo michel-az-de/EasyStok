@@ -59,10 +59,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # O jar é imutável e fixado por sha256: o cache poupa o Maven Central, que limita a taxa com 429 (#3261).
+      - name: Cache do org.json do harness nativo
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/json-20231013.jar
+          key: org-json-20231013-0f18192d
+
       - name: Baixar org.json do harness nativo
+        timeout-minutes: 5
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/json-20231013.jar" https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar
-          echo "0f18192df289114e17aa1a0d0a7f8372cc9f5c7e4f7e39adcf8906fe714fa7d3  $RUNNER_TEMP/json-20231013.jar" | sha256sum -c -
+          JAR="$RUNNER_TEMP/json-20231013.jar"
+          # Só baixa sem cache. Repete no 429 com teto de tempo; Retry-After acima do teto desiste na hora.
+          [ -f "$JAR" ] || curl -fSL --no-progress-meter --connect-timeout 10 --max-time 60 \
+            --retry 5 --retry-delay 10 --retry-max-time 120 -o "$JAR" \
+            https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar
+          echo "0f18192df289114e17aa1a0d0a7f8372cc9f5c7e4f7e39adcf8906fe714fa7d3  $JAR" | sha256sum -c -
 
       - name: Testes nativos do atualizador
         shell: pwsh
