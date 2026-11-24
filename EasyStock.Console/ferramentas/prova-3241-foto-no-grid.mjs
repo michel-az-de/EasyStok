@@ -18,14 +18,14 @@ const clientes = Array.from({ length: 60 }, (_, i) => {
 })
 const browser = await chromium.launch({ headless: true })
 const erros = []
-const fotosBaixadas = []
 
+// Cada largura roda em paralelo (contexto próprio), então cada uma guarda as próprias fotos baixadas.
 async function preparar(largura) {
+  const fotosBaixadas = []
   const movel = largura < 700
   const contexto = await browser.newContext({ viewport: { width: largura, height: movel ? 844 : 1080 }, isMobile: movel, hasTouch: movel, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' })
   await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja' }, usuario: { id: 'dona', nome: 'Dona de teste' } })))
   const acoes = Object.fromEntries(['verPedidos', 'atenderConversas', 'editarAtendimento', 'verCadastrosClientes', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros'].map((n) => [n, true]))
-  fotosBaixadas.length = 0
   await contexto.route('**/api/**', async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname
     const ok = (data, extra = {}) => route.fulfill({ json: { data, ...extra } })
@@ -43,7 +43,7 @@ async function preparar(largura) {
   page.on('pageerror', (e) => erros.push(e.message))
   await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
   await page.getByText('Cliente Ficticio 01', { exact: true }).waitFor()
-  return { contexto, page }
+  return { contexto, page, fotosBaixadas }
 }
 const linha = (page, n) => page.locator('tbody tr').filter({ hasText: `Cliente Ficticio ${String(n).padStart(2, '0')}` })
 const falhas = []
@@ -51,9 +51,9 @@ const item = async (nome, corpo) => {
   try { await corpo(); console.log(`ok    ${nome}`) } catch (e) { const motivo = e.message.split('\n').slice(0, 4).join(' | '); falhas.push(`${nome}: ${motivo}`); console.log(`FALHA ${nome}: ${motivo}`) }
 }
 
-for (const largura of [1920, 1440, 390]) {
-  await item(`${largura}: foto na linha com fotoUrl, iniciais na sem foto, carga só da linha visível`, async () => {
-    const { contexto, page } = await preparar(largura)
+await Promise.all([1920, 1440, 390].map((largura) =>
+  item(`${largura}: foto na linha com fotoUrl, iniciais na sem foto, carga só da linha visível`, async () => {
+    const { contexto, page, fotosBaixadas } = await preparar(largura)
     const foto = linha(page, 1).locator('img[alt="Foto de Cliente Ficticio 01"]')
     await foto.waitFor()
     await page.waitForFunction(() => { const i = document.querySelector('tbody tr img'); return i && i.complete && i.naturalWidth > 0 })
@@ -72,8 +72,7 @@ for (const largura of [1920, 1440, 390]) {
     await page.locator('tbody tr').filter({ hasText: 'Cliente Ficticio 60' }).locator('img[alt="Foto de Cliente Ficticio 60"]').waitFor()
     assert.ok(fotosBaixadas.includes(idDe(60)), 'a linha 60 baixou ao chegar')
     await contexto.close()
-  })
-}
+  })))
 await browser.close()
 if (erros.length) falhas.push(`erros de página: ${erros.slice(0, 3).join(' | ')}`)
 if (falhas.length) { console.log(`\n${falhas.length} falha(s)`); process.exit(1) }
