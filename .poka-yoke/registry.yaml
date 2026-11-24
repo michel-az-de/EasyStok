@@ -124,8 +124,8 @@ ci_gates:
     - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt) e job proprio de Api.IntegrationTests (#1890). Gate de merge.
     - console.yml     # qualidade + provas node do console. Gate.
     - secret-scan.yml # gitleaks. Gate.
-    - codeql.yml      # CodeQL C#. Gate.
     - build-images.yml # imagens GHCR no push do master.
   quarantined:        # tirados do gatilho por-commit
     - coverage.yml      # gatilho -> schedule + workflow_dispatch (#1890 tirou os 32 vermelhos de Api.IntegrationTests)
+    - codeql.yml        # gatilho -> schedule + workflow_dispatch (#3277: 39% dos minutos do CI)
   red_remaining: []   # deploy-render.yml e deploy-fly.yml removidos em #1890: Render e Fly desligados
