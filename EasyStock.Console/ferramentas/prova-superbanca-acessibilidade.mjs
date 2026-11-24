@@ -362,6 +362,18 @@ provar('Alça: outro ponteiro não move ou encerra o arrasto ativo', () => {
   emitir('pointermove', { pointerId: 1, clientX: 116 })
   assert.deepEqual(valores, [336]); m.desmontar()
 })
+// #3265: as colunas do Balcão e da Ficha passam `aoRestaurar`. Enter e duplo clique desfazem a escolha, sem gravar o
+// padrão da tela de agora; o Enter continua sem rolar a página.
+provar('Alça: com aoRestaurar, Enter e duplo clique só restauram, sem gravar o padrão', () => {
+  const valores = [], restauros = []
+  const m = montar(AlcaLargura, { ...propsAlca(valor => valores.push(valor)), aoRestaurar: () => restauros.push('restaurar') })
+  const evento = tecla('Enter', origem)
+  m.elemento.props.onKeyDown(evento)
+  m.elemento.props.onDoubleClick()
+  assert.deepEqual(restauros, ['restaurar', 'restaurar']); assert.deepEqual(valores, []); assert.equal(evento.prevenido, true)
+  m.elemento.props.onKeyDown(tecla('ArrowRight', origem))
+  assert.deepEqual(valores, [336], 'as setas continuam gravando a largura')
+})
 provar('Alça: setas invertidas, Shift, Home/End e reset respeitam limites', () => {
   const valores = [], m = montar(AlcaLargura, { ...propsAlca(valor => valores.push(valor)), invertida: true, padrao: 500 })
   for (const [key, shiftKey] of [['ArrowRight', false], ['ArrowLeft', true], ['Home', false], ['End', false], ['Enter', false]]) m.elemento.props.onKeyDown(tecla(key, origem, { shiftKey }))

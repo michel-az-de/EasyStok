@@ -164,7 +164,7 @@ Decisões da B1 (C6):
 
 - Em 1920 px a conversa tinha 1176 px, e o balão do cliente ficava a 1128 px do balão da loja. Agora a coluna da conversa para em 880 px. A sobra vai, em partes iguais, para a lista e para a ficha, até o máximo de cada alça (480 e 520). Em 1920 fica 450, 880 e 490.
 - A regra é contínua. A #1697 dava um salto em 1700 px, e entre 1600 e 1699 a conversa passava de 880. Agora a conversa cresce com a tela até cerca de 1570 px e para ali. Abaixo disso nada muda, então 1280 e 1440 ficam iguais.
-- A thread tem `max-width` de 880 px, centrada. Ela segura a leitura quando a atendente arrastou as alças para mais estreito, quando restaurou o padrão por Enter ou duplo clique (isso grava o padrão como escolha) e acima de cerca de 1980 px, onde as alças já chegaram ao máximo. A largura que a atendente escolheu continua valendo.
+- A thread tem `max-width` de 880 px, centrada. Ela segura a leitura quando a atendente arrastou as alças para mais estreito e acima de cerca de 1980 px, onde as alças já chegaram ao máximo. A largura que a atendente escolheu continua valendo.
 - O campo de escrever segue a mesma largura do fio. Sem isso, em 2560 o campo ocupava 1460 px, abaixo de um fio de 880.
 - Revisão da PR: Enter, duplo clique na alça e "Restaurar disposição" gravavam o padrão da tela atual como escolha. Como o padrão agora muda com a tela, restaurar em 1920 levava o 450/490 para o notebook, e a conversa ficava com 326 px em 1366. Agora restaurar desfaz a escolha e a coluna volta a acompanhar a tela. Arrastar até o valor do padrão continua sendo escolha.
 - O C6 deixa 296 px a menos para o cabeçalho em 1920, e é com essa largura que o B6 (C5) vai medir.
