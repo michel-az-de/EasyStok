@@ -417,3 +417,6 @@ EasyStock.Console/ferramentas/*.generated.html
 
 # Saida de build local (nuget obj) que nao e versionada
 .build/
+
+# Resultados do eval do agente (#3275)
+scripts/homologacao/eval/resultados/

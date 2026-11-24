@@ -14,6 +14,19 @@ Simula clientes reais contra uma API local isolada e mede a aderência do atendi
 
 Pré-requisitos: Docker, Python 3.12, o segredo de teste do app da Meta em `~/.easystok/meta-appsecret-teste-local` e a chave do modelo em `FW_KEY`. Suba o Worker junto (sem ele o outbox não anda). O agente é estocástico: para aceite, repita 5 rodadas.
 
+## Eval do agente (#3275)
+
+`eval_agente.py` é o portão de mudança do agente de atendimento: roda os casos de `eval/casos.json` k vezes (padrão 3) contra a bancada, avalia cada rodada com asserção determinística (ferramenta chamada ou proibida, desfecho do turno, texto proibido, nenhuma falha técnica como `falha_llm` ou `teto_saida`) e grava o resultado em `eval/resultados/` (fora do Git). Sai com 0 só se todo caso chegou ao mínimo de aprovação (0,8 por padrão). Mede também a entrada por turno (mediana e máximo, cache incluído), que é a medição que a revisão #3271 pediu antes de mexer na janela de contexto.
+
+**Rode antes de trocar modelo, prompt, ferramenta, guarda ou limite** e anexe o resultado à PR. Virar regra de processo depende da ADR que substitui a 0065 (#3271, seção 6).
+
+```powershell
+python -I scripts/homologacao/teste_eval_agente.py        # núcleo, sem Docker nem chave
+python scripts/homologacao/eval_agente.py --k 5            # contra a bancada (pré-requisitos acima)
+```
+
+Os casos nascem das linhas "P" de `matriz.py` (RC02, RC05, RC08, AG02, AG03, AG06). Na primeira execução com a bancada, calibre o mínimo e acrescente casos pelo mesmo formato: `falas` e `espera` com `ferramentas_chamadas`, `ferramentas_proibidas`, `desfecho_final` (`Respondeu`, `Escalou`) e `textos_proibidos`. O núcleo (`eval/nucleo.py`) não depende de Docker e é o que o teste cobre.
+
 ## Jornada pedido a dinheiro (#1889)
 
 Com o `laboratorio.ps1` no ar numa pasta nova, `python -I scripts/homologacao/jornada_pedido_a_dinheiro.py` percorre a versão 1.11.0 por HTTP: agente desligado por padrão, loja e caixa abertos, três clientes pelo chat do site cadastrados pela conversa, prévia igual ao pedido, link pago pelo Mercado Pago falso e baixado pelo webhook, maquininha e dinheiro na entrega, Cozinha até entregue e fechamento com a gaveta só com dinheiro (`dinheiroNaGaveta` em `GET /api/caixa/fechamentos`). Cria uma janela à noite no dia corrente porque o prazo mínimo de 100 minutos tira as janelas próximas. Fecha o caixa do dia: uma execução por base.
