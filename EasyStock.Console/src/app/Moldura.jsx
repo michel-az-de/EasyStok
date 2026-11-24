@@ -3,7 +3,7 @@ import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
 import { trocarTema, useTema } from '../hooks/useTema'
-import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
+import { balcaoComCardapio, fichaComCardapio, MAXIMO } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { BotaoIcone } from '../componentes/BotaoIcone'
@@ -217,7 +217,7 @@ function Cabecalho({
 // controles, os mesmos handlers; Balcão é a tela atual, não um botão.
 // #2762: ícone próprio (Gestão já usa `painel`) e camada de 300 px medida pelo Popover (`abaixo`): presa
 // ao gatilho de 76 px ela abria como faixa de 45 px, com os controles cortados.
-function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
+function DisposicaoConversas({ larguras, aoRedimensionar }) {
   const [aberto, setAberto] = useState(false)
   return <span className={css.disposicao}>
     <Botao variante="texto" className={css.itemTrilho} aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto(!aberto)}>
@@ -227,12 +227,13 @@ function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
       <div className={css.ajusteDisposicao}>
         <strong>Seu espaço de trabalho</strong>
         <label>Conversas <output>{larguras.balcao} px</output>
-          <input aria-label="Largura de Conversas" type="range" min="244" max="480" step="1" value={larguras.balcao} onChange={e => aoRedimensionar('balcao', Number(e.target.value))} />
+          <input aria-label="Largura de Conversas" type="range" min="244" max={MAXIMO.balcao} step="1" value={larguras.balcao} onChange={e => aoRedimensionar('balcao', Number(e.target.value))} />
         </label>
         <label>Ficha <output>{larguras.ficha} px</output>
-          <input aria-label="Largura da ficha" type="range" min="292" max="520" step="1" value={larguras.ficha} onChange={e => aoRedimensionar('ficha', Number(e.target.value))} />
+          <input aria-label="Largura da ficha" type="range" min="292" max={MAXIMO.ficha} step="1" value={larguras.ficha} onChange={e => aoRedimensionar('ficha', Number(e.target.value))} />
         </label>
-        <Botao variante="texto" onClick={() => { aoRedimensionar('balcao', padrao.balcao); aoRedimensionar('ficha', padrao.ficha) }}>Restaurar disposição</Botao>
+        {/* #3265: restaurar desfaz a escolha; a coluna volta a acompanhar a tela (o padrão muda com ela). */}
+        <Botao variante="texto" onClick={() => { aoRedimensionar('balcao', null); aoRedimensionar('ficha', null) }}>Restaurar disposição</Botao>
         <small>Guardado neste aparelho. Você também pode arrastar as divisórias.</small>
       </div>
     </Popover>}
@@ -515,7 +516,7 @@ function ConteudoMoldura({
           aoAlternarSimulacoes={aoAlternarSimulacoes}
           atendente={atendente}
           aoAbrirAjuda={aoAbrirAjuda}
-          disposicao={<DisposicaoConversas larguras={larguras} padrao={largurasPadrao} aoRedimensionar={aoRedimensionar} />}
+          disposicao={<DisposicaoConversas larguras={larguras} aoRedimensionar={aoRedimensionar} />}
         />
         <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
@@ -527,19 +528,21 @@ function ConteudoMoldura({
             rotulo="Redimensionar Conversas"
             valor={larguras.balcao}
             min={244}
-            max={480}
+            max={MAXIMO.balcao}
             padrao={largurasPadrao.balcao}
             aoMudar={(valor) => aoRedimensionar('balcao', valor)}
+            aoRestaurar={() => aoRedimensionar('balcao', null)}
           />
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           <AlcaLargura
             rotulo="Redimensionar ficha"
             valor={larguras.ficha}
             min={292}
-            max={520}
+            max={MAXIMO.ficha}
             padrao={largurasPadrao.ficha}
             invertida
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
+            aoRestaurar={() => aoRedimensionar('ficha', null)}
           />
           <Coluna variante="ficha" titulo="Ficha" semTitulo>
             <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} {...solicitacaoDaFicha} /></LimiteDeErro></div>

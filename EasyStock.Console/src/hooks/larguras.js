@@ -12,13 +12,24 @@ export const PADRAO = { balcao: 276, ficha: 316, cardapio: 460 }
 const PADRAO_ANTERIOR = { balcao: 360, ficha: 420, cardapio: 460 }
 
 const NOTEBOOK = 1400
-const TELA_LARGA = 1700
+// #3265 (C6) revê a tela larga da #1697, que dava a sobra à conversa: em 1920 ela ficava com 1176 px e o balão do
+// cliente a ~1.130 px do da loja. A conversa para na largura de leitura e a sobra vai, metade para cada lado, ao
+// Balcão e à Ficha até o máximo das alças (`Moldura.jsx`). Acima disso (~1980 px), o `max-width` da thread segura.
+export const LEITURA = 880
+export const MAXIMO = { balcao: 480, ficha: 520 }
+// Trilho e as duas alças da moldura de três colunas (`dominio/paineis.js`: TRILHO + 2 * VAO; `.palcoTres` não tem
+// padding). Hooks não importam do domínio (`verificar-camadas.mjs`); a `prova-1697` confere que é o mesmo número.
+export const TRILHO_E_VAOS = 100
 
 export function padraoPorTela(larguraDaTela) {
   if (larguraDaTela < NOTEBOOK) return { ...PADRAO, balcao: 260, ficha: 292 }
-  // Em tela larga, a conversa recebe a maior parte do espaço adicional.
-  if (larguraDaTela >= TELA_LARGA) return { ...PADRAO, balcao: 304, ficha: 340 }
-  return { ...PADRAO }
+  const conversa = larguraDaTela - TRILHO_E_VAOS - PADRAO.balcao - PADRAO.ficha
+  const sobra = Math.max(0, conversa - LEITURA)
+  return {
+    ...PADRAO,
+    balcao: Math.min(MAXIMO.balcao, PADRAO.balcao + Math.floor(sobra / 2)),
+    ficha: Math.min(MAXIMO.ficha, PADRAO.ficha + Math.ceil(sobra / 2)),
+  }
 }
 
 // A versão atual guarda apenas escolhas explícitas, inclusive o valor de um padrão anterior.
@@ -42,3 +53,12 @@ export const balcaoComCardapio = ({ balcao, cardapio }) => Math.max(balcao, Math
 export const fichaComCardapio = ({ ficha, cardapio }) => Math.max(ficha, Math.max(cardapio, 440) - 12)
 
 export const largurasDaTela = (escolhidas, larguraDaTela) => ({ ...padraoPorTela(larguraDaTela), ...escolhidas })
+
+// #3265 (revisão da PR #3266): `null` é restaurar. A escolha sai e a coluna volta a acompanhar a tela; gravar o
+// padrão da tela de agora levava o 450/490 de 1920 para o notebook. Arrastar, mesmo até o padrão, é escolha.
+export function escolher(escolhidas, chave, valor) {
+  const novo = { ...escolhidas }
+  if (valor == null) delete novo[chave]
+  else novo[chave] = valor
+  return novo
+}

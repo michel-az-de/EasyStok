@@ -155,3 +155,17 @@ Por que a A3 (C5) foi para o grupo B:
 - O selo no cabeçalho não cabe ao lado do Assistente e do menu sem quebrar a linha "WhatsApp · Janela aberta por…", que a A1 deixou numa linha só. Com o painel do cliente aberto, o cabeçalho da conversa tem 580 px em 1280 e 740 px em 1440 (812 px na produção, em 1912).
 - Selo e "Assumir conversa" juntos quebram a linha nessas larguras. Só o selo, sem o Assumir, ainda quebra em 1280 com o cliente aberto e em 1440 com nome longo e comanda: o cabeçalho passa de 64 para 77 px.
 - O ganho só aparece com a coluna larga (1920, ou o cliente fechado), e não no uso comum. A saída depende de como o grupo B redistribui a largura entre a lista, a conversa e o cartão do cliente. Duas opções para levar ao B: o cabeçalho em duas linhas ou o botão do Assistente só com o ícone.
+
+## Execução do grupo B (#3265)
+
+A revisão do plano dividiu o grupo B em seis PRs, em série: B1 (C6), B2 (R1 e R2), B3 (R3), B4 (R4), B5 (R5) e B6 (C5). B2 e B4 mexem nas mesmas linhas do cartão, e o B6 mede o cabeçalho com as larguras que o B1 fixa.
+
+Decisões da B1 (C6):
+
+- Em 1920 px a conversa tinha 1176 px, e o balão do cliente ficava a 1128 px do balão da loja. Agora a coluna da conversa para em 880 px. A sobra vai, em partes iguais, para a lista e para a ficha, até o máximo de cada alça (480 e 520). Em 1920 fica 450, 880 e 490.
+- A regra é contínua. A #1697 dava um salto em 1700 px, e entre 1600 e 1699 a conversa passava de 880. Agora a conversa cresce com a tela até cerca de 1570 px e para ali. Abaixo disso nada muda, então 1280 e 1440 ficam iguais.
+- A thread tem `max-width` de 880 px, centrada. Ela segura a leitura quando a atendente arrastou as alças para mais estreito e acima de cerca de 1980 px, onde as alças já chegaram ao máximo. A largura que a atendente escolheu continua valendo.
+- O campo de escrever segue a mesma largura do fio. Sem isso, em 2560 o campo ocupava 1460 px, abaixo de um fio de 880.
+- Revisão da PR: Enter, duplo clique na alça e "Restaurar disposição" gravavam o padrão da tela atual como escolha. Como o padrão agora muda com a tela, restaurar em 1920 levava o 450/490 para o notebook, e a conversa ficava com 326 px em 1366. Agora restaurar desfaz a escolha e a coluna volta a acompanhar a tela. Arrastar até o valor do padrão continua sendo escolha.
+- O C6 deixa 296 px a menos para o cabeçalho em 1920, e é com essa largura que o B6 (C5) vai medir.
+- Os prints de antes e depois, tirados do harness da prova-2185 com a conversa de demonstração "Cliente auto", estão em `critica-atendimento-3234/b1/`. Em 1920, a lista mais larga passa a mostrar os selos "Só modelo" e "Contato", que antes eram cortados.

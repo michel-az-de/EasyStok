@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { escolhidasDoSalvo, largurasDaTela, migrarLargurasAntigas, padraoPorTela } from './larguras'
+import { escolher, escolhidasDoSalvo, largurasDaTela, migrarLargurasAntigas, padraoPorTela } from './larguras'
 
 // Largura das colunas Balcão e Ficha, e do painel do cardápio (seção 9 da
 // direção visual). Uma chave só no localStorage para as três, lida e escrita
@@ -45,7 +45,7 @@ export function useLarguras() {
 
   const definir = useCallback((chave, valor) => {
     setEscolhidas((atual) => {
-      const novo = { ...atual, [chave]: valor }
+      const novo = escolher(atual, chave, valor)
       gravar(novo)
       return novo
     })

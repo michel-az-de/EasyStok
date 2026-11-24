@@ -10,11 +10,13 @@ const limitar = (valor, min, max) => Math.min(max, Math.max(min, valor))
 // ponteiro, setas pelo teclado, Home/End nos limites, duplo clique volta ao
 // padrão. `invertida` é para a coluna que cresce para a ESQUERDA (Ficha e o
 // painel do cardápio, ancorados à direita): arrastar o ponteiro para a
-// esquerda aumenta a largura, não diminui.
+// esquerda aumenta a largura, não diminui. `aoRestaurar` (opcional) troca o "grave o padrão" de Enter e do duplo
+// clique por "desfaça a escolha" (#3265: o padrão das colunas muda com a tela).
 export function AlcaLargura({
-  rotulo, valor, min, max, padrao, invertida = false, aoMudar,
+  rotulo, valor, min, max, padrao, invertida = false, aoMudar, aoRestaurar,
 }) {
   const id = useId()
+  const restaurar = () => (aoRestaurar ? aoRestaurar() : aoMudar(limitar(padrao, min, max)))
   const limparArrasto = useRef(null)
   useEffect(() => () => limparArrasto.current?.(), [])
 
@@ -67,7 +69,7 @@ export function AlcaLargura({
     } else if (evento.key === 'End') {
       aoMudar(max)
     } else if (evento.key === 'Enter') {
-      aoMudar(limitar(padrao, min, max))
+      restaurar()
     } else {
       return
     }
@@ -88,7 +90,7 @@ export function AlcaLargura({
       tabIndex={0}
       onPointerDown={aoDescerPonteiro}
       onKeyDown={aoTeclar}
-      onDoubleClick={() => aoMudar(limitar(padrao, min, max))}
+      onDoubleClick={restaurar}
     >
       <span className={css.linha} />
       <span className="sr" id={`${id}-instrucoes`}>Use as setas esquerda e direita para ajustar. Shift ajusta mais. Home e End vão aos limites. Enter restaura a largura padrão.</span>
