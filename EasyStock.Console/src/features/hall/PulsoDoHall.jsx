@@ -38,8 +38,8 @@ function Indicador({ item, movimentos, podeFecharCaixa }) {
     if (visto.current !== null && item.valor !== null && visto.current !== item.valor) setMudancas((n) => n + 1)
     visto.current = item.valor
   }, [item.valor])
-  // #2792: sem leitura, nada de travessão; o texto fica só para o leitor de tela.
-  const valor = item.valor === null ? <span className={css.oculto}>Sem leitura</span>
+  // #2792: sem leitura, nada de travessão. #2810: a frase fica na tela, menor que o número.
+  const valor = item.valor === null ? <span className={css.semLeitura}>Sem leitura</span>
     : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
   // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
   const aviso = item.estado === 'erro'

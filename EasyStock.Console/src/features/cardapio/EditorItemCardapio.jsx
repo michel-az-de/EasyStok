@@ -12,6 +12,7 @@ import { catalogoDeAdicionais } from '../../dominio/cardapio'
 import { fotoDoItem } from '../../dominio/vitrineCardapio'
 import { lerMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
 import { algumPassaDoLimite, erroDoLimite } from '../../componentes/limiteDoCampo'
+import { AnuncioDoLimite } from '../../componentes/Campo'
 import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
 import { EditorPorcoes } from './EditorPorcoes'
 import { porcoesPassamDoLimite } from './limitesDaPorcao'
@@ -19,6 +20,8 @@ import { EscolherFotoDoAcervo } from './EscolherFotoDoAcervo'
 import css from './editorItem.module.css'
 
 const VAZIA = { descricao: '', ingredientes: '', alergenos: '', preparo: '', instrucao: '' }
+// #2810: o mesmo teto do servidor (CardapioItem.LimiteNome).
+const LIMITE_NOME_DO_PRATO = 150
 const dataDoIso = (iso) => iso?.slice(0, 10) ?? ''
 const camposDe = (d) => ({ descricao: d.descricao, ingredientes: d.ingredientes, alergenos: d.alergenos,
   preparo: d.tempoPreparoMinutos == null ? '' : String(d.tempoPreparoMinutos), instrucao: d.instrucaoFinalizacao })
@@ -38,7 +41,8 @@ function CampoDaFicha({ rotulo, dica, limite, children }) {
       <label htmlFor={id}>{rotulo}</label>
       {cloneElement(children, { id, 'aria-describedby': descricao, 'aria-invalid': passou ? true : undefined })}
       {dica && <small id={idDaDica}>{dica}</small>}
-      {passou && <small id={idDoLimite} className={css.limite} role="status">{passou}</small>}
+      {passou && <small id={idDoLimite} className={css.limite}>{passou}</small>}
+      {limite != null && <AnuncioDoLimite limite={limite} passou={Boolean(passou)} />}
     </div>
   )
 }
@@ -186,7 +190,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
   }
 
   // #2792: algum campo de texto passa do limite: o aviso fica no campo e o Salvar trava.
-  const textoPassaDoLimite = algumPassaDoLimite([nome, 200], [ficha.descricao, 240], [ficha.ingredientes, 500], [ficha.alergenos, 200],
+  const textoPassaDoLimite = algumPassaDoLimite([nome, LIMITE_NOME_DO_PRATO], [ficha.descricao, 240], [ficha.ingredientes, 500], [ficha.alergenos, 200],
     ...(linha === 'casa' ? [[ficha.instrucao, 500]] : [])) || porcoesPassamDoLimite(porcoes)
   async function salvar(evento) {
     evento.preventDefault()
@@ -277,7 +281,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
-              <CampoDaFicha rotulo="Nome do prato" limite={200}><input required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Nome do prato" limite={LIMITE_NOME_DO_PRATO}><input required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></CampoDaFicha>
               <CampoDaFicha rotulo="Descrição para o cliente" dica="Até 240 caracteres. Conte o que o cliente vai receber." limite={240}><textarea rows={3} value={ficha.descricao} onChange={mudarFicha('descricao')} placeholder="O que faz este prato especial?" /></CampoDaFicha>
               <div className={css.dupla}>
                 <CampoDaFicha rotulo="Linha de produto"><select value={linha} onChange={(e) => setLinha(e.target.value)}>{Object.entries(linhas).map(([chave, l]) => <option key={chave} value={chave}>{l.rotulo}</option>)}</select></CampoDaFicha>

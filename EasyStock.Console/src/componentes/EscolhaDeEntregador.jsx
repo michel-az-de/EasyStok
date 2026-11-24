@@ -5,7 +5,7 @@ import { CampoSelecao, CampoTexto } from './Campo'
 import css from './EscolhaDeEntregador.module.css'
 
 // #2792: teto da placa no servidor, sem `maxLength` (cortava em silêncio). Componente não importa `dominio`: a conta é só o tamanho.
-const LIMITE_PLACA = 8
+const LIMITE_PLACA = 10
 
 // US-040: pergunta quem leva só quando o despacho ainda não sabe (ficha,
 // cozinha ou o cartão solto de Entregas; `dominio/viagem.js:

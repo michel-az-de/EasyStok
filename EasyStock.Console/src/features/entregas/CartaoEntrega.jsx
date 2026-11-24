@@ -26,7 +26,6 @@ const corPeloMinuto = (minutos) => {
 }
 
 const rotuloMinutos = (minutos) => {
-  if (minutos == null) return '' // #2792: sem travessão; o aria-label do anel diz "Sem janela escolhida"
   if (minutos < 0) return '+' + Math.min(Math.abs(Math.round(minutos)), 99)
   // #2237: acima de 99 min, as horas inteiras que faltam, para baixo (nunca promete tempo a mais).
   if (minutos > 99) return Math.floor(minutos / 60) + ' h'
@@ -85,13 +84,15 @@ export function CartaoEntrega({
         />
         {passo && (
           <Anel tamanho={44} traco={5} fracao={Math.max(0, Math.min(1, minutos / 60))} tom={corPeloMinuto(minutos)}>
-            <span
-              className={css.anelNumero} role="timer"
-              aria-label={minutos == null ? 'Sem janela escolhida'
-                : minutos < 0 ? `Atrasado ${Math.round(-minutos)} minutos` : `Próximo marco em ${Math.round(minutos)} minutos`}
-            >
-              {rotuloMinutos(minutos)}
-            </span>
+            {/* #2810: sem janela, "Sem hora" na tela, no lugar do anel em branco. */}
+            {minutos == null ? <span className={css.anelSemHora}>Sem hora</span> : (
+              <span
+                className={css.anelNumero} role="timer"
+                aria-label={minutos < 0 ? `Atrasado ${Math.round(-minutos)} minutos` : `Próximo marco em ${Math.round(minutos)} minutos`}
+              >
+                {rotuloMinutos(minutos)}
+              </span>
+            )}
           </Anel>
         )}
         {/* #2762: nome e estado no mesmo bloco, o estado embaixo do nome sem recuo calculado. */}

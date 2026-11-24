@@ -6,6 +6,7 @@ import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { algumPassaDoLimite, erroDoLimite } from '../../componentes/limiteDoCampo'
 import campo from '../../componentes/Campo.module.css'
+import { AnuncioDoLimite } from '../../componentes/Campo'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
 import {
@@ -217,6 +218,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
               aria-describedby={erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) ? `${c.linkId}-obs-${n}-limite` : undefined} />
           </label>
           {erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) && <p id={`${c.linkId}-obs-${n}-limite`} className={campo.erro}>{erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM)}</p>}
+          <AnuncioDoLimite limite={LIMITE_OBSERVACAO_ITEM} passou={Boolean(erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM))} />
         </details> : i.observacao && <small className={css.apontamento}>{i.observacao}</small>}
       </li>
     })}</ul>
@@ -240,6 +242,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
           onFocus={sugestao.aoFocar} onBlur={sugestao.aoSair} onKeyDown={sugestao.aoTeclar} />
       </label>
       {erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) && <p id={`${c.linkId}-obs-pedido-limite`} className={campo.erro}>{erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO)}</p>}
+      <AnuncioDoLimite limite={LIMITE_OBSERVACAO_PEDIDO} passou={Boolean(erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO))} />
       <SugestaoDeTexto sugestao={sugestao} />
       </details>
       {!c.pedido && <details className={css.entregaDaSelecao} open={!janela || c.entregaACombinar || c.freteCombinado == null}>

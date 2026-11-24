@@ -189,6 +189,8 @@
 .cabecaIndicador { display: flex; align-items: center; gap: var(--e-2); min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .cabecaIndicador > svg { flex: none; color: var(--tinta-2); }
 .valor { font: 700 var(--t-valor)/1.2 var(--f-corpo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* #2810: sem leitura, a frase cabe na linha do número sem gritar. */
+.semLeitura { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 /* #2762 (B10): valor que mudou por sync acende uma vez e assenta; o fundo cobre só o número. */
 .valorMudou { align-self: flex-start; border-radius: var(--r-1); animation: global(realcar) var(--dur-realce) var(--ease-padrao); }
 .frescor { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); color: var(--tinta); overflow-wrap: anywhere; }
