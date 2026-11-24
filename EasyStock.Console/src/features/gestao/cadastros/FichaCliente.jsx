@@ -157,7 +157,7 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
     <div role="status" className={css.vivo}>{sucesso && <p className={css.sucesso}>{sucesso}</p>}</div>
     {!intencao && erro && <p className={css.erro} role="alert">{erro}</p>}
     <BarraDeAbas abas={abas} ativa={ativa} aoTrocar={escolherAba} idPainel={idPainel} prefixoId={prefixoAba} rotulo="Partes da ficha" rolavel className={perfil.abas} />
-    <div role="tabpanel" id={idPainel} aria-labelledby={`${prefixoAba}-${ativa}`} className={perfil.painelDaAba}>
+    <div role="tabpanel" id={idPainel} aria-labelledby={`${prefixoAba}-${ativa}`} tabIndex={0} className={perfil.painelDaAba}>
     {ativa === 'pedidos' && <section aria-labelledby={ids.pedidos}>
       <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
       <p><strong>{resumo.contagem}</strong>{resumo.ultimo && <> · {resumo.ultimo}</>}</p>

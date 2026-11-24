@@ -36,11 +36,13 @@ const dossie = {
   itemFavorito: { nome: 'Feijoada', pedidos: 5 }, ultimaCompraEm: '2026-11-10T15:30:00', totalPedidos: 12, bloqueado: false,
   conversasRecentes: conversas, pedidoEmAndamento: null, contatoInformado: null, totalGasto: 1480.5,
 }
+// Só a prova de 1440 usa o histórico; as medidas de rolagem seguem com o mesmo cliente medido no master.
+const HISTORICO = [{ id: 'H1', campo: 'E-mail', alteradoPorNome: 'Operadora', valorAntigo: 'marina@antigo.com', valorNovo: 'marina.perfil@exemplo.com', alteradoEm: '2026-11-09T12:00:00' }]
 const pedidos = Array.from({ length: 5 }, (_, i) => ({ id: `P${i + 1}`, numeroDoDia: 10 + i, dataNumero: `2026-11-0${i + 1}`, criadoEm: `2026-11-0${i + 1}T12:00:00Z`, status: 'Entregue', total: 90 + i * 10, clienteNome: cliente.nome }))
 const browser = await chromium.launch({ headless: true })
 const erros = []
 
-async function abrirFicha(largura, altura) {
+async function abrirFicha(largura, altura, { alteracoes = [] } = {}) {
   const movel = largura < 700
   const contexto = await browser.newContext({ viewport: { width: largura, height: altura }, isMobile: movel, hasTouch: movel, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' })
   await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja' }, usuario: { id: 'dona', nome: 'Dona de teste' } })))
@@ -54,7 +56,7 @@ async function abrirFicha(largura, altura) {
     if (path === '/api/atendimento/agenda') return ok({ lojaDisponivel: true, dias: [] })
     if (path === '/api/notificacoes/badge') return ok({ count: 0 })
     if (path === '/api/clientes') return ok([cliente], { meta: { total: 1, totalCount: 1, page: 1, limit: 200 } })
-    if (path === `/api/clientes/${ID}`) return ok({ cliente, enderecos, telefones, documentos: [], alteracoes: [] })
+    if (path === `/api/clientes/${ID}`) return ok({ cliente, enderecos, telefones, documentos: [], alteracoes })
     if (path === `/api/clientes/${ID}/dossie`) return ok(dossie)
     if (path === '/api/pedidos') return ok(pedidos, { meta: { totalCount: 12, total: 12, page: 1, limit: 5 } })
     return ok([], { meta: { totalCount: 0, total: 0, page: 1, limit: 20 } })
@@ -101,7 +103,7 @@ for (const [largura, altura] of [[1920, 1080], [1440, 900], [1366, 768]]) {
 }
 
 await item('1440: as abas trocam o painel e cada painel mantém a região com o título', async () => {
-  const { contexto, ficha } = await abrirFicha(1440, 900)
+  const { contexto, ficha } = await abrirFicha(1440, 900, { alteracoes: HISTORICO })
   const aba = (nome) => ficha.getByRole('tab', { name: nome })
   assert.equal(await aba(/^Pedidos, 12$/).getAttribute('aria-selected'), 'true', 'Pedidos abre selecionada, com o total do cadastro')
   await ficha.getByRole('region', { name: 'Pedidos', exact: true }).getByText('Valor total R$ 1.480,50 · Costuma pedir Feijoada', { exact: true }).waitFor()
@@ -119,6 +121,16 @@ await item('1440: as abas trocam o painel e cada painel mantém a região com o 
   assert.equal(await painel.getAttribute('aria-labelledby'), await aba(/^Conversas$/).getAttribute('id'), 'o painel diz qual aba o rotula')
   // Notas e tags não vão para trás de aba: a restrição fica à vista em qualquer aba.
   await ficha.getByRole('region', { name: 'Tags', exact: true }).getByText('sem lactose', { exact: true }).waitFor()
+  // O Histórico do cadastro fica na coluna da direita, depois das abas.
+  const cartao = await ficha.getByRole('region', { name: `Resumo de ${cliente.nome}`, exact: true }).boundingBox()
+  const historico = await ficha.getByText('Histórico do cadastro', { exact: true }).boundingBox()
+  assert.ok(historico.x >= cartao.x + cartao.width, `Histórico na coluna da direita (x ${historico.x}, cartão até ${cartao.x + cartao.width})`)
+  // Com a ficha em leitura, Novo pedido é a ação principal; com o formulário aberto, volta a secundário (o principal é o Salvar).
+  const fundo = (nome) => ficha.getByRole('button', { name: nome, exact: true }).last().evaluate(el => getComputedStyle(el).backgroundColor)
+  assert.notEqual(await fundo('Novo pedido'), await fundo('Fechar'), 'Novo pedido em destaque na leitura')
+  await ficha.getByRole('button', { name: 'Editar dados', exact: true }).click()
+  await ficha.getByRole('button', { name: 'Salvar cadastro', exact: true }).waitFor()
+  assert.equal(await fundo('Novo pedido'), await fundo('Cancelar'), 'Com o formulário aberto, Novo pedido volta a secundário')
   await contexto.close()
 })
 
