@@ -43,11 +43,12 @@ assert.equal(diasDesde('lixo', hoje), null)
 
 // Tradução: a API da S1 pode não estar em produção; campo ausente vira null, nunca erro.
 const vazio = relacaoDoCliente({ id: 'c1', nome: 'Ana Teste' })
-assert.deepEqual(vazio, { gastoTotal: null, compras: null, ticketMedio: null, primeiraCompraEm: null, ultimaCompraEm: null,
+assert.deepEqual(vazio, { gastoTotal: null, compras: null, ticketMedio: null, criadoEm: null, primeiraCompraEm: null, ultimaCompraEm: null,
   ocorrenciasAbertas: null, ocorrenciasTotal: null, notasTotal: null, ultimaNota: null, tags: [], estagio: null, emRisco: false })
 assert.deepEqual(relacaoDoCliente(null), vazio)
 const cheio = relacaoDoCliente({ gastoTotal: 120.5, compras: 3, ticketMedio: 40.17, primeiraCompraEm: '2026-01-02T00:00:00Z', ultimaCompraEm: '2026-11-01T00:00:00Z',
   ocorrenciasAbertas: 1, ocorrenciasTotal: 2, notasTotal: 4, ultimaNota: 'Ligar', tags: ['vip', 'bairro', 'x', 'y'], estagio: 'recorrente', emRisco: true })
+assert.equal(relacaoDoCliente({ criadoEm: '2026-01-02T00:00:00Z' }).criadoEm, '2026-01-02T00:00:00Z', 'criadoEm passa para a linha')
 assert.equal(cheio.gastoTotal, 120.5)
 assert.equal(cheio.estagio, 'recorrente')
 assert.equal(cheio.emRisco, true)

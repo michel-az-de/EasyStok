@@ -77,7 +77,7 @@ export function relacionamentoDoDossie(dossie) {
 const ou = (v) => v ?? null
 export const relacaoDoCliente = (c) => ({
   gastoTotal: ou(c?.gastoTotal), compras: ou(c?.compras), ticketMedio: ou(c?.ticketMedio),
-  primeiraCompraEm: ou(c?.primeiraCompraEm), ultimaCompraEm: ou(c?.ultimaCompraEm),
+  criadoEm: ou(c?.criadoEm), primeiraCompraEm: ou(c?.primeiraCompraEm), ultimaCompraEm: ou(c?.ultimaCompraEm),
   ocorrenciasAbertas: ou(c?.ocorrenciasAbertas), ocorrenciasTotal: ou(c?.ocorrenciasTotal),
   notasTotal: ou(c?.notasTotal), ultimaNota: ou(c?.ultimaNota),
   tags: Array.isArray(c?.tags) ? c.tags : [], estagio: ou(c?.estagio), emRisco: c?.emRisco === true,

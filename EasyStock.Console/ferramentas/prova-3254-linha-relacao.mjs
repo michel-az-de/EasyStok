@@ -16,15 +16,17 @@ const base = { ocorrenciasAbertas: 0, ocorrenciasTotal: 0, notasTotal: 0, ultima
 // 1 sem pedido; 2 primeira compra; 3 recorrente em risco com reclamação, notas e a tag interna; 4 FIEL COM 1 COMPRA (a API manda, a tela só traduz);
 // 5 fiel com mais de 3 tags.
 const REL = [
-  { ...base, estagio: 'sem_pedido', gastoTotal: 0, compras: 0, ticketMedio: null, primeiraCompraEm: null, ultimaCompraEm: null },
-  { ...base, estagio: 'primeira_compra', gastoTotal: 38, compras: 1, ticketMedio: 38, primeiraCompraEm: '2026-11-15T15:00:00Z', ultimaCompraEm: '2026-11-15T15:00:00Z', notasTotal: 1, ultimaNota: 'Pede entrega depois das 18h.', tags: ['Instagram'] },
-  { ...base, estagio: 'recorrente', gastoTotal: 444, compras: 6, ticketMedio: 74, primeiraCompraEm: '2026-01-10T15:00:00Z', ultimaCompraEm: '2026-09-20T15:00:00Z', ocorrenciasAbertas: 1, ocorrenciasTotal: 2, notasTotal: 3, ultimaNota: 'Ligar antes de repor.', tags: ['WhatsApp', 'Restaurante', 'recompra_convidada'], emRisco: true },
+  { ...base, estagio: 'sem_pedido', criadoEm: '2026-10-05T15:00:00Z', gastoTotal: 0, compras: 0, ticketMedio: null, primeiraCompraEm: null, ultimaCompraEm: null },
+  { ...base, estagio: 'primeira_compra', gastoTotal: 38, compras: 1, ticketMedio: 38, primeiraCompraEm: '2026-11-15T15:00:00Z', ultimaCompraEm: '2026-11-15T15:00:00Z', notasTotal: 1, ultimaNota: 'Pede entrega depois das 18h.', tags: ['instagram'] },
+  { ...base, estagio: 'recorrente', criadoEm: '2025-12-20T15:00:00Z', gastoTotal: 444, compras: 6, ticketMedio: 74, primeiraCompraEm: '2026-01-10T15:00:00Z', ultimaCompraEm: '2026-09-20T15:00:00Z', ocorrenciasAbertas: 1, ocorrenciasTotal: 2, notasTotal: 3, ultimaNota: 'Ligar antes de repor.', tags: ['whatsapp', 'restaurante', 'recompra_convidada'], emRisco: true },
   { ...base, estagio: 'fiel', gastoTotal: 500, compras: 1, ticketMedio: 500, primeiraCompraEm: '2026-11-18T15:00:00Z', ultimaCompraEm: '2026-11-18T15:00:00Z' },
-  { ...base, estagio: 'fiel', gastoTotal: 1020, compras: 12, ticketMedio: 85, primeiraCompraEm: '2025-06-10T15:00:00Z', ultimaCompraEm: '2026-11-20T15:00:00Z', tags: ['Fiel', 'Instagram', 'Evento', 'Atacado'] },
+  { ...base, estagio: 'fiel', gastoTotal: 1020, compras: 12, ticketMedio: 85, primeiraCompraEm: '2025-06-10T15:00:00Z', ultimaCompraEm: '2026-11-20T15:00:00Z', tags: ['cliente_vip', 'instagram', 'evento', 'atacado'] },
 ]
 const cliente = (n, extra = {}) => ({ id: idDe(n), revisao: 1, nome: nomeDe(n), telefone: `1191111${String(1000 + n)}`, email: '', documento: '', tipoPessoa: 'fisica', ativo: true, orderCount: 0, ...extra })
-const comRelacao = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras }))
-const semRelacao = REL.map((_, i) => cliente(i + 1))
+// orderCount conta todo pedido criado (aqui 2 a mais que as compras): com a relação, a linha escreve as compras.
+// Cliente 1 sem telefone e e-mail; cliente 5 com os dois.
+const comRelacao = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras + 2, ...(i === 0 ? { telefone: '' } : {}), ...(i === 4 ? { email: 'ficticio05@exemplo.test' } : {}) }))
+const semRelacao = REL.map((_, i) => cliente(i + 1, i === 2 ? { orderCount: 3 } : {}))
 const carteiraZero = REL.map((_, i) => cliente(i + 1, { ...REL[0] }))
 const browser = await chromium.launch({ headless: true })
 const erros = []
@@ -110,7 +112,24 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.equal(await page.getByText('recompra_convidada').count(), 0, 'tag interna oculta')
     for (const botao of ['Abrir ficha de', 'Novo pedido de']) assert.equal(await page.getByRole('button', { name: `${botao} ${nomeDe(3)}` }).count(), 1, `ação ${botao} segue`)
     if (largo) {
-      assert.equal(await linha(page, 1).getByText('Sem pedido ainda', { exact: true }).count(), 1, 'selo de sem pedido segue na linha')
+      // Mudou de propósito: com a relação, o selo "Sem pedido ainda" repetia o estágio e saiu da linha.
+      assert.equal(await linha(page, 1).getByText('Sem pedido ainda', { exact: true }).count(), 0, 'sem selo de situação com a relação')
+      assert.equal(await linha(page, 3).getByText('Cliente', { exact: true }).count(), 0, 'sem selo Cliente com a relação')
+      assert.equal(await linha(page, 1).getByText('Sem pedido', { exact: true }).count(), 1, 'o estágio Sem pedido segue')
+      assert.match(await linha(page, 3).innerText(), /6 compras/, 'compras, não pedidos criados')
+      assert.match(await linha(page, 4).innerText(), /\b1 compra\b/, 'singular')
+      assert.doesNotMatch(await linha(page, 3).innerText(), /[0-9]+ pedidos?/, 'sem "N pedidos" com a relação')
+      assert.match(await linha(page, 3).innerText(), /dezembro de 2025/, 'cliente desde = cadastro')
+      assert.doesNotMatch(await linha(page, 3).innerText(), /janeiro de 2026/, 'não usa a primeira compra')
+      assert.match(await linha(page, 1).innerText(), /outubro de 2026/, 'lead também tem cliente desde')
+      assert.match(await linha(page, 1).innerText(), /Contato não informado/, 'sem telefone nem e-mail')
+      assert.match(await linha(page, 5).innerText(), /ficticio05@exemplo\.test/, 'e-mail secundário na célula do cliente')
+      assert.equal(await page.getByTitle('Comprou 2 vezes ou mais e está há 30 dias sem pedir.').count(), 1, 'regra do Em risco')
+      assert.equal(await linha(page, 3).getByTitle('Ligar antes de repor.').count(), 1, 'última nota no title')
+      assert.doesNotMatch(await page.locator('tbody').innerText(), /\u2014/, 'sem travessão')
+      assert.match(await linha(page, 5).innerText(), /cliente vip/, 'tag legível')
+      assert.equal(await page.getByText('cliente_vip').count(), 0, 'sem tag crua')
+      assert.match(await linha(page, 3).innerText(), /whatsapp/, 'tag normalizada')
       const tres = await linha(page, 3).innerText()
       assert.match(tres, /Reclamação/, 'sinal de reclamação aberta')
       assert.match(tres, /3 notas/, 'sinal de notas')
@@ -171,6 +190,9 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.equal(await page.getByRole('img', { name: /^Estágio/ }).count(), 0, 'sem estágio inventado')
     assert.equal(await page.getByRole('button', { name: `Abrir ficha de ${nomeDe(3)}` }).count(), 1, 'ação segue')
     if (largo) assert.ok(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).count() >= 5, 'traço no lugar do dado ausente')
+    if (largo) assert.equal(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).first().textContent(), '', 'o traço é desenhado em CSS')
+    assert.match(await linha(page, 3).innerText(), /3 pedidos/, 'API antiga segue com orderCount')
+    assert.equal(await linha(page, 1).getByText('Sem pedido ainda', { exact: true }).count(), 1, 'API antiga segue com o selo de situação')
     assert.doesNotMatch(await page.locator('tbody').innerText(), /NaN|Infinity|undefined|null/)
     assert.equal(erros.length, antes, 'sem erro de página')
     assert.ok((await rolagem(page)).pagina <= 0, 'página sem rolagem horizontal')
