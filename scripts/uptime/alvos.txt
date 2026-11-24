@@ -1,4 +1,5 @@
-# Alvos do vigia externo (#2107): nome|url|texto que a resposta precisa conter (opcional).
+# Alvos do vigia externo (#2107), monitorados no UptimeRobot desde a #3283: nome|url|texto que a resposta
+# precisa conter (opcional, monitor Keyword "alertar se NAO contem"). Fonte manual: mudou aqui, mude no painel.
 # Todo alvo precisa responder 200. Medidos em 27/10/2026.
 # /health/ready responde 503 quando o Postgres ou a configuracao falham.
 EZ API|https://api.easystok.online/health/ready|
