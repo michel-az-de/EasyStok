@@ -23,7 +23,7 @@ import { linkDoConvite, resumoDaRecompra } from '../../../dominio/recompra'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { clienteDaHash } from '../../../dominio/fichaCliente'
 import { conversasDoCliente } from '../../../dominio/conversa'
-import { mesPorExtenso, moeda } from '../../../dominio/formato'
+import { mesPorExtenso, moeda, plural } from '../../../dominio/formato'
 import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsVisiveis } from '../../../dominio/relacionamento'
 import { rotuloDaTag } from '../../../dominio/tag'
 import { nomeExibido } from '../../../dominio/nomeDoContato'
@@ -49,6 +49,8 @@ function FotoDaLinha({ nome, fotoUrl }) {
 // (API antiga) vira traço, nunca erro. O estágio é o código que a API mandou, sem conta no Console.
 const Traco = () => <span className={css.traco} role="img" aria-label="Sem dado" />
 const textoDoPercentual = (p) => (p > 0 && p < 1 ? 'menos de 1%' : `${Math.round(p)}%`)
+// Como o protótipo: reais inteiros, sem centavos; R$ 1.028,81 vira R$ 1.029 e cabe na coluna estreita.
+const reais = (v) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`
 const textoDosDias = (d) => (d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`)
 function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
   const estagio = estagioDoCliente(r.estagio), posicao = posicaoDoEstagio(r.estagio)
@@ -61,10 +63,10 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
     <td>{estagio ? <div className={css.estagio}><strong>{estagio}</strong>
       <span className={css.passos} role="img" aria-label={`Estágio ${posicao + 1} de 4: ${estagio}`}>{[0, 1, 2, 3].map(i => <i key={i} className={i <= posicao ? css.passoAceso : undefined} />)}</span>
       {r.emRisco && <Pilula tom="aviso" tamanho="inline" titulo="Comprou 2 vezes ou mais e está há 30 dias sem pedir.">Em risco</Pilula>}</div> : <Traco />}</td>
-    <td>{temGasto ? <div className={css.gasto}><strong>{r.gastoTotal > 0 ? moeda(r.gastoTotal) : 'Sem gasto ainda'}</strong>
+    <td>{temGasto ? <div className={css.gasto}><strong>{r.gastoTotal > 0 ? reais(r.gastoTotal) : 'Sem gasto ainda'}</strong>
       {Number.isFinite(totalDaCarteira) && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 && totalDaCarteira > 0 ? Math.max(pct, 2) : 0}%` }} /></span>}
       {r.gastoTotal > 0 && totalDaCarteira > 0 && <small>{textoDoPercentual(pct)} da carteira</small>}</div> : <Traco />}</td>
-    <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? moeda(r.ticketMedio) : <Traco />}</td>
+    <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? reais(r.ticketMedio) : <Traco />}</td>
     <td>{dias === null ? <Traco /> : textoDosDias(dias)}</td>
     <td>{desde ?? <Traco />}</td>
     <td><div className={css.sinais}>
@@ -268,7 +270,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
           const link = emRecompra ? linkDoConvite(telefoneCadastro(item), nome(item) === 'Contato sem nome' ? '' : nome(item), conta?.casa) : null
           // #2457 (U9): a linha inteira abre o cadastro; o botão Editar continua sendo o alvo do teclado.
           return <tr key={id} className={soLeads ? undefined : css.clicavel} onClick={soLeads ? undefined : e => { if (!e.target.closest('button, a')) editar(item) }}>
-            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : emRecompra ? resumoDaRecompra(item.orderCount, item.lastOrderAt) : item.nomeFantasia || item.marca || item.contato || item.titular || (comRelacao && Number.isFinite(item.relacao?.compras) ? (item.relacao.compras ? `${item.relacao.compras} compra${item.relacao.compras === 1 ? '' : 's'}` : '') : item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao || (comRelacao ? 'Contato não informado' : '')}</small>{comRelacao && telefone(item) && emailCadastro(item) && <small className={css.contatoMovel}>{emailCadastro(item)}</small>}{comRelacao && !Number.isFinite(item.relacao?.compras) && <span className={css.situacaoNoNome}>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</span>}</div></div></td>
+            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : emRecompra ? (Number.isFinite(item.relacao?.compras) ? plural(item.relacao.compras, 'compra', 'compras') : resumoDaRecompra(item.orderCount, item.lastOrderAt)) : item.nomeFantasia || item.marca || item.contato || item.titular || (comRelacao && Number.isFinite(item.relacao?.compras) ? (item.relacao.compras ? `${item.relacao.compras} compra${item.relacao.compras === 1 ? '' : 's'}` : '') : item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao || (comRelacao ? 'Contato não informado' : '')}</small>{comRelacao && telefone(item) && emailCadastro(item) && <small className={css.contatoMovel}>{emailCadastro(item)}</small>}{comRelacao && (!Number.isFinite(item.relacao?.compras) || !emAtividadeCadastro(item)) && <span className={css.situacaoNoNome}>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</span>}</div></div></td>
             {comRelacao && <CelulasDaRelacao relacao={item.relacao} totalDaCarteira={consulta.gastoTotalDaCarteira} />}
             {!comRelacao && <>
             <td>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : tela === 'bancos' ? item.instituicao || 'Não informada' : <><span>{telefone(item) || emailCadastro(item) || 'Contato não informado'}</span>{telefone(item) && <small>{emailCadastro(item)}</small>}</>}</td>

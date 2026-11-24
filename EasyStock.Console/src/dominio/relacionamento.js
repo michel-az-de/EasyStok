@@ -1,5 +1,5 @@
 // #3254 (S2): a relação do cliente no grid de Cadastros. O estágio vem pronto da API (#3244);
-// aqui só se traduz o código, nunca se recalcula por compras. Com extensão: a prova carrega direto pelo Node.
+// aqui só se traduz o código, nunca se recalcula por compras. A prova carrega o domínio pelo runner, que resolve o import sem extensão (./recompra).
 import { diasDeCalendarioEntre } from './formato.js'
 import { TAG_RECOMPRA_CONVIDADA } from './recompra'
 

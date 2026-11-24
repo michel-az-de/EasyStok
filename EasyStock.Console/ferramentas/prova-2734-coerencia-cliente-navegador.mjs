@@ -101,7 +101,11 @@ try {
   await pagina.locator('table > caption').waitFor({ state: 'attached' })
   assert.equal(await pagina.locator('table > caption').textContent(), 'Leads e clientes', 'a tabela tem nome')
   assert.equal(await pagina.locator('section[aria-labelledby]').first().evaluate(s => document.getElementById(s.getAttribute('aria-labelledby'))?.textContent), 'Leads e clientes', 'a região da lista usa o título que está na tela como nome')
-  assert.equal(await pagina.locator('th[scope="col"]').count(), 4, 'os cabeçalhos dizem que são de coluna')
+  // Todo th do cabeçalho diz que é de coluna e há um por coluna que a linha desenha (a linha com relação tem 9, a sem relação, 4).
+  const cabecalhos = await pagina.locator('thead th').count()
+  assert.ok(cabecalhos >= 4, 'a lista tem cabeçalhos')
+  assert.equal(await pagina.locator('thead th[scope="col"]').count(), cabecalhos, 'os cabeçalhos dizem que são de coluna')
+  assert.equal(await pagina.locator('tbody tr').first().locator('td').count(), cabecalhos, 'há um cabeçalho para cada coluna da linha')
 
   // A nota interna aparece sem clique: as 2 mais recentes, com quem escreveu e quando.
   let secaoNotas = editor.getByRole('region', { name: 'Notas internas', exact: true })

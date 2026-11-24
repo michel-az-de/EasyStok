@@ -21,18 +21,21 @@ const REL = [
   { ...base, estagio: 'recorrente', criadoEm: '2025-12-20T15:00:00Z', gastoTotal: 444, compras: 6, ticketMedio: 74, primeiraCompraEm: '2026-01-10T15:00:00Z', ultimaCompraEm: '2026-09-20T15:00:00Z', ocorrenciasAbertas: 1, ocorrenciasTotal: 2, notasTotal: 3, ultimaNota: 'Ligar antes de repor.', tags: ['whatsapp', 'restaurante', 'recompra_convidada'], emRisco: true },
   { ...base, estagio: 'fiel', gastoTotal: 500, compras: 1, ticketMedio: 500, primeiraCompraEm: '2026-11-18T15:00:00Z', ultimaCompraEm: '2026-11-18T15:00:00Z' },
   { ...base, estagio: 'fiel', gastoTotal: 1020, compras: 12, ticketMedio: 85, primeiraCompraEm: '2025-06-10T15:00:00Z', ultimaCompraEm: '2026-11-20T15:00:00Z', tags: ['cliente_vip', 'instagram', 'evento', 'atacado'] },
+  // 6: ticket de 4 dígitos e gasto de 5 dígitos (o texto não pode sair da célula). 7: inativo, com relação.
+  { ...base, estagio: 'fiel', gastoTotal: 12345.67, compras: 12, ticketMedio: 1028.81, primeiraCompraEm: '2025-03-10T15:00:00Z', ultimaCompraEm: '2026-11-21T15:00:00Z' },
+  { ...base, estagio: 'recorrente', gastoTotal: 300, compras: 3, ticketMedio: 100, primeiraCompraEm: '2026-02-10T15:00:00Z', ultimaCompraEm: '2026-08-21T15:00:00Z', ativo: false },
 ]
 const cliente = (n, extra = {}) => ({ id: idDe(n), revisao: 1, nome: nomeDe(n), telefone: `1191111${String(1000 + n)}`, email: '', documento: '', tipoPessoa: 'fisica', ativo: true, orderCount: 0, ...extra })
 // orderCount conta todo pedido criado (aqui 2 a mais que as compras): com a relação, a linha escreve as compras.
 // Cliente 1 sem telefone e e-mail; cliente 5 com os dois.
 const comRelacao = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras + 2, ...(i === 0 ? { telefone: '' } : {}), ...(i === 4 ? { email: 'ficticio05@exemplo.test' } : {}) }))
-const semRelacao = REL.map((_, i) => cliente(i + 1, i === 2 ? { orderCount: 3 } : {}))
+const semRelacao = REL.map((_, i) => cliente(i + 1, i === 2 ? { orderCount: 3 } : i === 6 ? { ativo: false } : {}))
 // Carteira 0 com clientes que têm compras (dado incoerente, mas a tela não pode quebrar nem inventar percentual).
 const carteiraZero = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras }))
 const browser = await chromium.launch({ headless: true })
 const erros = []
 const falhas = []
-let ultima = null
+const CARTEIRA = 50000
 
 // `resposta`: lista de clientes, 'erro' ou { portao, clientes }, que segura a resposta até o teste liberar (sem espera por tempo).
 async function preparar(largura, resposta, meta = {}) {
@@ -57,7 +60,7 @@ async function preparar(largura, resposta, meta = {}) {
   })
   const page = await contexto.newPage()
   page.setDefaultTimeout(15000)
-  page.on('pageerror', (e) => erros.push(e.message)); ultima = page
+  page.on('pageerror', (e) => erros.push(e.message))
   await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
   return { contexto, page }
 }
@@ -96,13 +99,21 @@ const sobreposicoes = (page) => page.evaluate(() => {
   })
   return problemas
 })
+// Texto que sai da célula: o conteúdo de cada td (e de cada filho direto) não pode ser mais largo que a célula.
+const transbordoDeTexto = (page) => page.evaluate(() => {
+  const problemas = []
+  document.querySelectorAll('tbody tr').forEach((tr, i) => [...tr.children].filter((td) => td.getClientRects().length).forEach((td, j) => {
+    if (td.scrollWidth > td.clientWidth) problemas.push(`linha ${i + 1} célula ${j + 1}: texto ${td.scrollWidth - td.clientWidth}px além da célula (${td.textContent.trim().slice(0, 30)})`)
+  }))
+  return problemas
+})
 const larguraDasBarras = (page) => page.evaluate(() => [...document.querySelectorAll('tbody [class*="trilhoGasto"] i')].map((i) => i.getBoundingClientRect().width))
 
 // As larguras rodam em paralelo; os itens de cada largura em série (em paralelo, a carga fria do servidor de desenvolvimento estoura o tempo da página).
 await Promise.all([1920, 1440, 390].map(async (largura) => {
   const largo = largura > 700
   await item(`${largura}: estágio vem da API, Em risco só com emRisco, tag interna oculta, sem rolagem nem sobreposição`, async () => {
-    const { contexto, page } = await preparar(largura, comRelacao, { gastoTotalDaCarteira: 2000 })
+    const { contexto, page } = await preparar(largura, comRelacao, { gastoTotalDaCarteira: CARTEIRA })
     await linha(page, 5).waitFor()
     // A API disse fiel com 1 compra: a tela diz Fiel, não recalcula.
     assert.equal(await linha(page, 4).getByRole('img', { name: 'Estágio 4 de 4: Fiel' }).count(), 1, 'fiel com 1 compra aparece como Fiel')
@@ -136,10 +147,10 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
       assert.match(tres, /Reclamação/, 'sinal de reclamação aberta')
       assert.match(tres, /3 notas/, 'sinal de notas')
       const cinco = await linha(page, 5).innerText()
-      assert.match(cinco, /R\$\s*1\.020,00/, 'gasto')
-      assert.match(cinco, /R\$\s*85,00/, 'ticket')
+      assert.match(cinco, /R\$\s*1\.020(?!,)/, 'gasto')
+      assert.match(cinco, /R\$\s*85(?!,)/, 'ticket')
       assert.match(cinco, /há \d+ dias?|hoje/, 'última compra')
-      assert.match(await linha(page, 4).innerText(), /25% da carteira/, 'gasto 500 de 2000')
+      assert.match(await linha(page, 4).innerText(), /1% da carteira/, 'gasto 500 de 50000')
       assert.equal(await linha(page, 5).locator('ul li').count(), 3, 'até 3 tags')
       assert.equal(await linha(page, 3).locator('ul li').count(), 2, 'a tag interna não aparece e as 2 tags restantes ficam (a API corta em 3 antes do filtro)')
     }
@@ -147,12 +158,20 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.ok(m.pagina <= 0, `página sem rolagem horizontal (${m.pagina}px)`)
     if (largo) assert.ok(m.lista <= 0 && m.tabela <= 1, `lista sem rolagem horizontal (${m.lista}px, tabela ${m.tabela}px)`)
     if (largo) assert.deepEqual(await sobreposicoes(page), [], 'blocos da linha sem sobreposição')
+    if (largo) assert.deepEqual(await transbordoDeTexto(page), [], 'texto de cada célula cabe nela')
+    if (largo) {
+      const quatro = await linha(page, 6).innerText()
+      assert.match(quatro, /R\$\s*12\.346/, 'gasto de 5 dígitos em reais inteiros')
+      assert.match(quatro, /R\$\s*1\.029/, 'ticket de 4 dígitos em reais inteiros')
+      assert.match(await linha(page, 7).innerText(), /Inativo/, 'inativo com relação mostra o selo Inativo')
+      assert.equal(await linha(page, 3).getByText('Inativo', { exact: true }).count(), 0, 'ativo não mostra Inativo')
+    }
     if (largo) console.log(`      altura da linha Todos em ${largura}: ${Math.round((await linha(page, 3).boundingBox()).height)} px`)
     await page.screenshot({ path: `${pasta}/clientes-${largura}.png` })
     await contexto.close()
   })
   if (largo) await item(`${largura}: barra de gasto sempre desenhada com a relação, em 0 sem gasto ou com carteira 0`, async () => {
-    let c = await preparar(largura, comRelacao, { gastoTotalDaCarteira: 2000 })
+    let c = await preparar(largura, comRelacao, { gastoTotalDaCarteira: CARTEIRA })
     await linha(c.page, 5).waitFor()
     const barras = await larguraDasBarras(c.page)
     assert.equal(barras.length, REL.length, 'uma barra por linha')
@@ -168,7 +187,7 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.ok(zero.length > 0 && zero.every((w) => w === 0), 'carteira 0: barra de gasto em 0')
     const corpo = await c.page.locator('tbody').innerText()
     assert.doesNotMatch(corpo, /da carteira/, 'carteira 0: sem percentual inventado')
-    assert.match(await linha(c.page, 5).innerText(), /R\$\s*1\.020,00/, 'carteira 0: o gasto de quem comprou segue na linha')
+    assert.match(await linha(c.page, 5).innerText(), /R\$\s*1\.020(?!,)/, 'carteira 0: o gasto de quem comprou segue na linha')
     assert.doesNotMatch(corpo, /NaN|Infinity|undefined/, 'sem lixo numérico')
     assert.deepEqual(await sobreposicoes(c.page), [], 'sem sobreposição com carteira 0')
     await c.contexto.close()
@@ -178,17 +197,23 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     await c.contexto.close()
   })
   for (const [aba, rotulo] of [['Sem pedido', 'Leads'], ['Recompra', 'Recompra']]) await item(`${largura}: aba ${rotulo} sem rolagem horizontal e com cada filho na própria célula`, async () => {
-    const { contexto, page } = await preparar(largura, comRelacao, { gastoTotalDaCarteira: 2000 })
+    const { contexto, page } = await preparar(largura, comRelacao, { gastoTotalDaCarteira: CARTEIRA })
     await linha(page, 5).waitFor()
     await page.getByRole('tab', { name: aba, exact: true }).click()
     await page.getByRole('tab', { name: aba, exact: true, selected: true }).waitFor()
     await linha(page, 5).waitFor()
-    if (aba === 'Recompra') assert.ok(await page.getByRole('link', { name: /^Chamar .* no WhatsApp$/ }).count() > 0, 'convite de recompra presente')
+    if (aba === 'Recompra') {
+      assert.ok(await page.getByRole('link', { name: /^Chamar .* no WhatsApp$/ }).count() > 0, 'convite de recompra presente')
+      const tres = await linha(page, 3).innerText()
+      assert.match(tres, /(?<![0-9])6 compras(?![a-z])/, 'Recompra escreve as compras da relação')
+      assert.doesNotMatch(tres, /[0-9]+ pedidos?|último há/, 'Recompra sem "N pedidos" nem "último há" ao lado de ticket e última compra')
+    }
     const m = await rolagem(page)
     assert.ok(m.pagina <= 0, `página sem rolagem horizontal (${m.pagina}px)`)
     if (largo) {
       assert.ok(m.lista <= 0 && m.tabela <= 1, `lista sem rolagem horizontal (${m.lista}px, tabela ${m.tabela}px)`)
       assert.deepEqual(await sobreposicoes(page), [], 'filhos dentro da própria célula, sem sobreposição')
+      assert.deepEqual(await transbordoDeTexto(page), [], 'texto de cada célula cabe nela')
       console.log(`      altura da linha ${rotulo} em ${largura}: ${Math.round((await linha(page, 3).boundingBox()).height)} px`)
     } else {
       // Em 390 a célula de ações também não deixa o link sair.
@@ -207,11 +232,21 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     if (largo) assert.ok(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).count() >= 5, 'traço no lugar do dado ausente')
     if (largo) assert.equal(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).first().textContent(), '', 'o traço é desenhado em CSS')
     assert.match(await linha(page, 3).innerText(), /3 pedidos/, 'API antiga segue com orderCount')
+    assert.match(await linha(page, 7).innerText(), /Inativo/, 'API antiga segue com Inativo')
     assert.equal(await linha(page, 1).getByText('Sem pedido ainda', { exact: true }).count(), 1, 'API antiga segue com o selo de situação')
     assert.doesNotMatch(await page.locator('tbody').innerText(), /NaN|Infinity|undefined|null/)
     assert.equal(erros.length, antes, 'sem erro de página')
     assert.ok((await rolagem(page)).pagina <= 0, 'página sem rolagem horizontal')
     if (largo) assert.deepEqual(await sobreposicoes(page), [], 'sem sobreposição')
+    await contexto.close()
+  })
+  await item(`${largura}: API antiga na aba Recompra segue com pedidos e último`, async () => {
+    const { contexto, page } = await preparar(largura, semRelacao.map((c, i) => (i === 2 ? { ...c, lastOrderAt: '2026-09-20T15:00:00Z' } : c)))
+    await linha(page, 3).waitFor()
+    await page.getByRole('tab', { name: 'Recompra', exact: true }).click()
+    await page.getByRole('tab', { name: 'Recompra', exact: true, selected: true }).waitFor()
+    await linha(page, 3).waitFor()
+    assert.match(await linha(page, 3).innerText(), /3 pedidos · último há \d+ dias/, 'sem relação, o resumo de hoje')
     await contexto.close()
   })
   await item(`${largura}: carregando, vazio e erro`, async () => {
