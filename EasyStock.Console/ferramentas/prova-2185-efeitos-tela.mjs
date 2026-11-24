@@ -56,12 +56,14 @@ import { ModalGestao } from '/src/features/gestao/ModalGestao.jsx'
 import { ProvedorDeAviso } from '/src/componentes/Aviso.jsx'
 import { PilhaDeAvisos } from '/src/app/PilhaDeAvisos.jsx'
 import { Moldura } from '/src/app/Moldura.jsx'
+import { tokensDaGeometria } from '/src/dominio/paineis.js'
 import { ModalNota } from '/src/features/notas/ModalNota.jsx'
 import { criarRascunhosDeNotas } from '/src/aplicacao/rascunhosDeNotas.js'
 import { BlocoColaborativoIa } from '/src/features/ficha-cliente/AreaColaborativaIa.jsx'
 import { identidadeDaMontagem } from '/src/aplicacao/montagemFicha.js'
 import { chaveDaAssistencia } from '/src/aplicacao/contextoAssistencia.js'
 import { useTamanhoTela } from '/src/hooks/useTamanhoTela.js'
+import { largurasDaTela } from '/src/hooks/larguras.js'
 import { CANAIS } from '/src/infra/catalogo.js'
 import { REGRAS_PADRAO } from '/src/dominio/automacao.js'
 import { TIPOS_DE_AVISO } from '/src/dominio/aviso.js'
@@ -137,6 +139,8 @@ function Nota() {
 
 function Cena() {
   const tamanho = useTamanhoTela()
+  // #3265 (C6): a moldura recebe as larguras da regra de produção (e as salvas, por ?larguras=), não números fixos.
+  const larguras = largurasDaTela(JSON.parse(q.get('larguras') ?? '{}'), window.innerWidth)
   const [gestaoAberta, abrirGestao] = useState(false)
   const [estado, despachar] = useReducer(reducer, null, iniciar)
   const [ocultoNoCelular, setOculto] = useState(false)
@@ -229,7 +233,7 @@ function Cena() {
           <Moldura
             tamanho={tamanho} aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} aoAbrirCardapio={noop}
             aoAbrirAutomacoes={noop} aoAbrirGestao={() => abrirGestao(true)} aoAbrirEntregas={noop} aoAbrirAjuda={noop} aoRascunho={noop}
-            simulando={false} aoAlternarSimulacoes={null} larguras={{ balcao: 320, ficha: 360, cardapio: 420 }} aoRedimensionar={noop}
+            simulando={false} aoAlternarSimulacoes={null} larguras={larguras} aoRedimensionar={noop}
             slotEditorNota={null} solicitacaoPainel={null}
           />
           <PilhaDeAvisos />
@@ -258,6 +262,8 @@ function Ajustes() {
   const gravacoes = useGravacoesDosAjustes()
   return <ContextoRascunhosDosAjustes.Provider value={{ rascunhos, definir: (chave, valor) => definir(atual => ({ ...atual, [chave]: valor })), ...gravacoes }}><Cena /></ContextoRascunhosDosAjustes.Provider>
 }
+// #3265 (C6): como em main.jsx, a partida aplica o token do trilho; sem ele o trilho media 130 px, e não 76.
+for (const [nome, valor] of Object.entries(tokensDaGeometria())) document.documentElement.style.setProperty(nome, valor)
 createRoot(document.getElementById('root')).render(<Ajustes />)
 `)
 
@@ -930,6 +936,32 @@ try {
     assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), esperadas, 'listar todas não muda o total que precisa da atendente')
     await ctx.close()
   })
+  // #3265 (C6): em 1920 a conversa tinha 1176 px e o balão do cliente ficava a ~1.130 px do balão da loja. Com o
+  // padrão novo a coluna da conversa fica com 880 px; com larguras estreitas salvas (244/292) a coluna é larga, mas a
+  // thread para em 880 px, centrada. (1268 = 1920 - 100 - 260 - 292: o `min-width` de 260 do Balcão vence o 244.)
+  for (const [nome, salvas, coluna] of [['padrão', '', 880], ['244/292 salvos', '&larguras=' + encodeURIComponent('{"balcao":244,"ficha":292}'), 1268]]) {
+    await confere(`C6. 1920 com ${nome}: a leitura da conversa para em 880 px, centrada`, async () => {
+      // A conversa "auto" tem a mensagem do cliente e duas respostas da loja: os dois lados do fio.
+      const { ctx, p } = await abrir('cena=moldura&inicial=auto' + salvas, { width: 1920, height: 1080 })
+      await p.locator('[role=log]').waitFor()
+      const m = await p.evaluate(() => {
+        const log = document.querySelector('[role=log]')
+        const caixa = log.getBoundingClientRect(), pai = log.parentElement.getBoundingClientRect()
+        const estilo = getComputedStyle(log)
+        const util = caixa.width - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight)
+        const baloes = [...log.querySelectorAll('[class*=balao]')].filter((b) => /entrada|saida/.test(b.className))
+        const esquerda = Math.min(...baloes.filter((b) => /entrada/.test(b.className)).map((b) => b.getBoundingClientRect().left))
+        const direita = Math.max(...baloes.filter((b) => /saida/.test(b.className)).map((b) => b.getBoundingClientRect().right))
+        return { coluna: Math.round(document.querySelector('section[aria-label=Conversa]').getBoundingClientRect().width), caixa: Math.round(caixa.width), util: Math.round(util), sobraEsq: Math.round(caixa.left - pai.left), sobraDir: Math.round(pai.right - caixa.right), vao: Math.round(direita - esquerda), baloes: baloes.length }
+      })
+      assert.ok(m.baloes >= 2, `a massa tem balões dos dois lados (${m.baloes})`)
+      assert.equal(m.coluna, coluna, 'coluna da conversa')
+      assert.ok(m.caixa <= 880 && m.util <= 880, `leitura: caixa ${m.caixa} px, texto ${m.util} px`)
+      assert.ok(m.vao <= 880, `do balão do cliente ao da loja: ${m.vao} px`)
+      assert.ok(Math.abs(m.sobraEsq - m.sobraDir) <= 1, `centrada (${m.sobraEsq} e ${m.sobraDir})`)
+      await ctx.close()
+    })
+  }
   await confere('E29. no modo API o F2 não é capturado (não há Simular)', async () => {
     const { ctx, p } = await abrir('cena=moldura&inicial=nenhuma')
     await p.getByRole('navigation', { name: 'Navegação' }).waitFor()

@@ -125,11 +125,39 @@ confere('3  em notebook a conversa não fica menor que as colunas dos lados', ()
     assert.deepEqual(p, { balcao: 260, ficha: 292, cardapio: 460 })
   }
 })
-confere('3  telas médias e largas usam as proporções aprovadas sem encolher a conversa', () => {
+confere('3  telas médias usam as proporções aprovadas sem encolher a conversa', () => {
   assert.deepEqual(larguras.padraoPorTela(1440), { balcao: 276, ficha: 316, cardapio: 460 })
-  assert.deepEqual(larguras.padraoPorTela(1920), { balcao: 304, ficha: 340, cardapio: 460 })
   assert.ok(conversa(1440) >= 730, 'a conversa mantém mais de metade da tela média')
-  assert.ok(conversa(1920) >= 1160, 'a tela larga preserva o espaço da conversa')
+})
+// #3265 (C6) revê a regra acima para tela larga: a #1697 dava a sobra à conversa, e em 1920 ela ficava com 1176 px
+// (medido na produção), com o balão do cliente a ~1.130 px do balão da loja e a lista cortando a prévia. Agora a
+// leitura para em 880 px e a sobra vai, em partes iguais, para o Balcão e a Ficha, até o máximo de cada alça.
+// Aqui a conta é a da tela (trilho e duas alças; o palco de três colunas não tem folga), medida pela prova-2185 (C6).
+const conversaNaTela = (vw) => { const p = larguras.padraoPorTela(vw); return vw - larguras.TRILHO_E_VAOS - p.balcao - p.ficha }
+confere('3  em tela larga a conversa para na largura de leitura e a sobra vai para o Balcão e a Ficha', () => {
+  assert.equal(larguras.LEITURA, 880)
+  assert.equal(larguras.TRILHO_E_VAOS, paineis.TRILHO + 2 * paineis.VAO, 'a geometria do hook é a do domínio')
+  assert.deepEqual(larguras.padraoPorTela(1920), { balcao: 450, ficha: 490, cardapio: 460 })
+  assert.equal(conversaNaTela(1920), 880)
+  const maximo = { balcao: 480, ficha: 520 }
+  assert.match(fonte('app/Moldura.jsx'), /max=\{480\}/, 'o máximo da alça do Balcão é o da regra')
+  assert.match(fonte('app/Moldura.jsx'), /max=\{520\}/, 'o máximo da alça da Ficha é o da regra')
+  for (const vw of [1600, 1700, 1920, 2560]) {
+    const p = larguras.padraoPorTela(vw)
+    const antes = vw >= 1700 ? { balcao: 304, ficha: 340 } : { balcao: 276, ficha: 316 }
+    assert.ok(p.balcao > antes.balcao && p.ficha > antes.ficha, `${vw}: a sobra vai para o Balcão e a Ficha (${p.balcao}/${p.ficha})`)
+    assert.ok(p.balcao <= maximo.balcao && p.ficha <= maximo.ficha, `${vw}: dentro dos máximos das alças`)
+    const noMaximo = p.balcao === maximo.balcao && p.ficha === maximo.ficha
+    assert.ok(conversaNaTela(vw) <= larguras.LEITURA || noMaximo, `${vw}: conversa com ${conversaNaTela(vw)} px`)
+  }
+  // Sem degrau: a #1697 saltava 56 px em 1700. Do padrão médio (1400) a 2600, um pixel de tela muda a conversa em no
+  // máximo um. O degrau de 1400 (notebook) é da #1697 e fica.
+  for (let vw = 1400; vw < 2600; vw++) {
+    const passo = conversaNaTela(vw + 1) - conversaNaTela(vw)
+    assert.ok(passo >= 0 && passo <= 1, `${vw}→${vw + 1}: a conversa mudou ${passo} px`)
+  }
+  // Acima de ~1980 px as alças chegam ao máximo e a conversa volta a crescer: o CSS segura a leitura.
+  assert.match(fonte('features/atendimento/atendimento.module.css'), /\.thread \{[^}]*max-width: 880px; margin-inline: auto;/)
 })
 confere('3  só a migração v1 descarta os padrões antigos gravados sem arraste', () => {
   assert.deepEqual(larguras.migrarLargurasAntigas({ balcao: 360, ficha: 420, cardapio: 460 }), {})

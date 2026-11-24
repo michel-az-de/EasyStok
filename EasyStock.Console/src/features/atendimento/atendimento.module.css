@@ -44,6 +44,9 @@
 .thread {
   flex: 1 0 auto; padding: var(--e-4) var(--e-5);
   display: flex; flex-direction: column; background: transparent;
+  /* #3265 (C6): leitura de até 880 px (a coluna de `hooks/larguras.js`), centrada. Segura a largura salva e a tela
+     acima de ~1980 px; a rolagem continua na borda da coluna, porque quem rola é `.rolagemCentro`. */
+  width: 100%; max-width: 880px; margin-inline: auto;
 }
 
 .balao {
