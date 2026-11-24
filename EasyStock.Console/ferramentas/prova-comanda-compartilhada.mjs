@@ -31,6 +31,7 @@ registerHooks({
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(){}'), shortCircuit: true }
     if (spec.endsWith('/SugestaoDeTexto')) return { url: codigo('export function SugestaoDeTexto(){}'), shortCircuit: true }
     if (spec.endsWith('/useComplementoDeTexto')) return { url: codigo('export const useComplementoDeTexto=()=>({})'), shortCircuit: true }
+    if (spec.endsWith('/Campo')) return { url: codigo('export function AnuncioDoLimite(){ return null }'), shortCircuit: true }
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
     if (spec.endsWith('/BlocoFreteApi')) return { url: codigo('export function ConsultaTransporte(){}'), shortCircuit: true }
     if (spec.endsWith('/SeletorJanelaApi')) return { url: codigo('export function SeletorJanelaApi(){}'), shortCircuit: true }
