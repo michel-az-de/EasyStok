@@ -23,7 +23,8 @@ import { linkDoConvite, resumoDaRecompra } from '../../../dominio/recompra'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { clienteDaHash } from '../../../dominio/fichaCliente'
 import { conversasDoCliente } from '../../../dominio/conversa'
-import { moeda } from '../../../dominio/formato'
+import { mesPorExtenso, moeda } from '../../../dominio/formato'
+import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsVisiveis } from '../../../dominio/relacionamento'
 import { nomeExibido } from '../../../dominio/nomeDoContato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
@@ -41,6 +42,37 @@ function FotoDaLinha({ nome, fotoUrl }) {
   const ref = useRef(null)
   const foto = useFotoCliente(useChegouNaTela(ref) ? fotoUrl : null)
   return <span ref={ref} className={css.fotoDaLinha}><Avatar nome={nome} foto={foto.url} tamanho="medio" /></span>
+}
+
+// #3254 (S2): estágio, gasto, ticket, última compra, sinais e tags da linha. Tudo vem da API (item.relacao); campo ausente
+// (API antiga) vira traço, nunca erro. O estágio é o código que a API mandou, sem conta no Console.
+const Traco = () => <span className={css.traco} role="img" aria-label="Sem dado">—</span>
+const textoDoPercentual = (p) => (p > 0 && p < 1 ? 'menos de 1%' : `${Math.round(p)}%`)
+const textoDosDias = (d) => (d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`)
+function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
+  const estagio = estagioDoCliente(r.estagio), posicao = posicaoDoEstagio(r.estagio)
+  const temGasto = Number.isFinite(r.gastoTotal)
+  const pct = percentualDoGasto(r.gastoTotal, totalDaCarteira)
+  const dias = diasDesde(r.ultimaCompraEm)
+  const desde = r.primeiraCompraEm && Number.isFinite(Date.parse(r.primeiraCompraEm)) ? mesPorExtenso(Date.parse(r.primeiraCompraEm)) : null
+  const tags = tagsVisiveis(r.tags)
+  const nota = typeof r.ultimaNota === 'string' ? r.ultimaNota : r.ultimaNota?.texto
+  return <>
+    <td>{estagio ? <div className={css.estagio}><strong>{estagio}</strong>
+      <span className={css.passos} role="img" aria-label={`Estágio ${posicao + 1} de 4: ${estagio}`}>{[0, 1, 2, 3].map(i => <i key={i} className={i <= posicao ? css.passoAceso : undefined} />)}</span>
+      {r.emRisco && <Pilula tom="aviso" tamanho="inline" titulo="Cliente que já comprou e está há tempo sem pedir.">Em risco</Pilula>}</div> : <Traco />}</td>
+    <td>{temGasto ? <div className={css.gasto}><strong>{moeda(r.gastoTotal)}</strong>
+      {totalDaCarteira > 0 && <><span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 ? Math.max(pct, 2) : 0}%` }} /></span><small>{textoDoPercentual(pct)} da carteira</small></>}</div> : <Traco />}</td>
+    <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? moeda(r.ticketMedio) : <Traco />}</td>
+    <td>{dias === null ? <Traco /> : textoDosDias(dias)}</td>
+    <td>{desde ?? <Traco />}</td>
+    <td><div className={css.sinais}>
+      {r.ocorrenciasAbertas > 0 ? <Pilula tom="perigo" tamanho="inline" titulo={r.ocorrenciasAbertas === 1 ? "1 reclamação ainda aberta." : `${r.ocorrenciasAbertas} reclamações ainda abertas.`}>Reclamação</Pilula>
+        : r.ocorrenciasTotal > 0 ? <small>{r.ocorrenciasTotal === 1 ? '1 reclamação resolvida' : `${r.ocorrenciasTotal} reclamações resolvidas`}</small> : null}
+      {r.notasTotal > 0 ? <span className={css.selo} title={nota || undefined}><Icone nome="conversa" tamanho={16} />{r.notasTotal === 1 ? '1 nota' : `${r.notasTotal} notas`}</span> : null}
+      {!(r.ocorrenciasTotal > 0) && !(r.notasTotal > 0) && <Traco />}</div></td>
+    <td>{tags.length ? <ul className={css.tagsDaLinha}>{tags.slice(0, 3).map(t => <li key={t} className={css.selo}>{t}</li>)}</ul> : <Traco />}</td>
+  </>
 }
 
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
@@ -111,6 +143,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const podeEditar = !CHAVE_EDICAO[tela] || acoes[CHAVE_EDICAO[tela]] === true
   const leads = filtrarSemCadastro(conversas ?? [], busca)
   const lista = soLeads ? leads : consulta.itens
+  const comRelacao = tela === 'clientes' && !soLeads
   const leitura = leituraDaLista(consulta, soLeads)
   // #2495 (S1, I6): a busca de produto usa outra rota, sem ordem; ali a escolha fica parada.
   const ordenavel = !soLeads && !emRecompra && Boolean(ORDENS_CADASTRO[tela]) && !(tela === 'produtos' && busca.trim())
@@ -226,17 +259,20 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {leitura === 'carregando' && lista.length === 0 ? <EsqueletoDeLista linhas={6}>Carregando cadastros…</EsqueletoDeLista> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : emRecompra ? 'Ninguém para chamar agora' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
         acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads && !emRecompra ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : undefined}>
         {busca ? 'Tente outro nome ou contato.' : emRecompra ? 'Aparece aqui quem já comprou 2 vezes ou mais e está há 30 dias sem pedir.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} aria-busy={leitura === 'carregando'}>
-        <table><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
-          : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}<th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th><th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
+        <table className={comRelacao ? css.comRelacao : undefined}><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
+          : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}{comRelacao ? ['Estágio', 'Gasto', 'Ticket médio', 'Última compra', 'Cliente desde', 'Sinais', 'Tags'].map(t => <th key={t} scope="col">{t}</th>) : <><th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th></>}<th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
           const id = item.id ?? item.produtoId
           const c = soLeads ? item : (conversas ?? []).find(c => c.clienteId === id)
           const situacao = situacaoDaLinha(tela, item, soLeads)
           const link = emRecompra ? linkDoConvite(telefoneCadastro(item), nome(item) === 'Contato sem nome' ? '' : nome(item), conta?.casa) : null
           // #2457 (U9): a linha inteira abre o cadastro; o botão Editar continua sendo o alvo do teclado.
           return <tr key={id} className={soLeads ? undefined : css.clicavel} onClick={soLeads ? undefined : e => { if (!e.target.closest('button, a')) editar(item) }}>
-            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : emRecompra ? resumoDaRecompra(item.orderCount, item.lastOrderAt) : item.nomeFantasia || item.marca || item.contato || item.titular || (item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao}</small></div></div></td>
+            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : emRecompra ? resumoDaRecompra(item.orderCount, item.lastOrderAt) : item.nomeFantasia || item.marca || item.contato || item.titular || (item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao}</small>{comRelacao && <span className={css.situacaoNoNome}>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</span>}</div></div></td>
+            {comRelacao && <CelulasDaRelacao relacao={item.relacao} totalDaCarteira={consulta.gastoTotalDaCarteira} />}
+            {!comRelacao && <>
             <td>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : tela === 'bancos' ? item.instituicao || 'Não informada' : <><span>{telefone(item) || emailCadastro(item) || 'Contato não informado'}</span>{telefone(item) && <small>{emailCadastro(item)}</small>}</>}</td>
             <td>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</td>
+            </>}
             <td><div className={css.acoes}>{emRecompra && (link ? <a className={css.chamar} href={link} target="_blank" rel="noopener noreferrer" aria-label={`Chamar ${nome(item)} no WhatsApp`} onClick={() => recompra.convidar(id, nome(item))} onAuxClick={e => e.button === 1 && recompra.convidar(id, nome(item))}>Chamar no WhatsApp</a> : <span className={css.situacao}>Sem telefone</span>)}{!soLeads && <Botao disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`${tela === 'clientes' ? 'Abrir ficha de' : podeEditar ? 'Editar' : 'Ver'} ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : tela === 'clientes' ? 'Abrir ficha' : podeEditar ? 'Editar' : 'Ver'}</Botao>}{podeNovoPedido && emAtividadeCadastro(item) && <Botao disabled={Boolean(novoPedido.abrindo || novoPedido.motivo)} title={novoPedido.motivo ?? undefined} aria-describedby={novoPedido.motivo ? ID_MOTIVO_NOVO_PEDIDO : undefined} onClick={() => (telefoneCadastro(item) ? novoPedido.iniciar(id) : pedirCelular({ id, nome: nome(item) }))} aria-label={`Novo pedido de ${nome(item)}`}>{novoPedido.abrindo === id ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}{c && <Botao variante="texto" onClick={() => abrirConversa(c.id)}>Conversa</Botao>}</div></td>
           </tr>
         })}</tbody></table>

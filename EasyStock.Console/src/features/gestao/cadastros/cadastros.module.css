@@ -148,3 +148,41 @@
 /* #2946: o convite é um link (abre outra aba), com a cara de ação da linha. */
 .chamar { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
 .chamar:hover { background: var(--sucesso-pastel); }
+
+/* #3254 (S2): linha do cliente com a relação. Colunas em porcentagem, tabela fixa: sem rolagem lateral em 1440 e 1920.
+   Destaque por contorno uniforme, fundo e peso do texto; nunca barra colorida só num lado. */
+.lista .comRelacao { table-layout: fixed; }
+.lista .comRelacao th, .lista .comRelacao td { padding-inline: var(--e-3); }
+.lista .comRelacao td { overflow-wrap: normal; }
+.lista .comRelacao td:first-child { overflow-wrap: anywhere; }
+.lista .comRelacao th:nth-child(1) { width: 19%; }
+.lista .comRelacao th:nth-child(2) { width: 12%; }
+.lista .comRelacao th:nth-child(3) { width: 12%; }
+.lista .comRelacao th:nth-child(4) { width: 8%; }
+.lista .comRelacao th:nth-child(5) { width: 7%; }
+.lista .comRelacao th:nth-child(6) { width: 8%; }
+.lista .comRelacao th:nth-child(7) { width: 11%; }
+.lista .comRelacao th:nth-child(8) { width: 11%; }
+.lista .comRelacao th:nth-child(9) { width: 12%; }
+.lista .comRelacao .contatoMovel { display: block; }
+.situacaoNoNome { display: block; margin-top: var(--e-1); }
+.traco { color: var(--tinta-3); }
+.estagio, .gasto, .sinais { display: grid; gap: var(--e-1); justify-items: start; min-width: 0; }
+.estagio strong, .gasto strong { font-weight: 700; }
+.passos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; width: 100%; max-width: 96px; height: 8px; }
+.passos i { background: var(--preenchimento); border: var(--b-1) solid var(--linha); border-radius: 2px; }
+.passos i.passoAceso { background: var(--marca); border-color: var(--marca); }
+.trilhoGasto { display: block; width: 100%; max-width: 120px; height: 8px; border-radius: 999px; background: var(--preenchimento); border: var(--b-1) solid var(--linha); overflow: hidden; }
+.trilhoGasto i { display: block; height: 100%; background: var(--marca); }
+.lista .gasto small { margin-top: 0; }
+.selo { display: inline-flex; align-items: center; gap: var(--e-1); max-width: 100%; padding: 2px var(--e-2); border: var(--b-1) solid var(--linha); border-radius: 999px; background: var(--preenchimento); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagsDaLinha { display: flex; flex-wrap: wrap; gap: var(--e-1); margin: 0; padding: 0; list-style: none; }
+@media (max-width: 700px) {
+  /* Em 390: cliente, estágio e ações. O resto cabe na ficha. */
+  .lista .comRelacao th:nth-child(n+3):not(:last-child), .lista .comRelacao td:nth-child(n+3):not(:last-child) { display: none; }
+  .lista .comRelacao th:nth-child(1) { width: 40%; }
+  .lista .comRelacao th:nth-child(2), .lista .comRelacao td:nth-child(2) { display: table-cell; width: 28%; }
+  .lista .comRelacao th:last-child { width: 32%; }
+  .lista .comRelacao th, .lista .comRelacao td { padding-inline: var(--e-2); }
+  .passos { max-width: 64px; }
+}
