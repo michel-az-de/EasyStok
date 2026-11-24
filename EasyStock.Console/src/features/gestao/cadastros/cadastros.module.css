@@ -153,19 +153,25 @@
    Destaque por contorno uniforme, fundo e peso do texto; nunca barra colorida só num lado. */
 .lista .comRelacao { table-layout: fixed; }
 .lista .comRelacao th, .lista .comRelacao td { padding-inline: var(--e-3); }
+.lista .comRelacao td { padding-block: var(--e-2); }
+.lista .comRelacao td:first-child small { margin-top: 0; }
 .lista .comRelacao td { overflow-wrap: normal; }
 .lista .comRelacao td:first-child { overflow-wrap: anywhere; }
-.lista .comRelacao th:nth-child(1) { width: 19%; }
-.lista .comRelacao th:nth-child(2) { width: 12%; }
-.lista .comRelacao th:nth-child(3) { width: 12%; }
-.lista .comRelacao th:nth-child(4) { width: 8%; }
+.lista .comRelacao th:nth-child(1) { width: 18%; }
+.lista .comRelacao th:nth-child(2) { width: 11%; }
+.lista .comRelacao th:nth-child(3) { width: 11%; }
+.lista .comRelacao th:nth-child(4) { width: 7%; }
 .lista .comRelacao th:nth-child(5) { width: 7%; }
 .lista .comRelacao th:nth-child(6) { width: 8%; }
-.lista .comRelacao th:nth-child(7) { width: 11%; }
-.lista .comRelacao th:nth-child(8) { width: 11%; }
-.lista .comRelacao th:nth-child(9) { width: 12%; }
+.lista .comRelacao th:nth-child(7) { width: 10%; }
+.lista .comRelacao th:nth-child(8) { width: 10%; }
+.lista .comRelacao th:nth-child(9) { width: 18%; }
+/* Ações compactas: lado a lado quando cabem, e o link do convite quebra dentro da célula em vez de sair dela. */
+.lista .comRelacao .acoes { gap: var(--e-1); }
+.lista .comRelacao .acoes button, .lista .comRelacao .acoes .chamar { min-height: 32px; padding-inline: var(--e-2); }
+.lista .comRelacao .acoes .chamar { white-space: normal; text-align: center; max-width: 100%; }
 .lista .comRelacao .contatoMovel { display: block; }
-.situacaoNoNome { display: block; margin-top: var(--e-1); }
+.situacaoNoNome { display: block; margin-top: 2px; }
 .traco { color: var(--tinta-3); }
 .estagio, .gasto, .sinais { display: grid; gap: var(--e-1); justify-items: start; min-width: 0; }
 .estagio strong, .gasto strong { font-weight: 700; }
@@ -184,5 +190,6 @@
   .lista .comRelacao th:nth-child(2), .lista .comRelacao td:nth-child(2) { display: table-cell; width: 28%; }
   .lista .comRelacao th:last-child { width: 32%; }
   .lista .comRelacao th, .lista .comRelacao td { padding-inline: var(--e-2); }
+  .lista .comRelacao .acoes { flex-direction: column; align-items: stretch; }
   .passos { max-width: 64px; }
 }

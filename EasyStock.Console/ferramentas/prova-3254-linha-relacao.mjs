@@ -126,6 +126,7 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.ok(m.pagina <= 0, `página sem rolagem horizontal (${m.pagina}px)`)
     if (largo) assert.ok(m.lista <= 0 && m.tabela <= 1, `lista sem rolagem horizontal (${m.lista}px, tabela ${m.tabela}px)`)
     if (largo) assert.deepEqual(await sobreposicoes(page), [], 'blocos da linha sem sobreposição')
+    if (largo) console.log(`      altura da linha Todos em ${largura}: ${Math.round((await linha(page, 3).boundingBox()).height)} px`)
     await page.screenshot({ path: `${pasta}/clientes-${largura}.png` })
     await contexto.close()
   })
@@ -141,6 +142,26 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.doesNotMatch(await c.page.locator('tbody').innerText(), /NaN|Infinity|undefined/, 'sem lixo numérico')
     assert.deepEqual(await sobreposicoes(c.page), [], 'sem sobreposição com carteira 0')
     await c.contexto.close()
+  })
+  for (const [aba, rotulo] of [['Sem pedido', 'Leads'], ['Recompra', 'Recompra']]) await item(`${largura}: aba ${rotulo} sem rolagem horizontal e com cada filho na própria célula`, async () => {
+    const { contexto, page } = await preparar(largura, comRelacao, { gastoTotalDaCarteira: 2000 })
+    await linha(page, 5).waitFor()
+    await page.getByRole('tab', { name: aba, exact: true }).click()
+    await page.getByRole('tab', { name: aba, exact: true, selected: true }).waitFor()
+    await linha(page, 5).waitFor()
+    if (aba === 'Recompra') assert.ok(await page.getByRole('link', { name: /^Chamar .* no WhatsApp$/ }).count() > 0, 'convite de recompra presente')
+    const m = await rolagem(page)
+    assert.ok(m.pagina <= 0, `página sem rolagem horizontal (${m.pagina}px)`)
+    if (largo) {
+      assert.ok(m.lista <= 0 && m.tabela <= 1, `lista sem rolagem horizontal (${m.lista}px, tabela ${m.tabela}px)`)
+      assert.deepEqual(await sobreposicoes(page), [], 'filhos dentro da própria célula, sem sobreposição')
+      console.log(`      altura da linha ${rotulo} em ${largura}: ${Math.round((await linha(page, 3).boundingBox()).height)} px`)
+    } else {
+      // Em 390 a célula de ações também não deixa o link sair.
+      assert.deepEqual(await sobreposicoes(page), [], 'filhos dentro da própria célula em 390')
+    }
+    await page.screenshot({ path: `${pasta}/${rotulo.toLowerCase()}-${largura}.png` })
+    await contexto.close()
   })
   await item(`${largura}: API antiga (sem os campos novos) mostra neutro, mantém as ações e não quebra`, async () => {
     const antes = erros.length
