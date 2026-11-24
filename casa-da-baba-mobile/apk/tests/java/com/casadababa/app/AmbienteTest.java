@@ -17,6 +17,7 @@ import org.json.JSONObject;
 /** #3114 (B9): login e pareamento do APK de homologação não abrem conexão com a produção. */
 public final class AmbienteTest {
     private static final List<String> abertas = new CopyOnWriteArrayList<>();
+    private static final List<HttpsURLConnection> conexoes = new CopyOnWriteArrayList<>();
     private static int checks;
 
     public static void main(String[] args) throws Exception {
@@ -36,9 +37,13 @@ public final class AmbienteTest {
         new SessionHttpClient(hml).request("/api/mobile/session", null, "token-teste");
         check(abertas.equals(List.of("https://api-teste.example/api/mobile/pairing", "https://api-teste.example/api/mobile/session")),
             "login e pareamento da homologação abrem só a API de teste: " + abertas);
+        check(conexoes.size() == 2 && conexoes.stream().allMatch(c -> "homologacao".equals(c.getRequestProperty("X-Cdb-Ambiente"))),
+            "homologação declara o ambiente em todo pedido, e a API da produção recusa (#3251)");
         abertas.clear();
+        conexoes.clear();
         new SessionHttpClient().request("/api/mobile/session", null, null);
         check(abertas.equals(List.of("https://api.easystok.online/api/mobile/session")), "cliente padrão segue o ambiente do build");
+        check(conexoes.size() == 1 && conexoes.get(0).getRequestProperty("X-Cdb-Ambiente") == null, "oficial não manda cabeçalho de ambiente");
 
         String[] producao = { "https://api.easystok.online", "https://API.EasyStok.Online", "https://easystok.online",
             "https://x.app.easystok.online", "https://casadababa.com", "https://www.casadababa.com",
@@ -67,7 +72,7 @@ public final class AmbienteTest {
         URL.setURLStreamHandlerFactory(protocol -> new URLStreamHandler() {
             @Override protected URLConnection openConnection(URL url) {
                 abertas.add(url.toString());
-                return new HttpsURLConnection(url) {
+                HttpsURLConnection conexao = new HttpsURLConnection(url) {
                     private final ByteArrayOutputStream corpo = new ByteArrayOutputStream();
                     public void disconnect() {}
                     public boolean usingProxy() { return false; }
@@ -81,6 +86,8 @@ public final class AmbienteTest {
                         return new ByteArrayInputStream("{\"data\":{\"status\":\"ok\"}}".getBytes(StandardCharsets.UTF_8));
                     }
                 };
+                conexoes.add(conexao);
+                return conexao;
             }
         });
     }

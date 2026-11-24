@@ -10,9 +10,14 @@ import org.json.JSONObject;
 
 class SessionHttpClient {
     private final String origin;
+    // #3251: a homologação se declara em todo pedido; a API da produção recusa. O oficial não manda nada.
+    private final String ambienteDeclarado;
 
     SessionHttpClient() { this(Ambiente.ATUAL); }
-    SessionHttpClient(Ambiente ambiente) { origin = ambiente.apiOrigin(); }
+    SessionHttpClient(Ambiente ambiente) {
+        origin = ambiente.apiOrigin();
+        ambienteDeclarado = "oficial".equals(ambiente.nome()) ? null : ambiente.nome();
+    }
 
     private String url(String path) { return origin + path; }
 
@@ -38,6 +43,7 @@ class SessionHttpClient {
         connection.setRequestProperty("Accept", "application/json");
         if (token != null) connection.setRequestProperty("Authorization", "Bearer " + token);
         if (deviceKey != null) connection.setRequestProperty("X-Mobile-Api-Key", deviceKey);
+        if (ambienteDeclarado != null) connection.setRequestProperty("X-Cdb-Ambiente", ambienteDeclarado);
         try {
             if (body != null) {
                 connection.setRequestMethod("POST");
