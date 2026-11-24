@@ -49,10 +49,10 @@ public sealed class TravaDeAmbienteMiddleware(RequestDelegate next, IConfigurati
     private bool AceitaHomologacao() =>
         bool.TryParse(configuracao[ChaveAceitaHomologacao], out var aceita) && aceita;
 
+    // Mesmo saneamento dos outros middlewares (o CodeQL reconhece), com teto de tamanho antes.
     private static string Sanitizar(string? valor)
     {
-        if (string.IsNullOrEmpty(valor)) return string.Empty;
-        var limpo = new string(valor.Where(c => !char.IsControl(c)).ToArray());
-        return limpo.Length > 80 ? limpo[..80] : limpo;
+        var curto = valor is { Length: > 80 } ? valor[..80] : valor ?? "";
+        return curto.Replace("\r", "").Replace("\n", "");
     }
 }
