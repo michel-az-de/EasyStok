@@ -40,6 +40,8 @@ async function preparar(largura) {
   })
   const page = await contexto.newPage()
   page.setDefaultTimeout(12000)
+  // A subida do app no Vite frio, com o job do CI carregado, passou de 12 s (run 45316855628). Só a navegação ganha folga; as asserções seguem em 12 s.
+  page.setDefaultNavigationTimeout(60000)
   page.on('pageerror', (e) => erros.push(e.message))
   await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
   await page.getByText('Cliente Ficticio 01', { exact: true }).waitFor()

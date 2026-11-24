@@ -62,6 +62,8 @@ async function preparar(largura, resposta, meta = {}) {
   })
   const page = await contexto.newPage()
   page.setDefaultTimeout(15000)
+  // Como na 3241: a subida do app no Vite frio, com o CI carregado, pode passar do teto das asserções.
+  page.setDefaultNavigationTimeout(60000)
   page.on('pageerror', (e) => erros.push(e.message))
   await page.goto(`${URL_CONSOLE}/#/m/cadastros/clientes`)
   return { contexto, page }
