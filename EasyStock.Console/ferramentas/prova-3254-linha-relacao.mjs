@@ -15,12 +15,14 @@ const nomeDe = (n) => `Cliente Ficticio ${String(n).padStart(2, '0')}`
 const base = { ocorrenciasAbertas: 0, ocorrenciasTotal: 0, notasTotal: 0, ultimaNota: null, tags: [], emRisco: false }
 // 1 sem pedido; 2 primeira compra; 3 recorrente em risco com reclamação, notas e a tag interna; 4 FIEL COM 1 COMPRA (a API manda, a tela só traduz);
 // 5 fiel com mais de 3 tags.
+// Tag longa como a API manda (normalizada): na coluna estreita ela é cortada com reticências e o title traz o rótulo inteiro.
+const TAG_LONGA = 'cliente_indicado_pela_feira_de_artesanato_do_bairro'
 const REL = [
   { ...base, estagio: 'sem_pedido', criadoEm: '2026-10-05T15:00:00Z', gastoTotal: 0, compras: 0, ticketMedio: null, primeiraCompraEm: null, ultimaCompraEm: null },
-  { ...base, estagio: 'primeira_compra', gastoTotal: 38, compras: 1, ticketMedio: 38, primeiraCompraEm: '2026-11-15T15:00:00Z', ultimaCompraEm: '2026-11-15T15:00:00Z', notasTotal: 1, ultimaNota: 'Pede entrega depois das 18h.', tags: ['instagram'] },
+  { ...base, estagio: 'primeira_compra', gastoTotal: 0.4, compras: 1, ticketMedio: 0.4, primeiraCompraEm: '2026-11-15T15:00:00Z', ultimaCompraEm: '2026-11-15T15:00:00Z', notasTotal: 1, ultimaNota: 'Pede entrega depois das 18h.', tags: ['instagram'] },
   { ...base, estagio: 'recorrente', criadoEm: '2025-12-20T15:00:00Z', gastoTotal: 444, compras: 6, ticketMedio: 74, primeiraCompraEm: '2026-01-10T15:00:00Z', ultimaCompraEm: '2026-09-20T15:00:00Z', ocorrenciasAbertas: 1, ocorrenciasTotal: 2, notasTotal: 3, ultimaNota: 'Ligar antes de repor.', tags: ['whatsapp', 'restaurante', 'recompra_convidada'], emRisco: true },
   { ...base, estagio: 'fiel', gastoTotal: 500, compras: 1, ticketMedio: 500, primeiraCompraEm: '2026-11-18T15:00:00Z', ultimaCompraEm: '2026-11-18T15:00:00Z' },
-  { ...base, estagio: 'fiel', gastoTotal: 1020, compras: 12, ticketMedio: 85, primeiraCompraEm: '2025-06-10T15:00:00Z', ultimaCompraEm: '2026-11-20T15:00:00Z', tags: ['cliente_vip', 'instagram', 'evento', 'atacado'] },
+  { ...base, estagio: 'fiel', gastoTotal: 1020, compras: 12, ticketMedio: 85, primeiraCompraEm: '2025-06-10T15:00:00Z', ultimaCompraEm: '2026-11-20T15:00:00Z', tags: ['cliente_vip', TAG_LONGA, 'evento', 'atacado'] },
   // 6: ticket de 4 dígitos e gasto de 5 dígitos (o texto não pode sair da célula). 7: inativo, com relação.
   { ...base, estagio: 'fiel', gastoTotal: 12345.67, compras: 12, ticketMedio: 1028.81, primeiraCompraEm: '2025-03-10T15:00:00Z', ultimaCompraEm: '2026-11-21T15:00:00Z' },
   { ...base, estagio: 'recorrente', gastoTotal: 300, compras: 3, ticketMedio: 100, primeiraCompraEm: '2026-02-10T15:00:00Z', ultimaCompraEm: '2026-08-21T15:00:00Z', ativo: false },
@@ -107,6 +109,18 @@ const transbordoDeTexto = (page) => page.evaluate(() => {
   }))
   return problemas
 })
+// A tag longa da linha 5: reticência computada, de fato cortada, com o rótulo inteiro no title, e a célula sem transbordo.
+const tagLonga = (page) => linha(page, 5).locator('ul li').filter({ hasText: /^cliente indicado/ }).evaluate((li) => {
+  const td = li.closest('td')
+  return { reticencia: getComputedStyle(li).textOverflow, cortada: li.scrollWidth > li.clientWidth, title: li.title, transbordoDaCelula: td.scrollWidth - td.clientWidth }
+})
+const confereTagLonga = async (page) => {
+  const t = await tagLonga(page)
+  assert.equal(t.reticencia, 'ellipsis', 'tag longa com text-overflow ellipsis')
+  assert.ok(t.cortada, 'tag longa de fato cortada (scrollWidth > clientWidth)')
+  assert.equal(t.title, TAG_LONGA.replace(/_/g, ' '), 'title com o rótulo inteiro')
+  assert.ok(t.transbordoDaCelula <= 0, `célula da tag sem transbordo (${t.transbordoDaCelula}px)`)
+}
 const larguraDasBarras = (page) => page.evaluate(() => [...document.querySelectorAll('tbody [class*="trilhoGasto"] i')].map((i) => i.getBoundingClientRect().width))
 
 // As larguras rodam em paralelo; os itens de cada largura em série (em paralelo, a carga fria do servidor de desenvolvimento estoura o tempo da página).
@@ -149,6 +163,11 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
       const cinco = await linha(page, 5).innerText()
       assert.match(cinco, /R\$\s*1\.020(?!,)/, 'gasto')
       assert.match(cinco, /R\$\s*85(?!,)/, 'ticket')
+      assert.match(cinco, /R\$\u00a0\d/, 'espaço não separável entre R$ e o número')
+      const dois = await linha(page, 2).innerText()
+      assert.match(dois, /R\$\u00a00,40/, 'ticket de R$ 0,40 com centavos, não R$ 0')
+      assert.doesNotMatch(dois, /R\$[\s\u00a0]*0(?!,)/, 'sem R$ 0 seco')
+      if (largura === 1440) await confereTagLonga(page)
       assert.match(cinco, /há \d+ dias?|hoje/, 'última compra')
       assert.match(await linha(page, 4).innerText(), /1% da carteira/, 'gasto 500 de 50000')
       assert.equal(await linha(page, 5).locator('ul li').count(), 3, 'até 3 tags')
@@ -204,6 +223,7 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     await linha(page, 5).waitFor()
     if (aba === 'Recompra') {
       assert.ok(await page.getByRole('link', { name: /^Chamar .* no WhatsApp$/ }).count() > 0, 'convite de recompra presente')
+      if (largura === 1440) await confereTagLonga(page)
       const tres = await linha(page, 3).innerText()
       assert.match(tres, /(?<![0-9])6 compras(?![a-z])/, 'Recompra escreve as compras da relação')
       assert.doesNotMatch(tres, /[0-9]+ pedidos?|último há/, 'Recompra sem "N pedidos" nem "último há" ao lado de ticket e última compra')

@@ -23,7 +23,7 @@ import { linkDoConvite, resumoDaRecompra } from '../../../dominio/recompra'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { clienteDaHash } from '../../../dominio/fichaCliente'
 import { conversasDoCliente } from '../../../dominio/conversa'
-import { mesPorExtenso, moeda, plural } from '../../../dominio/formato'
+import { mesPorExtenso, moeda, moedaCheia, plural } from '../../../dominio/formato'
 import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsVisiveis } from '../../../dominio/relacionamento'
 import { rotuloDaTag } from '../../../dominio/tag'
 import { nomeExibido } from '../../../dominio/nomeDoContato'
@@ -49,8 +49,6 @@ function FotoDaLinha({ nome, fotoUrl }) {
 // (API antiga) vira traço, nunca erro. O estágio é o código que a API mandou, sem conta no Console.
 const Traco = () => <span className={css.traco} role="img" aria-label="Sem dado" />
 const textoDoPercentual = (p) => (p > 0 && p < 1 ? 'menos de 1%' : `${Math.round(p)}%`)
-// Como o protótipo: reais inteiros, sem centavos; R$ 1.028,81 vira R$ 1.029 e cabe na coluna estreita.
-const reais = (v) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`
 const textoDosDias = (d) => (d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`)
 function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
   const estagio = estagioDoCliente(r.estagio), posicao = posicaoDoEstagio(r.estagio)
@@ -63,10 +61,10 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
     <td>{estagio ? <div className={css.estagio}><strong>{estagio}</strong>
       <span className={css.passos} role="img" aria-label={`Estágio ${posicao + 1} de 4: ${estagio}`}>{[0, 1, 2, 3].map(i => <i key={i} className={i <= posicao ? css.passoAceso : undefined} />)}</span>
       {r.emRisco && <Pilula tom="aviso" tamanho="inline" titulo="Comprou 2 vezes ou mais e está há 30 dias sem pedir.">Em risco</Pilula>}</div> : <Traco />}</td>
-    <td>{temGasto ? <div className={css.gasto}><strong>{r.gastoTotal > 0 ? reais(r.gastoTotal) : 'Sem gasto ainda'}</strong>
+    <td>{temGasto ? <div className={css.gasto}><strong>{r.gastoTotal > 0 ? moedaCheia(r.gastoTotal) : 'Sem gasto ainda'}</strong>
       {Number.isFinite(totalDaCarteira) && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 && totalDaCarteira > 0 ? Math.max(pct, 2) : 0}%` }} /></span>}
       {r.gastoTotal > 0 && totalDaCarteira > 0 && <small>{textoDoPercentual(pct)} da carteira</small>}</div> : <Traco />}</td>
-    <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? reais(r.ticketMedio) : <Traco />}</td>
+    <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? moedaCheia(r.ticketMedio) : <Traco />}</td>
     <td>{dias === null ? <Traco /> : textoDosDias(dias)}</td>
     <td>{desde ?? <Traco />}</td>
     <td><div className={css.sinais}>
@@ -74,7 +72,7 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
         : r.ocorrenciasTotal > 0 ? <small>{r.ocorrenciasTotal === 1 ? '1 reclamação resolvida' : `${r.ocorrenciasTotal} reclamações resolvidas`}</small> : null}
       {r.notasTotal > 0 ? <span className={css.selo} title={r.ultimaNota || undefined}><Icone nome="conversa" tamanho={16} />{r.notasTotal === 1 ? '1 nota' : `${r.notasTotal} notas`}</span> : null}
       {!(r.ocorrenciasTotal > 0) && !(r.notasTotal > 0) && <Traco />}</div></td>
-    <td>{tags.length ? <ul className={css.tagsDaLinha}>{tags.slice(0, 3).map(t => <li key={t} className={css.selo}>{rotuloDaTag(t)}</li>)}</ul> : <Traco />}</td>
+    <td>{tags.length ? <ul className={css.tagsDaLinha}>{tags.slice(0, 3).map(t => <li key={t} className={css.selo} title={rotuloDaTag(t)}>{rotuloDaTag(t)}</li>)}</ul> : <Traco />}</td>
   </>
 }
 
