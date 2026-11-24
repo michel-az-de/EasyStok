@@ -1996,12 +1996,16 @@
   // Min 60s entre escritas pra nao martelar IO em rajadas de operacao.
   var _localBackupTimer = null;
   var LOCAL_BACKUP_MIN_INTERVAL = 60 * 1000;
+  var _ultimaAcaoLocal = 0;
   function scheduleLocalBackup(reason, espera) {
+    if (!espera) _ultimaAcaoLocal = Date.now();
     if (_localBackupTimer) return;
     _localBackupTimer = setTimeout(function () {
       _localBackupTimer = null;
       var last = 0;
       try { last = parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0; } catch (e) {}
+      if (last > Date.now()) last = 0; // relógio voltou ou valor restaurado: grava já
+      if (last >= _ultimaAcaoLocal) return; // o pre-sync (ou outra gravação) já levou a ação
       var falta = LOCAL_BACKUP_MIN_INTERVAL - (Date.now() - last);
       // #3257: dentro do intervalo mínimo, reagenda para o fim dele. Antes a última ação da
       // rajada ficava fora do arquivo até a próxima ação.
@@ -2024,20 +2028,15 @@
       return { motivo: 'pareamento-invalido', mensagem: 'O servidor não reconhece mais este aparelho. ' + plural(n, 'alteração está', 'alterações estão') + ' só aqui. Conecte o aparelho de novo.' };
     if (e.retidoPorImportacao && n > 0)
       return { motivo: 'importacao-retida', mensagem: 'O envio está parado até você conferir a loja dos dados importados. ' + plural(n, 'alteração está', 'alterações estão') + ' só neste aparelho.' };
-    if (e.deadletter > 0)
-      return { motivo: 'recusadas', mensagem: plural(e.deadletter, 'alteração recusada', 'alterações recusadas') + ' pelo servidor ' + (e.deadletter === 1 ? 'existe' : 'existem') + ' só neste aparelho.' };
-    if (e.conflitos > 0)
-      return { motivo: 'conflitos', mensagem: plural(e.conflitos, 'alteração em conflito', 'alterações em conflito') + ' ' + (e.conflitos === 1 ? 'existe' : 'existem') + ' só neste aparelho.' };
-    var antiga = fila.some(function (m) { var t = m && (m.createdAt || m.ts); return t && e.agora - t > FILA_ANTIGA_MS; });
-    if (antiga)
-      return { motivo: 'fila-antiga', mensagem: plural(n, 'alteração está', 'alterações estão') + ' só neste aparelho há mais de um dia. Conecte à internet para enviar.' };
+    // Recusadas e conflitos ficam fora: não há tela para resolver, e o alerta seria permanente.
+    var antigas = fila.filter(function (m) { var t = m && (m.createdAt || m.ts); return t && e.agora - t > FILA_ANTIGA_MS; }).length;
+    if (antigas > 0)
+      return { motivo: 'fila-antiga', mensagem: plural(antigas, 'alteração está', 'alterações estão') + ' só neste aparelho há mais de um dia. Conecte à internet para enviar.' };
     return null;
   }
 
   async function avaliarDadoSoNoAparelho() {
     try { await localReady; } catch (e) {}
-    var stats = {};
-    try { if (window.cdbQueueStore && window.cdbQueueStore.ready) stats = await window.cdbQueueStore.getStats(); } catch (e) {}
     function conta(chave) {
       try { var v = JSON.parse(localStorage.getItem(chave) || '[]'); return Array.isArray(v) ? v.length : 0; } catch (e) { return 0; }
     }
@@ -2045,7 +2044,6 @@
     return dadoSoNoAparelho({
       agora: Date.now(), pareado: !!(pairing && pairing.apiKey), pareamentoInvalido: _pairingInvalid,
       retidoPorImportacao: syncHeldForImport(), fila: loadQueue(),
-      deadletter: stats.deadletterCount || 0, conflitos: stats.conflictCount || 0,
       pedidos: conta('cdb-orders'), caixa: conta('cdb-cash'), lotes: conta('cdb-batches')
     });
   }

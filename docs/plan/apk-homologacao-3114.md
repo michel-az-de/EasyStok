@@ -74,15 +74,14 @@ Issue #3257 (movida da #3251). O PWA, que é o mesmo conteúdo do APK, já fazia
   1. sem pareamento, com pedido, caixa, lote ou fila (produtos e clientes não contam, porque o PWA semeia exemplos);
   2. pareamento recusado pelo servidor (401), com fila;
   3. envio retido até conferir a loja dos dados importados, com fila;
-  4. alteração recusada pelo servidor (deadletter);
-  5. alteração em conflito;
-  6. item da fila com mais de 24 h.
-- `cdbSync.avaliarDadoSoNoAparelho()` espera o `localReady`, lê a fila em memória e os números do `queue-store`.
+  4. item da fila com mais de 24 h (a mensagem conta só esses).
+- `cdbSync.avaliarDadoSoNoAparelho()` espera o `localReady` e lê a fila em memória.
+- O arquivo local não grava de novo quando o pre-sync já levou a ação, e uma marca de backup no futuro (relógio que voltou, valor restaurado) não trava a gravação.
 - O health check mostra o alerta (`warn`, ação Diagnóstico, onde ficam a fila, o backup e a exportação) depois da impressora, que é problema passageiro, e antes da idade do backup. O banner pode ser fechado por 1 h e volta no próximo health check.
 
 ### Fora de S3
 
-- Deadletter e conflitos moram só no IndexedDB e não entram no arquivo nem no backup do servidor. O alerta avisa deles.
+- Alterações recusadas (deadletter) e conflitos: moram só no IndexedDB, fora do arquivo e do backup do servidor, e não há tela para resolvê-los. Um alerta seria permanente e esconderia o aviso de idade do backup. Fica para quando houver essa tela.
 - Fotos à espera de envio (`photo-store`) não entram no alerta.
 - Backup com o app fechado: sem app aberto não há dado novo.
 - Envio ao servidor sem pareamento: não existe; o alerta manda exportar ou conectar.

@@ -65,6 +65,28 @@ module.exports = function ({ test, sandbox, assert }) {
     }));
   });
 
+  test('#3257 sem gravação dobrada nem laço de timer', async () => {
+    const log = [];
+    const anterior = sandbox.localStorage.getItem(LAST_LOCAL);
+    sandbox.window.cdbSync._internal.cancelarBackupLocalAgendado();
+    try {
+      await comBackupNativo(log, () => comRelogio(async ({ avancar, agora }) => {
+        sandbox.localStorage.setItem(LAST_LOCAL, String(agora() - 30 * 1000));
+        sandbox.window.cdbSync.scheduleLocalBackup('action');
+        sandbox.localStorage.setItem(LAST_LOCAL, String(agora() + 1)); // pre-sync gravou depois da ação
+        await avancar(120 * 1000);
+        assert.deepStrictEqual(log, [], 'o pre-sync já levou a ação');
+
+        sandbox.localStorage.setItem(LAST_LOCAL, String(agora() + 30 * 24 * HORA)); // relógio voltou
+        sandbox.window.cdbSync.scheduleLocalBackup('action');
+        await avancar(5 * 1000);
+        assert.deepStrictEqual(log, ['arquivo'], 'marca no futuro não trava o backup');
+      }));
+    } finally {
+      if (anterior === null) sandbox.localStorage.removeItem(LAST_LOCAL); else sandbox.localStorage.setItem(LAST_LOCAL, anterior);
+    }
+  });
+
   test('#3257 envio ao servidor é automático a cada 24h, não antes', async () => {
     const enviados = [];
     const pairing = sandbox.localStorage.getItem('cdb-pairing');
@@ -112,10 +134,12 @@ module.exports = function ({ test, sandbox, assert }) {
       [{ pareado: false, lotes: 1 }, 'sem-pareamento'],
       [{ pareamentoInvalido: true, fila: [{ ts: AGORA }] }, 'pareamento-invalido'],
       [{ retidoPorImportacao: true, fila: [{ ts: AGORA }] }, 'importacao-retida'],
-      [{ deadletter: 2 }, 'recusadas'],
-      [{ conflitos: 1 }, 'conflitos'],
       [{ fila: [{ ts: AGORA - 25 * HORA }, { createdAt: AGORA }] }, 'fila-antiga'],
     ];
+    assert.match(avaliar(estado({ fila: [{ ts: AGORA - 25 * HORA }, { createdAt: AGORA }] })).mensagem, /^1 alteração está/,
+      'conta só os itens com mais de um dia');
+    assert.strictEqual(avaliar(estado({ deadletter: 2, conflitos: 1 })), null,
+      'recusadas e conflitos não têm tela para resolver: alerta permanente seria ruído');
     for (const [extra, motivo] of casos) {
       const r = avaliar(estado(extra));
       assert.ok(r && r.motivo === motivo, JSON.stringify(extra) + ' devia dar ' + motivo + ', deu ' + JSON.stringify(r));
