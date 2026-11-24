@@ -1,21 +1,10 @@
 name: CodeQL
 
+# #3277: só semanal e sob demanda. Era 39% dos minutos do CI (911 min em 38 h). Troca de risco
+# declarada: achado de C# aparece em até 7 dias, depois do deploy, e só na aba Security (a PR não
+# anota). Para antecipar, rode por workflow_dispatch.
 on:
-  push:
-    branches: [master, main]
-  # #2976 (S1.7): na PR, só quando muda C#, projeto ou workflow. Troca de risco declarada: achado em
-  # PR sem código C# só aparece no push do master, antes do deploy. Push no master e semanal seguem.
-  pull_request:
-    branches: [master, main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '**/*.cs'
-      - '**/*.csproj'
-      - '**/*.props'
-      - '**/*.targets'
-      - '**/*.sln'
-      - '**/*.slnf'
-      - '.github/workflows/**'
+  workflow_dispatch:
   schedule:
     - cron: '0 5 * * 1'
 
@@ -27,7 +16,6 @@ permissions:
 jobs:
   analyze:
     name: Analyze C#
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
