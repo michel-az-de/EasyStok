@@ -27,7 +27,8 @@ const cliente = (n, extra = {}) => ({ id: idDe(n), revisao: 1, nome: nomeDe(n), 
 // Cliente 1 sem telefone e e-mail; cliente 5 com os dois.
 const comRelacao = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras + 2, ...(i === 0 ? { telefone: '' } : {}), ...(i === 4 ? { email: 'ficticio05@exemplo.test' } : {}) }))
 const semRelacao = REL.map((_, i) => cliente(i + 1, i === 2 ? { orderCount: 3 } : {}))
-const carteiraZero = REL.map((_, i) => cliente(i + 1, { ...REL[0] }))
+// Carteira 0 com clientes que têm compras (dado incoerente, mas a tela não pode quebrar nem inventar percentual).
+const carteiraZero = REL.map((r, i) => cliente(i + 1, { ...r, orderCount: r.compras }))
 const browser = await chromium.launch({ headless: true })
 const erros = []
 const falhas = []
@@ -97,6 +98,7 @@ const sobreposicoes = (page) => page.evaluate(() => {
 })
 const larguraDasBarras = (page) => page.evaluate(() => [...document.querySelectorAll('tbody [class*="trilhoGasto"] i')].map((i) => i.getBoundingClientRect().width))
 
+// As larguras rodam em paralelo; os itens de cada largura em série (em paralelo, a carga fria do servidor de desenvolvimento estoura o tempo da página).
 await Promise.all([1920, 1440, 390].map(async (largura) => {
   const largo = largura > 700
   await item(`${largura}: estágio vem da API, Em risco só com emRisco, tag interna oculta, sem rolagem nem sobreposição`, async () => {
@@ -139,7 +141,7 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
       assert.match(cinco, /há \d+ dias?|hoje/, 'última compra')
       assert.match(await linha(page, 4).innerText(), /25% da carteira/, 'gasto 500 de 2000')
       assert.equal(await linha(page, 5).locator('ul li').count(), 3, 'até 3 tags')
-      assert.equal(await linha(page, 3).locator('ul li').count(), 2, 'a tag interna não ocupa vaga')
+      assert.equal(await linha(page, 3).locator('ul li').count(), 2, 'a tag interna não aparece e as 2 tags restantes ficam (a API corta em 3 antes do filtro)')
     }
     const m = await rolagem(page)
     assert.ok(m.pagina <= 0, `página sem rolagem horizontal (${m.pagina}px)`)
@@ -149,17 +151,30 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     await page.screenshot({ path: `${pasta}/clientes-${largura}.png` })
     await contexto.close()
   })
-  if (largo) await item(`${largura}: barra de gasto proporcional e em 0 quando a carteira é 0`, async () => {
+  if (largo) await item(`${largura}: barra de gasto sempre desenhada com a relação, em 0 sem gasto ou com carteira 0`, async () => {
     let c = await preparar(largura, comRelacao, { gastoTotalDaCarteira: 2000 })
     await linha(c.page, 5).waitFor()
     const barras = await larguraDasBarras(c.page)
-    assert.ok(barras.length > 0 && barras.some((w) => w > 0), 'com carteira, há barra com largura')
+    assert.equal(barras.length, REL.length, 'uma barra por linha')
+    assert.equal(barras[0], 0, 'cliente sem gasto: barra em 0')
+    assert.ok(barras.slice(1).every((w) => w > 0), 'quem gastou tem barra com largura')
+    assert.match(await linha(c.page, 1).innerText(), /Sem gasto ainda/, 'gasto 0 escreve Sem gasto ainda')
+    assert.doesNotMatch(await linha(c.page, 1).innerText(), /R\$\s*0,00|0%/, 'gasto 0 sem R$ 0,00 nem 0%')
     await c.contexto.close()
     c = await preparar(largura, carteiraZero, { gastoTotalDaCarteira: 0 })
     await linha(c.page, 1).waitFor()
-    assert.ok((await larguraDasBarras(c.page)).every((w) => w === 0), 'carteira 0: barra de gasto em 0')
-    assert.doesNotMatch(await c.page.locator('tbody').innerText(), /NaN|Infinity|undefined/, 'sem lixo numérico')
+    const zero = await larguraDasBarras(c.page)
+    assert.equal(zero.length, REL.length, 'carteira 0: a barra continua desenhada, uma por linha')
+    assert.ok(zero.length > 0 && zero.every((w) => w === 0), 'carteira 0: barra de gasto em 0')
+    const corpo = await c.page.locator('tbody').innerText()
+    assert.doesNotMatch(corpo, /da carteira/, 'carteira 0: sem percentual inventado')
+    assert.match(await linha(c.page, 5).innerText(), /R\$\s*1\.020,00/, 'carteira 0: o gasto de quem comprou segue na linha')
+    assert.doesNotMatch(corpo, /NaN|Infinity|undefined/, 'sem lixo numérico')
     assert.deepEqual(await sobreposicoes(c.page), [], 'sem sobreposição com carteira 0')
+    await c.contexto.close()
+    c = await preparar(largura, semRelacao)
+    await linha(c.page, 5).waitFor()
+    assert.equal((await larguraDasBarras(c.page)).length, 0, 'API antiga (carteira null): sem barra')
     await c.contexto.close()
   })
   for (const [aba, rotulo] of [['Sem pedido', 'Leads'], ['Recompra', 'Recompra']]) await item(`${largura}: aba ${rotulo} sem rolagem horizontal e com cada filho na própria célula`, async () => {

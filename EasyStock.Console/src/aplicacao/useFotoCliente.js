@@ -16,7 +16,7 @@ function guardar(fonte, url) {
 export function useFotoCliente(fotoUrl) {
   const [foto, setFoto] = useState({ fonte: null, url: null, erro: null })
   useEffect(() => {
-    if (!fotoUrl) return undefined
+    if (!fotoUrl || GUARDADAS.has(fotoUrl)) return undefined // já guardada: a linha que remonta não baixa de novo
     const controle = new AbortController()
     const leitor = new FileReader()
     let ativo = true

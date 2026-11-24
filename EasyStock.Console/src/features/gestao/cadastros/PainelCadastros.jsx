@@ -61,8 +61,9 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
     <td>{estagio ? <div className={css.estagio}><strong>{estagio}</strong>
       <span className={css.passos} role="img" aria-label={`Estágio ${posicao + 1} de 4: ${estagio}`}>{[0, 1, 2, 3].map(i => <i key={i} className={i <= posicao ? css.passoAceso : undefined} />)}</span>
       {r.emRisco && <Pilula tom="aviso" tamanho="inline" titulo="Comprou 2 vezes ou mais e está há 30 dias sem pedir.">Em risco</Pilula>}</div> : <Traco />}</td>
-    <td>{temGasto ? <div className={css.gasto}><strong>{moeda(r.gastoTotal)}</strong>
-      {totalDaCarteira > 0 && <><span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 ? Math.max(pct, 2) : 0}%` }} /></span><small>{textoDoPercentual(pct)} da carteira</small></>}</div> : <Traco />}</td>
+    <td>{temGasto ? <div className={css.gasto}><strong>{r.gastoTotal > 0 ? moeda(r.gastoTotal) : 'Sem gasto ainda'}</strong>
+      {Number.isFinite(totalDaCarteira) && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 && totalDaCarteira > 0 ? Math.max(pct, 2) : 0}%` }} /></span>}
+      {r.gastoTotal > 0 && totalDaCarteira > 0 && <small>{textoDoPercentual(pct)} da carteira</small>}</div> : <Traco />}</td>
     <td>{Number.isFinite(r.ticketMedio) && r.compras > 0 ? moeda(r.ticketMedio) : <Traco />}</td>
     <td>{dias === null ? <Traco /> : textoDosDias(dias)}</td>
     <td>{desde ?? <Traco />}</td>

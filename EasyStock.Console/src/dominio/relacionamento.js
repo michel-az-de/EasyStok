@@ -1,10 +1,12 @@
 // #3254 (S2): a relação do cliente no grid de Cadastros. O estágio vem pronto da API (#3244);
 // aqui só se traduz o código, nunca se recalcula por compras. Com extensão: a prova carrega direto pelo Node.
 import { diasDeCalendarioEntre } from './formato.js'
+import { TAG_RECOMPRA_CONVIDADA } from './recompra'
 
 const ESTAGIOS = ['sem_pedido', 'primeira_compra', 'recorrente', 'fiel']
 const ROTULOS = { sem_pedido: 'Sem pedido', primeira_compra: 'Primeira compra', recorrente: 'Recorrente', fiel: 'Fiel' }
-const TAGS_ESCONDIDAS = new Set(['recompra_convidada'])
+// A API normaliza tag (minúscula, sem acento, _ no lugar de - e espaço): compara-se na forma normalizada, da fonte única.
+const TAGS_ESCONDIDAS = new Set([TAG_RECOMPRA_CONVIDADA.replace(/-/g, '_')])
 
 export const estagioDoCliente = (codigo) => ROTULOS[codigo] ?? null
 
