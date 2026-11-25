@@ -146,6 +146,62 @@ public class ChecarAssistenteConversaUseCaseTests
     }
 
     [Fact]
+    public async Task SituacaoELojaBarrando_MostraAsOnzeEtapasNaOrdemDoCatalogoSemPararNaPrimeira()
+    {
+        // #3356 (R11): a tela lê todos os grupos, mesmo com o primeiro barrando; o robô é que para na primeira.
+        _conversa.Assumir(Agora.AddMinutes(-1), Guid.NewGuid());
+        _configuracao.Ativo = false;
+
+        var checagem = await CriarUseCase().ExecuteAsync(_empresaId, _conversa.Id, Agora);
+
+        checagem.Etapas.Select(e => e.Codigo).Should().Equal(PortoesDoAssistente.Catalogo.Select(p => p.Codigo));
+        Etapa(checagem, PortoesDoAssistente.Situacao).Estado.Should().Be(EstadoEtapaAssistente.Barra);
+        Etapa(checagem, PortoesDoAssistente.Chave).Estado.Should().Be(EstadoEtapaAssistente.Barra);
+        checagem.Bloqueio.Should().Be(Etapa(checagem, PortoesDoAssistente.Situacao).Detalhe, "é a primeira etapa que barra");
+        await _llm.Received().DisponivelAsync(_empresaId, Arg.Any<CancellationToken>());
+        await _conversas.Received().ContarRespostasDoAgenteDesdeAsync(
+            _empresaId, _conversa.Id, Agora.AddHours(-1), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaConcluida_QuemAtendeNaoSeAplicaEORoboResponde()
+    {
+        // A próxima mensagem do cliente abre outra conversa, que começa com o robô.
+        _conversa.Encerrar(Agora);
+
+        var checagem = await CriarUseCase().ExecuteAsync(_empresaId, _conversa.Id, Agora);
+
+        Etapa(checagem, PortoesDoAssistente.Situacao).Estado.Should().Be(EstadoEtapaAssistente.NaoSeAplica);
+        checagem.Responde.Should().BeTrue();
+        checagem.Etapas.Select(e => e.Codigo).Should().Equal(PortoesDoAssistente.Catalogo.Select(p => p.Codigo));
+    }
+
+    [Fact]
+    public async Task VinculoEmRevisao_ContinuaBarrandoNaTela()
+    {
+        // Só a janela e a situação concluída viram "não se aplica": a revisão de cadastro segue barrando a próxima mensagem.
+        _conversa.ExigirConferenciaCliente();
+
+        var checagem = await CriarUseCase().ExecuteAsync(_empresaId, _conversa.Id, Agora);
+
+        Etapa(checagem, PortoesDoAssistente.Vinculo).Estado.Should().Be(EstadoEtapaAssistente.Barra);
+        checagem.Responde.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task OTokenDeQuemChama_ChegaAoModeloAoContatoEAoBanco()
+    {
+        // #3356 (R11): a tela pede as etapas a PortoesDoAssistente.EtapasAsync, e o token tem de chegar às leituras dele.
+        using var origem = new CancellationTokenSource();
+
+        await CriarUseCase().ExecuteAsync(_empresaId, _conversa.Id, Agora, origem.Token);
+
+        await _llm.Received().DisponivelAsync(_empresaId, origem.Token);
+        await _equipe.Received().EhInscritoAsync(_empresaId, Arg.Any<string?>(), origem.Token);
+        await _conversas.Received().ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), origem.Token);
+    }
+
+    [Fact]
     public async Task ConversaDeOutraEmpresa_NaoEncontrada()
     {
         var acao = () => CriarUseCase().ExecuteAsync(Guid.NewGuid(), _conversa.Id, Agora);

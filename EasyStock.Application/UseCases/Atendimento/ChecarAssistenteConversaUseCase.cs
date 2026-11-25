@@ -53,11 +53,9 @@ public sealed class ChecarAssistenteConversaUseCase(
         var cliente = conversa.ClienteId is { } clienteId ? await clientes.GetByIdAsync(empresaId, clienteId) : null;
         var portoes = new PortoesDoAssistente(llm, conversas, turnos, limiteRespostas, equipe);
 
-        var etapas = PortoesDoAssistente.DaConversa(conversa, agora).Select(e => ParaProximaMensagem(e, conversa))
-            .Concat(await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
-            .ToList();
-        await foreach (var etapa in portoes.EtapasDoClienteEDoCustoAsync(empresaId, conversaId, configuracao, cliente, agora, ct))
-            etapas.Add(etapa);
+        var etapas = new List<EtapaAssistente>();
+        await foreach (var etapa in portoes.EtapasAsync(empresaId, conversa, configuracao, cliente, agora, ct))
+            etapas.Add(ParaProximaMensagem(etapa, conversa));
         var bloqueio = etapas.FirstOrDefault(e => e.Barra);
         var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
         var prompt = await GeracaoAgenteAtendimento.MontarSystemAsync(
