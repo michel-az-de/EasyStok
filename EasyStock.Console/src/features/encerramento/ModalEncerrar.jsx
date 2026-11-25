@@ -14,7 +14,7 @@ import { conversaEncerrada } from '../../dominio/conversa'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import {
-  PEDE_TEXTO_DA_DESPEDIDA, avisoDoEstornoAoEncerrar, avisoDoPedidoAoEncerrar, despedirAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
+  PEDE_TEXTO_DA_DESPEDIDA, avisoDaNotaAoEncerrar, avisoDoEstornoAoEncerrar, avisoDoPedidoAoEncerrar, despedirAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
 } from '../../dominio/resumoAtendimento'
 import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../../dominio/automacao'
 import { FolhaResumo } from './FolhaResumo'
@@ -32,7 +32,7 @@ const RASCUNHO_PADRAO = { avaliacaoCliente: null, autoavaliacao: null, anotacao:
 // clicar Encerrar, os números seguem o relógio da tela), resumo definitivo
 // (depois de clicar, lido de `conversa.atendimentos.at(-1)`, já congelado) e a
 // cópia impressa (sempre somente leitura, com só a opção marcada, seção 5).
-export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }) {
+export function ModalEncerrar({ conversaId, numeroAtendimento = null, notas = [], aoFechar }) {
   const { conversas, agora, regras, fonteApi } = useAtendimento()
   const { canais, cardapio } = useCatalogo()
   const {
@@ -206,6 +206,9 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
             )}
             {!encerrada && !leitura && avisoDoEstornoAoEncerrar(conversa) && (
               <p className={css.faixaAtencao}>{avisoDoEstornoAoEncerrar(conversa)}</p>
+            )}
+            {!encerrada && !leitura && avisoDaNotaAoEncerrar(notas, conversaId) && (
+              <p className={css.faixaAtencao}>{avisoDaNotaAoEncerrar(notas, conversaId)}</p>
             )}
             {!encerrada && !leitura && (
               <div className={css.confirmacaoEncerrar}>

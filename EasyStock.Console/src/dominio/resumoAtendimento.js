@@ -228,6 +228,14 @@ export function avisoDoEstornoAoEncerrar(conversa) {
   return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
 }
 
+// #3339 (R1D-10): a nota interna com texto, ainda não fixada, continua como rascunho depois de Concluir.
+// O modal diz isso para quem concluiu achando que a nota tinha ido junto.
+export function avisoDaNotaAoEncerrar(notas, conversaId) {
+  if (!conversaId || !Array.isArray(notas)) return null
+  const pendente = notas.some((nota) => nota?.id === conversaId && typeof nota.texto === 'string' && nota.texto.trim())
+  return pendente ? 'Há uma nota interna desta conversa que não foi fixada. Concluir não a fixa: o texto fica como rascunho.' : null
+}
+
 export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
   const pedido = conversa?.pedido
   if (!pedido) return null

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { primeiroNome } from '../../dominio/mensagem'
+import { devolverFocoAoCampoDepoisDeFechar } from './focoDoComposer'
 import css from './atendimento.module.css'
 
 export function ModalEnviarCardapio({
@@ -51,6 +52,7 @@ export function ModalEnviarCardapio({
       const dados = await preparar()
       if (await aoEnviar(dados.texto) === false) throw new Error('O pedido não foi enviado. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
       aoFechar()
+      devolverFocoAoCampoDepoisDeFechar()
     } catch (e) { setErro(e.message) }
     finally { trava.current = false; setEnviando(false) }
   }

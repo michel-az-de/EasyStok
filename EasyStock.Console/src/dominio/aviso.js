@@ -53,6 +53,13 @@ export function avisosDoRetrato(antes, retrato) {
   return avisos
 }
 
+// #3339 (R2F-06): a mensagem nova da conversa que está à vista já aparece no fio e o som toca; o toast só repetia e
+// cobria o fim da barra, onde fica "Assumir conversa". Só esse aviso, só para essa conversa, só com a aba visível.
+export function avisoJaEstaNaTela(aviso, { selecionadaId, painelNaTela, abaVisivel }) {
+  return aviso?.tipo === TIPOS_DE_AVISO.MENSAGEM_NOVA && Boolean(selecionadaId) && aviso.conversaId === selecionadaId
+    && Boolean(painelNaTela) && Boolean(abaVisivel)
+}
+
 // Pilha da tela: o aviso novo entra no fim; o do mesmo tipo e da mesma conversa sai (a segunda
 // mensagem da Marina substitui a primeira, não empilha), e acima do limite o mais velho cai.
 export function filaComAviso(fila, aviso, id) {
