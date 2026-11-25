@@ -58,7 +58,7 @@ public sealed class RegistroChamadaIaLlmClient(
         ChamadaIa chamada;
         try
         {
-            chamada = ChamadaIa.Registrar(requisicao.EmpresaId, null, null, resposta?.Modelo, requisicao.Finalidade, null,
+            chamada = ChamadaIa.Registrar(requisicao.EmpresaId, null, null, resposta?.Modelo, requisicao.Finalidade, requisicao.TurnoAgenteId,
                 resposta?.TokensEntrada ?? 0, resposta?.TokensSaida ?? 0, resposta?.TokensCacheLido ?? 0,
                 resposta?.TokensCacheEscrito ?? 0, null, (int)Math.Min(duracaoMs, int.MaxValue), desfecho,
                 relogio.GetUtcNow().UtcDateTime);

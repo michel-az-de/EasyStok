@@ -35,6 +35,20 @@ public class TurnoAgenteTests
     }
 
     [Fact]
+    public void IdInformadoVaiParaOTurnoEIdVazioNaoPassa()
+    {
+        // #3287 (R5): o id nasce antes das chamadas de IA e é o que o turno guarda.
+        var id = Guid.NewGuid();
+        var turno = TurnoAgente.Registrar(Guid.NewGuid(), Guid.NewGuid(), null, null, "m", 1, 1, 0, null, [], 1,
+            DesfechoTurnoAgente.Respondeu, 1, Agora, id: id);
+        turno.Id.Should().Be(id);
+
+        var vazio = () => TurnoAgente.Registrar(Guid.NewGuid(), Guid.NewGuid(), null, null, "m", 1, 1, 0, null, [], 1,
+            DesfechoTurnoAgente.Respondeu, 1, Agora, id: Guid.Empty);
+        vazio.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
     public void ModeloVazioViraDesconhecido() => Registrar(modelo: " ").Modelo.Should().Be("desconhecido");
 
     [Fact]
