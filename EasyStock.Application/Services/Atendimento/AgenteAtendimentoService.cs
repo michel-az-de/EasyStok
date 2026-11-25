@@ -306,8 +306,9 @@ public sealed class AgenteAtendimentoService(
             // Depois desse commit, o histórico impede correção. A cobrança precisa rodar fora da transação.
             if (await ExecutarAsync(_ => Task.FromResult("validado"), ct, gravar: false) is null) return null;
             try { return await efeito(ct); }
-            // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não interrupção.
-            catch (Exception) when (!ct.IsCancellationRequested)
+            // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não interrupção. Falha do banco segue
+            // interrompendo: a retomada refaz o turno.
+            catch (Exception ex) when (!ct.IsCancellationRequested && !FalhaDeBanco.Eh(ex))
             {
                 uow.DescartarAlteracoesPendentes();
                 throw;
@@ -341,7 +342,7 @@ public sealed class AgenteAtendimentoService(
                     T resultado;
                     try { resultado = await efeito(token); }
                     // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não troca de dona.
-                    catch (Exception) when (!ct.IsCancellationRequested) { falhouNaFerramenta = true; throw; }
+                    catch (Exception ex) when (!ct.IsCancellationRequested && !FalhaDeBanco.Eh(ex)) { falhouNaFerramenta = true; throw; }
                     if (gravar) await uow.CommitAsync();
                     _situacao = contexto.Conversa.Situacao;
                     return resultado;

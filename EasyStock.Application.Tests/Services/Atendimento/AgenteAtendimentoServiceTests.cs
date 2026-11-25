@@ -1139,6 +1139,22 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue();
     }
 
+    // #3340: falha do banco numa ferramenta não escala: o turno é interrompido e a retomada o refaz (como antes da #3340).
+    [Fact]
+    public async Task FalhaDoBancoNaFerramentaInterrompeSemEscalar()
+    {
+        var comanda = Ferramenta("enviar_cardapio_imagem", _ => throw new BancoFalso("22012: division_by_zero"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("enviar_cardapio_imagem"), Texto("Mandei a comanda!"));
+
+        var resultado = await CriarServico(comanda).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    private sealed class BancoFalso(string mensagem) : System.Data.Common.DbException(mensagem);
+
     // #3340 (R2I-04): exceção do envio da comanda (Meta fora do ar) escala com o molde, uma vez, sem a frase do modelo.
     [Fact]
     public async Task ComandaQueLancaExcecaoEscalaComMoldeUmaVez()

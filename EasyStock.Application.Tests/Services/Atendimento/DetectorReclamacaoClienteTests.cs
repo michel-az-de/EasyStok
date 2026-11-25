@@ -13,6 +13,21 @@ public class DetectorReclamacaoClienteTests
     public void CobrancaDeDinheiroOuProconEhReclamacao(string texto) =>
         DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
 
+    // Revisão da PR: quem só pergunta do estorno recebe a resposta do histórico (o assistente lê o ledger), não vai à dona.
+    [Theory]
+    [InlineData("Meu estorno foi confirmado?")]
+    [InlineData("quando cai o reembolso?")]
+    [InlineData("o estorno já caiu na conta?")]
+    public void PerguntaSobreOEstornoNaoEhReclamacao(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
+
+    [Theory]
+    [InlineData("estorne meu pedido agora")]
+    [InlineData("me reembolsem")]
+    [InlineData("preciso do estorno hoje")]
+    public void PedidoDeEstornoEmImperativoEhReclamacao(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
+
     [Theory]
     [InlineData("manda o link pra eu pagar")]
     [InlineData("quero uma lasanha")]
