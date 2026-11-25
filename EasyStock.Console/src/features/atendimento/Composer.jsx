@@ -11,7 +11,7 @@ import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
-import { chaveDaConfirmacao, gravarConfirmacao, jaConfirmou } from './confirmacaoDeEnvioAssumindo'
+import { chaveDaConfirmacao, descricaoDaConfirmacao, gravarConfirmacao, jaConfirmou } from './confirmacaoDeEnvioAssumindo'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
@@ -299,7 +299,7 @@ export function Composer({
       {confirmandoEnvio && (
         <Modal
           titulo="Enviar e assumir esta conversa?"
-          descricao={`O Assistente está atendendo ${primeiroNomeDaConversa(conversa)}. Ao enviar, você assume a conversa e o Assistente para de responder.`}
+          descricao={descricaoDaConfirmacao(conversa)}
           aoFechar={() => setConfirmandoEnvio(false)}
           // #3317 (F07): o foco vai ao botão que confirma, então Enter envia. Sem isto ia ao título (#2857) e o
           // Enter não fazia nada; no botão o tooltip "Fechar" do X também não reaparece.
