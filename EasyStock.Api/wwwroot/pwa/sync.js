@@ -1298,6 +1298,20 @@
     if (mudou) localStorage.setItem(_SERVER_MUTATION_MAP.batch.storage, JSON.stringify(state.batches));
   }
 
+  // #3325: o servidor devolve a folga de 30 s do cursor, então o mesmo registro volta em pulls seguidos.
+  // "Contém": cada campo do servidor já está no registro local. Campo só do aparelho (count, photo) não
+  // conta, null do servidor vale ausente no local e array exige o mesmo tamanho.
+  function _localContem(local, srv) {
+    if (srv === null || srv === undefined) return local === null || local === undefined;
+    if (Array.isArray(srv)) return Array.isArray(local) && local.length === srv.length && srv.every((v, i) => _localContem(local[i], v));
+    if (typeof srv === 'object') return !!local && typeof local === 'object' && Object.keys(srv).every(k => _localContem(local[k], srv[k]));
+    return local === srv;
+  }
+  // migrateClientsApt (app-nucleo.js) grava "Apto X" no local a cada abertura; o servidor manda address nulo.
+  function _paraComparar(type, payload) {
+    return type === 'client' && payload.apt && !payload.address ? Object.assign({}, payload, { address: 'Apto ' + payload.apt }) : payload;
+  }
+
   function applyServerMutations(mutations, unresolved = []) {
     _pullDeferred = syncHeldForImport();
     if (_pullDeferred) return false;
@@ -1369,6 +1383,13 @@
 
         if (op === 'upsert') {
           if (type === 'product' && idx >= 0 && !Object.prototype.hasOwnProperty.call(m.payload, 'photo') && coll[idx].photo) m.payload = { ...m.payload, photo: coll[idx].photo };
+          // #3325: o aparelho já tem este registro. Não marca mudança, senão a tela recarrega a cada pull enquanto
+          // a janela do cursor reenvia a mesma venda. Regrava a coleção porque o registro pode estar só na memória
+          // (a gravação da tentativa anterior falhou): se falhar de novo o lote conta erro e o cursor não avança.
+          if (idx >= 0 && _localContem(coll[idx], _paraComparar(type, m.payload))) {
+            localStorage.setItem(map.storage, JSON.stringify(coll));
+            return;
+          }
           if (idx >= 0) coll[idx] = m.payload;
           else coll.push(m.payload);
           changed = true;
