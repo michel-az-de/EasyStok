@@ -63,7 +63,7 @@ public interface IClienteProvedorIa
 /// No Assistente, com o prazo do turno ligado (180 s por padrão; <c>PrazoTurnoSegundos</c> 0 desliga), um prazo de provedor acima disso não alonga o turno.
 /// Com o prazo do turno desligado não há prazo por turno e o limite passa a ser o das voltas do laço (<c>MaximoIteracoes</c>, 6), cada uma com
 /// até 3 chamadas: cada chamada leva até o prazo do provedor, a nova tentativa depois de falha transitória a repete (300 s viram até 600 s por par)
-/// e uma resposta <c>max_tokens</c> com saída abaixo de 16384 abre mais uma. No pior caso, com 300 s, são 6 voltas de 900 s (90 min).
+/// e uma resposta <c>max_tokens</c> com saída abaixo de 16384 abre mais uma. No pior caso, com 300 s, são 6 voltas de 900 s (90 min só em chamadas ao modelo; as ferramentas e a gravação somam a isso).
 /// </summary>
 public sealed record DestinoIa(Guid ProvedorId, string BaseUrl, AutenticacaoProvedorIa Autenticacao, string Chave, string Modelo,
     int? SaidaMax = null, int? PrazoSegundos = null)
