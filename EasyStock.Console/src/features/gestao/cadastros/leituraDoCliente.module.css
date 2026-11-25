@@ -1,0 +1,30 @@
+/* #3344: o painel de leitura que abre a Ficha. Um cartão só, contorno uniforme de 1px e fundo; sem barra de um lado só. */
+.painel { display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-3); background: var(--papel); min-width: 0; }
+.painel h3 { margin: 0; font-size: var(--t-corpo); }
+.leitura { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
+.estagio { display: flex; align-items: center; gap: var(--e-3); }
+.estagio strong { font-size: var(--t-corpo); }
+.estagio small { color: var(--tinta); font-size: var(--t-apoio); }
+.passos { display: inline-flex; gap: 3px; }
+.passos i { width: 22px; height: 8px; border-radius: 4px; background: transparent; box-shadow: inset 0 0 0 1px var(--tinta-2); }
+.passos i.aceso { background: var(--marca, var(--tinta)); box-shadow: none; }
+.sinais { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); color: var(--tinta-2); font-size: var(--t-apoio); }
+.passoUrgente { border: 1px solid var(--erro); background: var(--erro-pastel, var(--elevado)); color: var(--tinta); font-weight: 600; }
+.passo { flex-basis: 100%; margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--elevado); font-size: var(--t-apoio); }
+.linha { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--e-3) var(--e-4); padding-block-start: var(--e-3); border-block-start: 1px solid var(--linha); }
+.painel > .linha:first-child { padding-block-start: 0; border-block-start: 0; }
+.oferta { display: grid; gap: var(--e-2); flex: 1 1 280px; min-width: 0; }
+.pratos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.pratos li { display: grid; gap: 1px; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--elevado); }
+.pratos small { color: var(--tinta-2); font-size: var(--t-apoio); }
+.vazio { margin: 0; color: var(--tinta); font-size: var(--t-corpo); }
+.assistente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.quem { display: inline-flex; align-items: center; gap: var(--e-2); font-weight: 600; font-size: var(--t-apoio); }
+.resposta:empty { display: none; }
+.resposta { display: grid; gap: var(--e-2); padding: var(--e-3); border: 1px solid var(--linha-media); border-radius: var(--r-2); background: var(--elevado); }
+.resposta p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.respostaAcoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--e-1) var(--e-2); }
+.respostaAcoes small { flex: 1 1 160px; color: var(--tinta); font-size: var(--t-apoio); }
+.erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
+.assistente button[aria-pressed='true'] { border: 1px solid var(--marca, var(--tinta)); font-weight: 600; }
+@media (max-width: 899px) { .assistente > button, .respostaAcoes > button { min-height: var(--toque); } }
