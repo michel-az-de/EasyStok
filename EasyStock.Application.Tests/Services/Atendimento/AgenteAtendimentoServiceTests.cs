@@ -108,6 +108,33 @@ public partial class AgenteAtendimentoServiceTests
             .Returns(total);
 
     [Fact]
+    public async Task ReclamacaoDoClienteEscalaSemChamarOModelo()
+    {
+        // #3340 (R2I-05): o modelo não tem como prometer estorno nem Procon; a dona atende antes dele.
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora, TipoConteudoMensagem.Texto,
+            "quero meu dinheiro de volta, vou no Procon", "wamid.in2"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true));
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            Arg.Is<string>(m => m.Contains("cobra dinheiro")), Agora, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PerguntaComumNaoEscalaEChamaOModelo()
+    {
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora, TipoConteudoMensagem.Texto,
+            "qual o horário de vocês?", "wamid.in3"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    [Fact]
     public async Task NoLimiteDeRespostasDaHora_NaoChamaOLlmEPassaParaADona()
     {
         // #2285: anti-loop de custo. Outro robô do lado do cliente faria o agente responder (e gastar) sem fim.
