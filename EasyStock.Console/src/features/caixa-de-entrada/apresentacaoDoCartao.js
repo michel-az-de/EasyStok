@@ -80,7 +80,8 @@ export function mostraEtiquetaDoEstado(estado) {
 
 // #2232 (banca UX, X1, WCAG 4.1.2): nome acessível do item da lista numa frase só, na ordem em
 // que se decide: quem, quanto espera, por quê, quando. Antes o leitor de tela lia o botão inteiro,
-// prévia incluída.
+// prévia incluída. O nome não contém o texto visível inteiro, então o axe acusa
+// `label-content-name-mismatch`: exceção decidida na #3336 (docs/dev/excecoes-acessibilidade-console.md).
 export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = null, contexto = [], atrasada = false, pagamentoNaoVisto = false, hora, selecionada = false }) {
   return [
     nome,
