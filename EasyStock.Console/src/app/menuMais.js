@@ -11,7 +11,7 @@ import { NOME_INICIO } from '../dominio/modulos'
 
 export const CHAVES_DO_MENU = {
   modulos: '__modulos', entregas: '__entregas', cozinha: '__cozinha', gestao: '__gestao', ajuda: '__ajuda',
-  claro: '__claro', escuro: '__escuro', sair: '__sair',
+  claro: '__claro', escuro: '__escuro', sair: '__sair', loja: '__loja', automaticas: '__automaticas',
 }
 
 // Medidas da folha, em px: linha de 48 (alvo de toque), 16 a mais quando há detalhe, 32 por título de
@@ -22,7 +22,7 @@ const TITULO = 32
 const RECUO = 16
 
 export function gruposDoMenuMais({
-  tema, permite = () => true, aoSair = null, sessaoPersistente = false, atendente = null, casa = null, celular = false,
+  tema, permite = () => true, aoSair = null, sessaoPersistente = false, atendente = null, casa = null, celular = false, lojaAberta = null, estadoAuto = null,
 }) {
   const ir = [
     { chave: CHAVES_DO_MENU.modulos, titulo: NOME_INICIO },
@@ -34,6 +34,19 @@ export function gruposDoMenuMais({
   ].filter(Boolean)
   return [
     { titulo: 'Ir para', itens: ir },
+    // #3282: no celular o topo só leva sino, Mais, filtro e Assistente; a loja e as respostas automáticas
+    // moram aqui, lado a lado e sem título visível (uma linha só, para a folha seguir sem rolagem), com o
+    // estado no próprio nome.
+    // O título "Conta" também fica só para o leitor de tela no celular: os 32 px dele pagam a linha nova.
+    ...(celular && lojaAberta !== null ? [{
+      titulo: 'Loja',
+      tituloOculto: true,
+      disposicao: 'linha',
+      itens: [
+        { chave: CHAVES_DO_MENU.loja, titulo: lojaAberta ? 'Loja aberta' : 'Loja fechada' },
+        { chave: CHAVES_DO_MENU.automaticas, titulo: estadoAuto ? `Respostas ${estadoAuto}` : 'Respostas automáticas' },
+      ],
+    }] : []),
     {
       // #2762: duas linhas de lista, como o grupo de cima; o par lado a lado deixava a opção marcada solta.
       titulo: 'Tema',
@@ -47,6 +60,7 @@ export function gruposDoMenuMais({
     // #1242 (D1): quem está logado e o Sair moram aqui.
     ...(aoSair ? [{
       titulo: 'Conta',
+      tituloOculto: celular && lojaAberta !== null,
       itens: [{
         chave: CHAVES_DO_MENU.sair,
         titulo: rotuloDoSair(sessaoPersistente),
@@ -59,5 +73,5 @@ export function gruposDoMenuMais({
 export const alturaDaFolha = (grupos) => RECUO * 2 + grupos.reduce((soma, grupo) => {
   const linhas = grupo.disposicao === 'linha' ? 1 : grupo.itens.length
   const detalhes = grupo.disposicao === 'linha' ? 0 : grupo.itens.filter((item) => item.detalhe).length
-  return soma + TITULO + linhas * LINHA + detalhes * DETALHE
+  return soma + (grupo.tituloOculto ? 0 : TITULO) + linhas * LINHA + detalhes * DETALHE
 }, 0)

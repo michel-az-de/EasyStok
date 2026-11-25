@@ -213,7 +213,7 @@ export function Popover({
         ))
         return (
           <div className={css.grupo} key={grupo.titulo}>
-            <p className={css.titulo}>{grupo.titulo}</p>
+            <p className={grupo.tituloOculto ? 'sr' : css.titulo}>{grupo.titulo}</p>
             {DISPOSICAO[grupo.disposicao] ? <div className={DISPOSICAO[grupo.disposicao]}>{linhas}</div> : linhas}
           </div>
         )
