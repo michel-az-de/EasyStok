@@ -26,7 +26,7 @@ module.exports = function ({ test, sandbox, assert }) {
   const mutacao = (type, payload) => ({ id: 'm-' + payload.id, deviceId: 'web', type, ts: 1, payload });
 
   // Roda n pulls seguidos devolvendo as mesmas mutações; devolve os reloads de cada pull e o cursor ao final.
-  async function puxar(state, mutations, vezes) {
+  async function puxar(state, mutations, vezes, opcoes) {
     await pausa(200); // reload agendado por teste anterior não entra na conta
     const S = sandbox.window.cdbSync;
     const original = sandbox.window.cdbApp;
@@ -47,9 +47,15 @@ module.exports = function ({ test, sandbox, assert }) {
       S.clearQueue();
       sandbox.localStorage.setItem('cdb-pull-cursor', '500');
       const porPull = [];
+      const gravar = sandbox.localStorage.setItem;
       for (let i = 0; i < vezes; i++) {
         const antes = reloads.length;
+        // Cota estourada na gravação do primeiro pull: a venda entra na memória e não no armazenamento.
+        sandbox.localStorage.setItem = (opcoes && opcoes.cotaNoPrimeiroPull && i === 0)
+          ? (k, v) => { if (k === 'cdb-orders') throw new Error('QuotaExceededError'); gravar.call(sandbox.localStorage, k, v); }
+          : gravar;
         await S.pull();
+        sandbox.localStorage.setItem = gravar;
         await pausa(250); // o reload sai num setTimeout depois do flush
         porPull.push(reloads.length - antes);
       }
@@ -129,6 +135,14 @@ module.exports = function ({ test, sandbox, assert }) {
     const { porPull } = await puxar(state, [mutacao('client.upsert', doServidor)], 2);
     assert.deepStrictEqual(porPull, [0, 0]);
     assert.strictEqual(state.clients[0].address, 'Apto 12');
+  });
+
+  test('#3325 gravação que falhou no primeiro pull: o reenvio grava, recarrega uma vez e o cursor só avança então', async () => {
+    const state = estado();
+    const { porPull, cursor } = await puxar(state, [mutacao('order.upsert', pedido('o-3325-cota'))], 3, { cotaNoPrimeiroPull: true });
+    assert.deepStrictEqual(porPull, [0, 1, 0], 'sem reload com o erro; o pull seguinte, que gravou, recarrega uma vez');
+    assert.strictEqual(cursor, '1003');
+    assert.strictEqual(JSON.parse(sandbox.localStorage.getItem('cdb-orders'))[0].id, 'o-3325-cota');
   });
 
   test('#3325 pedido igual junto com order.aReceber novo no mesmo lote: um reload só e o saldo gravado', async () => {

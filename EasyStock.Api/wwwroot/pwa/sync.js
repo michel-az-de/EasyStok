@@ -1190,6 +1190,9 @@
   let pullPromise = null;
   let _lastPullAt = 0;
   let _pullDeferred = false;
+  // #3325: lote que mudou a memória mas falhou na gravação não recarregou a tela. O lote seguinte, já sem erro, só
+  // acha o registro igual e não marcaria mudança: este aviso garante o reload que ficou devendo.
+  let _telaDesatualizada = false;
   async function pull() {
     if (pullPromise) return pullPromise;
     pullPromise = _pullInner().finally(() => { pullPromise = null; });
@@ -1433,6 +1436,8 @@
       _consecutiveApplyFailures = 0;
     }
 
+    if (changed && errorsThisBatch > 0) _telaDesatualizada = true;
+    if (errorsThisBatch === 0 && _telaDesatualizada) { changed = true; _telaDesatualizada = false; }
     if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando...');
       (async () => {
