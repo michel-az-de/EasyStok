@@ -145,3 +145,38 @@ A fatia 6 pode vir antes de todas: ela é a prova das outras.
 - A amostra do log é de 38 minutos, 48 chamadas e 2 conversas, com cara de sessão de teste. Os 6% de R1 valem para essa janela.
 - O plano `18-harness-do-agente.md` foi lido por trechos. Os planos `19` e `provedores-ia-2948` e as ADR-0065, 0066 e 0067 foram lidos inteiros.
 - Não li as 23 ferramentas uma a uma, nem `PromptAtendimento.cs`.
+
+## 9. Estado em 25/11/2026
+
+Marcação feita depois que as fatias entraram na `master`. As seções 1 a 8 ficam como foram escritas, na base `16c64c25b`: este quadro só diz o que mudou desde então e o que continua aberto. A PR é a mergeada; a issue da fatia vai entre parênteses. As provas de cada uma estão na descrição da PR.
+
+| # | Estado | PR (issue) |
+|---|---|---|
+| R1 | Tratado: `max_tokens` é desfecho próprio e o texto cortado nunca vai ao cliente; se a saída cortada ficou abaixo de 16384 tokens (o teto que ela usou), repete uma vez pedindo 16384; estourando de novo, ou se já tinha 16384 ou mais, a conversa vai para a equipe com o motivo `teto_saida` | #3274 (#3273) |
+| R2 | Tratado: a nova tentativa repete uma vez a falha sem código HTTP (rede, prazo, resposta ilegível), 5xx, 408 e 429, menos a repetição depois de `max_tokens`, que não tem outra; os outros 4xx (400, 401, 402 e afins) e o provedor indisponível (disjuntor, cota, sem chave) sobem direto | #3274 (#3273) |
+| R3 | Tratado: a fila ordena por conversa, até 2 turnos por loja e 4 no total (valores padrão); o prazo do turno, 180 s por padrão (0 desliga), conta o tempo das ferramentas, mas só corta a espera pelo modelo: ferramenta em curso e envio terminam e a volta seguinte não chama o modelo | #3293 (#3291) |
+| R4 | Tratado: a guarda monta a alternância com o nome da dona configurado | #3280 (#3278) |
+| R5 | Tratado: `chamada_ia.turno_agente_id` é preenchido nas chamadas enviadas dos dois caminhos; a linha de cota estourada, que nem chega a sair, fica sem turno | #3288 (#3287) |
+| R6 | Tratado: a cota em US$ e a soma do mês de `chamada_ia` fecham no mês de Brasília | #3296 (#3295) |
+| R7 | Tratado: turnos, limite de respostas e preços são obrigatórios no serviço do agente | #3305 (#3298) |
+| R8 | Tratado no caminho por loja: cada modelo ganha `saida_max` (256 a 200000), que vira o teto de saída de toda chamada dele no lugar do global do `.env` e limita a repetição depois de `max_tokens` (pular a repetição quando o teto não sobe é a #3313); cada provedor ganha `prazo_segundos` (5 a 300 s) no lugar do prazo global; os dois são opcionais e nulo usa o global; nenhum valor foi gravado: até a tela de cadastro (S4 da #2948) o valor entra por SQL | #3312 (#3304) |
+| R9 | Tratado: a decisão de seguir pelo `.env` quando a flag não lê ficou escrita no código; rever com a S5b | #3288 (#3287) |
+| R10 | Tratado: o roteador lê o gasto do mês uma vez por escopo e provedor | #3288 (#3287) |
+| R11 | Parcial: um método devolve o primeiro portão do cliente e do custo (pessoa, limite e cota); os portões da conversa e da loja seguem em chamadas à parte; a finalização do turno tem colaborador próprio (`FinalizacaoDoTurno`) | #3305 (#3298) |
+| R12 | Tratado: o log de erro do caminho do `.env` sai sem a chave | #3274 (#3273) |
+| R13 | Fora desta série: sai com a S5b do plano #2948 | sem PR (#2948) |
+| R14 | Aberto: decisão do Felipe sobre o prazo de retomada de 60 s | sem issue |
+| D1 | Parcial: teto e prazo por modelo e provedor passam a morar no banco (R8); o `.env` global só sai com a S5b e a ADR nova, que fixa "dois lugares, sem perfil em arquivo", espera o GO | #3312 (#3304) |
+| D2 | Parcial: o turno não grava mais `UsoIa` (#3293) e a chamada de IA carrega o id do turno (#3288); o `TurnoAgente` ainda guarda consumo e custo próprios e a cota de tokens lê dele, então `chamada_ia` ainda não é a fonte única | #3293 (#3291), #3288 (#3287) |
+| D3 | Fora desta série: a cota de tokens vira derivada da de US$, ou sai, na S5b | sem PR (#2948) |
+| D4 | Parcial: `max_tokens` é desfecho próprio (`teto_saida`, #3274); a falha transitória se separa da definitiva só na nova tentativa, e depois as duas terminam como `falha_llm`; teto e prazo existem por modelo e provedor no caminho por loja (#3312); a recusa (`refusal`) ainda não é desfecho próprio | #3274 (#3273), #3312 (#3304) |
+| D5 | Parcial: o eval mínimo entrou (casos com asserção determinística, k rodadas, veredito pelo código de saída); falta a primeira rodada real contra a bancada, que calibra o mínimo de 0,8 e os casos; nenhum workflow do GitHub roda o eval | #3276 (#3275) |
+| D6 | Sem mudança: manter só o formato Anthropic Messages | sem PR |
+| D7 | Sem mudança: não generalizar; a separação de R11 já prepara o segundo agente | #3305 (#3298) |
+| D8 | Parcial: a janela fica como está e o eval mede a entrada por turno com cache; a medida real espera a primeira rodada | #3276 (#3275) |
+| ADR | Aberto: a ADR nova no lugar da ADR-0065 (seção 6) espera o GO do Felipe e é issue própria, de tier ALTO | sem issue |
+
+Surgiu durante a série:
+
+- A prova `prova-2543-chip-do-motivo.mjs` lia texto de C# que o refactor da #3298 moveu e deixou o workflow `console` da `master` vermelho. Corrigida na #3311 (#3310). O filtro de caminhos do `console.yml` não inclui `EasyStock.Application`, então uma PR só de backend não roda esse workflow: mudar o filtro é de tier ALTO e fica como sugestão ao Felipe.
+- A conferência E32 da `prova-2185-efeitos-tela.mjs` falhou em duas execuções entre 00:01 e 00:05 de Brasília de 25/11 e passou às 00:15, sem mudança de código. A hipótese é a dependência do relógio, ainda não reproduzida nem provada: issue #3307.
