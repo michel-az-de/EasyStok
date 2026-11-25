@@ -67,17 +67,26 @@ function PostIt({ nota }) {
   )
 }
 
+// Maior `em` (em ms) entre as mensagens; null sem mensagem com data.
+const emMs = (m) => { const t = m?.em ? Date.parse(m.em) : NaN; return Number.isFinite(t) ? t : null }
+function ultimaEm(mensagens) {
+  let maior = null
+  for (const m of mensagens) { const t = emMs(m); if (t !== null && (maior === null || t > maior)) maior = t }
+  return maior
+}
+
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [], visivel = true,
   temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, numeroComanda = null, aoReagir, aoApagar,
 }) {
   const fim = useRef(null)
-  // #3300 (F8): as mensagens que já estavam no fio quando a conversa abriu não animam; só a que chega depois.
-  // Ajuste de estado no render quando a conversa muda (padrão do React), sem efeito nem ref.
-  const [base, setBase] = useState(() => ({ chave: chaveRolagem, ids: new Set(mensagens.map((m) => m.id)) }))
-  if (base.chave !== chaveRolagem || (base.ids.size === 0 && mensagens.length > 0)) {
-    setBase({ chave: chaveRolagem, ids: new Set(mensagens.map((m) => m.id)) })
+  // #3300 (F8): só anima a mensagem mais nova que a última que estava no fio quando a conversa abriu. As de antes
+  // (abertura e "Ver mensagens anteriores") não animam. Ajuste de estado no render quando a conversa muda.
+  const [base, setBase] = useState(() => ({ chave: chaveRolagem, ultima: ultimaEm(mensagens) }))
+  if (base.chave !== chaveRolagem || (base.ultima === null && mensagens.length > 0)) {
+    setBase({ chave: chaveRolagem, ultima: ultimaEm(mensagens) })
   }
+  const novo = (m) => base.ultima !== null && emMs(m) !== null && emMs(m) > base.ultima
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
@@ -170,13 +179,13 @@ export function Thread({
       aoApagar: aoApagar ? apagar : undefined,
     }
     // #3234 (C1): a tentativa de antes, aberta a pedido, não repete o aviso nem tem Reenviar (fica só na última).
-    if (l.tipo === 'tentativa') return <Balao key={l.chave} mensagem={l.mensagem} novo={!base.ids.has(l.mensagem.id)} trocaDeVoz={l.trocaDeVoz} rotuloDaTentativa={l.rotulo} {...comuns} />
+    if (l.tipo === 'tentativa') return <Balao key={l.chave} mensagem={l.mensagem} novo={novo(l.mensagem)} trocaDeVoz={l.trocaDeVoz} rotuloDaTentativa={l.rotulo} {...comuns} />
     // Sem a ação (demonstração) o balão não mostra o Reenviar. Fora de grupo, quem reenvia fica solta.
     const aoReenviarAqui = aoReenviar ? (l.tentativas ? reenviar : reenviarSolta) : undefined
-    if (!l.tentativas) return <Balao key={l.chave} mensagem={l.mensagem} novo={!base.ids.has(l.mensagem.id)} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui} />
+    if (!l.tentativas) return <Balao key={l.chave} mensagem={l.mensagem} novo={novo(l.mensagem)} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui} />
     return (
       <Balao
-        key={l.chave} mensagem={l.mensagem} novo={!base.ids.has(l.mensagem.id)} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui}
+        key={l.chave} mensagem={l.mensagem} novo={novo(l.mensagem)} trocaDeVoz={l.trocaDeVoz} {...comuns} aoReenviar={aoReenviarAqui}
         tentativas={l.tentativas} tentativasAbertas={l.aberto} aoAlternarTentativas={alternarTentativas} chaveDoGrupo={l.chaveDoGrupo}
       />
     )
