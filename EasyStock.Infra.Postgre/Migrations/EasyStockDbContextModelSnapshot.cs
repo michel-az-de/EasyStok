@@ -5019,6 +5019,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("rotulo");
 
+                    b.Property<int?>("SaidaMax")
+                        .HasColumnType("integer")
+                        .HasColumnName("saida_max");
+
                     b.HasKey("Id");
 
                     b.HasAlternateKey("EmpresaId", "Id")
@@ -5038,6 +5042,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                             t.HasCheckConstraint("ck_modelo_ia_fator_fora_pico", "fator_fora_pico > 0 AND fator_fora_pico <= 1");
 
                             t.HasCheckConstraint("ck_modelo_ia_padrao_ligado", "NOT padrao OR ligado");
+
+                            t.HasCheckConstraint("ck_modelo_ia_saida_max", "saida_max IS NULL OR (saida_max >= 256 AND saida_max <= 200000)");
                         });
                 });
 
@@ -5088,6 +5094,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("numeric(12,6)")
                         .HasColumnName("orcamento_mensal_usd");
 
+                    b.Property<int?>("PrazoSegundos")
+                        .HasColumnType("integer")
+                        .HasColumnName("prazo_segundos");
+
                     b.HasKey("Id");
 
                     b.HasAlternateKey("EmpresaId", "Id")
@@ -5097,7 +5107,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_provedor_ia_credencial");
 
-                    b.ToTable("provedor_ia", (string)null);
+                    b.ToTable("provedor_ia", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_provedor_ia_prazo_segundos", "prazo_segundos IS NULL OR (prazo_segundos >= 5 AND prazo_segundos <= 300)");
+                        });
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.IdempotencyKey", b =>

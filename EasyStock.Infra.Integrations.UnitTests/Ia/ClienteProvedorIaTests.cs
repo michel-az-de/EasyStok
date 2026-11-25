@@ -35,8 +35,8 @@ public class ClienteProvedorIaTests
 
     private readonly LogEmLista _log = new();
 
-    private ClienteProvedorIa Criar(FilaHandler handler, ResiliencePipelineRegistry<string>? registro = null) =>
-        new(new Fabrica(handler), Options.Create(new AnthropicAgenteOptions { MaxTokensAgente = 1024, TimeoutSegundos = 30 }),
+    private ClienteProvedorIa Criar(HttpMessageHandler handler, ResiliencePipelineRegistry<string>? registro = null, int timeoutSegundos = 30) =>
+        new(new Fabrica(handler), Options.Create(new AnthropicAgenteOptions { MaxTokensAgente = 1024, TimeoutSegundos = timeoutSegundos }),
             registro ?? new ResiliencePipelineRegistry<string>(), _log);
 
     private static DestinoIa Destino(AutenticacaoProvedorIa auth = AutenticacaoProvedorIa.XApiKey, string baseUrl = BaseDeepSeek,
@@ -63,6 +63,93 @@ public class ClienteProvedorIaTests
         corpo.RootElement.GetProperty("max_tokens").GetInt32().Should().Be(1024);
         resposta.Modelo.Should().Be("deepseek-flash");
         (resposta.TokensEntrada, resposta.TokensSaida).Should().Be((200, 10));
+    }
+
+    private static int MaxTokensEnviado(FilaHandler handler)
+    {
+        using var corpo = JsonDocument.Parse(handler.Requisicoes.Single().Corpo);
+        return corpo.RootElement.GetProperty("max_tokens").GetInt32();
+    }
+
+    [Fact]
+    public async Task TetoDeSaidaDoModeloVaiNoCorpoNoLugarDoGlobal()
+    {
+        var handler = new FilaHandler((HttpStatusCode.OK, RespostaTexto));
+
+        await Criar(handler).EnviarAsync(Destino() with { SaidaMax = 8192 }, Requisicao());
+
+        MaxTokensEnviado(handler).Should().Be(8192, "o modelo tem teto próprio; o global de 1024 é só a reserva");
+    }
+
+    [Fact]
+    public async Task TetoDoModeloMenorQueOGlobalVaiNoCorpo()
+    {
+        var handler = new FilaHandler((HttpStatusCode.OK, RespostaTexto));
+
+        await Criar(handler).EnviarAsync(Destino() with { SaidaMax = 512 }, Requisicao()); // global de 1024
+
+        MaxTokensEnviado(handler).Should().Be(512, "o teto do modelo vale mesmo abaixo do global: o provedor recusaria um max_tokens maior");
+    }
+
+    [Theory]
+    [InlineData(2048, 16384, 2048)]
+    [InlineData(32000, 16384, 32000)]
+    [InlineData(16384, 16384, 16384)]
+    public async Task NovaTentativaNuncaPassaDoMaximoDoModelo(int saidaMax, int piso, int esperado)
+    {
+        var handler = new FilaHandler((HttpStatusCode.OK, RespostaTexto));
+
+        await Criar(handler).EnviarAsync(Destino() with { SaidaMax = saidaMax }, Requisicao() with { MaxTokensMinimo = piso });
+
+        MaxTokensEnviado(handler).Should().Be(esperado,
+            "o saida_max cadastrado é o máximo que o modelo aceita: o piso da nova tentativa depois de max_tokens não o ultrapassa");
+    }
+
+    [Fact]
+    public async Task SemTetoDoModeloOPisoDaNovaTentativaSobeOGlobalComoAntes()
+    {
+        var handler = new FilaHandler((HttpStatusCode.OK, RespostaTexto));
+
+        await Criar(handler).EnviarAsync(Destino(), Requisicao() with { MaxTokensMinimo = 16384 });
+
+        MaxTokensEnviado(handler).Should().Be(16384, "sem saida_max cadastrado o caminho do .env segue igual (#3273)");
+    }
+
+    [Fact]
+    public async Task CancelamentoDeQuemChamaNaoViraFalhaDePrazoDoProvedor()
+    {
+        using var cancelamento = new CancellationTokenSource();
+        var envio = Criar(new PendenteHandler()).EnviarAsync(Destino() with { PrazoSegundos = 30 }, Requisicao(), cancelamento.Token);
+
+        cancelamento.CancelAfter(TimeSpan.FromMilliseconds(100));
+
+        (await Task.WhenAny(envio, Task.Delay(TimeSpan.FromSeconds(10)))).Should().BeSameAs(envio);
+        var act = () => envio;
+        await act.Should().ThrowAsync<OperationCanceledException>("quem chamou cancelou: não é o prazo do provedor, que vira HttpRequestException");
+    }
+
+    [Fact]
+    public async Task PrazoDoProvedorVaiNoLugarDoGlobal()
+    {
+        var cliente = Criar(new PendenteHandler()); // global de 30 s
+
+        var envio = cliente.EnviarAsync(Destino() with { PrazoSegundos = 1 }, Requisicao());
+
+        (await Task.WhenAny(envio, Task.Delay(TimeSpan.FromSeconds(10)))).Should().BeSameAs(envio, "o prazo de 1 s do provedor vale, não o global de 30 s");
+        var act = () => envio;
+        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("*no prazo*");
+    }
+
+    [Fact]
+    public async Task SemPrazoDoProvedorVaiOGlobal()
+    {
+        var cliente = Criar(new PendenteHandler(), timeoutSegundos: 1);
+
+        var envio = cliente.EnviarAsync(Destino(), Requisicao());
+
+        (await Task.WhenAny(envio, Task.Delay(TimeSpan.FromSeconds(10)))).Should().BeSameAs(envio, "sem prazo do provedor vale o global de 1 s");
+        var act = () => envio;
+        (await act.Should().ThrowAsync<HttpRequestException>()).WithMessage("*no prazo*");
     }
 
     [Fact]
@@ -240,6 +327,16 @@ public class ClienteProvedorIaTests
                 request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken)));
             var (status, corpo) = respostas[Math.Min(_proxima++, respostas.Length - 1)];
             return new HttpResponseMessage(status) { Content = new StringContent(corpo, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    /// <summary>Nunca responde: só termina quando o prazo da chamada cancela.</summary>
+    private sealed class PendenteHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("O handler pendente não deveria responder.");
         }
     }
 

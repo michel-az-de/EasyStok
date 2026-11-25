@@ -31,7 +31,7 @@ public sealed class RotasIaRepository(IServiceScopeFactory escopos) : IRotasIa
         return provedor is null
             ? null
             : new RotaIa(provedor.Id, provedor.BaseUrl, provedor.Autenticacao, provedor.OrcamentoMensalUsd, modelo,
-                caiuNoPadrao && !string.IsNullOrEmpty(pedido));
+                caiuNoPadrao && !string.IsNullOrEmpty(pedido), provedor.PrazoSegundos);
     }
 
     public async Task<decimal> GastoDoMesAsync(Guid empresaId, Guid provedorId, DateTime agoraUtc, CancellationToken ct = default)

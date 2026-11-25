@@ -47,12 +47,16 @@ public sealed class ClienteProvedorIa(
         else
             request.Headers.Add("x-api-key", destino.Chave);
         request.Headers.Add("anthropic-version", AnthropicMessagesClient.AnthropicVersion);
-        request.Content = new ByteArrayContent(AnthropicMessagesClient.MontarCorpo(requisicao, destino.Modelo, AnthropicMessagesClient.TetoDeSaida(requisicao, config.MaxTokensAgente)));
+        // #3304 (R8): o teto e o prazo do modelo e do provedor da loja valem; sem eles, o global do .env é a reserva.
+        // O teto do modelo é o MÁXIMO que ele aceita: nem o piso da nova tentativa depois de max_tokens passa dele.
+        var teto = AnthropicMessagesClient.TetoDeSaida(requisicao, destino.SaidaMax ?? config.MaxTokensAgente);
+        if (destino.SaidaMax is { } maximoDoModelo) teto = Math.Min(teto, maximoDoModelo);
+        request.Content = new ByteArrayContent(AnthropicMessagesClient.MontarCorpo(requisicao, destino.Modelo, teto));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
         var http = fabrica.CreateClient(NomeHttp);
         using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        prazo.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSegundos));
+        prazo.CancelAfter(TimeSpan.FromSeconds(destino.PrazoSegundos ?? config.TimeoutSegundos));
 
         HttpResponseMessage enviada;
         try

@@ -10,7 +10,9 @@ public class ProvedorIaConfiguration : IEntityTypeConfiguration<ProvedorIa>
 {
     public void Configure(EntityTypeBuilder<ProvedorIa> b)
     {
-        b.ToTable("provedor_ia");
+        // #3304 (R8): os limites do CHECK saem das constantes do domínio, então os dois nunca divergem.
+        b.ToTable("provedor_ia", t => t.HasCheckConstraint("ck_provedor_ia_prazo_segundos",
+            $"prazo_segundos IS NULL OR (prazo_segundos >= {ProvedorIa.PrazoMinimoSegundos} AND prazo_segundos <= {ProvedorIa.PrazoMaximoSegundos})"));
         b.HasKey(p => p.Id);
         b.HasAlternateKey(p => new { p.EmpresaId, p.Id }).HasName("ak_provedor_ia_empresa_id");
         b.Ignore(p => p.ProviderKey);
@@ -23,6 +25,7 @@ public class ProvedorIaConfiguration : IEntityTypeConfiguration<ProvedorIa>
         b.Property(p => p.Autenticacao).HasColumnName("autenticacao").HasConversion<int>().IsRequired();
         b.Property(p => p.Ligado).HasColumnName("ligado").IsRequired();
         b.Property(p => p.OrcamentoMensalUsd).HasColumnName("orcamento_mensal_usd").HasPrecision(12, 6);
+        b.Property(p => p.PrazoSegundos).HasColumnName("prazo_segundos");
         b.Property(p => p.CredencialId).HasColumnName("credencial_id");
         b.Property(p => p.CriadoEm).HasColumnName("criado_em").IsRequired();
         b.Property(p => p.AlteradoEm).HasColumnName("alterado_em").IsRequired();
@@ -41,6 +44,8 @@ public class ModeloIaConfiguration : IEntityTypeConfiguration<ModeloIa>
         {
             t.HasCheckConstraint("ck_modelo_ia_padrao_ligado", "NOT padrao OR ligado");
             t.HasCheckConstraint("ck_modelo_ia_fator_fora_pico", "fator_fora_pico > 0 AND fator_fora_pico <= 1");
+            t.HasCheckConstraint("ck_modelo_ia_saida_max",
+                $"saida_max IS NULL OR (saida_max >= {ModeloIa.SaidaMaxMinima} AND saida_max <= {ModeloIa.SaidaMaxMaxima})");
         });
         b.HasKey(m => m.Id);
         b.HasAlternateKey(m => new { m.EmpresaId, m.Id }).HasName("ak_modelo_ia_empresa_id");
@@ -56,6 +61,7 @@ public class ModeloIaConfiguration : IEntityTypeConfiguration<ModeloIa>
         b.Property(m => m.PrecoSaida).HasColumnName("preco_saida").HasPrecision(12, 6);
         b.Property(m => m.PrecoCacheLido).HasColumnName("preco_cache_lido").HasPrecision(12, 6);
         b.Property(m => m.FatorForaPico).HasColumnName("fator_fora_pico").HasPrecision(4, 3).HasDefaultValue(1m).IsRequired();
+        b.Property(m => m.SaidaMax).HasColumnName("saida_max");
         b.Property(m => m.CriadoEm).HasColumnName("criado_em").IsRequired();
         b.Property(m => m.AlteradoEm).HasColumnName("alterado_em").IsRequired();
 
