@@ -294,11 +294,12 @@ export function textoDoItem({ nome, quantidade, unidade } = {}) {
   return UNIDADES_CONTADAS.includes(un) ? `${qtd}× ${nome}` : `${qtd} ${un} ${nome}`
 }
 
-// O que foi pedido, na linha: até 3 itens na ordem em que entraram e "+N" pelo resto (`itensCount` é o total).
+// O que foi pedido, na linha: até 3 itens na ordem em que entraram e "+N" pelo resto (`itensSemFrete` é o total; API
+// antiga, `itensCount`).
 export function itensDaLinha(pedido) {
   const resumo = Array.isArray(pedido?.itensResumo) ? pedido.itensResumo : []
   if (resumo.length === 0) return null
-  const resto = Math.max(0, (pedido.itensCount ?? resumo.length) - resumo.length)
+  const resto = Math.max(0, (pedido.itensSemFrete ?? pedido.itensCount ?? resumo.length) - resumo.length)
   return { texto: resumo.map(textoDoItem).join(', '), resto: resto > 0 ? `+${resto}` : null }
 }
 

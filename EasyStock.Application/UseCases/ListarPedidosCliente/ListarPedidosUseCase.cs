@@ -17,7 +17,9 @@ public sealed record ListarPedidosQuery(
     string? Order = "desc",
     // E4 L2 (#3076): dia da entrega = AgendadoParaEm, ou CriadoEm no pedido para agora.
     DateTime? EntregaDesde = null,
-    DateTime? EntregaAte = null);
+    DateTime? EntregaAte = null,
+    // #3294: só a tela Pedidos de Cadastros pede os sinais da linha; Web e Cozinha seguem com a linha de sempre.
+    bool ComSinais = false);
 
 public sealed record ListarPedidosResult(
     IReadOnlyList<PedidoResult> Items,
@@ -41,6 +43,8 @@ public class ListarPedidosUseCase(IPedidoRepository repo, IPedidosResumoQuery re
             q.Status, q.ClienteId, q.Desde, q.Ate,
             q.Search, q.Sort, q.Order, q.EntregaDesde, q.EntregaAte);
         var pedidos = items.ToList();
+        if (!q.ComSinais)
+            return new ListarPedidosResult(pedidos.Select(CriarPedidoUseCase.Map).ToList(), total, page, size);
 
         // #3294: uma leitura por página para a ordem da compra e a situação; a lista nunca faz N+1.
         var sinais = pedidos.Count == 0
@@ -57,8 +61,10 @@ public class ListarPedidosUseCase(IPedidoRepository repo, IPedidosResumoQuery re
         CriarPedidoUseCase.Map(p) with
         {
             // A ordem em que os itens entraram no pedido; o Include não garante ordem.
-            ItensResumo = p.Itens.OrderBy(i => i.CriadoEm).ThenBy(i => i.Id).Take(ItensNaLinha)
+            // A linha de frete não é item pedido (#2018): fica fora do resumo e da conta do "+N".
+            ItensResumo = p.Itens.Where(i => !i.EhLinhaDeFrete).OrderBy(i => i.CriadoEm).ThenBy(i => i.Id).Take(ItensNaLinha)
                 .Select(i => new PedidoItemNaLista(i.Nome, i.Quantidade, i.Unidade)).ToList(),
+            ItensSemFrete = p.Itens.Count(i => !i.EhLinhaDeFrete),
             CompraDoCliente = sinais?.CompraDoCliente,
             SituacaoDesde = sinais?.SituacaoDesde ?? p.CriadoEm,
             Atrasado = RegraDeAtraso.EstaAtrasado(p.Status, p.AgendadoParaEm, agoraUtc),

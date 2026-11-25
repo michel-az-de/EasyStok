@@ -151,7 +151,9 @@ for (const largura of [1920, 1440, 390]) {
         await page.getByRole('button', { name: /^Mais opções do Pedido Nº 007/ }).click()
         const cancelar = page.getByRole('menuitem', { name: 'Cancelar pedido', exact: true })
         assert.equal(await cancelar.isDisabled(), true)
-        await page.getByText('Já foi entregue').waitFor()
+        await page.getByText('Já foi entregue').click()
+        await page.waitForTimeout(300)
+        assert.equal(await page.getByRole('dialog').count(), 0, 'clicar no motivo do menu não abre o detalhe')
         await page.keyboard.press('Escape')
       })
       await item('indicador "aguardando pagamento" filtra a lista e o resumo não muda', async () => {

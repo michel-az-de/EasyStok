@@ -5,7 +5,8 @@ import { consultaDePedidos, consultaDoResumo } from '../../dominio/pedidosCadast
 const opcoes = (contexto, sinal) => ({ identidadeEsperada: contexto.identidade, sinal, prazoComCancelamento: true })
 
 export async function listarPedidos(filtros, contexto, sinal, agoraMs = Date.now()) {
-  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, ...consultaDePedidos(filtros, agoraMs) })
+  // #3294: `sinais` pede itens, ordem da compra, tempo na situação e atraso da linha (só esta tela paga essa leitura).
+  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, ...consultaDePedidos(filtros, agoraMs), sinais: 'true' })
   const r = await chamarApi(`/api/pedidos?${parametros}`, { ...opcoes(contexto, sinal), envelope: true })
   const itens = r?.data
   if (!Array.isArray(itens)) throw new Error('A lista de pedidos não foi recebida. Tente carregar novamente.')

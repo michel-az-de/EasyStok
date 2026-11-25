@@ -41,6 +41,7 @@ assert.equal(d.clientesQueVoltaram({ primeiraCompra: 0, recompra: 0 }), null); t
 assert.deepEqual(d.itensDaLinha({ itensCount: 5, itensResumo: [{ nome: 'Bolo', quantidade: 2, unidade: 'un' }, { nome: 'Brigadeiro', quantidade: 1.5, unidade: 'kg' }, { nome: 'Torta', quantidade: 1 }] }),
   { texto: '2× Bolo, 1,5 kg Brigadeiro, 1× Torta', resto: '+2' }); testes++
 assert.equal(d.itensDaLinha({ itensCount: 0, itensResumo: [] }), null); testes++
+assert.equal(d.itensDaLinha({ itensCount: 2, itensSemFrete: 1, itensResumo: [{ nome: 'Bolo', quantidade: 1 }] }).resto, null, 'frete não vira +1'); testes++
 assert.equal(d.itensDaLinha({}), null, 'API antiga sem itensResumo'); testes++
 // 6. Ordem da compra.
 assert.deepEqual(d.compraDoClienteNaLinha({ compraDoCliente: 1 }), { texto: '1ª compra', nova: true }); testes++

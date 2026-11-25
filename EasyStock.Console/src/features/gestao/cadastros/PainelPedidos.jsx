@@ -141,7 +141,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
               const tempo = tempoNaSituacao(item)
               const seloDaCompra = compra && <span className={compra.nova ? css.primeiraCompra : base.selo}>{compra.texto}</span>
               const motivoSemCancelar = semCancelar(item)
-              return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (!e.target.closest('button, a')) verPedido(item) }}>
+              return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (e.currentTarget.contains(e.target) && !e.target.closest('button, a')) verPedido(item) }}>
+                {/* O menu abre num portal: o clique nele sobe pela árvore do React até aqui, mas não está dentro da linha. */}
                 <td><strong>{numeroDoPedido(item)}</strong><small>{[item.criadoEm && horaCurta(item.criadoEm), canal].filter(Boolean).join(' · ')}</small>
                   <span className={css.soCelular}><small className={css.cliente}>{nome}{seloDaCompra}</small><small className={css.situacao}>{situacaoNaLinha}{atrasado}</small><small>Entrega: {quandoEntregar(item)}</small></span></td>
                 <td><span className={css.cliente}><span>{nome}</span>{seloDaCompra}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>

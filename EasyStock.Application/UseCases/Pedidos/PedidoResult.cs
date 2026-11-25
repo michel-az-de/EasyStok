@@ -36,7 +36,8 @@ public sealed record PedidoResult(
     IReadOnlyList<PedidoItemNaLista>? ItensResumo = null,
     int? CompraDoCliente = null,
     DateTime? SituacaoDesde = null,
-    bool? Atrasado = null
+    bool? Atrasado = null,
+    int? ItensSemFrete = null
 );
 
 public sealed record PedidoItemNaLista(string Nome, decimal Quantidade, string? Unidade);

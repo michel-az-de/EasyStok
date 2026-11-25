@@ -18,7 +18,7 @@ API (sem migração):
 - `GET api/pedidos/resumo` (`PedidosResumoController`, Operador, módulo Atendimento, empresa do token). Recebe os mesmos filtros da lista menos situação, página e ordem: `clienteId`, `desde`, `ate`, `search`, `entregaDesde`, `entregaAte`.
 - O filtro da lista saiu do `PedidoRepository` para `PedidoFiltroDaLista`, usado pela lista e pelo resumo. A faixa e as linhas medem o mesmo recorte.
 - Somas no banco (`PedidosResumoQuery`), sempre a partir da empresa.
-- A lista ganha campos opcionais na linha: `itensResumo` (3 primeiros itens na ordem em que entraram), `compraDoCliente`, `situacaoDesde` e `atrasado`. Os sinais vêm em uma leitura só por página.
+- A lista ganha campos opcionais na linha, só com `sinais=true` (a tela de Cadastros pede; Web e Cozinha não pagam a leitura): `itensResumo` (3 primeiros itens na ordem em que entraram, sem a linha de frete), `itensSemFrete`, `compraDoCliente`, `situacaoDesde` e `atrasado`. Os sinais vêm em uma leitura só por página.
 
 Console:
 
@@ -47,6 +47,10 @@ Console:
 - Integração Postgres (`PedidosResumoQueryIntegrationTests`): duas empresas, pedido alheio apontando o mesmo cliente, e o resumo igual à soma das linhas em 3 páginas.
 - Console: `prova-3294-dominio.mjs` (regras puras) e `prova-3294-pedidos-inteligencia.mjs` (navegador com HTTP controlado, 1920, 1440 e 390, claro e escuro).
 
-## 5. Fora
+## 5. Risco aceito
+
+O resumo faz 7 consultas agregadas (9 com período anterior) e, em "Qualquer data", lê o histórico inteiro da empresa a cada recarga da lista. A revisão independente pediu medir o `EXPLAIN` num inquilino grande; se pesar, o caminho é juntar contagens e o índice `(EmpresaId, ClienteId, CriadoEm)`, em PR própria com migração.
+
+## 6. Fora
 
 Ficha, Atendimento, regras de cancelamento e pagamento e o `PedidosController` ficaram como estavam.
