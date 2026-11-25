@@ -377,6 +377,15 @@ public class RoteadorIaLlmClientTests
     }
 
     [Fact]
+    public async Task EscopoNovoLeOGastoDeNovo()
+    {
+        await Roteador().EnviarAsync(Requisicao());
+        await Roteador().EnviarAsync(Requisicao());
+
+        await _rotas.Received(2).GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FalhaAoSomarOGastoNaoFicaGuardadaNoMemo()
     {
         _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())

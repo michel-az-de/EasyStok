@@ -83,6 +83,20 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task ChamadaQueFalhaTambemLevaOIdDoTurnoGravadoComErro()
+    {
+        var requisicoes = new List<RequisicaoLlm>();
+        _llm.EnviarAsync(Arg.Do<RequisicaoLlm>(requisicoes.Add), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("fora do ar"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        requisicoes.Should().NotBeEmpty().And.OnlyContain(r => r.TurnoAgenteId == turno.Id);
+    }
+
+    [Fact]
     public async Task FalhaDoLlmGravaTurnoComErro()
     {
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
