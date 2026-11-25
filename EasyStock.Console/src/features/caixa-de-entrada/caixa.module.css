@@ -74,7 +74,7 @@
    não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
 .contextoLinha {
   display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
-  font-size: var(--t-micro); line-height: 1.35; height: 1.5em; color: var(--tinta-3); white-space: nowrap;
+  font-size: var(--t-micro); line-height: 1.35; height: 1.75em; color: var(--tinta-3); white-space: nowrap; /* #3282: a pílula ganhou 3 px de respiro vertical; a fileira cresce junto */
 }
 
 /* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
@@ -154,8 +154,10 @@
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }
 .chipFiltro:hover:not(.chipLigado) { background: var(--preenchimento-forte); color: var(--tinta); }
+/* #3282 (crítica, P3): a cor de ação é só de botão que age (Assumir, + Itens). Filtro ligado vira tinta cheia:
+   o estado segue em forma (fundo cheio, aria-pressed) e a cor de ação deixa de ter dois sentidos. */
 .chipLigado {
-  background: var(--acao); color: var(--sobre-acao); border-color: var(--acao);
+  background: var(--tinta); color: var(--elevado); border-color: var(--tinta);
   box-shadow: none;
 }
 .chipCanal { position: relative; padding: 0 10px; gap: 5px; }

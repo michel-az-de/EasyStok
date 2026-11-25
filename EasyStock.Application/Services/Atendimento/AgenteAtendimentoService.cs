@@ -189,11 +189,14 @@ public sealed class AgenteAtendimentoService(
         var ferramentasProtegidas = _ferramentas.Where(par => !desligadas.Contains(par.Key)).ToDictionary(par => par.Key,
             par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
+        // #3287 (R5): o id do turno nasce antes das chamadas, para chamada_ia apontar para ele.
+        var turnoId = Guid.NewGuid();
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
             llm, system.Estavel, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
             modelos?.Value.DoTurno(configuracao.ModeloAgente), // S68: modelo da loja só se aprovado
             // #2862: data e dossiê fora do bloco cacheado. #3068: a orientação da retomada vai junto, só neste turno.
-            systemVolatil: system.Volatil + (entradaRetomada is null ? string.Empty : RetomadaDoAssistente.Orientacao(prazoRetomada)));
+            systemVolatil: system.Volatil + (entradaRetomada is null ? string.Empty : RetomadaDoAssistente.Orientacao(prazoRetomada)),
+            turnoAgenteId: turnoId);
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
@@ -223,7 +226,7 @@ public sealed class AgenteAtendimentoService(
             await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, gravacao.UltimaSaidaId,
                 consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
                 precos?.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
-                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, motivo), token);
+                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, motivo, turnoId), token);
         }
 
         async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)

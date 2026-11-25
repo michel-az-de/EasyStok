@@ -711,3 +711,9 @@
 /* #3210: botões do Assistente da conversa, no fim do painel móvel. */
 /* Gruda no pé do painel (a rolagem é do corpo): era o rodapé fixo da modal. */
 .assistenteRodape { position: sticky; bottom: calc(-1 * var(--e-3)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e-2); padding: var(--e-3) 0; margin-bottom: calc(-1 * var(--e-3)); background: var(--papel); }
+
+/* #3282: "Enviar e assumir" no celular: sem o ícone e em duas linhas, para não quebrar em três nem empurrar "Nota". */
+@media (max-width: 759px) {
+  .acoes > .enviar.enviarAssume { min-width: 84px; padding-inline: var(--e-2); font-size: var(--t-micro); line-height: 1.15; text-wrap: balance; }
+  .acoes > .enviar.enviarAssume svg { display: none; }
+}

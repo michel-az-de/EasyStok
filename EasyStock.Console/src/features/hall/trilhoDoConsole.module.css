@@ -8,7 +8,11 @@
 .itens {
   flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--e-1);
   overflow-x: hidden; overflow-y: auto;
+  /* #3282 (crítica, P3): o scrollbar clássico do Windows tirava ~15 px do trilho de 76 px e cortava "Atendimento" e
+     "Respostas automáticas" na borda. A lista segue rolando por roda e teclado; só a barra não ocupa o lugar. */
+  scrollbar-width: none;
 }
+.itens::-webkit-scrollbar { display: none; }
 .inicio { composes: inicio from '../../componentes/Trilho.module.css'; margin-bottom: var(--e-2); }
 .item { composes: item from '../../componentes/Trilho.module.css'; cursor: pointer; }
 .atual { composes: ativo from '../../componentes/Trilho.module.css'; }

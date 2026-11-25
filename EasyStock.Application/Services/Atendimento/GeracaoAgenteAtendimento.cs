@@ -121,7 +121,8 @@ public static class GeracaoAgenteAtendimento
         ILogger logger,
         CancellationToken ct,
         string? modelo = null,
-        string? systemVolatil = null)
+        string? systemVolatil = null,
+        Guid? turnoAgenteId = null)
     {
         // #2862: ordem fixa (ordinal, não de cultura) para o prefixo de ferramentas ser igual entre turnos.
         var definicoes = ferramentas.Values
@@ -138,7 +139,7 @@ public static class GeracaoAgenteAtendimento
             try
             {
                 var requisicao = new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
-                { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento };
+                { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento, TurnoAgenteId = turnoAgenteId };
                 resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, ct);
                 // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
                 if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)

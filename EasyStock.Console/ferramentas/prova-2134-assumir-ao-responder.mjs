@@ -172,6 +172,13 @@ try {
     })
   }
 
+  // #3282: a 1a vez da sessão pergunta; o diálogo confirma com o mesmo verbo do botão.
+  const confirmarEnvio = async (p) => {
+    const dialogo = p.getByRole('dialog', { name: 'Enviar e assumir esta conversa?' })
+    await dialogo.waitFor({ timeout: 2000 })
+    await dialogo.getByRole('button', { name: 'Enviar e assumir', exact: true }).click()
+  }
+
   // --- 2. responder é assumir -------------------------------------------------------------------
   await confere('2. enviar com o Assistente atendendo assume antes e avisa "Você assumiu a conversa"', async () => {
     const { ctx } = await contexto()
@@ -179,6 +186,8 @@ try {
     const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
     await campo.fill('Oi Renan, já te respondo por aqui')
     await campo.press('Enter')
+    assert.deepEqual(await ordemDe(p), [], '#3282: a 1a vez pergunta antes de assumir e de enviar')
+    await confirmarEnvio(p)
     await p.waitForFunction(() => window.ordem.length >= 2, null, { timeout: 4000 }).catch(() => {})
     assert.deepEqual(await ordemDe(p), ['assumir', 'enviar:Oi Renan, já te respondo por aqui'], 'a ordem precisa ser assumir e depois enviar')
     await p.getByText('Você assumiu a conversa', { exact: true }).waitFor({ timeout: 2000 })
@@ -191,7 +200,10 @@ try {
     const { ctx } = await contexto()
     const p = await abrir(ctx)
     await p.getByLabel('Mensagem para o cliente', { exact: true }).fill('Pode ser às 12h')
-    await p.getByRole('button', { name: 'Enviar mensagem', exact: true }).click()
+    const botao = p.getByRole('button', { name: 'Enviar e assumir a conversa', exact: true })
+    assert.match(await botao.innerText(), /Enviar e assumir/, '#3282: o texto do botão diz que assume')
+    await botao.click()
+    await confirmarEnvio(p)
     await p.waitForFunction(() => window.ordem.length >= 2, null, { timeout: 4000 }).catch(() => {})
     assert.deepEqual(await ordemDe(p), ['assumir', 'enviar:Pode ser às 12h'])
     await ctx.close()
@@ -203,6 +215,7 @@ try {
     const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
     await campo.fill('Não deve sair')
     await campo.press('Enter')
+    await confirmarEnvio(p)
     await p.getByRole('alert').filter({ hasText: /não saiu/i }).waitFor({ timeout: 3000 })
     assert.deepEqual(await ordemDe(p), ['assumir'], 'a mensagem saiu mesmo sem assumir')
     assert.equal(await campo.inputValue(), 'Não deve sair', 'o texto precisa continuar no campo')
@@ -225,11 +238,45 @@ try {
     await ctx.close()
   })
 
+  await confere('2. #3282: cancelar a pergunta não assume, não envia e mantém o texto; o foco volta ao campo', async () => {
+    const { ctx } = await contexto()
+    const p = await abrir(ctx)
+    const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
+    await campo.fill('Ainda não')
+    await campo.press('Enter')
+    const dialogo = p.getByRole('dialog', { name: 'Enviar e assumir esta conversa?' })
+    await dialogo.waitFor({ timeout: 2000 })
+    await dialogo.getByRole('button', { name: 'Cancelar', exact: true }).click()
+    await dialogo.waitFor({ state: 'hidden', timeout: 2000 })
+    assert.deepEqual(await ordemDe(p), [], 'cancelar não assume nem envia')
+    assert.equal(await campo.inputValue(), 'Ainda não')
+    await ctx.close()
+  })
+
+  await confere('2. #3282: depois de confirmar, a mesma aba não pergunta de novo (recarregar mantém a escolha)', async () => {
+    const { ctx } = await contexto()
+    const p = await abrir(ctx)
+    const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
+    await campo.fill('Primeira')
+    await campo.press('Enter')
+    await confirmarEnvio(p)
+    await p.waitForFunction(() => window.ordem.length >= 2, null, { timeout: 4000 }).catch(() => {})
+    await p.reload()
+    const campo2 = p.getByLabel('Mensagem para o cliente', { exact: true })
+    await campo2.fill('Segunda')
+    await campo2.press('Enter')
+    await p.waitForFunction(() => window.ordem.length >= 2, null, { timeout: 4000 }).catch(() => {})
+    assert.deepEqual(await ordemDe(p), ['assumir', 'enviar:Segunda'], 'a 2a vez da sessão assume sem diálogo')
+    await ctx.close()
+  })
+
   await confere('2. Enter repetido durante o assumir lento assume uma vez só e envia uma vez só', async () => {
     const { ctx } = await contexto()
     const p = await abrir(ctx, 'assumir=lento')
     const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
     await campo.fill('Uma vez só')
+    await campo.press('Enter')
+    await confirmarEnvio(p)
     await campo.press('Enter')
     await campo.press('Enter')
     await p.waitForTimeout(300)

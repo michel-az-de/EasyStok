@@ -349,12 +349,20 @@ try {
     await ctx.close()
   })
 
+  // #3282: com o Assistente atendendo, a 1a vez da sessão pergunta antes de assumir; o diálogo confirma com o verbo do botão.
+  const confirmarEnvio = async (p) => {
+    const dialogo = p.getByRole('dialog', { name: 'Enviar e assumir esta conversa?' })
+    await dialogo.waitFor({ timeout: 3000 })
+    await dialogo.getByRole('button', { name: 'Enviar e assumir', exact: true }).click()
+  }
+
   // --- F23: letras digitadas enquanto o servidor assume --------------------------------------------------------
   await confere('F23. o que ela digita enquanto o assumir espera fica no campo; só o texto enviado sai', async () => {
     const { ctx, p } = await abrir('inicial=robo&lento=1')
     await esperarPainel(p)
     await campo(p).fill('Primeira mensagem')
     await campo(p).press('Enter')
+    await confirmarEnvio(p)
     await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'assumir'))
     await campo(p).pressSequentially(' e outra coisa', { delay: 5 })
     await p.evaluate(() => window.controle.liberar())
@@ -481,6 +489,7 @@ try {
     await p.getByText('bolo.png', { exact: true }).waitFor()
     await campo(p).fill('Legenda')
     await campo(p).press('Enter')
+    await confirmarEnvio(p)
     await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'assumir'))
     await campo(p).pressSequentially(' e mais', { delay: 5 })
     await p.evaluate(() => window.controle.liberar())
@@ -495,6 +504,7 @@ try {
     await p.locator('input[type="file"]').setInputFiles({ name: 'bolo.png', mimeType: 'image/png', buffer: PNG })
     await p.getByText('bolo.png', { exact: true }).waitFor()
     await campo(p).press('Enter')
+    await confirmarEnvio(p)
     await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'assumir'))
     await p.getByRole('button', { name: /^Remover/ }).first().click()
     await p.getByText('bolo.png', { exact: true }).waitFor({ state: 'detached' })

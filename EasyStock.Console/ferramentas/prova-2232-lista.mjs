@@ -51,8 +51,9 @@ confere('L5  o Balcão abre em "Precisa de você"', () => {
   assert.equal(estadoInicial({ conversas: [] }).filtros.aba, 'precisa')
 })
 confere('L5  segmento ligado em alto contraste; parado com contorno de botão', () => {
-  assert.match(regra('.chipLigado'), /background:\s*var\(--acao\)/)
-  assert.match(regra('.chipLigado'), /color:\s*var\(--sobre-acao\)/)
+  // #3282: filtro ligado em tinta cheia; a cor de ação fica só para botão que age.
+  assert.match(regra('.chipLigado'), /background:\s*var\(--tinta\)/)
+  assert.match(regra('.chipLigado'), /color:\s*var\(--elevado\)/)
   assert.match(regra('.chipFiltro'), /border:\s*var\(--b-1\) solid var\(--linha-media\)/)
 })
 

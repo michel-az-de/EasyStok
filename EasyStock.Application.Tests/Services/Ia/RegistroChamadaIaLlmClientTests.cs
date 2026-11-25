@@ -70,6 +70,22 @@ public class RegistroChamadaIaLlmClientTests
     }
 
     [Fact]
+    public async Task ChamadaDoTurnoGravaOIdDoTurnoNoSucessoENaFalha()
+    {
+        // #3287 (R5): o caminho do .env também liga a chamada ao turno.
+        var turno = Guid.NewGuid();
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 1, 1)),
+                _ => Task.FromException<RespostaLlm>(new HttpRequestException("fora", null, HttpStatusCode.BadGateway)));
+
+        await Cliente().EnviarAsync(Requisicao() with { TurnoAgenteId = turno });
+        await FluentActions.Awaiting(() => Cliente().EnviarAsync(Requisicao() with { TurnoAgenteId = turno }))
+            .Should().ThrowAsync<HttpRequestException>();
+
+        _gravadas.Should().HaveCount(2).And.OnlyContain(c => c.TurnoAgenteId == turno);
+    }
+
+    [Fact]
     public async Task OutraExcecaoGravaErro()
     {
         _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())

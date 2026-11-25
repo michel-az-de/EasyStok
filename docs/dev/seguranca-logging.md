@@ -92,7 +92,7 @@ Ordem do deploy: `subir` (o coletor sai da `edge`) e logo depois `ligar` (api, w
 
 ### Disco
 
-A retenção limita só por tempo (30 dias) e o disco é o mesmo do Postgres. O `/health/disco` da API responde 503 abaixo de `Observabilidade:Disco:MinimoLivrePercentual` (padrão 15%) e o vigia externo (`scripts/uptime/alvos.txt`) abre a issue `uptime`. Não tira a API do balanceador: fica fora de `/health` e de `/health/ready`. Mede a raiz do container, que fica no disco do Docker na VPS.
+A retenção limita só por tempo (30 dias) e o disco é o mesmo do Postgres. O `/health/disco` da API responde 503 abaixo de `Observabilidade:Disco:MinimoLivrePercentual` (padrão 15%) e o vigia externo (UptimeRobot, alvos em `scripts/uptime/alvos.txt`) avisa o Felipe. Não tira a API do balanceador: fica fora de `/health` e de `/health/ready`. Mede a raiz do container, que fica no disco do Docker na VPS.
 
 ### Riscos aceitos
 

@@ -32,6 +32,9 @@ public sealed class RoteadorIaLlmClient(
     private readonly Dictionary<Guid, bool> _flag = [];
     private readonly Dictionary<(Guid, string), RotaIa?> _rotas = [];
     private readonly HashSet<(Guid, Guid)> _cotaGravada = [];
+    // #3287 (R10): o gasto do mês lido uma vez por escopo (até 7 somas num turno de 6 voltas). A cota é suave (D6): o turno
+    // que cruza o orçamento termina, e o gasto fresco vale a partir do próximo escopo.
+    private readonly Dictionary<(Guid, Guid), decimal> _gasto = [];
 
     public IAgenteLlmClient DoEnv => doEnv;
 
@@ -108,6 +111,9 @@ public sealed class RoteadorIaLlmClient(
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             // Sem conseguir ler a flag, a loja segue no .env, como antes da S2b: a leitura nunca derruba o turno.
+            // DECISÃO (R9, #3287): o turno usa a chave global do .env pelo resto da requisição. A cota de tokens da loja
+            // continua valendo; fica de fora só o orçamento em US$ do provedor. Rever quando o .env sair (S5b do #2948):
+            // sem chave global, a falha daqui passa a ser "indisponível" e a equipe atende.
             logger.LogError(ex, "IA da empresa {EmpresaId}: falha ao ler a flag {Flag}; segue pelo .env.", empresaId,
                 FeatureCatalogo.IaProvedorPorLoja);
             ligada = false;
@@ -143,7 +149,7 @@ public sealed class RoteadorIaLlmClient(
                 throw new ProvedorIaIndisponivelException("O modelo de IA da loja não tem preço e o provedor tem orçamento.");
             }
 
-            var gasto = await rotas.GastoDoMesAsync(empresaId, rota.ProvedorId, Agora(), ct);
+            var gasto = await GastoAsync(empresaId, rota.ProvedorId, ct);
             if (gasto >= orcamento)
             {
                 logger.LogWarning("Cota de IA estourada: empresa {EmpresaId}, provedor {ProvedorId}, gasto US$ {Gasto} de US$ {Orcamento}.",
@@ -180,17 +186,25 @@ public sealed class RoteadorIaLlmClient(
         return rota;
     }
 
+    private async Task<decimal> GastoAsync(Guid empresaId, Guid provedorId, CancellationToken ct)
+    {
+        if (_gasto.TryGetValue((empresaId, provedorId), out var memo)) return memo;
+        var gasto = await rotas.GastoDoMesAsync(empresaId, provedorId, Agora(), ct);
+        _gasto[(empresaId, provedorId)] = gasto;
+        return gasto;
+    }
+
     private DateTime Agora() => relogio.GetUtcNow().UtcDateTime;
 
     private ChamadaIa Chamada(Guid empresaId, FinalidadeIa finalidade, RotaIa rota, RespostaLlm? resposta,
-        DesfechoChamadaIa desfecho, long duracaoMs)
+        DesfechoChamadaIa desfecho, long duracaoMs, Guid? turnoAgenteId = null)
     {
         var agora = Agora();
         var custo = resposta is null
             ? null
             : rota.Modelo.Custo(resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheLido, FaixaHorariaIa.ForaDoPico(agora));
         return ChamadaIa.Registrar(empresaId, rota.ProvedorId, rota.Modelo.Id, resposta?.Modelo ?? rota.Modelo.IdExterno,
-            finalidade, null, resposta?.TokensEntrada ?? 0, resposta?.TokensSaida ?? 0, resposta?.TokensCacheLido ?? 0,
+            finalidade, turnoAgenteId, resposta?.TokensEntrada ?? 0, resposta?.TokensSaida ?? 0, resposta?.TokensCacheLido ?? 0,
             resposta?.TokensCacheEscrito ?? 0, custo, (int)Math.Min(duracaoMs, int.MaxValue), desfecho, agora);
     }
 
@@ -199,7 +213,7 @@ public sealed class RoteadorIaLlmClient(
         ChamadaIa chamada;
         try
         {
-            chamada = Chamada(requisicao.EmpresaId, requisicao.Finalidade, rota, resposta, desfecho, duracaoMs);
+            chamada = Chamada(requisicao.EmpresaId, requisicao.Finalidade, rota, resposta, desfecho, duracaoMs, requisicao.TurnoAgenteId);
         }
         catch (Exception ex)
         {

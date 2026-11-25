@@ -9,6 +9,9 @@ import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
 import { useSugestaoProativa } from '../../aplicacao/useSugestaoProativa'
 import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
+import { Modal } from '../../componentes/Modal'
+import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
+import { chaveDaConfirmacao, gravarConfirmacao, jaConfirmou } from './confirmacaoDeEnvioAssumindo'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
@@ -127,6 +130,10 @@ export function Composer({
   const [assumindo, setAssumindo] = useState(false)
   const [assumiu, setAssumiu] = useState(false)
   const [erroAssumir, setErroAssumir] = useState(null)
+  // #3282: "Enviar" que assume pergunta uma vez por sessão; o Enter com o diálogo aberto não envia.
+  const chaveConfirmacao = useChaveDaSessao(chaveDaConfirmacao)
+  const [confirmandoEnvio, setConfirmandoEnvio] = useState(false)
+  const enviaAssumindo = Boolean(aoAssumirAntes) && !assumiu
   async function assumirSePreciso() {
     if (!aoAssumirAntes) return true
     assumindoRef.current = true
@@ -142,15 +149,23 @@ export function Composer({
     return assumida
   }
 
+  function confirmarEnvioAssumindo() {
+    gravarConfirmacao(chaveConfirmacao)
+    setConfirmandoEnvio(false)
+    enviarComposer(true)
+  }
+
   // "Enviar" com anexo em espera manda o anexo (o texto digitado vira legenda
   // de imagem, se houver); sem anexo, segue o fluxo de sempre. Um só botão,
   // uma só tecla Enter, sem o composer perguntar qual dos dois você quis.
-  async function enviarComposer() {
+  async function enviarComposer(jaPerguntou = false) {
     // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
     // acima do campo e o Enviar fica desligado até ela trocar.
     if (variavelSobrando || excedeLimite || assumindoRef.current) return
+    if (confirmandoEnvio && !jaPerguntou) return
     // Enter com o campo vazio não manda balão vazio (#1287).
     if (!anexo && !rascunho.trim()) return
+    if (!jaPerguntou && enviaAssumindo && !jaConfirmou(chaveConfirmacao)) { setConfirmandoEnvio(true); return }
     // #2185 (F23): o que vai é o que ela mandou no toque; o que digitar enquanto o servidor assume fica no campo.
     const enviado = rascunho
     if (!(await assumirSePreciso())) return
@@ -277,6 +292,19 @@ export function Composer({
       {/* #2134: junto do campo, onde a atendente olha ao enviar. */}
       {assumiu && <p className={css.avisoAssumiu} role="status"><Icone nome="check" /> Você assumiu a conversa</p>}
       {erroAssumir && <p className={css.erroAssumir} role="alert">{erroAssumir}</p>}
+      {confirmandoEnvio && (
+        <Modal
+          titulo="Enviar e assumir esta conversa?"
+          descricao={`O Assistente está atendendo ${primeiroNomeDaConversa(conversa)}. Ao enviar, você assume a conversa e o Assistente para de responder.`}
+          aoFechar={() => setConfirmandoEnvio(false)}
+          rodape={(
+            <>
+              <Botao onClick={() => setConfirmandoEnvio(false)}>Cancelar</Botao>
+              <Botao variante="primario" onClick={confirmarEnvioAssumindo}>Enviar e assumir</Botao>
+            </>
+          )}
+        />
+      )}
 
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
@@ -426,17 +454,17 @@ export function Composer({
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <Tooltip texto={variavelSobrando ?? (excedeLimite ? limite.texto : temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
+                <Tooltip texto={variavelSobrando ?? (excedeLimite ? limite.texto : temTexto || anexo ? (enviaAssumindo ? 'Enviar e assumir a conversa' : 'Enviar mensagem') : restricao ?? 'Escreva a mensagem para enviar')}
                   atalho={temTexto || anexo ? 'Enter' : undefined}>
                 <Botao
                   variante="primario"
-                  className={css.enviar}
-                  aria-label="Enviar mensagem"
+                  className={`${css.enviar} ${enviaAssumindo ? css.enviarAssume : ''}`}
+                  aria-label={enviaAssumindo ? 'Enviar e assumir a conversa' : 'Enviar mensagem'}
                   icone="enviar"
                   aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || excedeLimite || Boolean(variavelSobrando) || !(temTexto || anexo)}
-                  onClick={enviarComposer}
-                >Enviar</Botao>
+                  onClick={() => enviarComposer()}
+                >{enviaAssumindo ? 'Enviar e assumir' : 'Enviar'}</Botao>
                 </Tooltip>
               ) : (
                 // #2185 (R15): o microfone ocupa o lugar do Enviar com o mesmo tamanho e o mesmo desenho (ícone e

@@ -251,7 +251,8 @@ await Promise.all([1920, 1440, 390].map(async (largura) => {
     assert.equal(await page.getByText('Em risco', { exact: true }).count(), 0)
     assert.equal(await page.getByRole('img', { name: /^Estágio/ }).count(), 0, 'sem estágio inventado')
     assert.equal(await page.getByRole('button', { name: `Abrir ficha de ${nomeDe(3)}` }).count(), 1, 'ação segue')
-    if (largo) assert.ok(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).count() >= 5, 'traço no lugar do dado ausente')
+    // #3281: 4 células de relação (estágio, gasto, última compra, sinais), um traço em cada.
+    if (largo) assert.equal(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).count(), 4, 'traço no lugar do dado ausente')
     if (largo) assert.equal(await linha(page, 3).getByRole('img', { name: 'Sem dado' }).first().textContent(), '', 'o traço é desenhado em CSS')
     assert.match(await linha(page, 3).innerText(), /3 pedidos/, 'API antiga segue com orderCount')
     assert.match(await linha(page, 7).innerText(), /Inativo/, 'API antiga segue com Inativo')

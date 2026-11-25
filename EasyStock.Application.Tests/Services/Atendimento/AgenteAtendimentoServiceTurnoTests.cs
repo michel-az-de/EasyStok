@@ -68,6 +68,35 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task TodaChamadaDoTurnoLevaOIdDoTurnoGravado()
+    {
+        // #3287 (R5): o id nasce antes das chamadas e é o mesmo do TurnoAgente, para ligar chamada_ia ao turno.
+        var requisicoes = new List<RequisicaoLlm>();
+        _llm.EnviarAsync(Arg.Do<RequisicaoLlm>(requisicoes.Add), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("consultar_pedido"), Texto("Seu pedido fica pronto por volta das 15h40."));
+        VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        requisicoes.Should().HaveCount(2).And.OnlyContain(r => r.TurnoAgenteId == turno.Id);
+    }
+
+    [Fact]
+    public async Task ChamadaQueFalhaTambemLevaOIdDoTurnoGravadoComErro()
+    {
+        var requisicoes = new List<RequisicaoLlm>();
+        _llm.EnviarAsync(Arg.Do<RequisicaoLlm>(requisicoes.Add), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("fora do ar"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        requisicoes.Should().NotBeEmpty().And.OnlyContain(r => r.TurnoAgenteId == turno.Id);
+    }
+
+    [Fact]
     public async Task FalhaDoLlmGravaTurnoComErro()
     {
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
