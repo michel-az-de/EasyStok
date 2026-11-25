@@ -57,6 +57,8 @@ const MOTIVOS = [
     'o agente não conseguiu responder (falha ao chamar o LLM)', 'Assistente falhou'],
   [`${ATD}GeracaoAgenteAtendimento.cs`, '$"o agente não produziu resposta (stop_reason=',
     'o agente não produziu resposta (stop_reason=max_tokens)', 'Assistente sem resposta'],
+  [`${ATD}GeracaoAgenteAtendimento.cs`, 'MotivoRecusa = "o modelo recusou responder"',
+    'o modelo recusou responder (refusal)', 'Modelo recusou'],
   [`${ATD}FinalizacaoDoTurno.cs`, '$"resposta do agente barrada ({barrada}); precisa de conferência humana"',
     'resposta do agente barrada (preço fora da tabela); precisa de conferência humana', 'Resposta para conferir'],
   [`${ATD}FinalizacaoDoTurno.cs`, '$"o agente atingiu o limite de {AgenteAtendimentoService.MaximoIteracoes} iterações',

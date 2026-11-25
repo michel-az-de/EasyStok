@@ -31,6 +31,7 @@ const ROTULOS_CURTOS = [
   [/^o robô respondeu \d+ vezes/i, 'Limite de respostas'],
   [/^o assistente falhou ao responder|^o agente não conseguiu responder/i, 'Assistente falhou'],
   [/^o agente não produziu resposta/i, 'Assistente sem resposta'],
+  [/^o modelo recusou responder/i, 'Modelo recusou'],
   [/^resposta do agente barrada/i, 'Resposta para conferir'],
   [/^o agente atingiu o limite/i, 'Assistente não concluiu'],
   [/^o menu de janelas não saiu/i, 'Menu não enviado'],

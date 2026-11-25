@@ -58,12 +58,16 @@ public interface IClienteProvedorIa
 
 /// <summary>
 /// Para onde a chamada vai. O <see cref="ToString"/> nunca mostra a chave.
-/// <paramref name="SaidaMax"/>: o máximo de tokens de saída que o modelo aceita (#3304); nem a nova tentativa depois de
-/// <c>max_tokens</c> passa dele. <paramref name="PrazoSegundos"/>: prazo da chamada ao provedor; nulo em ambos segue o global do <c>.env</c>.
-/// No Assistente, com o prazo do turno ligado (180 s por padrão; <c>PrazoTurnoSegundos</c> 0 desliga), um prazo de provedor acima disso não alonga o turno.
-/// Com o prazo do turno desligado não há prazo por turno e o limite passa a ser o das voltas do laço (<c>MaximoIteracoes</c>, 6), cada uma com
-/// até 3 chamadas: cada chamada leva até o prazo do provedor, a nova tentativa depois de falha transitória a repete (300 s viram até 600 s por par)
-/// e uma resposta <c>max_tokens</c> com saída abaixo de 16384 abre mais uma. No pior caso, com 300 s, são 6 voltas de 900 s (90 min só em chamadas ao modelo; as ferramentas e a gravação somam a isso).
+/// <paramref name="SaidaMax"/>: o máximo de tokens de saída que o modelo aceita (#3304). Toda chamada sai com ele, então depois de
+/// <c>max_tokens</c> não há nova tentativa com teto maior (#3313). <paramref name="PrazoSegundos"/>: prazo de CADA chamada ao provedor;
+/// nulo em ambos segue o global do <c>.env</c>.
+/// O prazo do turno (180 s por padrão; <c>PrazoTurnoSegundos</c> 0 desliga) só corta a espera pelo modelo: a ferramenta já iniciada e o
+/// envio ao cliente terminam, então o turno pode passar dele. Desligado, nada fora do laço limita o turno (a fila não reserva o item com
+/// prazo) e o limite são as voltas (<c>MaximoIteracoes</c>, 6) com até 3 chamadas cada: a chamada, a nova tentativa depois de falha
+/// transitória (repete a chamada após 300 ms) e, sem <c>SaidaMax</c>, a repetição depois de <c>max_tokens</c>; cada uma leva até o prazo
+/// do provedor. No pior caso, com 300 s e sem <c>SaidaMax</c>, são 6 voltas de 900 s (90 min só de espera pelo provedor; com
+/// <c>SaidaMax</c>, 60 min). Somam a isso as ferramentas, a leitura da chave no cofre antes de cada chamada (flag, rota e gasto do mês vêm do banco só na primeira do escopo), as esperas de 300 ms
+/// (até 1,8 s no turno) e a gravação de cada chamada.
 /// </summary>
 public sealed record DestinoIa(Guid ProvedorId, string BaseUrl, AutenticacaoProvedorIa Autenticacao, string Chave, string Modelo,
     int? SaidaMax = null, int? PrazoSegundos = null)

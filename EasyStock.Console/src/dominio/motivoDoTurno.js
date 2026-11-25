@@ -25,6 +25,7 @@ const MOTIVOS = Object.freeze({
   falha_llm: 'falha no modelo de IA',
   teto_saida: 'a resposta passou do limite de texto do modelo',
   prazo_turno: 'o turno passou do prazo',
+  recusa_modelo: 'o modelo recusou responder',
   escalada_modelo: 'o Assistente pediu a equipe',
   interrompido: 'turno interrompido',
 })

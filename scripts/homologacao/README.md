@@ -16,7 +16,7 @@ Pré-requisitos: Docker, Python 3.12, o segredo de teste do app da Meta em `~/.e
 
 ## Eval do agente (#3275)
 
-`eval_agente.py` é o portão de mudança do agente de atendimento: roda os casos de `eval/casos.json` k vezes (padrão 3) contra a bancada, avalia cada rodada com asserção determinística (ferramenta chamada ou proibida, desfecho do turno, texto proibido, nenhuma falha técnica como `falha_llm` ou `teto_saida`) e grava o resultado em `eval/resultados/` (fora do Git). Sai com 0 só se todo caso chegou ao mínimo de aprovação (0,8 por padrão). Mede também a entrada por turno (mediana e máximo, cache incluído), que é a medição que a revisão #3271 pediu antes de mexer na janela de contexto.
+`eval_agente.py` é o portão de mudança do agente de atendimento: roda os casos de `eval/casos.json` k vezes (padrão 3) contra a bancada, avalia cada rodada com asserção determinística (ferramenta chamada ou proibida, desfecho do turno, texto proibido, nenhuma falha técnica como `falha_llm`, `teto_saida` ou `recusa_modelo`) e grava o resultado em `eval/resultados/` (fora do Git). Sai com 0 só se todo caso chegou ao mínimo de aprovação (0,8 por padrão). Mede também a entrada por turno (mediana e máximo, cache incluído), que é a medição que a revisão #3271 pediu antes de mexer na janela de contexto.
 
 **Rode antes de trocar modelo, prompt, ferramenta, guarda ou limite** e anexe o resultado à PR. Virar regra de processo depende da ADR que substitui a 0065 (#3271, seção 6).
 

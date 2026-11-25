@@ -43,6 +43,13 @@ public class MotivoDoTurnoTests
         MotivoDoTurno.DaFalhaDaGeracao("qualquer coisa com R$ 59", false).Should().Be("guarda:outro");
     }
 
+    [Theory]
+    [InlineData(GeracaoAgenteAtendimento.MotivoRecusa, "recusa_modelo")]
+    [InlineData(GeracaoAgenteAtendimento.MotivoRecusa + " (refusal)", "recusa_modelo")]
+    [InlineData(GeracaoAgenteAtendimento.MotivoTetoDeSaida + " (max_tokens)", "teto_saida")]
+    public void RecusaETetoDeSaidaTemCodigoProprio(string motivoDaGeracao, string esperado) =>
+        MotivoDoTurno.DaFalhaDaGeracao(motivoDaGeracao, false).Should().Be(esperado);
+
     // Código de portão que o domínio recusasse derrubaria o turno depois de escalar e antes do commit.
     [Fact]
     public void TodoPortaoDoCatalogoViraMotivoQueODominioAceita()
@@ -64,6 +71,7 @@ public class MotivoDoTurnoTests
 
     [Fact]
     public void CodigosFixosPassamNoDominio() =>
-        new[] { MotivoDoTurno.Iteracoes, MotivoDoTurno.Menu, MotivoDoTurno.FalhaLlm, MotivoDoTurno.EscaladaModelo, MotivoDoTurno.Interrompido }
+        new[] { MotivoDoTurno.Iteracoes, MotivoDoTurno.Menu, MotivoDoTurno.FalhaLlm, MotivoDoTurno.TetoSaida, MotivoDoTurno.PrazoTurno,
+                MotivoDoTurno.RecusaModelo, MotivoDoTurno.EscaladaModelo, MotivoDoTurno.Interrompido }
             .ToList().ForEach(ValidoNoDominio);
 }
