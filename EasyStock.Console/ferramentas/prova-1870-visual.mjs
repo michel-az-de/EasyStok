@@ -176,7 +176,7 @@ confere('4  restrição de formato permanece acessível e problemas de envio con
   // #3234 (C3) revê a #2420 e a #2427, com o aceite do Felipe (23/11): a lista de mensagens padrão tem uma entrada
   // só, Respostas. A faixa diz por quê; o campo diz onde ela está, e só quando o modelo pode sair.
   assert.doesNotMatch(composer, /Escolher modelo|css\.escolherModelo/)
-  assert.match(composer, /podeEnviarModelo \? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa'/)
+  assert.match(composer, /podeEnviarModelo \? 'Escolha uma mensagem padrão em Respostas' : motivoDoCampoFechado\(motivo\)/)
   for (const erro of ['erroAnexo', 'variavelSobrando']) assert.match(composer, new RegExp(`\\{${erro} && <p className=\\{css\\.restricao\\} role="alert">\\{${erro}\\}`))
   assert.match(composer, /\{erroAssumir && <p className=\{css\.erroAssumir\} role="alert">\{erroAssumir\}/)
   const css = fonte('features/atendimento/atendimento.module.css')

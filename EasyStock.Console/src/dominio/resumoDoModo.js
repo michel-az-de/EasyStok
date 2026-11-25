@@ -43,6 +43,13 @@ function rotuloDoModo(modo, conversa, outro) {
   return ROTULO[modo.chave]
 }
 
+// #3339 (R1D-08): com o atendente conduzindo, janela fechada é o motivo da barra. Sem ele, a linha
+// do próximo passo sugere concluir ou devolver, e a janela não dá nenhuma das duas saídas.
+export function motivoDaBarra(motivoDaFila, motivoDeEscrita, pausado) {
+  if (motivoDaFila || !pausado || motivoDeEscrita?.acao !== 'janela') return motivoDaFila ?? null
+  return { chave: 'janela', texto: `${motivoDeEscrita.titulo} ${motivoDeEscrita.detalhe}`, tom: 'aviso' }
+}
+
 // #2185 (E22): quem não pode reabrir não recebe a ordem "reabra"; o botão nem existe para ela.
 const LINHA_ENCERRADA_SEM_PERMISSAO = 'Peça a quem pode reabrir a conversa.'
 

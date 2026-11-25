@@ -11,13 +11,14 @@ import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
-import { chaveDaConfirmacao, gravarConfirmacao, jaConfirmou } from './confirmacaoDeEnvioAssumindo'
+import { chaveDaConfirmacao, descricaoDaConfirmacao, gravarConfirmacao, jaConfirmou } from './confirmacaoDeEnvioAssumindo'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
 import { useRascunhoLocal } from '../../aplicacao/useRascunhoLocal'
 import { aceitaFormato, motivoDeAnexo, motivoDeAudio, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
+import { motivoDoCampoFechado } from '../../dominio/janela'
 import { restoDoEnvio } from '../../dominio/rascunho'
 import { anexosEmEspera, chaveDoAnexo } from '../../aplicacao/anexosEmEspera'
 import {
@@ -127,6 +128,9 @@ export function Composer({
   // caso e assume pelo mesmo caminho do botão Assumir. Se falhar, nada sai e o erro fica aqui,
   // junto do campo (o aviso da barra de modo pode estar fora da tela).
   const assumindoRef = useRef(false)
+  // #3339 (R1D-09): o Enviar vira Gravar no mesmo lugar quando o campo esvazia; o 2º clique de um duplo clique
+  // cairia nele e pediria o microfone. Gravar logo depois de um envio não começa a gravação.
+  const ultimoEnvioEm = useRef(0)
   const [assumindo, setAssumindo] = useState(false)
   const [assumiu, setAssumiu] = useState(false)
   const [erroAssumir, setErroAssumir] = useState(null)
@@ -295,7 +299,7 @@ export function Composer({
       {confirmandoEnvio && (
         <Modal
           titulo="Enviar e assumir esta conversa?"
-          descricao={`O Assistente está atendendo ${primeiroNomeDaConversa(conversa)}. Ao enviar, você assume a conversa e o Assistente para de responder.`}
+          descricao={descricaoDaConfirmacao(conversa)}
           aoFechar={() => setConfirmandoEnvio(false)}
           // #3317 (F07): o foco vai ao botão que confirma, então Enter envia. Sem isto ia ao título (#2857) e o
           // Enter não fazia nada; no botão o tooltip "Fechar" do X também não reaparece.
@@ -349,8 +353,8 @@ export function Composer({
                 aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
-                  // #3234 (C2): "Janela fechada" fica só na faixa acima; aqui, só o caminho.
-                  ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa')
+                  // #3234 (C2): com saída por mensagem padrão o campo só aponta o caminho; sem saída (#3339, R1D-14) ele diz o motivo da faixa, e não só "indisponível".
+                  ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : motivoDoCampoFechado(motivo))
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão
@@ -467,6 +471,7 @@ export function Composer({
                   aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || excedeLimite || Boolean(variavelSobrando) || !(temTexto || anexo)}
                   onClick={() => {
+                    ultimoEnvioEm.current = Date.now()
                     // #3317 (F06): ao esvaziar o campo o Enviar dá lugar ao Gravar áudio, e o foco ia junto. No toque o
                     // foco fica onde está: devolvê-lo abriria o teclado sem ela pedir (#2135).
                     if (window.matchMedia?.('(pointer: fine)').matches) textareaDoCampo()?.focus({ preventScroll: true })
@@ -484,7 +489,7 @@ export function Composer({
                     aria-label="Gravar áudio"
                     icone="mic"
                     disabled={!podeEscrever || !podeAudio}
-                    onClick={gravador.iniciar}
+                    onClick={() => { if (Date.now() - ultimoEnvioEm.current >= 600) gravador.iniciar() }}
                   >Gravar</Botao>
                 </Tooltip>
               )}

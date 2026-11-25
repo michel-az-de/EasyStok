@@ -13,12 +13,18 @@ const MOTIVOS_CONHECIDOS = [
   [/^atendimento automático desligado/i, AUTOMATICO_DESLIGADO],
 ]
 
+// #3339 (R2I-08): a guarda barrou a resposta e o parêntese traz a categoria ("valor R$ 45,00 sem origem em
+// ferramenta"). Ela sai do parêntese para os dois pontos, para o chip ler o porquê.
+const RESPOSTA_BARRADA = /^resposta do agente barrada \(([^)]*)\)(.*)$/i
+
 // Motivo desconhecido segue como veio, sem o trecho técnico entre parênteses.
 export function motivoDeEscalada(motivo) {
   const texto = String(motivo ?? '').trim()
   if (!texto) return null
   const conhecido = MOTIVOS_CONHECIDOS.find(([padrao]) => padrao.test(texto))
   if (conhecido) return conhecido[1]
+  const barrada = RESPOSTA_BARRADA.exec(texto)
+  if (barrada) return `resposta do Assistente barrada: ${barrada[1].trim()}${barrada[2]}`.replace(/\s{2,}/g, ' ').trim()
   return texto.replace(/\s*\([^)]*\)/g, '').replace(/\s{2,}/g, ' ').trim() || null
 }
 
@@ -26,13 +32,23 @@ export function motivoDeEscalada(motivo) {
 // ele, o chip cortava a frase em 28 letras ("Contato encaminhado à…"). A frase inteira continua na
 // barra da conversa. `ferramentas/prova-2543-chip-do-motivo.mjs` confere cada trecho no C#.
 const ROTULOS_CURTOS = [
+  // #3339: o motivo da guarda, um rótulo por categoria. Cada padrão casa com o texto que `RESPOSTA_BARRADA` gera.
+  [/^resposta do assistente barrada: valor /i, 'Valor sem origem'],
+  [/^resposta do assistente barrada: link /i, 'Link sem origem'],
+  [/^resposta do assistente barrada: afirma situação/i, 'Situação não confirmada'],
+  [/^resposta do assistente barrada: afirma pagamento/i, 'Pagamento não confirmado'],
+  [/^resposta do assistente barrada: afirma frete/i, 'Frete não confirmado'],
+  [/^resposta do assistente barrada: promete frete grátis/i, 'Desconto sem aval'],
+  [/^resposta do assistente barrada: promete encaminhamento/i, 'Encaminhamento não feito'],
+  [/^resposta do assistente barrada: texto com chamada/i, 'Texto de ferramenta'],
+  [/^resposta do assistente barrada: ferramenta falhou/i, 'Ferramenta falhou'],
   [/^(contato )?encaminhado à responsável/i, 'Com a responsável'],
   [/^contato da equipe/i, 'Contato da equipe'],
   [/^o robô respondeu \d+ vezes/i, 'Limite de respostas'],
   [/^o assistente falhou ao responder|^o agente não conseguiu responder/i, 'Assistente falhou'],
   [/^o agente não produziu resposta/i, 'Assistente sem resposta'],
   [/^o modelo recusou responder/i, 'Modelo recusou'],
-  [/^resposta do agente barrada/i, 'Resposta para conferir'],
+  [/^resposta do (agente|assistente) barrada/i, 'Resposta para conferir'],
   [/^o agente atingiu o limite/i, 'Assistente não concluiu'],
   [/^o menu de janelas não saiu/i, 'Menu não enviado'],
   [/^o canal \S+ não tem agente/i, 'Canal sem Assistente'],

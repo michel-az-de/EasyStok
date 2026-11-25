@@ -96,6 +96,9 @@ function motivoForaDaJanela(janela, canal) {
   }
 }
 
+// #3339 (R1D-14): o campo fechado diz o motivo que a faixa diz, para a atendente não ver só "indisponível".
+export const motivoDoCampoFechado = (motivo) => motivo?.titulo ?? 'Mensagem indisponível nesta conversa'
+
 // #2185: "Cadastro bloqueado. Bloqueado. Motivo: X Vale em todos..." repetia a palavra e engolia o ponto
 // do motivo. A frase agora é uma lista de períodos: quando e quem (só se houver), motivo, alcance, saída.
 function detalheDoBloqueio(bloqueio) {

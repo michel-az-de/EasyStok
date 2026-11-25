@@ -424,7 +424,7 @@ function Composicao({ rota }) {
       {/* #2440: limite próprio; erro numa janela não trava o "Encerrar" nem o contrário. */}
       <LimiteDeErro key={encerrando ?? 'nenhum'} parte="Encerramento">
       {encerrando && (
-        <ModalEncerrar conversaId={encerrando} numeroAtendimento={encerrandoNumero} aoFechar={fecharEncerramento} />
+        <ModalEncerrar conversaId={encerrando} numeroAtendimento={encerrandoNumero} notas={notas} aoFechar={fecharEncerramento} />
       )}
       </LimiteDeErro>
 

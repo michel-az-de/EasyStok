@@ -10,7 +10,8 @@
 import { nomeDoMeio } from './cobranca'
 import { faltaPagar, pagamentosDoPedido, totalPago } from './pagamento'
 import { atendimentoDesde, ehLead, indiceInicioDoAtendimento } from './conversa'
-import { duracao, horaCurta, partesNoFuso } from './formato'
+import { duracao, horaCurta, moeda, partesNoFuso } from './formato'
+import { ocorrenciaAberta } from './ocorrencia'
 import { itensDetalhados, totalDoPedido } from './pedido'
 import { passoPorId } from './esteira'
 
@@ -213,6 +214,40 @@ export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMe
 
 // #1761: "o pedido 3 segue na esteira" falava esteira, que não é palavra da casa, e chamava de
 // pedido o número da comanda. No EasyStok a conversa tem comanda; na demonstração, só o pedido.
+// #3339 (R1D-01): quem espera estorno ou tem ocorrência aberta não recebe a despedida de encerramento.
+// A caixa nasce desmarcada, e o modal diz qual estorno ainda não foi marcado.
+// No modo API a conversa não traz a ocorrência: o modal lê as do pedido (`GET /api/ocorrencias?pedidoId=`, formato do
+// OcorrenciaDto) e passa a lista em `ocorrenciasDoPedido`. Sem ela (carregando, ou a leitura falhou), vale a da conversa.
+const abertasDoPedido = (ocorrenciasDoPedido) => (Array.isArray(ocorrenciasDoPedido) ? ocorrenciasDoPedido : []).filter((o) => o?.status === 'aberta')
+
+// `ocorrenciasIncertas`: no modo API, a leitura das ocorrências ainda não chegou ou falhou. Sem saber se há estorno
+// pendente a despedida não nasce marcada (quem atende marca, se quiser).
+export function despedirAoEncerrar(conversa, { regra, podeDespedir, ocorrenciasDoPedido = null, ocorrenciasIncertas = false }) {
+  const ocorrenciaEmAberto = ocorrenciaAberta(conversa?.pedido?.ocorrencia) || abertasDoPedido(ocorrenciasDoPedido).length > 0
+  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaEmAberto && !ocorrenciasIncertas
+}
+
+export function avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido = null) {
+  const pedido = conversa?.pedido
+  const cobranca = pedido?.cobranca
+  if (cobranca?.pagaEm && !cobranca.estornadaEm && ocorrenciaAberta(pedido.ocorrencia)) {
+    const valor = cobranca.valorPago ?? 0
+    return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
+  }
+  // API: a devolução pedida na ocorrência aberta que ainda não foi confirmada nem recusada. O estorno online confirmado
+  // pelo provedor chega como `confirmado` com `reembolsoEm` ainda nulo: já saiu, não é "não marcado".
+  const pendente = abertasDoPedido(ocorrenciasDoPedido).find((o) => o.reembolsoValor > 0 && !o.reembolsoEm && !['recusado', 'confirmado'].includes(o.reembolsoSituacao))
+  return pendente ? `Estorno de ${moeda(pendente.reembolsoValor)} não marcado` : null
+}
+
+// #3339 (R1D-10): a nota interna com texto, ainda não fixada, continua como rascunho depois de Concluir.
+// O modal diz isso para quem concluiu achando que a nota tinha ido junto.
+export function avisoDaNotaAoEncerrar(notas, conversaId) {
+  if (!conversaId || !Array.isArray(notas)) return null
+  const pendente = notas.some((nota) => nota?.id === conversaId && typeof nota.texto === 'string' && nota.texto.trim())
+  return pendente ? 'Há uma nota interna desta conversa que não foi fixada. Concluir não a fixa: o texto fica como rascunho.' : null
+}
+
 export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
   const pedido = conversa?.pedido
   if (!pedido) return null

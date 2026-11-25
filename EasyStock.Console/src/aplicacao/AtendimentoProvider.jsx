@@ -6,6 +6,7 @@ import { carregarConversas } from '../infra/repositorioConversas'
 import { proximoId } from '../infra/numeracao'
 import { carregarCatalogo } from '../infra/repositorioCatalogo'
 import { pedirSugestao } from '../infra/conexaoAgente'
+import { avisoJaEstaNaTela } from '../dominio/aviso'
 import { REGRAS_PADRAO } from '../dominio/automacao'
 import { FUNCIONAMENTO_PADRAO, estaAberta } from '../dominio/funcionamento'
 import {
@@ -274,7 +275,10 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
     automaticoPausado: estado.automaticoPausado,
     janelas: estado.catalogo.janelas,
-    aoAvisar: filaDeAvisos.avisar,
+    aoAvisar: (aviso) => {
+      if (avisoJaEstaNaTela(aviso, { selecionadaId: estado.selecionadaId, painelNaTela: painelDaConversaNaTela, abaVisivel: document.visibilityState !== 'hidden' })) return
+      filaDeAvisos.avisar(aviso)
+    },
     aoTocar: (evento, conversaId) => {
       setEventosSonoros((atual) => [
         ...atual, { id: proximoId('som'), evento, conversaId, quando: agoraRef.current },
