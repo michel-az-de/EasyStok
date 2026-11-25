@@ -197,7 +197,7 @@ public sealed class AgenteAtendimentoService(
             // #2862: data e dossiê fora do bloco cacheado. #3068: a orientação da retomada vai junto, só neste turno.
             systemVolatil: system.Volatil + (entradaRetomada is null ? string.Empty : RetomadaDoAssistente.Orientacao(prazoRetomada)),
             turnoAgenteId: turnoId,
-            // #3291 (R3): prazo total só das chamadas ao modelo; ferramenta e envio terminam com o ct do serviço.
+            // #3291 (R3): prazo do turno (relógio corrido, ferramentas incluídas) que só interrompe o modelo; ferramenta e envio terminam com o ct do serviço.
             prazoTotal: (prazoTurno?.Value ?? new PrazoDoTurnoAgenteOptions()).Prazo);
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;

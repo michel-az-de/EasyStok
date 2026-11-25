@@ -3,9 +3,10 @@ using Microsoft.Extensions.Configuration;
 namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
-/// #3291 (R3 da revisão #3271): prazo total das chamadas ao modelo em um turno do Assistente. Sem ele, o pior caso era de
-/// 6 voltas de até 60 s, cada uma com nova tentativa. O prazo só corta a chamada ao modelo: ferramenta já iniciada e
-/// envio ao cliente terminam. Configuração em <c>Atendimento:FilaTurnoAgente:PrazoTurnoSegundos</c>; zero ou negativo
+/// #3291 (R3 da revisão #3271): prazo do turno do Assistente, contado no relógio desde a primeira volta (as ferramentas
+/// gastam dele). Sem ele, o pior caso era de 6 voltas de até 60 s, cada uma com nova tentativa. O prazo só interrompe a
+/// espera pelo modelo: ferramenta já iniciada e envio ao cliente terminam, e o turno escala quando a volta seguinte
+/// encontra o prazo vencido. Configuração em <c>Atendimento:FilaTurnoAgente:PrazoTurnoSegundos</c>; zero ou negativo
 /// desliga o prazo.
 /// </summary>
 public sealed class PrazoDoTurnoAgenteOptions

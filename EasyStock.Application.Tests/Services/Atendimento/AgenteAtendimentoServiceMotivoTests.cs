@@ -255,8 +255,9 @@ public partial class AgenteAtendimentoServiceTests
         turno.TotalTokens.Should().BeGreaterThan(0, "a volta que terminou foi paga");
         turno.Ferramentas.Should().Equal(new FerramentaDoTurno("consultar_pedido", true));
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
-        await _cloudClient.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Is<string>(t => t.Contains("nunca")),
-            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        // Sem resposta duplicada: sai uma mensagem só, o encaminhamento da escalada.
+        await _cloudClient.Received(1).EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -48,7 +48,7 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
                         // gravação fora do turno, uma conversa lenta não segura as outras da loja. Dentro da conversa a
                         // ordem fica. O teto por loja limita o gasto em paralelo e a folga da cota suave (a conferência
                         // da cota não é atômica: no máximo "teto menos um" turnos passam juntos pelo limite).
-                        executor.Agendar(job.ConversaId, job.EmpresaId, async ct =>
+                        AgendarTurno(executor, job, async ct =>
                         {
                             using var scope = serviceProvider.CreateScope();
                             var useCase = scope.ServiceProvider.GetRequiredService<ProcessarTurnoAgenteUseCase>();
@@ -73,6 +73,14 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
 
         await AguardarTurnosEmCursoAsync(executor);
     }
+
+    /// <summary>
+    /// #3291 (R3): a chave é a conversa (ordem dentro dela) e o grupo é a loja (teto por loja). Trocar os dois volta a
+    /// serializar por loja; <c>AtendimentoFilaTurnoAgenteAgendamentoTests</c> trava a ligação.
+    /// </summary>
+    public static void AgendarTurno(
+        ExecutorPorChave executor, ProcessarTurnoAgenteJob job, Func<CancellationToken, Task> trabalho, CancellationToken ct) =>
+        executor.Agendar(job.ConversaId, job.EmpresaId, trabalho, ct);
 
     /// <summary>Espera os turnos em curso no desligamento, com teto curto; loga quantos ficaram para trás.</summary>
     private async Task AguardarTurnosEmCursoAsync(ExecutorPorChave executor)

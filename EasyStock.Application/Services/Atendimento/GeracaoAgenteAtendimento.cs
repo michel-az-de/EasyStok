@@ -134,7 +134,8 @@ public static class GeracaoAgenteAtendimento
         var consumo = new ConsumoGeracaoAgente();
         var situacaoInicial = contexto.Conversa.Situacao;
 
-        // #3291 (R3): o prazo total corta só a espera pelo modelo. Ferramenta e envio seguem com o ct de quem chamou:
+        // #3291 (R3): o prazo corre desde a primeira volta (ferramentas gastam dele) e corta só a espera pelo modelo.
+        // Ferramenta e envio seguem com o ct de quem chamou:
         // turno que já mexeu no mundo não é cortado no meio. O desligamento do serviço (ct cancelado) segue subindo
         // como cancelamento e nunca vira prazo.
         using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -232,7 +233,7 @@ public static class GeracaoAgenteAtendimento
     /// <summary>#3273 (R1): começo do motivo quando o teto de saída estoura na nova tentativa também.</summary>
     public const string MotivoTetoDeSaida = "o agente atingiu o teto de saída do modelo";
 
-    /// <summary>#3291 (R3): começo do motivo quando as chamadas ao modelo passam do prazo total do turno.</summary>
+    /// <summary>#3291 (R3): começo do motivo quando o turno passa do prazo, contado desde a primeira volta.</summary>
     public const string MotivoPrazoDoTurno = "o agente passou do prazo do turno";
 
     private static string MotivoDoPrazo(TimeSpan? prazo) =>
