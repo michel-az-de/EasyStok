@@ -63,6 +63,10 @@
   position: relative; display: grid; min-width: 0; min-height: 116px;
   border: var(--b-1) solid transparent; border-radius: var(--r-2); background: var(--papel); overflow: clip;
 }
+/* #3301: o cartão que pede produção ganha fundo tingido e contorno uniforme (nunca barra de um lado só);
+   o cartão que já entrou no lote vem depois e vence. */
+.pedeUrgente { border-color: var(--erro); background: var(--erro-pastel); }
+.pedeRepor { border-color: var(--alerta); background: var(--alerta-pastel); }
 .noLote { border-color: var(--marca); background: var(--marca-claro); }
 .noLote .tamanho { background: var(--papel); }
 .tocar {
@@ -208,4 +212,37 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .cartao { transition: border-color var(--dur-curta) var(--ease-padrao), background var(--dur-curta) var(--ease-padrao); }
+}
+
+/* #3301: a leitura dos dados. A frase do topo, o motivo no cartão e os dois grupos da grade. O tom é cor
+   com ícone e texto ao lado: a cor nunca vai sozinha. */
+.tomPerigo { color: var(--erro); }
+.tomAtencao { color: var(--alerta); }
+.tomOk { color: var(--sucesso); }
+.tomNeutro { color: var(--tinta-2); }
+.leitura {
+  display: flex; align-items: center; gap: var(--e-2); margin: 0; min-width: 0;
+  font-size: var(--t-forte); font-weight: 700; line-height: var(--lh-compacto);
+}
+.leitura > svg { flex: none; }
+.cabecaDaFalta { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2) var(--e-4); flex-wrap: wrap; min-width: 0; }
+.avisoDoPorTudo { margin: 0; }
+.contaDaFalta { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+/* O link da conta ocupa a própria linha, com a altura de toque: dentro do parágrafo ele tinha 18 px. */
+.verConta { display: inline-flex; align-items: center; width: fit-content; min-height: var(--toque); }
+.tituloDoGrupo { grid-column: 1 / -1; margin-top: var(--e-2); }
+.tituloDoGrupo:first-child { margin-top: 0; }
+.totalDoGrupo {
+  display: inline-block; min-width: 1.6em; padding: 0 var(--e-2); border-radius: var(--r-pilula); text-align: center;
+  background: var(--preenchimento); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.descricaoDoCartao { display: grid; gap: 2px; min-width: 0; }
+.motivo { display: flex; align-items: flex-start; gap: var(--e-1); font-size: var(--t-micro); font-weight: 650; line-height: var(--lh-corpo); }
+.motivo > svg { flex: none; margin-top: 2px; }
+
+/* Celular: a faixa "Falta produzir" vira uma fileira que rola de lado, e a grade volta a aparecer no primeiro
+   quadro (eram quatro linhas de chips antes do primeiro prato). */
+@media (max-width: 600px) {
+  .falta .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--e-2); }
+  .falta .chips > * { flex-shrink: 0; }
 }
