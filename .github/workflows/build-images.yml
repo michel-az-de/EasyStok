@@ -222,7 +222,8 @@ jobs:
             [ "$MODO" = apagar ] || { head -5 "$pacote.txt"; continue; }
             while read -r id _; do
               [ -n "$id" ] || continue
-              gh api -X DELETE "/users/$DONO/packages/container/$pacote/versions/$id" >/dev/null
+              gh api -X DELETE "/users/$DONO/packages/container/$pacote/versions/$id" >/dev/null \
+                || echo "::warning::falha ao apagar $pacote versao $id; segue"
             done <"$pacote.txt"
           done
           echo "Total: $total"

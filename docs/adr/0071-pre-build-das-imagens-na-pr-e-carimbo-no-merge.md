@@ -43,6 +43,7 @@ Medido em 80 PRs mergeadas de 22 a 25/11/2026: em 59% a 64% delas nenhum outro m
 - **Mesma árvore não é mesmo byte.** O `Dockerfile.Web` roda `npm install` sem lockfile e todos os Dockerfiles rodam
   `apt-get`. Isso já valia para o build do merge. Agora a imagem que vai ao ar é a que a PR buildou, a mesma que
   o review viu.
+- **Janelas do GHCR e do deploy (revisão da PR #3348).** A tag recém-publicada pode levar cerca de 1 min para responder e a tag apagada ainda respondeu por 9 min: no pior caso o carimbo falha e roda o build completo. O `:sha` carimbado fica visível antes da conferência do job; o deploy confere o `GIT_SHA` no container e a camada fina não muda o `rootfs`. O passo que aquece o cache é de melhor esforço (um merge seguinte cancela o run). O cron das 05:23 em São Paulo e a limpeza manual no master criam um run com o `headSha` do master que o `gh run list --commit` do `vps-deploy.sh` pode ver; só atrasa um deploy que coincida com o minuto da limpeza.
 - **Merge que não seja squash.** Vale `HEAD^{tree}` do master, que no merge commit e no rebase também é a árvore do merge
   ref: o carimbo continua correto. O fluxo do projeto é squash.
 
