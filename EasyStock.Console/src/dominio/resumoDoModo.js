@@ -69,14 +69,16 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
     ? sinalUrgente(conversa, agora)
     : null
   if (urgente) linha = urgente.texto
+  // O `title` da pílula e da linha e o leitor de tela leem o `detalhe`: ele não pode seguir dizendo "Assistente respondendo".
+  const detalheFinal = urgente ? `Precisa de você. ${urgente.texto}.` : detalhe
 
   return {
     chave: modo.chave,
-    tom: urgente ? 'aviso' : modo.tom,
+    tom: urgente ? urgente.tom : modo.tom,
     rotulo: urgente ? 'Precisa de você' : rotuloDoModo(modo, conversa, outro),
     urgente: Boolean(urgente),
     linha,
-    detalhe,
+    detalhe: detalheFinal,
     proximo,
     sugereEncerrar: proximo?.chave === 'encerrar-ou-aguardar',
   }

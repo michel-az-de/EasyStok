@@ -64,4 +64,15 @@ await caso('a BarraModo passa `agora` ao resumo', () => {
   assert.match(fonte('features/atendimento/BarraModo.jsx'), /resumoDoModo\([^)]*agora/)
 })
 
+await caso('o detalhe (title e leitor de tela) não diz "Assistente respondendo" com o sinal', () => {
+  const r = resumoDoModo(restricao, false, false, { agora })
+  assert.doesNotMatch(r.detalhe, /Assistente respondendo/)
+  assert.match(r.detalhe, /Precisa de você/)
+})
+
+await caso('devolução mantém o tom de perigo do cartão', () => {
+  const c = conversa([{ id: 'm1', dir: 'in', texto: 'O pedido veio errado, quero meu dinheiro de volta', em: iso(3) }])
+  assert.equal(resumoDoModo(c, false, false, { agora }).tom, motivoDePrecisar(c, agora, false).tom)
+})
+
 fim()
