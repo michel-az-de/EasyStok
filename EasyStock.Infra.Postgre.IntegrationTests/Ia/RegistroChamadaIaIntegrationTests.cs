@@ -83,17 +83,20 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
                  {
                      new DateTime(2026, 11, 30, 12, 0, 0, DateTimeKind.Utc),
                      new DateTime(2026, 12, 1, 1, 30, 0, DateTimeKind.Utc),
+                     new DateTime(2026, 12, 1, 2, 59, 59, 999, DateTimeKind.Utc),
+                     new DateTime(2026, 12, 1, 3, 0, 0, DateTimeKind.Utc),
                      new DateTime(2026, 12, 1, 3, 30, 0, DateTimeKind.Utc),
                  })
             await registro.RegistrarAsync(EasyStock.Domain.Entities.Ia.ChamadaIa.Registrar(empresa, null, null, "deepseek-flash",
                 FinalidadeIa.Atendimento, null, 100, 20, 0, 0, 1m, 10, DesfechoChamadaIa.Ok, instante));
 
-        // 22:45 de 30/11 em Brasília (01:45 UTC de 01/12): ainda novembro, soma a primeira e a segunda.
-        (await registro.SomarMesAsync(empresa, new DateTime(2026, 12, 1, 1, 45, 0, DateTimeKind.Utc)))
-            .Should().Be(new UsoMensalIa(2, 200, 40, 2m));
-        // 00:45 de 01/12 em Brasília (03:45 UTC): dezembro, só a terceira.
+        // Último milissegundo de 30/11 em Brasília (02:59:59.999 UTC de 01/12): ainda novembro. Entram as de 30/11 12:00,
+        // 01:30 e a desse mesmo milissegundo; a da meia-noite exata (03:00:00 UTC) fica de fora.
+        (await registro.SomarMesAsync(empresa, new DateTime(2026, 12, 1, 2, 59, 59, 999, DateTimeKind.Utc)))
+            .Should().Be(new UsoMensalIa(3, 300, 60, 3m));
+        // 00:45 de 01/12 em Brasília (03:45 UTC): dezembro, a da meia-noite exata (03:00:00 UTC) e a de 03:30.
         (await registro.SomarMesAsync(empresa, new DateTime(2026, 12, 1, 3, 45, 0, DateTimeKind.Utc)))
-            .Should().Be(new UsoMensalIa(1, 100, 20, 1m));
+            .Should().Be(new UsoMensalIa(2, 200, 40, 2m));
     }
 
     private sealed class RelogioFixo : TimeProvider
