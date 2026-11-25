@@ -13,6 +13,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
 import css from './caixa.module.css'
 import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
+import { textoDaFaixaNaoEntregues } from './textoNaoEntregues'
 import { assinaturaDaDispensa, chaveDaDispensa, faixaDispensada, gravarDispensa, lerDispensa } from './dispensaNaoEntregues'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
@@ -162,13 +163,16 @@ export function NaoEntregues({ aoAbrir }) {
     setAberto(false)
   }
 
+  const textoFaixa = textoDaFaixaNaoEntregues({ total: itens.length, erro: Boolean(erro), carregando })
   return (
     <>
       {!dispensada && (
         <div className={css.faixaNaoEntregues}>
           <button type="button" className={css.abrirNaoEntregues} onFocus={(evento) => { focoFaixaRef.current = evento.currentTarget }} onClick={() => { setAberto(true); carregar() }}>
             <Icone nome="message-square-warning" tamanho={20} />
-            {erro ? 'Mensagens sem atualizar' : carregando && itens.length === 0 ? 'Conferindo mensagens…' : itens.length === 1 ? '1 mensagem não entregue' : `${itens.length} mensagens não entregues`}
+            <span className={css.rotuloNaoEntregues}>
+              {textoFaixa.visivel}{textoFaixa.complemento && <span className="sr">{textoFaixa.complemento}</span>}
+            </span>
             <span className={css.verNaoEntregues}>Revisar</span>
           </button>
           {itens.length > 0 && !erro && (

@@ -1,0 +1,6 @@
+/* #3322: mesmo desenho do ajuste da Disposição (moldura.module.css). */
+.ancora { position: relative; display: inline-flex; }
+.ajuste { display: grid; gap: var(--e-3); padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta); }
+.ajuste label { display: grid; grid-template-columns: 1fr auto; gap: var(--e-2); }
+.ajuste input { grid-column: 1 / -1; width: 100%; min-height: var(--toque); accent-color: var(--marca); }
+.ajuste output, .ajuste small { font-size: var(--t-micro); color: var(--tinta-2); }
