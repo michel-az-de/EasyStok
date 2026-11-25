@@ -342,7 +342,7 @@ public partial class AgenteAtendimentoServiceTests
     {
         var aguardando = new TaskCompletionSource<RespostaLlm>(TaskCreationOptions.RunContinuationsAsynchronously);
         var chamou = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ => { chamou.SetResult(); return aguardando.Task; });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ => { chamou.TrySetResult(); return aguardando.Task; });
         var turno = CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
         await chamou.Task;
         _conversa.VincularCliente(Guid.NewGuid());
@@ -352,6 +352,23 @@ public partial class AgenteAtendimentoServiceTests
         var gravado = TurnoGravado();
         gravado.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
         gravado.Motivo.Should().Be(MotivoDoTurno.FalhaLlmDefinitiva);
+        // O fim normal do turno escalaria; só o InterrompidoAsync não escala: é o que prende este teste a ele.
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    // #3347 (D4): sem chave, cota estourada ou disjuntor aberto não trazem status do provedor: seguem falha_llm.
+    [Fact]
+    public async Task Motivo_ProvedorIndisponivelGravaFalhaLlm()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new ProvedorIaIndisponivelException("cota estourada"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        turno.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

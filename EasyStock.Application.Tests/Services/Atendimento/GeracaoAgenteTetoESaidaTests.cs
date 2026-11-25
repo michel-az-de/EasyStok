@@ -9,12 +9,15 @@ namespace EasyStock.Application.Tests.Services.Atendimento;
 
 /// <summary>
 /// #3273 (R1, R2 da revisão #3271): estourar <c>max_tokens</c> é desfecho próprio, nunca resposta final; e a nova tentativa
-/// só repete falha transitória.
+/// só repete falha transitória. #3347 (D4): a mesma regra separa, no motivo do turno, a falha definitiva da transitória.
 /// </summary>
 public class GeracaoAgenteTetoESaidaTests
 {
     private static readonly DateTime Agora = new(2026, 11, 24, 15, 0, 0, DateTimeKind.Utc);
     private readonly Guid _empresaId = Guid.NewGuid();
+
+    // #3347 (D4): a frase para a equipe é a mesma nas duas classes de falha; fica como literal para fixar que não muda.
+    private const string FraseDaFalhaDoLlm = "o agente não conseguiu responder (falha ao chamar o LLM)";
 
     private static RespostaLlm Fim(string texto) => new("end_turn", [new BlocoTextoLlm(texto)], 10, 5);
 
@@ -178,9 +181,6 @@ public class GeracaoAgenteTetoESaidaTests
         geracao.Consumo.FalhaLlmDefinitiva.Should().BeTrue();
     }
 
-    // #3347 (D4): definitiva é a falha que repetir não resolve (a regra da nova tentativa); a frase para a equipe é a mesma nas duas.
-    private const string FraseDaFalhaDoLlm = "o agente não conseguiu responder (falha ao chamar o LLM)";
-
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]
@@ -188,7 +188,8 @@ public class GeracaoAgenteTetoESaidaTests
     [InlineData(HttpStatusCode.Forbidden)]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.Redirect)]
-    public async Task FalhaDefinitivaNaoRepete(HttpStatusCode status)
+    [InlineData((HttpStatusCode)499)]
+    public async Task FalhaDefinitivaNaoRepeteEGravaADefinitiva(HttpStatusCode status)
     {
         var capturadas = new List<RequisicaoLlm>();
         var llm = Llm(capturadas, () => throw new HttpRequestException("definitivo", null, status));
@@ -208,7 +209,7 @@ public class GeracaoAgenteTetoESaidaTests
     [InlineData(HttpStatusCode.GatewayTimeout)]
     [InlineData(HttpStatusCode.RequestTimeout)]
     [InlineData(HttpStatusCode.TooManyRequests)]
-    public async Task FalhaTransitoriaRepeteUmaVez(HttpStatusCode status)
+    public async Task FalhaTransitoriaRepeteUmaVezEContinuaTransitoria(HttpStatusCode status)
     {
         var capturadas = new List<RequisicaoLlm>();
         var llm = Llm(capturadas, () => throw new HttpRequestException("blip", null, status));
@@ -222,7 +223,7 @@ public class GeracaoAgenteTetoESaidaTests
     }
 
     [Fact]
-    public async Task FalhaDeRedeSemStatusRepeteUmaVez()
+    public async Task FalhaDeRedeSemStatusRepeteUmaVezEContinuaTransitoria()
     {
         var capturadas = new List<RequisicaoLlm>();
         var llm = Llm(capturadas, () => throw new HttpRequestException("connection reset"));
@@ -235,11 +236,14 @@ public class GeracaoAgenteTetoESaidaTests
     }
 
     // Resposta ilegível, tempo esgotado e afins não trazem status: a nova tentativa os repete e a classe é a transitória.
-    [Fact]
-    public async Task ExcecaoSemStatusRepeteUmaVezEContinuaTransitoria()
+    [Theory]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(TaskCanceledException))]
+    [InlineData(typeof(TimeoutException))]
+    public async Task ExcecaoSemStatusRepeteUmaVezEContinuaTransitoria(Type tipo)
     {
         var capturadas = new List<RequisicaoLlm>();
-        var llm = Llm(capturadas, () => throw new InvalidOperationException("resposta ilegível"));
+        var llm = Llm(capturadas, () => throw (Exception)Activator.CreateInstance(tipo, "sem status")!);
 
         var geracao = await GerarAsync(llm);
 
