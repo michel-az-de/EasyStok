@@ -77,10 +77,12 @@ confere('5a demo: link automático com regra cobranca-pix não conta como respos
   assert.equal(motivoDePrecisar(c, AGORA, false)?.chave, 'diz-que-pagou')
 })
 
-confere('5a API: aviso de cobrança com origemAutomatica sistema não conta como resposta', () => {
+// Revisão da PR: na API toda saída do autor Sistema vira `origemAutomatica: 'sistema'` (FAQ por gatilho, boas-vindas,
+// avisos de pedido, cobrança). A resposta não traz o que distingue a cobrança, então a API segue como antes: a
+// saída do Sistema conta como resposta. Separar a cobrança na API pede um campo no servidor (fica fora desta subida).
+confere('5a API: saída do Sistema sem regra segue contando como resposta (a API não distingue a cobrança)', () => {
   const c = conversaComLinkAutomatico({ origemAutomatica: 'sistema' })
-  assert.equal(mensagensSemRespostaReal(c).length, 1)
-  assert.equal(motivoDePrecisar(c, AGORA, false)?.chave, 'diz-que-pagou')
+  assert.equal(mensagensSemRespostaReal(c).length, 0)
 })
 
 confere('5a guarda: resposta automática do Assistente (origem agente) ainda conta como resposta', () => {

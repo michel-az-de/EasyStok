@@ -95,8 +95,15 @@ caso('modo API: o modal diz o estorno que a ocorrência aberta ainda não conclu
   assert.match(avisoDoEstornoAoEncerrar(semPendencia, pedido), /^Estorno de R\$\s85,00 não marcado$/)
 })
 
+// Revisão da PR: o estorno online confirmado pelo provedor chega com `reembolsoSituacao: 'confirmado'` e `reembolsoEm`
+// ainda nulo enquanto a ocorrência segue aberta; dizer "não marcado" levaria a devolver o dinheiro duas vezes.
+caso('modo API: lista ainda não lida ou leitura que falhou não deixa a despedida nascer marcada', () => {
+  assert.equal(despedirAoEncerrar(semPendencia, { regra: REGRA, podeDespedir: true, ocorrenciasIncertas: true }), false)
+  assert.equal(despedirAoEncerrar(semPendencia, { regra: REGRA, podeDespedir: true, ocorrenciasIncertas: false, ocorrenciasDoPedido: [] }), true)
+})
+
 caso('modo API: estorno confirmado, recusado ou sem valor não gera a linha', () => {
-  for (const o of [doPedido({ reembolsoValor: 85, reembolsoEm: '2026-11-25T13:00:00Z' }), doPedido({ reembolsoValor: 85, reembolsoSituacao: 'recusado' }), doPedido(), doPedido({ status: 'resolvida', reembolsoValor: 85 })]) {
+  for (const o of [doPedido({ reembolsoValor: 85, reembolsoEm: '2026-11-25T13:00:00Z' }), doPedido({ reembolsoValor: 85, reembolsoSituacao: 'recusado' }), doPedido({ reembolsoValor: 85, reembolsoSituacao: 'confirmado' }), doPedido(), doPedido({ status: 'resolvida', reembolsoValor: 85 })]) {
     assert.equal(avisoDoEstornoAoEncerrar(semPendencia, [o]), null)
   }
 })

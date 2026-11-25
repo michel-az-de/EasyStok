@@ -220,9 +220,11 @@ export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMe
 // OcorrenciaDto) e passa a lista em `ocorrenciasDoPedido`. Sem ela (carregando, ou a leitura falhou), vale a da conversa.
 const abertasDoPedido = (ocorrenciasDoPedido) => (Array.isArray(ocorrenciasDoPedido) ? ocorrenciasDoPedido : []).filter((o) => o?.status === 'aberta')
 
-export function despedirAoEncerrar(conversa, { regra, podeDespedir, ocorrenciasDoPedido = null }) {
+// `ocorrenciasIncertas`: no modo API, a leitura das ocorrências ainda não chegou ou falhou. Sem saber se há estorno
+// pendente a despedida não nasce marcada (quem atende marca, se quiser).
+export function despedirAoEncerrar(conversa, { regra, podeDespedir, ocorrenciasDoPedido = null, ocorrenciasIncertas = false }) {
   const ocorrenciaEmAberto = ocorrenciaAberta(conversa?.pedido?.ocorrencia) || abertasDoPedido(ocorrenciasDoPedido).length > 0
-  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaEmAberto
+  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaEmAberto && !ocorrenciasIncertas
 }
 
 export function avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido = null) {
@@ -232,8 +234,9 @@ export function avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido = null) {
     const valor = cobranca.valorPago ?? 0
     return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
   }
-  // API: a devolução pedida na ocorrência aberta que ainda não foi confirmada nem recusada.
-  const pendente = abertasDoPedido(ocorrenciasDoPedido).find((o) => o.reembolsoValor > 0 && !o.reembolsoEm && o.reembolsoSituacao !== 'recusado')
+  // API: a devolução pedida na ocorrência aberta que ainda não foi confirmada nem recusada. O estorno online confirmado
+  // pelo provedor chega como `confirmado` com `reembolsoEm` ainda nulo: já saiu, não é "não marcado".
+  const pendente = abertasDoPedido(ocorrenciasDoPedido).find((o) => o.reembolsoValor > 0 && !o.reembolsoEm && !['recusado', 'confirmado'].includes(o.reembolsoSituacao))
   return pendente ? `Estorno de ${moeda(pendente.reembolsoValor)} não marcado` : null
 }
 

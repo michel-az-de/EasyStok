@@ -47,10 +47,10 @@ export const MOTIVO_PERGUNTA_FORA_DO_ROTEIRO = 'Pergunta fora do roteiro do Assi
 const ehAvisoDeEsteira = (mensagem) => Boolean(mensagem?.automatica) && (mensagem?.regra ?? '').startsWith('esteira-')
 
 // #3339 (R1C-03): o balão automático de cobrança (link ou Pix reenviado) também é aviso, não
-// conversa. Na demonstração vem com `regra` `cobranca-*`; na API o aviso sai como `Sistema`, que o
-// servidor já trata como não-resposta (RetomadaDoAssistente.cs), então `origemAutomatica` `sistema`.
-const ehAvisoDeCobranca = (mensagem) => Boolean(mensagem?.automatica)
-  && ((mensagem?.regra ?? '').startsWith('cobranca') || mensagem?.origemAutomatica === 'sistema')
+// conversa. Na demonstração vem com `regra` `cobranca-*`. Na API a cobrança sai como `Sistema`, igual a FAQ por
+// gatilho, boas-vindas e avisos de pedido, e a resposta não traz o que a distingue: lá vale o de antes (a saída do
+// Sistema conta como resposta). Separar a cobrança na API pede um campo no servidor.
+const ehAvisoDeCobranca = (mensagem) => Boolean(mensagem?.automatica) && (mensagem?.regra ?? '').startsWith('cobranca')
 
 // Resposta que conversa de verdade com o cliente: a dona escrevendo, ou o
 // automático respondendo alguma coisa que não seja aviso de esteira nem de cobrança (FAQ,
