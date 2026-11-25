@@ -149,6 +149,11 @@ public sealed class AgenteAtendimentoService(
 
         // #3149: dicionário gravado que a leitura descarta não some calado (uma linha por turno, sem o conteúdo).
         if (DicionarioDaLoja.Descartado(configuracao.DicionarioJson)) LogsDoAssistente.DicionarioDescartado(logger, conversaId);
+        // #3340 (R2I-05): cliente que cobra dinheiro ou fala em Procon vai à dona sem chamar o modelo, como a cota.
+        if (DetectorReclamacaoCliente.EhReclamacao(pendentes.Select(m => m.Texto)))
+            return await EscalarPeloPortaoAsync(EtapaAssistente.Barrou("reclamacao", "Reclamação",
+                "O cliente cobra dinheiro ou fala em reclamar fora: a dona atende.",
+                "cliente cobra dinheiro ou fala em reclamar fora (estorno, Procon)"));
         var system = await GeracaoAgenteAtendimento.MontarSystemTurnoAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);

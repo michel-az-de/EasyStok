@@ -76,7 +76,8 @@ internal sealed class FinalizacaoDoTurno(
                     : GuardaRespostaAgente.Avaliar(geracao.Texto,
                         contexto.ResultadosDasFerramentas,
                         turno.Ferramentas,
-                        configuracao.NomeDona);
+                        configuracao.NomeDona,
+                        geracao.Consumo?.Ferramentas.Where(f => f.Ok).Select(f => f.Nome));
                 if (concluiu && motivoEscalada is null && barrada is null)
                     respondeu = await EnviarRespostaAsync(gravacao, conversa, geracao.Texto!, ct) || respondeu;
                 else
