@@ -127,6 +127,9 @@ export function Composer({
   // caso e assume pelo mesmo caminho do botão Assumir. Se falhar, nada sai e o erro fica aqui,
   // junto do campo (o aviso da barra de modo pode estar fora da tela).
   const assumindoRef = useRef(false)
+  // #3339 (R1D-09): o Enviar vira Gravar no mesmo lugar quando o campo esvazia; o 2º clique de um duplo clique
+  // cairia nele e pediria o microfone. Gravar logo depois de um envio não começa a gravação.
+  const ultimoEnvioEm = useRef(0)
   const [assumindo, setAssumindo] = useState(false)
   const [assumiu, setAssumiu] = useState(false)
   const [erroAssumir, setErroAssumir] = useState(null)
@@ -467,6 +470,7 @@ export function Composer({
                   aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || excedeLimite || Boolean(variavelSobrando) || !(temTexto || anexo)}
                   onClick={() => {
+                    ultimoEnvioEm.current = Date.now()
                     // #3317 (F06): ao esvaziar o campo o Enviar dá lugar ao Gravar áudio, e o foco ia junto. No toque o
                     // foco fica onde está: devolvê-lo abriria o teclado sem ela pedir (#2135).
                     if (window.matchMedia?.('(pointer: fine)').matches) textareaDoCampo()?.focus({ preventScroll: true })
@@ -484,7 +488,7 @@ export function Composer({
                     aria-label="Gravar áudio"
                     icone="mic"
                     disabled={!podeEscrever || !podeAudio}
-                    onClick={gravador.iniciar}
+                    onClick={() => { if (Date.now() - ultimoEnvioEm.current >= 600) gravador.iniciar() }}
                   >Gravar</Botao>
                 </Tooltip>
               )}
