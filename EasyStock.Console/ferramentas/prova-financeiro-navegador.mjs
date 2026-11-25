@@ -323,7 +323,7 @@ try {
   await modal.waitFor({ state: 'hidden' })
   assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).evaluate((no) => no === document.activeElement), true)
   // #3331 (impeccable): com a conta escolhida, o resumo ao lado não repete o primário da linha.
-  assert.equal(await page.locator('main [class*="primario"]:visible').filter({ hasText: 'Pagar a próxima parcela' }).count(), 0, '#3331: "Pagar a próxima parcela" não é primário')
+  assert.equal(await page.locator('[class*="primario"]:visible').filter({ hasText: 'Pagar a próxima parcela' }).count(), 0, '#3331: "Pagar a próxima parcela" não é primário')
   assert.equal(await page.getByRole('button', { name: 'Pagar a próxima parcela', exact: true }).count(), 1, '#3331: o botão do resumo continua lá')
   await page.screenshot({ path: join(evidencias, 'financeiro-contas-desktop.png') })
   // #2095: "Pagar" na linha abre o registro da próxima parcela direto (2 cliques em vez de 3).
@@ -376,10 +376,11 @@ try {
   // #3331 (impeccable): resultado negativo no extrato leva a cor de saída, como o valor da saída na lista.
   const cores = await page.evaluate(() => {
     const cor = (no) => getComputedStyle(no).color
-    const resultado = [...document.querySelectorAll('main .indicador strong, main strong')].find((no) => /11,00/.test(no.textContent))
+    const valorDe = (rotulo) => [...document.querySelectorAll('main [class*="indicador"]')].find((no) => no.querySelector(':scope > span')?.textContent.trim() === rotulo).querySelector(':scope > strong')
     const saida = [...document.querySelectorAll('main span')].find((no) => /^R\$\s30,00$/.test(no.textContent.trim()))
-    return { resultado: cor(resultado), saida: cor(saida) }
+    return { resultado: cor(valorDe('Resultado dos movimentos')), saida: cor(saida), entradas: cor(valorDe('Entradas do período')) }
   })
+  assert.notEqual(cores.resultado, cores.entradas, '#3331: resultado negativo não usa a tinta neutra')
   assert.equal(cores.resultado, cores.saida, '#3331: resultado negativo em cor de saída')
   await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link', { name: 'Relatórios', exact: true }).click()
   await page.getByRole('button', { name: 'Ampliar relatório', exact: true }).click()
