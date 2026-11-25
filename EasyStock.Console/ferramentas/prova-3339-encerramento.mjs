@@ -75,11 +75,30 @@ caso('estorno já marcado não segura a despedida nem gera linha', () => {
   assert.equal(avisoDoEstornoAoEncerrar(estornado), null)
 })
 
-// No modo API a ocorrência não vem no pedido: o cadastro do cliente traz só a contagem das abertas (revisão da PR).
-caso('modo API: ocorrência aberta no cadastro do cliente segura a despedida', () => {
-  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: { ocorrenciasAbertas: 1 } }, { regra: REGRA, podeDespedir: true }), false)
-  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: { ocorrenciasAbertas: 0 } }, { regra: REGRA, podeDespedir: true }), true)
-  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: {} }, { regra: REGRA, podeDespedir: true }), true)
+// No modo API a conversa não traz a ocorrência: o modal lê as do pedido em `GET /api/ocorrencias?pedidoId=` e passa a lista
+// (formato do OcorrenciaDto). Sem a lista (ainda carregando, ou a leitura falhou), vale o que a conversa já tem.
+const doPedido = (extra = {}) => ({ id: 'o1', status: 'aberta', reembolsoValor: null, reembolsoEm: null, reembolsoSituacao: null, ...extra })
+
+caso('modo API: ocorrência aberta do pedido segura a despedida', () => {
+  const abertas = [doPedido()]
+  assert.equal(despedirAoEncerrar(semPendencia, { regra: REGRA, podeDespedir: true, ocorrenciasDoPedido: abertas }), false)
+})
+
+caso('modo API: só ocorrência encerrada, lista vazia ou ausente não seguram a despedida', () => {
+  for (const lista of [[doPedido({ status: 'resolvida' })], [], null, undefined]) {
+    assert.equal(despedirAoEncerrar(semPendencia, { regra: REGRA, podeDespedir: true, ocorrenciasDoPedido: lista }), true)
+  }
+})
+
+caso('modo API: o modal diz o estorno que a ocorrência aberta ainda não concluiu', () => {
+  const pedido = [doPedido({ reembolsoValor: 85, reembolsoSolicitadoEm: '2026-11-25T12:00:00Z' })]
+  assert.match(avisoDoEstornoAoEncerrar(semPendencia, pedido), /^Estorno de R\$\s85,00 não marcado$/)
+})
+
+caso('modo API: estorno confirmado, recusado ou sem valor não gera a linha', () => {
+  for (const o of [doPedido({ reembolsoValor: 85, reembolsoEm: '2026-11-25T13:00:00Z' }), doPedido({ reembolsoValor: 85, reembolsoSituacao: 'recusado' }), doPedido(), doPedido({ status: 'resolvida', reembolsoValor: 85 })]) {
+    assert.equal(avisoDoEstornoAoEncerrar(semPendencia, [o]), null)
+  }
 })
 
 caso('sem regra ou sem permissão de escrita, a despedida continua desmarcada', () => {

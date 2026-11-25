@@ -216,18 +216,25 @@ export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMe
 // pedido o número da comanda. No EasyStok a conversa tem comanda; na demonstração, só o pedido.
 // #3339 (R1D-01): quem espera estorno ou tem ocorrência aberta não recebe a despedida de encerramento.
 // A caixa nasce desmarcada, e o modal diz qual estorno ainda não foi marcado.
-export function despedirAoEncerrar(conversa, { regra, podeDespedir }) {
-  // Na demonstração a ocorrência vem no pedido; no modo API o cadastro do cliente traz só a contagem das abertas.
-  const ocorrenciaEmAberto = ocorrenciaAberta(conversa?.pedido?.ocorrencia) || Number(conversa?.cliente?.ocorrenciasAbertas) > 0
+// No modo API a conversa não traz a ocorrência: o modal lê as do pedido (`GET /api/ocorrencias?pedidoId=`, formato do
+// OcorrenciaDto) e passa a lista em `ocorrenciasDoPedido`. Sem ela (carregando, ou a leitura falhou), vale a da conversa.
+const abertasDoPedido = (ocorrenciasDoPedido) => (Array.isArray(ocorrenciasDoPedido) ? ocorrenciasDoPedido : []).filter((o) => o?.status === 'aberta')
+
+export function despedirAoEncerrar(conversa, { regra, podeDespedir, ocorrenciasDoPedido = null }) {
+  const ocorrenciaEmAberto = ocorrenciaAberta(conversa?.pedido?.ocorrencia) || abertasDoPedido(ocorrenciasDoPedido).length > 0
   return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaEmAberto
 }
 
-export function avisoDoEstornoAoEncerrar(conversa) {
+export function avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido = null) {
   const pedido = conversa?.pedido
   const cobranca = pedido?.cobranca
-  if (!cobranca?.pagaEm || cobranca.estornadaEm || !ocorrenciaAberta(pedido.ocorrencia)) return null
-  const valor = cobranca.valorPago ?? 0
-  return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
+  if (cobranca?.pagaEm && !cobranca.estornadaEm && ocorrenciaAberta(pedido.ocorrencia)) {
+    const valor = cobranca.valorPago ?? 0
+    return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
+  }
+  // API: a devolução pedida na ocorrência aberta que ainda não foi confirmada nem recusada.
+  const pendente = abertasDoPedido(ocorrenciasDoPedido).find((o) => o.reembolsoValor > 0 && !o.reembolsoEm && o.reembolsoSituacao !== 'recusado')
+  return pendente ? `Estorno de ${moeda(pendente.reembolsoValor)} não marcado` : null
 }
 
 // #3339 (R1D-10): a nota interna com texto, ainda não fixada, continua como rascunho depois de Concluir.

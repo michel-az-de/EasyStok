@@ -8,6 +8,7 @@ import { impressaoDoResumo } from '../../aplicacao/impressos'
 import { useAviso } from '../../componentes/Aviso'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useOcorrenciasDoPedido } from '../../aplicacao/useOcorrenciasDoPedido'
 import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
@@ -56,8 +57,15 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, notas = []
   // nasce desmarcada e desligada, com o motivo, em vez de concluir "com ressalva" depois do toque.
   const escrita = permissaoDeEscrita(conversa, agora, canalDaConversa(canais, conversa))
   const podeDespedir = !conversa || escrita.pode
-  // #3339 (R1D-01): com estorno em aberto ou ocorrência aberta, a caixa nasce desmarcada.
+  // #3339 (R1D-01): com estorno em aberto ou ocorrência aberta, a caixa nasce desmarcada. No modo API a ocorrência
+  // vem de uma leitura ao abrir; se ela chega antes de a dona mexer na caixa, a caixa se desmarca.
+  const ocorrenciasDoPedido = useOcorrenciasDoPedido(fonteApi && numeroAtendimento == null ? conversa?.pedido?.pedidoId ?? null : null)
   const [enviarMensagem, setEnviarMensagem] = useState(despedirAoEncerrar(conversa, { regra: regraEncerramento, podeDespedir }))
+  const mexeuNaCaixa = useRef(false)
+  useEffect(() => {
+    if (!mexeuNaCaixa.current) setEnviarMensagem(despedirAoEncerrar(conversa, { regra: regraEncerramento, podeDespedir, ocorrenciasDoPedido }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage à ocorrência que chegou
+  }, [ocorrenciasDoPedido])
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
@@ -68,6 +76,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, notas = []
   useEffect(() => {
     setCancelarMarcado(false)
     pedidoJaCancelado.current = false
+    mexeuNaCaixa.current = false
     setEnviarMensagem(despedirAoEncerrar(conversa, { regra: regraEncerramento, podeDespedir }))
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reseta ao trocar de conversa, não a cada tecla
@@ -204,8 +213,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, notas = []
                 {avisoDoPedidoAoEncerrar(conversa, { fonteApi })}
               </p>
             )}
-            {!encerrada && !leitura && avisoDoEstornoAoEncerrar(conversa) && (
-              <p className={css.faixaAtencao}>{avisoDoEstornoAoEncerrar(conversa)}</p>
+            {!encerrada && !leitura && avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido) && (
+              <p className={css.faixaAtencao}>{avisoDoEstornoAoEncerrar(conversa, ocorrenciasDoPedido)}</p>
             )}
             {!encerrada && !leitura && avisoDaNotaAoEncerrar(notas, conversaId) && (
               <p className={css.faixaAtencao}>{avisoDaNotaAoEncerrar(notas, conversaId)}</p>
@@ -229,7 +238,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, notas = []
                     checked={despedir}
                     disabled={!podeDespedir}
                     aria-describedby={podeDespedir ? undefined : 'sem-despedida'}
-                    onChange={(e) => setEnviarMensagem(e.target.checked)}
+                    onChange={(e) => { mexeuNaCaixa.current = true; setEnviarMensagem(e.target.checked) }}
                   />
                   Mandar mensagem de encerramento ao cliente
                 </label>
