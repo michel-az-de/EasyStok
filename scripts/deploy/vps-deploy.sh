@@ -11,9 +11,12 @@
 #      da a tag easystok-<svc>:vps-<sha>; nao sobe fonte. Se o build do CI ainda
 #      corre, espera (ESPERA_IMAGENS). Fallback: envia o `git archive` do SHA,
 #      extrai em ~/build/easystok-<sha> e roda docker build api/worker/web com
-#      GIT_SHA. Cai no fallback com --local, com --origem espelho, para SHA que nao
-#      e o master atual, sem run do build-images, build do CI falho ou cancelado,
-#      espera esgotada ou pull com falha (rc 9 interno: o script refaz em build).
+#      GIT_SHA. Imagem que ja esta no GHCR vale para qualquer sha (rollback incluso).
+#      Fallback em build local: --local, --origem espelho, imagem ausente com sha
+#      que nao e o master atual ou com --rollback (esses nunca esperam o CI), sem
+#      run do build-images, run falho ou cancelado, espera esgotada ou pull com
+#      falha (rc 9 interno: o script refaz em build). O digest de cada imagem
+#      puxada vai para o historico (digests=), para auditoria.
 #   4. pg_dump -Fc do banco            -> a migration roda no startup da API
 #   5. guarda :vps atual como vps-prev-<ts> e promove vps-<sha> -> vps
 #   6. compose up -d, espera healthy e confere GIT_SHA no ez-api
@@ -103,9 +106,9 @@ read -r -d '' REMOTE <<'REMOTE_EOF' || true
 set -euo pipefail
 registra() {
   local rc=$?
-  # #3323: duas colunas novas no fim (imagens do deploy e segundos na VPS); as seis antigas ficam onde estavam.
-  printf '%s\t%s\t%s\trc=%s\t%s\t%s\timagens=%s\tdur=%ss\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODO" "$SHA" "$rc" "$QUEM" "$MOTIVO" \
-    "${IMAGENS:-build}" "$SECONDS" >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true
+  # #3323: tres colunas novas no fim (imagens do deploy, segundos na VPS e digests puxados); as seis antigas ficam onde estavam.
+  printf '%s\t%s\t%s\trc=%s\t%s\t%s\timagens=%s\tdur=%ss\tdigests=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODO" "$SHA" "$rc" "$QUEM" "$MOTIVO" \
+    "${IMAGENS:-build}" "$SECONDS" "${DIGESTS:--}" >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true
 }
 trap registra EXIT
 exec 9>/tmp/easystok-deploy.lock
@@ -133,11 +136,15 @@ puxa_imagens() {
       return 1
     fi
   done
+  DIGESTS=""
   for s in $SERVICES; do
     ref="$REGISTRO/easystok-$s:$SHA_FULL"
-    docker tag "$ref" "easystok-$s:vps-$SHA"
+    dg="$(docker image inspect -f '{{index .RepoDigests 0}}' "$ref" 2>/dev/null | sed -n 's/.*@sha256:\(.\{12\}\).*/\1/p' | head -1)"
+    DIGESTS="$DIGESTS${DIGESTS:+,}$s=${dg:-?}"
+    docker tag "$ref" "easystok-$s:vps-$SHA" || return 1
     docker rmi "$ref" >/dev/null 2>&1 || true
   done
+  echo "    digests: $DIGESTS"
 }
 
 SRC="$BUILD_ROOT/easystok-$SHA"

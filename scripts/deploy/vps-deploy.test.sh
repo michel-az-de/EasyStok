@@ -31,7 +31,7 @@ cat > "$W/bin/ssh" <<EOF
 cat >/dev/null
 printf '%s\n' "\$@" | sed 's/ bash -c .*//' > "$W/ssh-args"
 # #3323: FAKE_SSH_9=1 simula o pull das imagens do CI falhando na VPS (rc 9); o build volta 0.
-case "\$*" in *IMAGENS=pull*) [ "\${FAKE_SSH_9:-0}" = 1 ] && exit 9 ;; esac
+case "\$*" in *IMAGENS=pull*) [ "\${FAKE_SSH_9:-0}" = 1 ] && exit 9; [ -n "\${FAKE_SSH_RC:-}" ] && exit "\$FAKE_SSH_RC" ;; esac
 exit 0
 EOF
 chmod +x "$W/bin/ssh"
@@ -144,8 +144,16 @@ r=$(local_run FAKE_GHCR=1 "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$B"
                                           confere "espelho: remoto em build"            "IMAGENS=build" "$r"
 r=$(local_run X=0 -- "$C");              confere "sha a frente do master: build"       "nao ha build do master para esperar" "$r"
                                           confere "sha a frente do master: sem gh"      "gh=nao" "$r"
+r=$(local_run "ROLLBACK_CONFIRMA=${A:0:8}" -- --rollback "$A" --motivo "teste")
+                                          confere "rollback sem imagem no GHCR: consulta o registro" "curl=sim" "$r"
+                                          confere "rollback sem imagem no GHCR: nunca espera o CI" "gh=nao" "$r"
+                                          confere "rollback sem imagem no GHCR: build na VPS" "IMAGENS=build" "$r"
 r=$(local_run FAKE_GHCR=1 "ROLLBACK_CONFIRMA=${A:0:8}" -- --rollback "$A" --motivo "teste")
-                                          confere "rollback: sem espera pelo CI"        "gh=nao" "$r"
+                                          confere "rollback com imagem no GHCR: usa o pull" "IMAGENS=pull" "$r"
+                                          confere "rollback com imagem no GHCR: nao consulta o gh" "gh=nao" "$r"
+r=$(local_run FAKE_GHCR=1 FAKE_SSH_RC=6 -- "$B")
+                                          confere "pull com rc 6 na VPS: devolve 6"     "rc=6" "$r"
+                                          confere "pull com rc 6 na VPS: nao refaz em build" "imagens: pull)" "$r"
 r=$(local_run "FAKE_GH_SEQ=in_progress null|in_progress null|in_progress null" FAKE_GHCR_APOS=3 -- "$B")
                                           confere "espera o build do CI: exit 0"        "rc=0" "$r"
                                           confere "espera o build do CI: esperou"       "esperando o build-images" "$r"
@@ -196,7 +204,7 @@ case "$1" in
           *psql*) [ "${FAKE_PSQL_FAIL:-0}" = 1 ] && exit 1; echo "${FAKE_PONTE_MUDA:-0}" ;;
           *) echo DUMP ;;
         esac ;;
-  image) if [ "$3" = -f ]; then echo "GIT_SHA=${FAKE_IMG_SHA:-$SHA_FULL}"; else grep -q "^$3 " "$STATE/tags" 2>/dev/null; fi ;;
+  image) if [ "$3" = -f ] && [[ "$4" == *RepoDigests* ]]; then echo "ghcr.io/x/y@sha256:abcdef0123456789abcdef"; elif [ "$3" = -f ]; then echo "GIT_SHA=${FAKE_IMG_SHA:-$SHA_FULL}"; else grep -q "^$3 " "$STATE/tags" 2>/dev/null; fi ;;
   tag) src=$(grep "^$2 " "$STATE/tags" | cut -d' ' -f2); sed -i "\#^$3 #d" "$STATE/tags"; echo "$3 ${src:-$2}" >> "$STATE/tags" ;;
   compose) : ;;
   logs) : ;;
@@ -284,6 +292,7 @@ r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "
                               confere "sucesso: sem pull no build local" "pulls=0" "$r"
                               confere "sucesso: fonte extraida"          "fonte=1" "$r"
                               confere "sucesso: historico traz imagens e duracao" "imagens=build	dur=[0-9]*s" "$r"
+                              confere "sucesso: build local sem digest no historico" "imagens=build	dur=[0-9]*s	digests=-" "$r"
 # #3323: IMAGENS=pull usa as imagens do CI e nao toca na fonte nem no docker build.
 r=$(run IMAGENS=pull);       confere "pull: exit 0"                     "rc=0" "$r"
                               confere "pull: promove a imagem do GHCR"   "imagem=ghcr.io/michel-az-de/easystok-api:" "$r"
@@ -293,6 +302,7 @@ r=$(run IMAGENS=pull);       confere "pull: exit 0"                     "rc=0" "
                               confere "pull: tira a tag do GHCR"         "ghcr_sobra=0" "$r"
                               confere "pull: marca current"              "current=novo0001" "$r"
                               confere "pull: historico diz imagens=pull" "imagens=pull	dur=[0-9]*s" "$r"
+                              confere "pull: historico guarda o digest de cada imagem" "digests=api=abcdef012345,worker=abcdef012345,web=abcdef012345" "$r"
 r=$(run2 IMAGENS=pull FAKE_PULL_FAIL=1); confere "pull falho: exit 9"   "rc=9" "$r"
                               confere "pull falho: nao troca a imagem"   "imagem=easystok-api:vps-antiga" "$r"
                               confere "pull falho: nao faz dump"         "dump=0" "$r"
