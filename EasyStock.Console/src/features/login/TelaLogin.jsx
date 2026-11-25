@@ -88,7 +88,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
               value={senha} onChange={(e) => setSenha(e.target.value)} readOnly={ocupado}
             />
             <label className={css.mostrar}>
-              <input type="checkbox" checked={senhaVisivel} onChange={(e) => setSenhaVisivel(e.target.checked)} />
+              <input type="checkbox" checked={senhaVisivel} disabled={ocupado} onChange={(e) => setSenhaVisivel(e.target.checked)} />
               Mostrar a senha
             </label>
             <Botao variante="primario" tipo="submit" largo disabled={ocupado}>
