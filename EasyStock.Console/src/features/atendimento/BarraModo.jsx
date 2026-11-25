@@ -18,17 +18,18 @@ import css from './atendimento.module.css'
 // O motivo da passagem fica à vista: "Passou para você" sem dizer "alergia a camarão" obrigava a
 // procurar o porquê. A frase dos outros estados repetia a pílula e fica para o leitor de tela e o
 // `title` (#1442, #1870). Cadastro bloqueado é explicado junto do campo de mensagem.
-export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, acoes, aoAssumir }) {
+export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, motivo, acoes, aoAssumir }) {
   const [confirmando, setConfirmando] = useState(null)
   // A barra não remonta ao trocar de conversa: o Assumir em andamento é de uma conversa só (#2185 F22).
   const [assumindo, setAssumindo] = useState(() => new Set())
   const emVoo = useRef(new Set())
-  const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora })
+  const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
   const faixa = resumo.chave === MODOS.COM_VOCE ? faixaDaTransferencia(conversa.passagem) : null
   // Com o Assistente desligado na loja, "pausado" e "volta" prometem o que não acontece.
   const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
-  const linha = semAssistente ? 'O Assistente está desligado.' : resumo.linha
-  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE || resumo.urgente
+  // #3318: o motivo de precisar de você vence o aviso do Assistente desligado e fica à vista.
+  const linha = semAssistente && !resumo.precisa ? 'O Assistente está desligado.' : resumo.linha
+  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE || resumo.precisa
 
   async function assumir() {
     setConfirmando(null)
