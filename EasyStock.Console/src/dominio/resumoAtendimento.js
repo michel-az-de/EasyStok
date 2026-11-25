@@ -10,7 +10,8 @@
 import { nomeDoMeio } from './cobranca'
 import { faltaPagar, pagamentosDoPedido, totalPago } from './pagamento'
 import { atendimentoDesde, ehLead, indiceInicioDoAtendimento } from './conversa'
-import { duracao, horaCurta, partesNoFuso } from './formato'
+import { duracao, horaCurta, moeda, partesNoFuso } from './formato'
+import { ocorrenciaAberta } from './ocorrencia'
 import { itensDetalhados, totalDoPedido } from './pedido'
 import { passoPorId } from './esteira'
 
@@ -213,6 +214,20 @@ export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMe
 
 // #1761: "o pedido 3 segue na esteira" falava esteira, que não é palavra da casa, e chamava de
 // pedido o número da comanda. No EasyStok a conversa tem comanda; na demonstração, só o pedido.
+// #3339 (R1D-01): quem espera estorno ou tem ocorrência aberta não recebe a despedida de encerramento.
+// A caixa nasce desmarcada, e o modal diz qual estorno ainda não foi marcado.
+export function despedirAoEncerrar(conversa, { regra, podeDespedir }) {
+  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaAberta(conversa?.pedido?.ocorrencia)
+}
+
+export function avisoDoEstornoAoEncerrar(conversa) {
+  const pedido = conversa?.pedido
+  const cobranca = pedido?.cobranca
+  if (!cobranca?.pagaEm || cobranca.estornadaEm || !ocorrenciaAberta(pedido.ocorrencia)) return null
+  const valor = cobranca.valorPago ?? 0
+  return valor > 0 ? `Estorno de ${moeda(valor)} não marcado` : null
+}
+
 export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
   const pedido = conversa?.pedido
   if (!pedido) return null

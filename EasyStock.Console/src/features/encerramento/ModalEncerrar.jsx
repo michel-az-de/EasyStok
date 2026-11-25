@@ -14,7 +14,7 @@ import { conversaEncerrada } from '../../dominio/conversa'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import {
-  PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
+  PEDE_TEXTO_DA_DESPEDIDA, avisoDoEstornoAoEncerrar, avisoDoPedidoAoEncerrar, despedirAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
 } from '../../dominio/resumoAtendimento'
 import { GATILHOS, contextoDePrevia, regraDoGatilho, textoDaRegra } from '../../dominio/automacao'
 import { FolhaResumo } from './FolhaResumo'
@@ -56,7 +56,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   // nasce desmarcada e desligada, com o motivo, em vez de concluir "com ressalva" depois do toque.
   const escrita = permissaoDeEscrita(conversa, agora, canalDaConversa(canais, conversa))
   const podeDespedir = !conversa || escrita.pode
-  const [enviarMensagem, setEnviarMensagem] = useState(Boolean(regraEncerramento) && podeDespedir)
+  // #3339 (R1D-01): com estorno em aberto ou ocorrência aberta, a caixa nasce desmarcada.
+  const [enviarMensagem, setEnviarMensagem] = useState(despedirAoEncerrar(conversa, { regra: regraEncerramento, podeDespedir }))
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
@@ -67,7 +68,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   useEffect(() => {
     setCancelarMarcado(false)
     pedidoJaCancelado.current = false
-    setEnviarMensagem(Boolean(regraEncerramento) && podeDespedir)
+    setEnviarMensagem(despedirAoEncerrar(conversa, { regra: regraEncerramento, podeDespedir }))
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reseta ao trocar de conversa, não a cada tecla
   }, [conversaId])
@@ -202,6 +203,9 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
               <p className={css.faixaAtencao}>
                 {avisoDoPedidoAoEncerrar(conversa, { fonteApi })}
               </p>
+            )}
+            {!encerrada && !leitura && avisoDoEstornoAoEncerrar(conversa) && (
+              <p className={css.faixaAtencao}>{avisoDoEstornoAoEncerrar(conversa)}</p>
             )}
             {!encerrada && !leitura && (
               <div className={css.confirmacaoEncerrar}>
