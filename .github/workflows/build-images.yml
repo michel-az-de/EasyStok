@@ -2,23 +2,52 @@
 # Poda P01 (#1169): a imagem do Admin saiu junto com o projeto.
 # #3323: a VPS puxa daqui a imagem do sha (scripts/deploy/vps-deploy.sh) em vez de buildar de
 # novo; o build local virou o fallback. Estas imagens sao o caminho do deploy.
+# #3345: o publish da api (107 s dos 154 s do build) sai do caminho do merge. Na PR (mesmo
+# repositorio) o workflow builda as tres imagens e publica :tree-<hash da arvore do merge ref>.
+# No push do master, se a arvore do commit e igual a de uma PR ja buildada, o job nao compila: poe
+# so o GIT_SHA por cima da imagem da PR (camada fina, so metadado) e publica :<sha>. Arvore
+# diferente (o master andou entre o build da PR e o merge), carimbo ou conferencia com falha:
+# build completo, como antes. O vps-deploy.sh nao muda: puxa :<sha> e confere o GIT_SHA no container.
 #
-# - Tags: :<sha do commit> sempre; :latest so no master (rodada manual numa branch nao mexe nele).
+# - Tags: :<sha do commit> sempre; :latest so no master (rodada manual numa branch nao mexe nele);
+#   :tree-<hash> so na PR. O :latest do carimbo so se move depois de conferir o :sha.
 # - GIT_SHA via build-arg, declarado só no estágio runtime dos Dockerfiles —
-#   não invalida o cache de camadas (issue 572).
+#   não invalida o cache de camadas (issue 572). Na PR vale tree-<hash>: imagem de PR nunca passa
+#   na conferencia do deploy, que exige o sha do commit.
 # - Cache buildx type=gha mode=min, escopo v2 por imagem: so as camadas da imagem final.
 #   O mode=max exportava todo estagio de build e levava 123 s dos 296 s da api (medido).
+#   A PR so le o cache (o do master ela le; o dela o master nao le). O carimbo nao grava cache,
+#   entao um passo final do job aquece o cache depois do :sha, fora do caminho do deploy.
 # - provenance: false: sem attestation, o manifesto fica simples e o push mais curto.
+# - Limpeza: o job limpa-tree apaga, todo dia, as versoes que so tem tags tree-* e passaram de 2 dias.
+#   Manual: workflow_dispatch com limpar=simular (lista) ou apagar.
+# - Confianca (ADR-0071): quem escreve numa PR do mesmo repositorio roda o workflow dela com
+#   packages: write; o master nao tem protecao de branch, entao quem escreve ja empurra no master.
+#   PR de fork e do Dependabot nao pre-buildam. O job da PR e continue-on-error: o gate e o ci.yml.
 name: build-images
 
 on:
   push:
     branches: [master, main]
+  pull_request:
   workflow_dispatch:
+    inputs:
+      limpar:
+        description: 'Tags tree-*: nao = so builda; simular = lista o que apagaria; apagar = apaga'
+        type: choice
+        options: [nao, simular, apagar]
+        default: nao
+      idade_dias:
+        description: 'Idade minima, em dias, das tags tree-* que a limpeza apaga'
+        default: '2'
+  schedule:
+    - cron: '23 8 * * *' # 05:23 em Sao Paulo
 
 # Push novo em master cancela o build do commit anterior: so a tag do HEAD atual interessa.
+# Na PR o grupo e o merge ref: push novo na PR cancela o build velho dela. A limpeza tem grupo
+# proprio: nao cancela o build do master nem e cancelada por ele.
 concurrency:
-  group: build-images-${{ github.ref }}
+  group: build-images-${{ github.ref }}-${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.limpar != 'nao')) && 'limpeza' || 'build' }}
   cancel-in-progress: true
 
 permissions:
@@ -27,8 +56,19 @@ permissions:
 
 jobs:
   build-push:
+    # Sem build na limpeza. PR de fork e do Dependabot nao recebem token de escrita no GHCR.
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name != 'workflow_dispatch' || inputs.limpar == 'nao') &&
+      (github.event_name != 'pull_request' ||
+       (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # O pre-build e otimizacao: falha na PR nao barra o merge (sem a tag tree-*, o master faz o build
+    # completo). A falha aparece no run, nao no check da PR.
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    env:
+      IMAGEM: ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +86,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Hash da arvore do commit em build: na PR e o do merge ref (o que o master vai ter se nao andar),
+      # no push e o do commit do master.
+      - name: Arvore do commit
+        id: arvore
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -56,7 +102,62 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Ha imagem de PR com a mesma arvore? So vale se o rotulo dela traz a mesma arvore. Falha de
+      # leitura conta como "nao": build completo.
+      - name: Procura a imagem da PR
+        id: pr
+        if: github.event_name != 'pull_request'
+        env:
+          ARVORE: ${{ steps.arvore.outputs.hash }}
+        run: |
+          digest="$(docker buildx imagetools inspect "$IMAGEM:tree-$ARVORE" --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty' || true)"
+          if [ -n "$digest" ]; then
+            rotulo="$(docker buildx imagetools inspect "$IMAGEM@$digest" --format '{{json .Image}}' 2>/dev/null | jq -r '.config.Labels["io.easystok.tree"] // empty' || true)"
+            [ "$rotulo" = "$ARVORE" ] || { echo "::warning::tree-$ARVORE traz o rotulo '$rotulo': ignorada"; digest=""; }
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          if [ -n "$digest" ]; then echo "Imagem da PR: tree-$ARVORE ($digest). So carimba."; else echo "Sem imagem da PR para a arvore $ARVORE: build completo."; fi
+
+      # Camada fina: so o GIT_SHA por cima da imagem da PR (sem COPY nem RUN: nenhuma camada nova).
+      - name: Carimba a imagem da PR com o sha
+        id: carimbo
+        if: steps.pr.outputs.digest != ''
+        continue-on-error: true
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .github/carimbo
+          push: true
+          provenance: false
+          build-args: |
+            BASE=${{ env.IMAGEM }}@${{ steps.pr.outputs.digest }}
+            GIT_SHA=${{ github.sha }}
+          tags: ${{ env.IMAGEM }}:${{ github.sha }}
+
+      # O deploy confere o GIT_SHA do container; aqui o carimbo precisa ter exatamente um GIT_SHA igual
+      # ao sha e todo o resto igual a base: mesmas camadas (rootfs) e mesma config (Entrypoint, User,
+      # Healthcheck, portas...). Qualquer diferenca: continue-on-error e o build completo roda.
+      - name: Confere o carimbo
+        id: confere
+        if: steps.carimbo.outcome == 'success'
+        continue-on-error: true
+        env:
+          BASE_DIGEST: ${{ steps.pr.outputs.digest }}
+        run: |
+          base="$(docker buildx imagetools inspect "$IMAGEM@$BASE_DIGEST" --format '{{json .Image}}')"
+          novo="$(docker buildx imagetools inspect "$IMAGEM:$GITHUB_SHA" --format '{{json .Image}}')"
+          jq -n -e --argjson b "$base" --argjson n "$novo" --arg sha "$GITHUB_SHA" '
+            def sem_sha: .config | .Env |= map(select(startswith("GIT_SHA=") | not));
+            ($n.config.Env | map(select(startswith("GIT_SHA=")))) == ["GIT_SHA=" + $sha]
+            and ($b | sem_sha) == ($n | sem_sha)
+            and $b.rootfs == $n.rootfs' >/dev/null
+          echo "carimbo=ok" >> "$GITHUB_OUTPUT"
+
+      - name: Move o latest para o carimbo
+        if: steps.confere.outputs.carimbo == 'ok' && github.ref == 'refs/heads/master'
+        run: docker buildx imagetools create --tag "$IMAGEM:latest" "$IMAGEM:$GITHUB_SHA"
+
       - name: Build + push easystok-${{ matrix.name }}
+        if: steps.confere.outputs.carimbo != 'ok'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -64,10 +165,65 @@ jobs:
           push: true
           provenance: false
           build-args: |
-            GIT_SHA=${{ github.sha }}
+            GIT_SHA=${{ github.event_name == 'pull_request' && format('tree-{0}', steps.arvore.outputs.hash) || github.sha }}
+          labels: ${{ github.event_name == 'pull_request' && format('io.easystok.tree={0}', steps.arvore.outputs.hash) || '' }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}:${{ github.sha }}
-            ${{ github.ref == 'refs/heads/master' && format('ghcr.io/{0}/easystok-{1}:latest', github.repository_owner, matrix.name) || '' }}
+            ${{ github.event_name == 'pull_request' && format('{0}:tree-{1}', env.IMAGEM, steps.arvore.outputs.hash) || format('{0}:{1}', env.IMAGEM, github.sha) }}
+            ${{ github.ref == 'refs/heads/master' && format('{0}:latest', env.IMAGEM) || '' }}
+          cache-from: type=gha,scope=easystok-v2-${{ matrix.name }}
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=gha,mode=min,scope=easystok-v2-{0}', matrix.name) || '' }}
+
+      # O deploy ja puxa o :sha (o GHCR o mostra desde o carimbo); este passo so mantem o cache do master
+      # fresco para o proximo build completo (mudanca so de script, que sem ele perderia o atalho de
+      # 28 s). Roda depois de tudo, sem push, e nao derruba o job.
+      - name: Aquece o cache do master
+        if: steps.confere.outputs.carimbo == 'ok' && github.event_name == 'push'
+        continue-on-error: true
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          provenance: false
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           cache-from: type=gha,scope=easystok-v2-${{ matrix.name }}
           cache-to: type=gha,mode=min,scope=easystok-v2-${{ matrix.name }}
 
+  # Tags tree-* sao descartaveis: so servem entre o build da PR e o merge. Apaga a versao que so tem
+  # tags tree-* e passou da idade (nunca versao sem tag, nunca :sha nem :latest). O :sha carimbado
+  # reaproveita as camadas da imagem da PR; o teste de limpeza confere que ele segue puxavel.
+  limpa-tree:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.limpar != 'nao')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Limpa as tags tree-*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DONO: ${{ github.repository_owner }}
+          MODO: ${{ inputs.limpar || 'apagar' }}
+          IDADE_DIAS: ${{ inputs.idade_dias || '2' }}
+        run: |
+          set -euo pipefail
+          corte="$(date -u -d "$IDADE_DIAS days ago" +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Modo $MODO; apaga versoes so com tags tree-* criadas antes de $corte"
+          total=0
+          for pacote in easystok-api easystok-web easystok-worker; do
+            gh api --paginate "/users/$DONO/packages/container/$pacote/versions?per_page=100" >"$pacote.json"
+            jq -r --arg corte "$corte" '.[]
+              | select((.metadata.container.tags | length) > 0
+                       and all(.metadata.container.tags[]; startswith("tree-"))
+                       and .created_at < $corte)
+              | "\(.id) \(.created_at) \(.metadata.container.tags | join(","))"' "$pacote.json" >"$pacote.txt"
+            n="$(wc -l <"$pacote.txt")"
+            echo "$pacote: $n versao(oes) para apagar de $(jq -s 'map(length) | add' "$pacote.json") no total"
+            total=$(( total + n ))
+            [ "$MODO" = apagar ] || { head -5 "$pacote.txt"; continue; }
+            while read -r id _; do
+              [ -n "$id" ] || continue
+              gh api -X DELETE "/users/$DONO/packages/container/$pacote/versions/$id" >/dev/null \
+                || echo "::warning::falha ao apagar $pacote versao $id; segue"
+            done <"$pacote.txt"
+          done
+          echo "Total: $total"

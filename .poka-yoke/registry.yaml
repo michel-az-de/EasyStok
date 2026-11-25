@@ -124,7 +124,7 @@ ci_gates:
     - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt) e job proprio de Api.IntegrationTests (#1890). Gate de merge.
     - console.yml     # qualidade + provas node do console. Gate.
     - secret-scan.yml # gitleaks. Gate.
-    - build-images.yml # imagens GHCR no push do master.
+    - build-images.yml # imagens GHCR no push do master; na PR pre-builda :tree-<hash> e no merge so carimba o sha (#3345, ADR-0071). Nao e gate de merge.
   quarantined:        # tirados do gatilho por-commit
     - coverage.yml      # gatilho -> schedule + workflow_dispatch (#1890 tirou os 32 vermelhos de Api.IntegrationTests)
     - codeql.yml        # gatilho -> schedule + workflow_dispatch (#3277: 39% dos minutos do CI)
