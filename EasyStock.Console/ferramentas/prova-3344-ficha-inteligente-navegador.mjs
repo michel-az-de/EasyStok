@@ -101,7 +101,7 @@ await item('1440: leitura, pratos de compra real e Assistente só no clique', as
   assert.equal(perguntas.length, 0, 'a IA não roda ao abrir a ficha')
   await painel.getByRole('button', { name: 'Escrever mensagem de recompra', exact: true }).click()
   await painel.getByText('Sentimos sua falta', { exact: false }).waitFor()
-  assert.equal(perguntas.length, 1); assert.match(perguntas[0].pergunta, /Marina/); assert.match(perguntas[0].pergunta, /Feijoada/)
+  assert.equal(perguntas.length, 1); assert.equal(perguntas[0].conversaId, null, 'sem conversa: o histórico de mensagens não segue'); assert.match(perguntas[0].pergunta, /Marina/); assert.match(perguntas[0].pergunta, /Feijoada/)
   assert.doesNotMatch(perguntas[0].pergunta, /marina\.perfil@|99999|12345678909/, 'a pergunta não leva e-mail, telefone nem documento')
   await painel.getByText('Nada foi enviado ao cliente.', { exact: false }).waitFor()
   await page.screenshot({ path: `${pasta}/leitura-1440.png` })

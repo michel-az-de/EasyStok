@@ -47,6 +47,10 @@ caso('pratos: favorito primeiro, depois o último pedido, sem repetir e no máxi
   assert.deepEqual(p.map((x) => x.nome), ['Molho bechamel', 'Lasanha', 'Nhoque'])
   assert.equal(p[0].motivo, 'Costuma pedir'); assert.equal(p[1].motivo, 'Pediu no último pedido')
 })
+caso('a linha de frete do pedido não é prato', () => {
+  const p = pratosParaOferecer({ ultimoPedido: { itens: [{ nome: 'Entrega — Centro' }, { nome: 'Frete' }, { nome: 'Lasanha' }] } })
+  assert.deepEqual(p.map((x) => x.nome), ['Lasanha'])
+})
 caso('sem compra não há prato', () => {
   assert.deepEqual(pratosParaOferecer(), []); assert.deepEqual(pratosParaOferecer({ favorito: '  ', ultimoPedido: { itens: [] } }), [])
 })

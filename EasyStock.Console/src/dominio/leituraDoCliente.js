@@ -25,7 +25,7 @@ export function leituraDoCliente(relacao, agora = Date.now()) {
 export function proximoPassoDoCliente(leitura) {
   if (!leitura) return null
   if (leitura.reclamacaoAberta) return 'Resolva a reclamação antes de oferecer algo.'
-  if (leitura.emRisco) return 'Está há tempo sem pedir: vale chamar com algo que ela gosta.'
+  if (leitura.emRisco) return 'Está há tempo sem pedir: vale chamar com um prato de que a pessoa gosta.'
   if (leitura.posicao === 0) return 'Ainda não pediu: apresente o cardápio.'
   if (leitura.posicao === 1) return 'Primeira compra feita: convide para repetir.'
   return null

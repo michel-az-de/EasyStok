@@ -10,6 +10,8 @@ import { perguntaSobreOCliente, pratosParaOferecer } from '../../../dominio/prat
 import { primeiroNome } from '../../../dominio/mensagem'
 import css from './leituraDoCliente.module.css'
 
+// Nome que parece telefone (só dígitos e sinais) não vai para o modelo.
+const nomeParaAPergunta = (nome) => { const limpo = String(nome ?? '').trim(); return /^[\d+()\s-]+$/.test(limpo) ? '' : primeiroNome(limpo) }
 const MODOS = { pratos: 'Sugerir oferta', recompra: 'Escrever mensagem de recompra' }
 
 // #3344: o painel que abre a Ficha. Leitura do cliente com as palavras da lista de Clientes (estágio, risco, última
@@ -23,7 +25,6 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
   const passo = proximoPassoDoCliente(leitura)
   const alergias = (relacionamento?.tags ?? []).filter((t) => ehRestricao(t, restricoes)).map(rotuloDaTag)
   const podeRecomprar = Boolean(leitura?.ultimaCompra) && pratos.length > 0
-  const conversaId = relacionamento?.conversas?.[0]?.id ?? null
   const [pedido, definir] = useState({ modo: null, carregando: false, texto: null, erro: null, copiado: false })
   const controle = useRef(null)
   useEffect(() => () => controle.current?.abort(), [])
@@ -35,14 +36,14 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
     const sinal = (controle.current = new AbortController()).signal
     definir({ modo, carregando: true, texto: null, erro: null, copiado: false })
     try {
-      const texto = await perguntarSobreOCliente(perguntaSobreOCliente(modo, { primeiroNome: primeiroNome(cliente.nome ?? ''), leitura, pratos, restricoes: alergias }), conversaId, { sinal })
+      const texto = await perguntarSobreOCliente(perguntaSobreOCliente(modo, { primeiroNome: nomeParaAPergunta(cliente.nome), leitura, pratos, restricoes: alergias }), { sinal })
       if (!sinal.aborted) definir({ modo, carregando: false, texto, erro: null, copiado: false })
     } catch (e) {
       if (!sinal.aborted) definir({ modo, carregando: false, texto: null, erro: e.message || 'O Assistente não respondeu agora. Tente de novo.', copiado: false })
     }
   }
   async function copiar() {
-    try { await navigator.clipboard.writeText(pedido.texto); definir((p) => ({ ...p, copiado: true })) } catch { /* sem permissão: o texto segue na tela */ }
+    try { await navigator.clipboard.writeText(pedido.texto); definir((p) => ({ ...p, copiado: true, erro: null })) } catch { definir((p) => ({ ...p, erro: 'Não deu para copiar. Selecione o texto e copie.' })) }
   }
 
   return <section className={css.painel} aria-label="Leitura do cliente" data-leitura-do-cliente>
@@ -66,11 +67,11 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
       <h3>O que oferecer</h3>
       {pratos.length > 0
         ? <ul className={css.pratos}>{pratos.map((p) => <li key={p.nome}><strong>{p.nome}</strong><small>{p.motivo}</small></li>)}</ul>
-        : <p className={css.vazio}>Sem compras ainda. Registre um pedido para ver sugestões.</p>}
+        : <p className={css.vazio}>{Number(relacao?.compras) === 0 ? 'Sem compras ainda. Registre um pedido para ver sugestões.' : 'Sem sugestão de pratos por enquanto.'}</p>}
     </div>
     {pratos.length > 0 && <div className={css.assistente}>
       <span className={css.quem}><AvatarAssistente tamanho={24} decorativo />Assistente</span>
-      {Object.entries(MODOS).map(([modo, rotulo]) => <Botao key={modo} disabled={pedido.carregando || (modo === 'recompra' && !podeRecomprar)} aria-pressed={pedido.modo === modo && Boolean(pedido.texto)} onClick={() => perguntar(modo)}>{pedido.carregando && pedido.modo === modo ? 'Pensando…' : rotulo}</Botao>)}
+      {Object.entries(MODOS).filter(([modo]) => modo !== 'recompra' || podeRecomprar).map(([modo, rotulo]) => <Botao key={modo} disabled={pedido.carregando} onClick={() => perguntar(modo)}>{pedido.carregando && pedido.modo === modo ? 'Pensando…' : rotulo}</Botao>)}
     </div>}
     </div>
     <output aria-live="polite" className={css.resposta}>

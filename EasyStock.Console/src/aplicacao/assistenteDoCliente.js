@@ -3,10 +3,12 @@ import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { listarPedidosDoCliente, obterPedido } from './pedidosCadastro'
 import { pedidoValido } from '../dominio/pratosParaOferecer'
 
-// #3344: o Assistente age na Ficha só no clique da atendente, com a conversa mais recente do cliente quando há (a API
-// aceita sem conversa). A resposta é só texto para revisar; nada é enviado ao cliente e as ações propostas não rodam aqui.
-export async function perguntarSobreOCliente(pergunta, conversaId, { sinal } = {}) {
-  const { texto } = await perguntarAssistente(pergunta, conversaId ?? null, { sinal })
+// #3344: o Assistente age na Ficha só no clique da atendente. A pergunta já leva o que precisa, então vai sem conversa:
+// o histórico de mensagens não segue para o modelo. A resposta é só texto para revisar; nada é enviado ao cliente, as
+// ações propostas não rodam aqui, e a espera tem teto de 15 s (sem isso o botão ficaria preso em "Pensando…").
+const PRAZO_MS = 15_000
+export async function perguntarSobreOCliente(pergunta, { sinal } = {}) {
+  const { texto } = await perguntarAssistente(pergunta, null, { sinal: AbortSignal.any([sinal, AbortSignal.timeout(PRAZO_MS)].filter(Boolean)) })
   const limpo = String(texto ?? '').trim()
   if (!limpo) throw new Error('O Assistente não respondeu. Tente de novo.')
   return limpo
