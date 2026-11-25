@@ -524,12 +524,19 @@ try {
     const gravar = p.getByRole('button', { name: 'Gravar áudio' })
     await gravar.waitFor()
     // #3355: com o campo vazio o próximo passo é escrever; o Gravar é opção e não disputa o laranja com Assumir e Itens.
-    const cor = (alvo, prop) => alvo.evaluate((e, prop) => getComputedStyle(e)[prop], prop)
-    const token = (nome) => p.evaluate((nome) => { const d = document.createElement('i'); d.style.background = `var(${nome})`; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c }, nome)
-    assert.notEqual(await cor(gravar, 'backgroundColor'), await token('--acao'), 'o Gravar não é laranja cheio')
+    // Cores normalizadas num canvas de 1 px: `color-mix` e `rgb()` serializam diferente.
+    const pixel = (css) => p.evaluate((css) => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = css; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data].join() }, css)
+    const fundo = async (alvo) => pixel(await alvo.evaluate((e) => getComputedStyle(e).backgroundColor))
+    const token = async (nome) => pixel(await p.evaluate((nome) => { const d = document.createElement('i'); d.style.background = `var(${nome})`; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c }, nome))
+    assert.equal(await fundo(gravar), await token('--preenchimento'), 'o Gravar é secundário, não laranja cheio')
     await gravar.hover()
     await p.waitForTimeout(250)
-    assert.notEqual(await cor(gravar, 'backgroundColor'), await token('--preenchimento-forte'), 'o hover não se confunde com o desabilitado')
+    const noHover = await fundo(gravar)
+    assert.notEqual(noHover, await token('--preenchimento-forte'), 'o hover não se confunde com o desabilitado')
+    assert.notEqual(noHover, await token('--preenchimento'), 'o hover muda o fundo')
+    await p.mouse.move(0, 0)
+    await campo(p).fill('oi')
+    assert.equal(await fundo(p.getByRole('button', { name: /^Enviar/ }).first()), await token('--acao'), 'com texto, o Enviar segue laranja')
     await ctx.close()
   })
 
