@@ -36,6 +36,13 @@
 /* O prazo vencido mantém o ícone e o texto acessível, sem piscar. */
 .cartao.slaEstourado { box-shadow: none; }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: none; }
+/* #3330 (F22): no Alto Contraste o navegador troca os fundos por Canvas, e a conversa aberta e o filtro ligado
+   só diferiam por `background`. O contorno com cor de sistema mantém a forma; com foco, vale o anel de foco. */
+@media (forced-colors: active) {
+  .cartao[aria-current='true']:not(:focus-visible), .chipLigado:not(:focus-visible) {
+    outline: var(--b-3) solid Highlight; outline-offset: calc(-1 * var(--b-3));
+  }
+}
 
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 

@@ -267,7 +267,8 @@ function PainelDaConversa({
 
       {/* Uma área rolável só: conversa e painel do agente rolam juntos, e o composer fica
           preso no pé da coluna em qualquer largura. */}
-      <div className={css.rolagemCentro}>
+      {/* #3330 (F22): área que rola precisa de foco para quem só usa o teclado, e de nome para o leitor de tela. */}
+      <section className={css.rolagemCentro} aria-label={`Conversa com ${selecionada.nome}`} tabIndex={0}>
         <Thread
           mensagens={selecionada.mensagens}
           chaveRolagem={selecionada.id}
@@ -286,7 +287,7 @@ function PainelDaConversa({
           abrindoAnteriores={abrindoAnteriores}
           aoVerAnteriores={carregarMensagensAnteriores ? aoVerAnteriores : undefined}
         />
-      </div>
+      </section>
 
       {/* #1510: remonta por conversa; anexo em espera e gravação não passam para a próxima. */}
       <div data-area-envio style={{ flexShrink: 0 }}>

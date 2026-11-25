@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -87,6 +87,15 @@ export function Thread({
     setBase({ chave: chaveRolagem, ultima: ultimaEm(mensagens) })
   }
   const novo = (m) => base.ultima !== null && emMs(m) !== null && emMs(m) > base.ultima
+  // #3330 (F21): ao abrir outra conversa o fio inteiro entra de uma vez, e numa região viva o leitor de tela leria
+  // tudo (964 caracteres medidos). Calada já no commit que traz as mensagens e viva de novo logo depois, para a
+  // mensagem nova seguir anunciada.
+  const [silencio, setSilencio] = useState({ chave: chaveRolagem, calado: true })
+  if (silencio.chave !== chaveRolagem) setSilencio({ chave: chaveRolagem, calado: true })
+  useEffect(() => {
+    const espera = setTimeout(() => setSilencio((s) => (s.chave === chaveRolagem ? { ...s, calado: false } : s)), 500)
+    return () => clearTimeout(espera)
+  }, [chaveRolagem])
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
@@ -192,7 +201,7 @@ export function Thread({
   }
 
   return (
-    <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
+    <div className={css.thread} role="log" aria-live={silencio.calado ? 'off' : 'polite'} aria-label="Mensagens da conversa">
       {/* #2005 (console-09): o fio traz as 100 mais recentes; as de antes abrem sob demanda. */}
       {temAnteriores && aoVerAnteriores && (
         <div className={css.verAnteriores}>
