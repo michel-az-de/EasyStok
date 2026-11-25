@@ -481,6 +481,9 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
     ?? cobrancaVencida(conversa, agora)
 }
 
+// DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de pagamento: neutra no cartão e na barra (#3318).
+export const tomDoMotivo = (motivo) => (motivo?.chave === 'cobranca' ? 'neutro' : motivo?.tom)
+
 export const precisaDeVoce = (conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) =>
   motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente) != null
 
