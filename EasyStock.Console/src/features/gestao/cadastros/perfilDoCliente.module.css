@@ -6,6 +6,8 @@
 /* Fora da ficha (cliente novo, produto, fornecedor, conta) os invólucros não contam para o layout. */
 .semColunas { display: contents; }
 .colunaCartao, .colunaConteudo { min-width: 0; }
+/* #3344: a coluna da direita empilha com vão menor entre o painel de leitura, notas e abas. */
+.colunaConteudo { display: grid; gap: var(--e-3); align-content: start; }
 
 .cartao { padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-3); background: var(--papel); }
 .colunaCartao > .cartao { margin: 0; }
@@ -28,4 +30,7 @@ nav.abas { padding-bottom: 0; border: 1px solid var(--linha); border-radius: var
 
 @media (max-width: 899px) {
   .perfil { grid-template-columns: minmax(0, 1fr); gap: var(--e-4); }
+  .cartao .quadro { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-2); }
+  .cartao .quadro > div { flex-direction: column-reverse; align-items: flex-start; gap: 0; }
+  .cartao .quadro > div + div { border-block-start: 0; }
 }

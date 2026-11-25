@@ -13,6 +13,7 @@ import { Botao } from '../../../componentes/Botao'
 import { FichaCliente } from './FichaCliente'
 import { ResumoDoCliente } from './ResumoDoCliente'
 import { RelacionamentoCliente } from './RelacionamentoCliente'
+import { LeituraDoCliente } from './LeituraDoCliente'
 import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
 import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, motivoDoCadastroVazio, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
@@ -235,6 +236,8 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {/* #2849: o que só a tela que abriu sabe (no Atendimento: apontamentos, avisos, endereço da conversa). */}
     {ehFicha && complemento}
     {/* `key`: o atalho por endereço troca a pessoa sem desmontar o editor; modal, aviso e notas abertas não passam adiante. */}
+    {/* #3344: leitura, o que oferecer e o Assistente abrem a coluna; a linha da lista (editor.relacao) dá estágio e risco. */}
+    {comRelacionamento && !formularioAberto && <LeituraDoCliente key={`leitura:${id}`} cliente={dados} relacao={editor.relacao} relacionamento={relacionamento.dados} contexto={contexto} restricoes={restricoes} />}
     {comRelacionamento && <RelacionamentoCliente key={id} clienteId={id} relacionamento={relacionamento} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento} aoRascunhar={aoRascunharRelacionamento} restricoes={restricoes} />}
     {conversa && podeEditar && formularioAberto && <section className={css.assistente} aria-label="Assistência ao cadastro">
       <div className={css.barra}><strong>Conferir dados da conversa</strong><Botao icone="conversa" disabled={salvando || sugestao.carregando} onClick={sugestao.consultar}>{sugestao.carregando ? 'Consultando…' : 'Consultar com IA'}</Botao></div>

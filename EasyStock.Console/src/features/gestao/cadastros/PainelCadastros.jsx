@@ -208,7 +208,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     const abortar = new AbortController(); pedido.current = abortar
     try {
       const dados = tela === 'bancos' ? abrirEdicaoCadastro(tela, item) : await obterCadastro(tela, item.id ?? item.produtoId, contexto, abortar.signal)
-      if (!abortar.signal.aborted) definir({ editor: { dados, inicial: dados } })
+      if (!abortar.signal.aborted) definir({ editor: { dados, inicial: dados, ...(tela === 'clientes' && item.relacao ? { relacao: item.relacao } : {}) } })
     } catch (e) { if (!abortar.signal.aborted) { falhar(e.message); aoFixarContexto(false) } }
     finally { if (!abortar.signal.aborted) abrir(null) }
   }
