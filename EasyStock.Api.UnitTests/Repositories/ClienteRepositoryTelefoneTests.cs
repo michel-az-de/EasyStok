@@ -96,6 +96,32 @@ public sealed class ClienteRepositoryTelefoneTests : IDisposable
         (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992")).Should().BeNull();
     }
 
+    // Revisão da PR: com mais de um cadastro casando, o resultado não pode depender da ordem do banco.
+    [Fact]
+    public async Task NumeroIdenticoNaListaVenceOutraGrafiaNoTelefonePrincipal()
+    {
+        var emOutraGrafia = await GravarAsync(_empresaId, "1197573992");
+        var identico = await GravarAsync(_empresaId, "1133334444", outroNumero: "+5511997573992");
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992"))!.Id.Should().Be(identico.Id);
+        emOutraGrafia.Id.Should().NotBe(identico.Id);
+    }
+
+    [Fact]
+    public async Task EntreDoisCadastrosEmOutraGrafiaVenceOMaisAntigo()
+    {
+        var recente = Cliente.Criar(_empresaId, "Recente");
+        recente.Telefone = "11 99757-3992";
+        recente.CriadoEm = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        var antigo = Cliente.Criar(_empresaId, "Antigo");
+        antigo.Telefone = "(11) 99757-3992";
+        antigo.CriadoEm = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        _db.Clientes.AddRange(recente, antigo); // o mais recente entra primeiro: só o desempate explícito o derruba
+        await _db.SaveChangesAsync();
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992"))!.Id.Should().Be(antigo.Id);
+    }
+
     [Fact]
     public async Task NaoAchaNumeroDeOutraEmpresa()
     {

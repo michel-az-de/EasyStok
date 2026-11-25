@@ -227,7 +227,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                                 || (formas.Count > 0
                                     && ((c.Telefone != null && formas.Contains(c.Telefone.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))
                                         || c.Telefones.Any(t => formas.Contains(t.Numero.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))))))
-                .OrderBy(c => c.Telefone == telefone ? 0 : 1) // o telefone principal vence a lista
+                // Número idêntico vence outra grafia; entre iguais, o cadastro mais antigo (sem depender da ordem do banco).
+                .OrderBy(c => c.Telefone == telefone ? 0 : c.Telefones.Any(t => t.Numero == telefone) ? 1 : 2)
+                .ThenBy(c => c.CriadoEm).ThenBy(c => c.Id)
                 .FirstOrDefaultAsync();
         }
 
