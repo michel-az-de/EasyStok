@@ -5,7 +5,8 @@
 // d no modal "Enviar e assumir esta conversa?" o foco começa no botão de confirmar, Enter confirma e o tooltip
 //   "Fechar" do X não reaparece (#2857);
 // e o anel de foco do campo tem contraste >= 3:1 sobre o fundo nos dois temas (WCAG 1.4.11; antes: 1,3:1 e 1,7:1);
-// f Tab fecha o popover de filtros (papel dialog) e aria-expanded volta a false (guarda da #3300).
+// f Tab fecha o popover de filtros (papel dialog), aria-expanded volta a false e o foco não se perde;
+// g com ponteiro de toque (tablet) o foco não é levado ao campo depois de Assumir (o teclado não abre sem ela pedir).
 // PLAYWRIGHT_MODULE aponta para o runtime externo; sem ele usa o `playwright` do node_modules.
 // O Vite do runner está no modo API; esta prova sobe o seu, em demonstração (como prova-3009).
 import assert from 'node:assert/strict'
@@ -37,8 +38,8 @@ const confere = async (descricao, fn) => {
 const navegador = await chromium.launch({ headless: true })
 const TEMAS = ['light', 'dark']
 
-async function abrir(tema = 'light', largura = 1440, altura = 900) {
-  const contexto = await navegador.newContext({ viewport: { width: largura, height: altura }, colorScheme: tema, reducedMotion: 'reduce' })
+async function abrir(tema = 'light', largura = 1440, altura = 900, opcoes = {}) {
+  const contexto = await navegador.newContext({ viewport: { width: largura, height: altura }, colorScheme: tema, reducedMotion: 'reduce', ...opcoes })
   const pagina = await contexto.newPage()
   await pagina.goto(`${origem}/#/m/atendimento/balcao`, { waitUntil: 'networkidle', timeout: 120_000 })
   await pagina.waitForSelector('[class*=contextoLinha]', { timeout: 30_000 })
@@ -107,7 +108,7 @@ const exigeFocoNoCampo = async (pagina, depoisDe) => {
   const { contexto, pagina } = await abrir()
   await pagina.getByRole('button', { name: 'Nota interna' }).first().click()
   await pagina.locator('dialog[open] textarea').first().fill('nota do campo')
-  await pagina.getByRole('button', { name: /^(Salvar|Fixar nota)/ }).first().click()
+  await pagina.locator('dialog[open]').getByRole('button', { name: /^(Salvar|Fixar nota)/ }).first().click()
   await pagina.waitForTimeout(600)
   await confere('c2. depois de salvar a Nota interna o foco termina no campo de mensagem', () => exigeFocoNoCampo(pagina, 'salvar a nota interna'))
   await contexto.close()
@@ -189,6 +190,20 @@ for (const tema of TEMAS) {
     for (let i = 0; i < 25 && await pagina.getByRole('dialog', { name: 'Filtros das conversas' }).count() > 0; i++) await pagina.keyboard.press('Tab')
     assert.equal(await pagina.getByRole('dialog', { name: 'Filtros das conversas' }).count(), 0, 'o popover seguiu aberto depois de 25 Tab')
     assert.equal(await gatilho.getAttribute('aria-expanded'), 'false', 'aria-expanded ficou true com o popover fechado')
+    assert.notEqual(await quemTemOFoco(pagina), 'o body (o foco se perdeu)', 'o foco se perdeu ao fechar o popover')
+  })
+  await contexto.close()
+}
+
+// --- g. toque (tablet, 1000 px): o foco não vai ao campo sem ela pedir; o teclado não abre -----------------------------
+{
+  // hasTouch + isMobile fazem o Chromium declarar (pointer: coarse), como num tablet.
+  const { contexto, pagina } = await abrir('light', 1000, 800, { hasTouch: true, isMobile: true })
+  await pagina.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
+  await pagina.waitForTimeout(600)
+  await confere('g. com ponteiro de toque o foco não é levado ao campo depois de Assumir', async () => {
+    assert.equal(await pagina.evaluate(() => matchMedia('(pointer: fine)').matches), false, 'a emulação de toque não pegou')
+    assert.equal(await focoNoCampo(pagina), false, 'o foco foi ao campo de mensagem num aparelho de toque')
   })
   await contexto.close()
 }

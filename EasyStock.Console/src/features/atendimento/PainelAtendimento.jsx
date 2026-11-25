@@ -100,16 +100,21 @@ function PainelDaConversa({
   // digitação seguinte se perdia. No desktop o foco volta ao campo de mensagem, depois que a tela já mudou. Só
   // volta se o foco se perdeu (body, barra ou a reserva do título); no toque o teclado não abre sem ela pedir.
   const [pedidosDeFoco, setPedidosDeFoco] = useState(0)
+  const idAtual = useRef(selecionada?.id)
+  useEffect(() => { idAtual.current = selecionada?.id }, [selecionada?.id])
   useEffect(() => {
-    if (pedidosDeFoco === 0 || focarAoTrocar) return
+    // Tablet e qualquer toque ficam de fora, como no #2135: `focarAoTrocar` só vale no celular por largura.
+    if (pedidosDeFoco === 0 || focarAoTrocar || !window.matchMedia?.('(pointer: fine)').matches) return
     const atual = document.activeElement
     const perdido = !atual || atual === document.body || atual === document.documentElement
       || atual.matches('[data-foco-reserva]') || atual.closest('[data-controle-conversa]')
     if (perdido) compositorPublicoRef.current?.querySelector('textarea:not(:disabled)')?.focus({ preventScroll: true })
   }, [pedidosDeFoco, focarAoTrocar])
   async function aoAssumirDaBarra() {
-    const resultado = await assumirAtendimento(selecionada.id)
-    if (resultado !== false) setPedidosDeFoco((n) => n + 1)
+    const id = selecionada.id
+    const resultado = await assumirAtendimento(id)
+    // Trocou de conversa durante o Assumir: o campo que está na tela já não é o dela.
+    if (resultado !== false && idAtual.current === id) setPedidosDeFoco((n) => n + 1)
     return resultado
   }
 

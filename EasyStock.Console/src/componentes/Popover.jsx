@@ -6,7 +6,8 @@ import { Icone } from './Icone'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
-const SELETOR_FOCAVEIS = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+const SELETOR_FOCAVEIS = ['button:not(:disabled)', 'a[href]', 'input:not(:disabled)', 'select:not(:disabled)', 'textarea:not(:disabled)', '[tabindex]']
+  .map((no) => `${no}:not([tabindex="-1"])`).join(', ')
 const DISPOSICAO = { linha: css.linha, faixa: css.faixa }
 const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
   .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
