@@ -43,7 +43,7 @@ function motivoDaLinha(motivo, origem) {
 // já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
 export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
-  grupo, busca, aoAbrir, fonteApi = false, usuario = null, novo = false,
+  grupo, busca, aoAbrir, fonteApi = false, usuario = null, novo = false, tabIndex, atenuado = false,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const fotoCadastrada = useFotoCliente(conversa.cliente?.fotoUrl)
@@ -89,11 +89,13 @@ export const CartaoConversa = memo(function CartaoConversa({
   return (
     <button
       type="button"
-      className={novo ? `${classesDoCartao(css, { motivo, slaEstourado })} ${css.cartaoNovo}` : classesDoCartao(css, { motivo, slaEstourado })}
+      data-conversa-id={conversa.id}
+      tabIndex={tabIndex}
+      className={novo ? `${classesDoCartao(css, { motivo, slaEstourado, atenuado })} ${css.cartaoNovo}` : classesDoCartao(css, { motivo, slaEstourado, atenuado })}
       aria-current={selecionada}
       aria-label={rotuloDoCartao({
         nome: nome.titulo, estado: estado.texto, pendentes, contexto: contexto.map((item) => item.texto),
-        atrasada: slaEstourado, pagamentoNaoVisto, hora, selecionada,
+        atrasada: slaEstourado, pagamentoNaoVisto, hora, selecionada, foraDaLista: atenuado,
       })}
       onClick={() => aoAbrir(conversa.id)}
     >

@@ -29,6 +29,7 @@ import { ModalDevolverAssistente } from './ModalDevolverAssistente'
 import { ModalPassarConversa } from './PassarConversa'
 import { rotuloDoPedido } from '../../dominio/rotulos'
 import { Thread } from './Thread'
+import { devolverFocoAoCampoDepoisDeFechar } from './focoDoComposer'
 import css from './atendimento.module.css'
 
 // #3037: o anfitrião da confirmação de "conversa de outra" vale para todo o Painel, com ou sem conversa aberta.
@@ -48,7 +49,7 @@ function PainelDaConversa({
 }) {
   const {
     selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao, sessao,
-    aberta, horarioDaLoja,
+    aberta, horarioDaLoja, proximaDaFila,
   } = useAtendimento()
   const {
     enviar, reabrir, assumirAtendimento, devolverAutomatico,
@@ -304,6 +305,11 @@ function PainelDaConversa({
         rascunho={rascunho}
         escritaDeFora={escritaDeFora}
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
+        // #3363 (S3): Ctrl+Enter envia e abre o topo de "Precisa de você"; sem outra na fila, fica nesta conversa.
+        aoAvancar={() => {
+          const proxima = proximaDaFila(selecionada.id)
+          if (proxima) { selecionar(proxima); devolverFocoAoCampoDepoisDeFechar() }
+        }}
         // #2134: responder com o Assistente atendendo é assumir, pelo mesmo caminho do botão Assumir.
         // #2185 (F12): a mesma conta do caminho do envio (`acoesDaConversa`): Assistente atendendo ou conversa de colega.
         aoAssumirAntes={acoesTela.assumirAntesDeEnviar ? () => assumirAtendimento(selecionada.id) : null}

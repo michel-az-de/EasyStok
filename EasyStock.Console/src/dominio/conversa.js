@@ -219,6 +219,21 @@ function ordenarSemSla(lista, agora, { ordenacao, automaticoPausado, janelas, ab
   })
 }
 
+// #3363 (S3): a conversa do topo de "Precisa de você" que não é `atualId`, ou `null`. É a mesma lista da aba (mesma regra
+// e mesma ordem, inclusive o SLA estourado no topo), com o canal e o responsável ligados; ignora a aba exibida e a busca,
+// porque Ctrl+Enter vai à próxima que precisa dela e não à que a atendente estava procurando.
+export function proximaDaFila(conversas, atualId, filtros, agora, {
+  automaticoPausado = {}, aberta = true, janelas = [], expediente = null, usuario = null,
+} = {}) {
+  const fila = conversasDoBalcao(
+    conversas, { ...filtros, aba: 'precisa', busca: '' }, agora, automaticoPausado, aberta, janelas, expediente, usuario,
+  )
+  const ordenada = ordenarBalcao(fila, agora, {
+    ordenacao: filtros.ordenacao, automaticoPausado, janelas, aberta, expediente, aba: 'precisa',
+  })
+  return ordenada.find((c) => c.id !== atualId)?.id ?? null
+}
+
 // Só é cliente da casa quem já recebeu alguma coisa. Confirmar endereço cria
 // cadastro, não cria histórico, e a ficha não pode dizer o contrário.
 export const jaComprou = (cliente) => cliente.pedidos > 0 && Boolean(cliente.desde)

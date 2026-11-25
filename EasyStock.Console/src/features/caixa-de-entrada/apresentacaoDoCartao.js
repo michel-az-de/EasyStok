@@ -82,7 +82,7 @@ export function mostraEtiquetaDoEstado(estado) {
 // que se decide: quem, quanto espera, por quê, quando. Antes o leitor de tela lia o botão inteiro,
 // prévia incluída. O nome não contém o texto visível inteiro, então o axe acusa
 // `label-content-name-mismatch`: exceção decidida na #3336 (docs/dev/excecoes-acessibilidade-console.md).
-export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = null, contexto = [], atrasada = false, pagamentoNaoVisto = false, hora, selecionada = false }) {
+export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = null, contexto = [], atrasada = false, pagamentoNaoVisto = false, hora, selecionada = false, foraDaLista = false }) {
   return [
     nome,
     estado,
@@ -92,6 +92,7 @@ export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = nu
     atrasada ? 'prazo de resposta estourado' : null,
     pagamentoNaoVisto ? 'pagamento novo' : null,
     hora,
+    foraDaLista ? 'saiu desta lista' : null,
     selecionada ? 'conversa aberta' : null,
   ].filter(Boolean).join(', ')
 }

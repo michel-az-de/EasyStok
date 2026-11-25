@@ -37,13 +37,14 @@ import { inserirNoCursor } from '../../dominio/acoesNaMensagem'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { PainelMensagensPadrao } from './PainelMensagensPadrao'
 import { acoesDoComposer } from './apresentacaoDaConversa'
+import { devolverFocoAoCartaoAberto } from './focoDaLista'
 import { revisaoDoContexto } from '../../dominio/contextoDaSugestao'
 import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import css from './atendimento.module.css'
 
 export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
-  aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
+  aoEnviar, aoAvancar = null, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false, aoAssumirAntes = null,
   modeloAberto = false, aoAbrirModelos, aoFecharModelos, modelosFixos = true,
   notaEmRascunho = false, visivel = true,
@@ -137,6 +138,9 @@ export function Composer({
   // #3282: "Enviar" que assume pergunta uma vez por sessão; o Enter com o diálogo aberto não envia.
   const chaveConfirmacao = useChaveDaSessao(chaveDaConfirmacao)
   const [confirmandoEnvio, setConfirmandoEnvio] = useState(false)
+  // #3363 (S3): o Ctrl+Enter que abre o modal quer, no Enter que confirma, abrir também a próxima da fila. A intenção mora
+  // aqui até a confirmação usá-la; cancelar ou fechar o modal a apaga, e o Enter seguinte só envia.
+  const [avancarAoConfirmar, setAvancarAoConfirmar] = useState(false)
   const enviaAssumindo = Boolean(aoAssumirAntes) && !assumiu
   async function assumirSePreciso() {
     if (!aoAssumirAntes) return true
@@ -153,29 +157,42 @@ export function Composer({
     return assumida
   }
 
+  function fecharConfirmacaoDeEnvio() {
+    setConfirmandoEnvio(false)
+    setAvancarAoConfirmar(false)
+  }
+
   function confirmarEnvioAssumindo() {
     gravarConfirmacao(chaveConfirmacao)
-    setConfirmandoEnvio(false)
-    enviarComposer(true)
+    const avancar = avancarAoConfirmar
+    fecharConfirmacaoDeEnvio()
+    enviarComposer(true).then((aceito) => { if (aceito && avancar) aoAvancar?.() })
+  }
+
+  // #3363 (S3): Ctrl+Enter é o Enter que, passando as guardas e assumindo, abre a próxima da fila. Só avança com o envio
+  // aceito (`true`); falha do servidor depois disso segue no balão e não reabre a conversa.
+  async function enviarEAvancar() {
+    if (await enviarComposer(false, true)) aoAvancar?.()
   }
 
   // "Enviar" com anexo em espera manda o anexo (o texto digitado vira legenda
   // de imagem, se houver); sem anexo, segue o fluxo de sempre. Um só botão,
   // uma só tecla Enter, sem o composer perguntar qual dos dois você quis.
-  async function enviarComposer(jaPerguntou = false) {
+  // Devolve `true` quando o envio foi aceito (passou as guardas, assumiu e entregou o texto ou a mídia), `false` nos outros.
+  async function enviarComposer(jaPerguntou = false, avancar = false) {
     // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
     // acima do campo e o Enviar fica desligado até ela trocar.
-    if (variavelSobrando || excedeLimite || assumindoRef.current) return
-    if (confirmandoEnvio && !jaPerguntou) return
+    if (variavelSobrando || excedeLimite || assumindoRef.current) return false
+    if (confirmandoEnvio && !jaPerguntou) return false
     // Enter com o campo vazio não manda balão vazio (#1287).
-    if (!anexo && !rascunho.trim()) return
-    if (!jaPerguntou && enviaAssumindo && !jaConfirmou(chaveConfirmacao)) { setConfirmandoEnvio(true); return }
+    if (!anexo && !rascunho.trim()) return false
+    if (!jaPerguntou && enviaAssumindo && !jaConfirmou(chaveConfirmacao)) { setAvancarAoConfirmar(avancar); setConfirmandoEnvio(true); return false }
     // #2185 (F23): o que vai é o que ela mandou no toque; o que digitar enquanto o servidor assume fica no campo.
     const enviado = rascunho
-    if (!(await assumirSePreciso())) return
+    if (!(await assumirSePreciso())) return false
     if (anexo) {
       // Tirou a prévia enquanto o servidor assumia: a foto não sai.
-      if (anexosEmEspera.ler(chaveAnexo) !== anexo) return
+      if (anexosEmEspera.ler(chaveAnexo) !== anexo) return false
       const comLegenda = anexo.tipo === 'imagem'
       const molde = comLegenda
         ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: enviado })
@@ -184,13 +201,14 @@ export function Composer({
       setAnexo(null)
       // Só a legenda sai com a mídia: arquivo não leva texto, e o que está no campo continua lá.
       if (comLegenda) aoMudarRascunho(restoDoEnvio(lerTexto(), enviado))
-      return
+      return true
     }
     // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.
     descarregar()
     aoEnviar(enviado)
     const agoraNoCampo = lerTexto()
     if (agoraNoCampo !== enviado) aoMudarRascunho(restoDoEnvio(agoraNoCampo, enviado))
+    return true
   }
 
   // #1444 (homologação 07/10: "não sei se ele tá enviando"): o gravador fica no lugar mostrando o
@@ -300,13 +318,13 @@ export function Composer({
         <Modal
           titulo="Enviar e assumir esta conversa?"
           descricao={descricaoDaConfirmacao(conversa)}
-          aoFechar={() => setConfirmandoEnvio(false)}
+          aoFechar={fecharConfirmacaoDeEnvio}
           // #3317 (F07): o foco vai ao botão que confirma, então Enter envia. Sem isto ia ao título (#2857) e o
           // Enter não fazia nada; no botão o tooltip "Fechar" do X também não reaparece.
           focarCampo
           rodape={(
             <>
-              <Botao onClick={() => setConfirmandoEnvio(false)}>Cancelar</Botao>
+              <Botao onClick={fecharConfirmacaoDeEnvio}>Cancelar</Botao>
               <Botao variante="primario" data-foco-inicial onClick={confirmarEnvioAssumindo}>Enviar e assumir</Botao>
             </>
           )}
@@ -365,9 +383,17 @@ export function Composer({
                 onFocus={sugestao.aoFocar}
                 onBlur={() => { sugestao.aoSair(); descarregar() }}
                 onKeyDown={(e) => {
-                  if (e.isComposing || e.nativeEvent?.isComposing || e.keyCode === 229 || e.altKey || e.ctrlKey || e.metaKey) return
+                  if (e.isComposing || e.nativeEvent?.isComposing || e.keyCode === 229 || e.altKey) return
+                  // #3363 (S3): Ctrl ou Meta com Enter (sem Shift) envia e avança; com a barra de respostas aberta ela tem a
+                  // precedência e a tecla não faz nada. As outras combinações com Ctrl ou Meta seguem fora do campo.
+                  if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !barra.aberto) { e.preventDefault(); enviarEAvancar() }
+                    return
+                  }
                   if (barra.aoTeclar(e)) return
                   if (sugestao.aoTeclar(e)) return
+                  // #3363 (S2): barra, menu e sugestão já fecharam o que estava aberto e saíram acima; sobrando o Esc, ele leva à lista.
+                  if (e.key === 'Escape' && !e.shiftKey) { if (devolverFocoAoCartaoAberto()) e.preventDefault(); return }
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarComposer() }
                 }}
               />

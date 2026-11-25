@@ -123,7 +123,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     destravarRef.current = setTimeout(() => setOrdemCongelada(null), 300)
   }
 
-  const lista = useMemo(() => {
+  const listaBase = useMemo(() => {
     if (!ordemCongelada) return visiveis
     const porId = new Map(visiveis.map((c) => [c.id, c]))
     const congeladas = new Set(ordemCongelada)
@@ -131,6 +131,41 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     const novas = visiveis.filter((c) => !congeladas.has(c.id))
     return [...ordenada, ...novas]
   }, [visiveis, ordemCongelada])
+
+  // #3363 (S4): enquanto a mesma conversa fica aberta, a ordem dos cartões é a de quando ela abriu. Responder muda o
+  // motivo e a hora dela e, sem isto, o cartão sai do lugar e os de baixo sobem de uma vez (hoje 365 px e 6 × 93,2 px).
+  // Ela fica no lugar, atenuada se já não pertence a esta lista, até a troca de conversa; só então a lista reordena.
+  // Mudar aba, canal, busca, ordem ou responsável recomeça a conta. Estado no render, como `buscaVista`, sem efeito.
+  const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
+  const [ancora, setAncora] = useState(null)
+  const ancoraValeu = ancora?.id === selecionadaId && ancora.chave === chaveDaLista
+  if (!ancoraValeu && (selecionadaId != null || ancora != null)) {
+    setAncora(selecionadaId == null ? null : { id: selecionadaId, chave: chaveDaLista, ordem: listaBase.map((c) => c.id) })
+  }
+  const lista = useMemo(() => {
+    if (!ancoraValeu || !ancora.ordem.includes(selecionadaId)) return listaBase
+    const porId = new Map(listaBase.map((c) => [c.id, c]))
+    const tinha = new Set(ancora.ordem)
+    const ordenada = ancora.ordem.map((id) => porId.get(id) ?? (id === selecionadaId ? conversas.find((c) => c.id === id) : undefined)).filter(Boolean)
+    return [...ordenada, ...listaBase.filter((c) => !tinha.has(c.id))]
+  }, [listaBase, ancora, ancoraValeu, selecionadaId, conversas])
+  const foraDaLista = ancoraValeu && !listaBase.some((c) => c.id === selecionadaId) ? selecionadaId : null
+
+  // #3363 (S1): a lista é uma parada de Tab só (foco itinerante). A parada é o cartão aberto; sem aberto, o último que teve
+  // foco; sem ele, o primeiro. ↑ ↓ j k Home End andam entre os cartões. Estado, não ref: o id entra na conta do render.
+  const [focoId, setFocoId] = useState(null)
+  const naLista = (id) => id != null && lista.some((c) => String(c.id) === String(id))
+  const ativoId = String(naLista(selecionadaId) ? selecionadaId : naLista(focoId) ? focoId : lista[0]?.id)
+  function aoTeclarNaLista(e) {
+    // Só com o foco num cartão e sem modificador (WCAG 2.1.4): j e k em campo de texto continuam escrevendo.
+    if (!e.target.matches?.('button[data-conversa-id]') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+    const passo = { ArrowDown: 1, j: 1, ArrowUp: -1, k: -1 }[e.key]
+    if (passo === undefined && e.key !== 'Home' && e.key !== 'End') return
+    const cartoes = [...e.currentTarget.querySelectorAll('button[data-conversa-id]')]
+    const alvo = e.key === 'Home' ? 0 : e.key === 'End' ? cartoes.length - 1 : cartoes.indexOf(e.target) + passo
+    e.preventDefault()
+    cartoes[Math.min(Math.max(alvo, 0), cartoes.length - 1)]?.focus()
+  }
 
   const semCanal = filtros.canais.length === 0
   const semBusca = !filtros.busca.trim()
@@ -142,7 +177,6 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   const novas = vistas.current ? new Set(lista.map((c) => c.id).filter((id) => !vistas.current.has(id))) : new Set()
   useEffect(() => { if (!carga) vistas.current = new Set(lista.map((c) => c.id)) })
   const rolagem = useRef(null)
-  const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
   useLayoutEffect(() => {
     if (!carga && rolagem.current) rolagem.current.scrollTop = filtros.posicao ?? 0
   }, [carga, chaveDaLista])
@@ -190,7 +224,12 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {/* #3300 (F7): lista para o leitor de tela ("lista, 11 itens"); `display: contents` não muda o layout. */}
-        <div role="list" aria-label="Conversas" className={css.listaSemCaixa}>
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- #3363: as setas valem em qualquer cartão; a lista é o único ancestral comum. */}
+        <div
+          role="list" aria-label="Conversas" className={css.listaSemCaixa}
+          onFocus={(e) => { const id = e.target.dataset?.conversaId; if (id) setFocoId(id) }}
+          onKeyDown={aoTeclarNaLista}
+        >
         {lista.map((conversa) => (
           <div role="listitem" key={conversa.id} className={css.listaSemCaixa}>
           <CartaoConversa
@@ -207,6 +246,8 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             aoAbrir={abrir}
             fonteApi={fonteApi}
             usuario={sessao?.usuario}
+            tabIndex={String(conversa.id) === ativoId ? 0 : -1}
+            atenuado={conversa.id === foraDaLista}
           />
           </div>
         ))}

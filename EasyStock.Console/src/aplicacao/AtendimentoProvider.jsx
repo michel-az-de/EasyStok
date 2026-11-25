@@ -16,7 +16,7 @@ import {
 import { montarPromptLivre } from '../dominio/assistente'
 import { historicoComPedidoVivo } from '../dominio/cliente'
 import {
-  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasDoCliente, conversasEncerradasDoBalcao, ordenarBalcao,
+  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasDoCliente, conversasEncerradasDoBalcao, ordenarBalcao, proximaDaFila,
 } from '../dominio/conversa'
 import { conversasParaEncerrarPorJanela } from '../dominio/janela'
 import { ocupacaoDeHoje } from '../dominio/entrega'
@@ -442,6 +442,11 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
           aba: estado.filtros.aba,
         },
       ),
+      // #3363 (S3): o topo de "Precisa de você" que não é `atualId`, pela mesma regra de `visiveis` (mesmo usuário, mesma
+      // ordem), lido só quando a atendente aperta Ctrl+Enter e por isso fora do cálculo de cada render.
+      proximaDaFila: (atualId) => proximaDaFila(conversasDaFila, atualId, estado.filtros, agoraEfetivo, {
+        automaticoPausado: estado.automaticoPausado, aberta, janelas: estado.catalogo.janelas, expediente: horarioDaLoja, usuario,
+      }),
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
       // busca da lista de cima, sem aba, porque nenhum dos dois existe em
       // "Precisa de você".
