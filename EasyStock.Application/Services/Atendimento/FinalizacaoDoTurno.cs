@@ -31,8 +31,10 @@ internal sealed class FinalizacaoDoTurno(
     public async Task<ResultadoTurnoAgente> FinalizarAsync(Turno turno, CancellationToken ct)
     {
         var (empresaId, conversaId, agora) = (turno.EmpresaId, turno.ConversaId, turno.Agora);
-        var (conversa, configuracao, gravacao) = (turno.Conversa, turno.Configuracao, turno.Gravacao);
         var (geracao, contexto) = (turno.Geracao, turno.Contexto);
+        // #3340: a conversa do contexto, não a do início do turno. Depois de uma ferramenta que lançou, o contexto soltou as
+        // entidades e a proteção do vínculo travou a conversa de novo; só a instância relida é gravada pelo commit.
+        var (conversa, configuracao, gravacao) = (contexto.Conversa, turno.Configuracao, turno.Gravacao);
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 

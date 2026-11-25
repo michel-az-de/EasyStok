@@ -33,7 +33,13 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     Func<CancellationToken, Task>? gravarSaida = null)
 {
     public Guid EmpresaId { get; } = empresaId;
-    public Conversa Conversa { get; } = conversa;
+    public Conversa Conversa { get; private set; } = conversa;
+
+    /// <summary>
+    /// #3340: depois de uma ferramenta que lançou, o serviço solta as entidades rastreadas e a conversa relida pelo lock é
+    /// outra instância. O contexto passa a apontar para ela, a única que o commit grava.
+    /// </summary>
+    public void Reanexar(Conversa relida) => Conversa = relida;
     public Guid? ClienteIdEsperado { get; } = conversa.ClienteId;
     public long VinculoRevisaoEsperada { get; } = conversa.VinculoRevisao;
     public EasyStock.Domain.Enums.Atendimento.SituacaoConversa SituacaoEsperada { get; } = conversa.Situacao;

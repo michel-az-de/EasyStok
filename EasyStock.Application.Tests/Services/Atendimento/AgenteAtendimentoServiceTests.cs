@@ -1021,6 +1021,23 @@ public partial class AgenteAtendimentoServiceTests
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // #3340 (revisão da PR): recusa que só orienta a ordem dos passos (resumo antes do link, esperar o ok, pedido já pago)
+    // o modelo resolve na própria volta; escalar o pedido comum à equipe por isso seria ruído.
+    [Theory]
+    [InlineData("""{"linkGerado":false,"motivo":"resumo_nao_enviado","orientacao":"Mande o resumo."}""")]
+    [InlineData("""{"linkGerado":false,"motivo":"aguardando_ok","orientacao":"Espere o cliente confirmar."}""")]
+    [InlineData("""{"linkGerado":false,"motivo":"pedido_ja_pago","orientacao":"Já está pago."}""")]
+    public async Task RecusaQueSoOrientaOModeloNaoEscala(string recusa)
+    {
+        var pagamento = Ferramenta("enviar_link_pagamento", _ => recusa);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("enviar_link_pagamento"), Texto("Só falta o seu ok para eu mandar o link."));
+
+        var resultado = await CriarServico(pagamento).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeFalse();
+    }
+
     // #3340: consulta sem resultado ou dado que falta é conversa normal: o modelo pergunta ao cliente, sem escalar.
     [Theory]
     [InlineData("""{"erro":"pedido_nao_encontrado"}""")]
@@ -1073,6 +1090,31 @@ public partial class AgenteAtendimentoServiceTests
         _unitOfWork.Received(1).DescartarAlteracoesPendentes();
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("Mandei")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3340 (revisão da PR): a exceção da ferramenta solta as entidades do contexto (`DescartarAlteracoesPendentes`) e a
+    // finalização trava a conversa de novo, o que traz uma instância nova. A escalada tem de acontecer nela: na instância
+    // antiga, solta do contexto, o `SaveChanges` não grava a situação e a conversa seguiria automática.
+    [Fact]
+    public async Task ExcecaoDeFerramentaEscalaNaInstanciaQueOBancoReleu()
+    {
+        var viva = Conversa.Abrir(_empresaId, WaId, Agora.AddMinutes(-1), "Maria");
+        typeof(Conversa).GetProperty(nameof(Conversa.Id))!.SetValue(viva, _conversa.Id);
+        viva.RegistrarEntrada(Agora.AddMinutes(-1));
+        var soltou = false;
+        _unitOfWork.When(u => u.DescartarAlteracoesPendentes()).Do(_ => soltou = true);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => soltou ? viva : _conversa);
+        var comanda = Ferramenta("enviar_cardapio_imagem",
+            _ => throw new WhatsAppCloudException(131000, "Meta fora do ar", ehPermanente: false, statusHttp: 502));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("enviar_cardapio_imagem"), Texto("Mandei a comanda!"));
+
+        var resultado = await CriarServico(comanda).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _escalador.Received(1).EscalarAsync(_empresaId, viva, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
+        await _escalador.DidNotReceive().EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 
     // #3340 (R2I-10): a segunda comanda da volta devolve "já enviada" e não apaga o envio da primeira.

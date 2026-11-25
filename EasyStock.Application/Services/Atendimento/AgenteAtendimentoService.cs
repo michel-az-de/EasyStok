@@ -337,6 +337,7 @@ public sealed class AgenteAtendimentoService(
                         contexto.Interromper();
                         return null;
                     }
+                    if (!ReferenceEquals(atual, contexto.Conversa)) contexto.Reanexar(atual);
                     T resultado;
                     try { resultado = await efeito(token); }
                     // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não troca de dona.

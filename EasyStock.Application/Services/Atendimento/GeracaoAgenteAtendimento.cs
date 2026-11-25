@@ -305,13 +305,22 @@ public static class GeracaoAgenteAtendimento
             if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
             return (raiz.TryGetProperty("erro", out var erro) && erro.ValueKind == System.Text.Json.JsonValueKind.String
                     && erro.GetString() is "itens_invalidos" or "pedido_recusado")
-                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False);
+                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False
+                    && !RecusaQueSoOrienta(raiz));
         }
         catch (System.Text.Json.JsonException)
         {
             return false;
         }
     }
+
+    // Recusa do link que só diz ao modelo qual é o próximo passo (resumo antes do link, esperar o ok, pedido já pago):
+    // ele resolve na própria volta, então não é falha do turno e não escala o pedido comum.
+    private static readonly HashSet<string> MotivosQueSoOrientam = ["resumo_nao_enviado", "aguardando_ok", "pedido_ja_pago"];
+
+    private static bool RecusaQueSoOrienta(System.Text.Json.JsonElement raiz) =>
+        raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
+        && motivo.GetString() is { } texto && MotivosQueSoOrientam.Contains(texto);
 
     // Qualquer "erro" devolvido (consulta sem resultado, dado que falta) invalida a resposta verificada de uma ferramenta
     // anterior, como antes da #3340; só não escala.
