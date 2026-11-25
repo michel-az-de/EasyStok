@@ -1,6 +1,8 @@
 // #3330: leitor de tela, teclado e forced-colors no Atendimento do desktop, medidos no Chromium em modo demonstração (1440x900).
 // a ao trocar de conversa o fio não é anunciado de novo: nada do que entra no `role=log` na troca cai numa região
 //   viva ligada (antes: 964 caracteres anunciados de uma vez);
+// f a regra pura do silêncio (`silencioDoFio.js`) também cala o histórico que chega depois da troca (modo API, conversa
+//   que abre vazia) e deixa a mensagem ao vivo passar;
 // b depois da troca assentar, o fio volta a anunciar mensagem nova (a correção não cala o log para sempre);
 // c a área de rolagem do fio entra na ordem do Tab, tem papel e nome, mostra o foco e rola pelo teclado
 //   (antes: sem tabindex nem nome, o axe `scrollable-region-focusable`);
@@ -71,6 +73,28 @@ const vigiarOFio = (pagina) => pagina.evaluate(() => {
 })
 const anunciado = (pagina) => pagina.evaluate(() => window.__anunciado)
 const areaDoFio = (pagina) => pagina.locator('[role=log]').locator('xpath=..')
+
+// --- f. regra do silêncio do fio (pura): o histórico que chega depois da troca no modo API também cala ---------------------
+{
+  const { novoSilencio, proximoSilencio } = await import('../src/features/atendimento/silencioDoFio.js')
+  const rodar = (chaveInicial, totalInicial, passos) => passos.reduce((estado, [chave, total]) => proximoSilencio(estado, chave, total), novoSilencio(chaveInicial, totalInicial))
+  await confere('f. conversa que abre cheia: só a troca de conversa cala de novo', () => {
+    const aberta = novoSilencio('c1', 40)
+    assert.equal(proximoSilencio(aberta, 'c1', 41), aberta, 'mensagem ao vivo numa conversa cheia não pode calar o fio')
+    const trocada = proximoSilencio(aberta, 'c2', 12)
+    assert.equal(trocada.chave, 'c2'); assert.equal(trocada.calado, true); assert.equal(trocada.rodada, 1, 'a troca reinicia o silêncio')
+  })
+  await confere('f. conversa que abre vazia e recebe o histórico de uma vez (várias mensagens) cala de novo', () => {
+    const depois = rodar('c1', 0, [['c1', 0], ['c1', 38]])
+    assert.equal(depois.rodada, 1, 'o histórico de 38 mensagens chegou com o fio vivo e seria lido inteiro')
+    assert.equal(depois.calado, true)
+  })
+  await confere('f. a primeira mensagem ao vivo e as seguintes seguem anunciadas numa conversa que abriu vazia', () => {
+    const depois = rodar('c1', 0, [['c1', 1], ['c1', 2], ['c1', 3]])
+    assert.equal(depois.rodada, 0, 'mensagem ao vivo cala o fio e deixa de ser anunciada')
+    assert.equal(depois.vazio, false)
+  })
+}
 
 // --- a e b. troca de conversa não re-anuncia; mensagem nova segue anunciada ---------------------------------------------
 {

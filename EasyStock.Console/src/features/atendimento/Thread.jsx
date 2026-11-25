@@ -9,6 +9,7 @@ import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
+import { MS_DE_SILENCIO_DO_FIO, novoSilencio, proximoSilencio } from './silencioDoFio'
 import { useRolagemDoFio } from './useRolagemDoFio'
 import css from './atendimento.module.css'
 
@@ -87,15 +88,15 @@ export function Thread({
     setBase({ chave: chaveRolagem, ultima: ultimaEm(mensagens) })
   }
   const novo = (m) => base.ultima !== null && emMs(m) !== null && emMs(m) > base.ultima
-  // #3330 (F21): ao abrir outra conversa o fio inteiro entra de uma vez, e numa região viva o leitor de tela leria
-  // tudo (964 caracteres medidos). Calada já no commit que traz as mensagens e viva de novo logo depois, para a
-  // mensagem nova seguir anunciada.
-  const [silencio, setSilencio] = useState({ chave: chaveRolagem, calado: true })
-  if (silencio.chave !== chaveRolagem) setSilencio({ chave: chaveRolagem, calado: true })
+  // #3330 (F21): o fio calado no commit que traz as mensagens e vivo de novo logo depois (silencioDoFio.js).
+  const [silencio, setSilencio] = useState(() => novoSilencio(chaveRolagem, mensagens.length))
+  const seguinteSilencio = proximoSilencio(silencio, chaveRolagem, mensagens.length)
+  if (seguinteSilencio !== silencio) setSilencio(seguinteSilencio)
   useEffect(() => {
-    const espera = setTimeout(() => setSilencio((s) => (s.chave === chaveRolagem ? { ...s, calado: false } : s)), 500)
+    const rodada = silencio.rodada
+    const espera = setTimeout(() => setSilencio((s) => (s.rodada === rodada ? { ...s, calado: false } : s)), MS_DE_SILENCIO_DO_FIO)
     return () => clearTimeout(espera)
-  }, [chaveRolagem])
+  }, [silencio.rodada])
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)

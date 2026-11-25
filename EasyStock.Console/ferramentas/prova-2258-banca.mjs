@@ -57,7 +57,7 @@ await caso('F3: o esqueleto aparece só sem valor e respeita movimento reduzido'
 await caso('T3: BarraModo vem antes da área que rola e não é sticky nem absoluta', () => {
   const painel = ler('features/atendimento/PainelAtendimento.jsx')
   const barra = painel.indexOf('<BarraModo')
-  const rolagem = painel.indexOf('<div className={css.rolagemCentro}>')
+  const rolagem = painel.search(/<(div|section) className=\{css\.rolagemCentro\}/) // #3330: a área do fio é uma região (`section`)
   assert.ok(barra !== -1 && rolagem !== -1 && barra < rolagem, 'BarraModo não está antes de rolagemCentro')
   const css = ler('features/atendimento/atendimento.module.css')
   assert.match(regra(css, '.modo'), /flex-shrink:\s*0/)
