@@ -171,7 +171,7 @@ public partial class AgenteAtendimentoServiceTests
         turno.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
     }
 
-    // #3347 (D4): a falha que repetir não resolve (chave, crédito, modelo) tem código próprio; o desfecho segue Erro e a frase é a mesma.
+    // #3347 (D4): a falha com status que a nova tentativa não repete (chave, crédito, modelo) tem código próprio; o desfecho segue Erro e a frase é a mesma.
     [Fact]
     public async Task Motivo_FalhaDefinitivaDaGeracaoGravaFalhaLlmDefinitiva()
     {

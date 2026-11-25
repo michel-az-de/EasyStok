@@ -40,8 +40,9 @@ public static class MotivoDoTurno
         : Slugs.GetValueOrDefault(categoria, GuardaOutro);
 
     /// <summary>
-    /// #3347 (D4): o código da falha do LLM. Definitiva é a que repetir não resolve (<c>FalhaTransitoria</c> a recusa: chave,
-    /// crédito, modelo ou pedido recusados); o resto (rede, prazo, 5xx, 408, 429 e o provedor indisponível) é transitório.
+    /// #3347 (D4): o código da falha do LLM. Definitiva é a resposta do provedor com status que a nova tentativa não repete
+    /// (400, 401, 402, 403, 404, 3xx e afins: chave, crédito, modelo ou pedido recusados). O resto segue <c>falha_llm</c>: o
+    /// transitório (rede, prazo, 5xx, 408, 429) e o provedor indisponível (disjuntor, cota, sem chave), que não traz status.
     /// </summary>
     public static string DaFalhaDoLlm(bool definitiva) => definitiva ? FalhaLlmDefinitiva : FalhaLlm;
 

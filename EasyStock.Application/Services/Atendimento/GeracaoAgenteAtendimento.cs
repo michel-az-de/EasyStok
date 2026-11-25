@@ -34,8 +34,9 @@ public sealed class ConsumoGeracaoAgente
     public bool FalhaLlm { get; private set; }
 
     /// <summary>
-    /// #3347 (D4): a falha foi definitiva, do tipo que repetir não resolve (<c>FalhaTransitoria</c> a recusa). Só vale junto de
-    /// <see cref="FalhaLlm"/>, que continua verdadeiro nas duas classes: o desfecho Erro depende dele.
+    /// #3347 (D4): a falha foi definitiva: o provedor respondeu com um status que a nova tentativa não repete
+    /// (<c>FalhaTransitoria</c> devolve falso: 400, 401, 402, 403, 404, 3xx e afins). Só vale junto de <see cref="FalhaLlm"/>,
+    /// que continua verdadeiro nas duas classes: o desfecho Erro depende dele.
     /// </summary>
     public bool FalhaLlmDefinitiva { get; private set; }
 
@@ -194,7 +195,7 @@ public static class GeracaoAgenteAtendimento
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 contexto.LimparRespostaVerificada();
-                // #3347 (D4): a regra que decide se repete decide a classe gravada: o que repetir não resolve é definitivo.
+                // #3347 (D4): a regra da nova tentativa decide a classe gravada: status que ela não repete é falha definitiva.
                 consumo.RegistrarFalhaLlm(definitiva: !FalhaTransitoria(ex));
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", contexto.Conversa.Id);
                 return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);

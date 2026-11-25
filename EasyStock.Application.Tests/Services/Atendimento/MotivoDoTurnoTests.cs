@@ -45,7 +45,7 @@ public class MotivoDoTurnoTests
         MotivoDoTurno.DaFalhaDaGeracao("qualquer coisa com R$ 59", false).Should().Be("guarda:outro");
     }
 
-    // #3347 (D4): a falha que repetir não resolve não se confunde com a transitória no histórico dos turnos.
+    // #3347 (D4): a falha com status que a nova tentativa não repete não se confunde com a transitória no histórico dos turnos.
     [Theory]
     [InlineData(false, "falha_llm")]
     [InlineData(true, "falha_llm_definitiva")]
