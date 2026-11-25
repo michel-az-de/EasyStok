@@ -127,6 +127,31 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
     }
 
     [SkippableFact]
+    public async Task GastoDoMesSegueOMesDeBrasiliaNasTresUltimasHorasDoMes()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        // #3295 (R6): o mês da cota em US$ é o de Brasília, o mesmo da cota de tokens. 01/12 01:30 UTC ainda é 30/11 22:30 lá.
+        var empresa = Guid.NewGuid();
+        var (provedor, padrao, _) = await SemearLojaAsync(empresa, 10m);
+        await using var sp = Provedor();
+        var registro = sp.GetRequiredService<IRegistroChamadaIa>();
+        foreach (var (instante, custo) in new[]
+                 {
+                     (new DateTime(2026, 11, 30, 12, 0, 0, DateTimeKind.Utc), 1m),
+                     (new DateTime(2026, 12, 1, 1, 30, 0, DateTimeKind.Utc), 2m),
+                     (new DateTime(2026, 12, 1, 3, 30, 0, DateTimeKind.Utc), 4m),
+                 })
+            await registro.RegistrarAsync(ChamadaIa.Registrar(empresa, provedor, padrao, "deepseek-flash", FinalidadeIa.Atendimento,
+                null, 100, 20, 0, 0, custo, 10, DesfechoChamadaIa.Ok, instante));
+
+        var rotas = sp.GetRequiredService<IRotasIa>();
+        // 22:45 de 30/11 em Brasília (01:45 UTC de 01/12): ainda novembro, soma a primeira e a segunda.
+        (await rotas.GastoDoMesAsync(empresa, provedor, new DateTime(2026, 12, 1, 1, 45, 0, DateTimeKind.Utc))).Should().Be(3m);
+        // 00:45 de 01/12 em Brasília (03:45 UTC): dezembro, só a terceira.
+        (await rotas.GastoDoMesAsync(empresa, provedor, new DateTime(2026, 12, 1, 3, 45, 0, DateTimeKind.Utc))).Should().Be(4m);
+    }
+
+    [SkippableFact]
     public async Task ModeloPedidoCasaComIdExternoESemCasamentoCaiNoPadrao()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
