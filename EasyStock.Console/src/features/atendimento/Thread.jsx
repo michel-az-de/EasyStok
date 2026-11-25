@@ -20,7 +20,7 @@ import css from './atendimento.module.css'
 function Divisoria({ numero }) {
   return (
     <div className={css.divisoriaAtendimento} role="separator">
-      <span>Atendimento {numero} concluído · novo atendimento a seguir</span>
+      <span>Atendimento {numero} concluído<span className={css.divisoriaResto}> · novo atendimento a seguir</span></span>
     </div>
   )
 }

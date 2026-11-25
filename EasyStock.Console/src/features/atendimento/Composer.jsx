@@ -401,7 +401,7 @@ export function Composer({
                   onPointerDown={(evento) => { if (barra.pelaBarra) evento.stopPropagation() }}
                   onClick={abrirNotaInterna}
                 >
-                  <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
+                  <Icone nome="nota" /><span className={css.rotuloNota}>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
                 </Botao>
               </Tooltip>
               {/* #2833: emoji no cursor, com busca por :nome. */}

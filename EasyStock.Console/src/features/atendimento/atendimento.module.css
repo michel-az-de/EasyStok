@@ -138,6 +138,13 @@
 .divisoriaAtendimento::before, .divisoriaAtendimento::after {
   content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);
 }
+/* #3300 (F2): em 2 linhas a data fixa cobria a primeira e sobrava só "seguir". Uma linha só, e no celular sem o resto. */
+.divisoriaAtendimento > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 759px) {
+  .divisoriaResto { display: none; }
+  /* #3300 (F6): "Nota" estourava o botão de 48 px a 390; fica o ícone, o aria-label segue "Nota interna". */
+  .rotuloNota { display: none; }
+}
 
 /* #2005 (console-09): "Ver mensagens anteriores", no topo do fio. */
 .verAnteriores { display: flex; justify-content: center; margin: var(--e-2) 0 var(--e-3); }
@@ -279,6 +286,12 @@
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 .modoAssumir { margin-left: auto; flex: none; }
+/* #3300 (F4): um laranja só entre a barra e o campo. Com texto no campo, quem age é "Enviar e assumir"; "Assumir
+   conversa" vira secundário (mesmas cores do `secundario` do Botao). */
+:global([data-conteudo-console]):has(.composer textarea:not(:placeholder-shown)) .modoAssumir:not(:disabled) {
+  background: var(--preenchimento); border-color: transparent; color: var(--tinta);
+}
+:global([data-conteudo-console]):has(.composer textarea:not(:placeholder-shown)) .modoAssumir:hover:not(:disabled) { background: var(--preenchimento-forte); }
 /* #2185: em coluna estreita o motivo, espremido ao lado de Assumir, quebrava em 3 linhas. Desce inteiro para baixo do estado. */
 .modoLinha { container: barra-modo / inline-size; }
 @container barra-modo (max-width: 559px) {
