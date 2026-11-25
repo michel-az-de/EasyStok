@@ -15,6 +15,7 @@ confere() { if grep -q -- "$2" <<<"$3"; then echo "ok   $1"; else echo "FAIL $1:
 # ---------------------------------------------------------------- parte 1
 # origin com A <- B (master); clone local com C descendente nao publicado.
 W="$(mktemp -d)"
+W_T="$(cd "$W" && (pwd -W 2>/dev/null || pwd))"
 git init -q --bare "$W/origin.git"
 git clone -q "$W/origin.git" "$W/c" 2>/dev/null
 g() { (cd "$W/c" && git -c user.name=t -c user.email=t@t "$@"); }
@@ -29,8 +30,44 @@ cat > "$W/bin/ssh" <<EOF
 # ssh falso: consome o tar e guarda os argumentos sem o corpo do script remoto
 cat >/dev/null
 printf '%s\n' "\$@" | sed 's/ bash -c .*//' > "$W/ssh-args"
+# #3323: FAKE_SSH_9=1 simula o pull das imagens do CI falhando na VPS (rc 9); o build volta 0.
+case "\$*" in *IMAGENS=pull*) [ "\${FAKE_SSH_9:-0}" = 1 ] && exit 9 ;; esac
+exit 0
 EOF
 chmod +x "$W/bin/ssh"
+# #3323: curl falso do GHCR (token e manifest). FAKE_GHCR=1: a imagem existe; FAKE_GHCR_APOS=N: passa a existir
+# depois de N consultas de manifest.
+cat > "$W/bin/curl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$W/curl-calls"
+case "\$*" in
+  *ghcr.io/token*) echo '{"token":"t"}'; exit 0 ;;
+  *manifests*)
+    n=\$(( \$(cat "$W/curl-n" 2>/dev/null || echo 0) + 1 )); echo \$n > "$W/curl-n"
+    [ "\${FAKE_GHCR:-0}" = 1 ] && exit 0
+    [ -n "\${FAKE_GHCR_APOS:-}" ] && [ "\$n" -gt "\$FAKE_GHCR_APOS" ] && exit 0
+    exit 22 ;;
+esac
+exit 22
+EOF
+# gh falso: FAKE_GH_SEQ = estados "<status> <conclusion>" do run do build-images, um por chamada, separados por |
+# (vazio = sem run). FAKE_GH_AVANCA=1 avanca o master do origin quando o estado e "completed cancelled".
+cat > "$W/bin/gh" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$W/gh-calls"
+[ -n "\${FAKE_GH_SEQ:-}" ] || exit 0
+n=\$(( \$(cat "$W/gh-n" 2>/dev/null || echo 0) + 1 )); echo \$n > "$W/gh-n"
+IFS='|' read -ra seq <<<"\$FAKE_GH_SEQ"
+i=\$(( n - 1 )); [ \$i -lt \${#seq[@]} ] || i=\$(( \${#seq[@]} - 1 ))
+estado="\${seq[\$i]}"
+if [ "\${FAKE_GH_AVANCA:-0}" = 1 ] && [ "\${estado%% *}" = completed ] && [ "\${estado#* }" = cancelled ]; then
+  o="git --git-dir=$W_T/origin.git"
+  novo=\$(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \$o commit-tree "\$(\$o rev-parse 'master^{tree}')" -p "\$(\$o rev-parse master)" -m avanca)
+  \$o update-ref refs/heads/master "\$novo"
+fi
+echo "\$estado"
+EOF
+chmod +x "$W/bin/curl" "$W/bin/gh"
 
 # local <env...> -- <args...>: roda o script no clone; imprime rc, saida e se o ssh foi chamado
 # Git Bash: pwd -W da o caminho Windows e MSYS_NO_PATHCONV impede converter /tmp/... no -e.
@@ -38,9 +75,11 @@ DIR_T="$(pwd -W 2>/dev/null || pwd)"; export MSYS_NO_PATHCONV=1
 local_run() {
   local envs=() rc
   while [ "$1" != -- ]; do envs+=("$1"); shift; done; shift
-  rm -f "$W/ssh-args"
-  out=$(cd "$W/c" && env PATH="$W/bin:$PATH" "${envs[@]}" bash "$SCRIPT" "$@" </dev/null 2>&1) && rc=0 || rc=$?
+  rm -f "$W/ssh-args" "$W/curl-calls" "$W/curl-n" "$W/gh-calls" "$W/gh-n"
+  out=$(cd "$W/c" && env PATH="$W/bin:$PATH" ESPERA_PASSO=0 "${envs[@]}" bash "$SCRIPT" "$@" </dev/null 2>&1) && rc=0 || rc=$?
   echo "rc=$rc"; echo "$out"
+  if [ -f "$W/curl-calls" ]; then echo "curl=sim"; else echo "curl=nao"; fi
+  if [ -f "$W/gh-calls" ]; then echo "gh=sim"; else echo "gh=nao"; fi
   if [ -f "$W/ssh-args" ]; then echo "ssh=sim"; cat "$W/ssh-args"; else echo "ssh=nao"; fi
 }
 
@@ -89,6 +128,51 @@ r=$(local_run "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$A")
 r=$(local_run "ESPELHO_URL=$W_T/nao-ha.git" -- --origem espelho "$B")
                                           confere "espelho inacessivel: exit 7"         "rc=7" "$r"
 g remote set-url origin "$W_T/origin.git"
+# #3323: imagens do CI. Pull do GHCR quando o sha esta la; senao espera so o build do master; fallback em build local.
+r=$(local_run FAKE_GHCR=1 -- "$B");      confere "imagens prontas: exit 0"             "rc=0" "$r"
+                                          confere "imagens prontas: avisa o GHCR"       "imagens: GHCR, prontas" "$r"
+                                          confere "imagens prontas: remoto em pull"     "IMAGENS=pull" "$r"
+                                          confere "imagens prontas: nao consulta o gh"  "gh=nao" "$r"
+                                          confere "imagens prontas: mostra o relogio"   "em [0-9]*s (imagens: pull)" "$r"
+r=$(local_run FAKE_GHCR=1 -- --local "$B"); confere "--local: build na VPS"            "build na VPS (--local)" "$r"
+                                          confere "--local: remoto em build"            "IMAGENS=build" "$r"
+                                          confere "--local: nao consulta GHCR nem gh"   "curl=nao" "$r"
+                                          confere "--local: nao consulta o gh"          "gh=nao" "$r"
+r=$(local_run FAKE_GHCR=1 "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$B")
+                                          confere "espelho: nunca usa GHCR"             "curl=nao" "$r"
+                                          confere "espelho: nunca usa gh"               "gh=nao" "$r"
+                                          confere "espelho: remoto em build"            "IMAGENS=build" "$r"
+r=$(local_run X=0 -- "$C");              confere "sha a frente do master: build"       "nao ha build do master para esperar" "$r"
+                                          confere "sha a frente do master: sem gh"      "gh=nao" "$r"
+r=$(local_run FAKE_GHCR=1 "ROLLBACK_CONFIRMA=${A:0:8}" -- --rollback "$A" --motivo "teste")
+                                          confere "rollback: sem espera pelo CI"        "gh=nao" "$r"
+r=$(local_run "FAKE_GH_SEQ=in_progress null|in_progress null|in_progress null" FAKE_GHCR_APOS=3 -- "$B")
+                                          confere "espera o build do CI: exit 0"        "rc=0" "$r"
+                                          confere "espera o build do CI: esperou"       "esperando o build-images" "$r"
+                                          confere "espera o build do CI: depois puxa"   "GHCR pronto para" "$r"
+                                          confere "espera o build do CI: remoto em pull" "IMAGENS=pull" "$r"
+r=$(local_run "FAKE_GH_SEQ=completed failure" -- "$B")
+                                          confere "build do CI falhou: build na VPS"    "terminou 'failure'; build na VPS" "$r"
+                                          confere "build do CI falhou: remoto em build" "IMAGENS=build" "$r"
+r=$(local_run X=0 -- "$B");              confere "sem run do build-images: build"       "sem run do build-images" "$r"
+r=$(local_run "FAKE_GH_SEQ=in_progress null" ESPERA_IMAGENS=2 -- "$B")
+                                          confere "teto da espera: build na VPS"        "teto de 2s; build na VPS" "$r"
+r=$(local_run "FAKE_GH_SEQ=in_progress null" ESPERA_IMAGENS=0 -- "$B")
+                                          confere "ESPERA_IMAGENS=0: nao espera"        "nao ha build do master para esperar" "$r"
+r=$(local_run "FAKE_GH_SEQ=completed success" -- "$B")
+                                          confere "CI ok sem imagem no GHCR: build"     "nao mostra o sha; build na VPS" "$r"
+r=$(local_run FAKE_GHCR=1 FAKE_SSH_9=1 -- "$B")
+                                          confere "pull falhou na VPS: refaz, exit 0"   "rc=0" "$r"
+                                          confere "pull falhou na VPS: avisa o fallback" "refazendo em build na VPS" "$r"
+                                          confere "pull falhou na VPS: 2a chamada em build" "IMAGENS=build" "$r"
+r=$(local_run "FAKE_GH_SEQ=completed cancelled" FAKE_GH_AVANCA=1 -- "$B")
+                                          confere "master avancou na espera: exit 7"    "rc=7" "$r"
+                                          confere "master avancou na espera: explica"   "avancou para" "$r"
+                                          confere "master avancou na espera: sem ssh"   "ssh=nao" "$r"
+git --git-dir="$W_T/origin.git" update-ref refs/heads/master "$B"
+r=$(local_run "FAKE_GH_SEQ=completed cancelled" -- "$B")
+                                          confere "cancelado sem avanco: build na VPS"  "build-images cancelado" "$r"
+                                          confere "cancelado sem avanco: exit 0"        "rc=0" "$r"
 # copia do script diferente da do origin/master: recusa o deploy de verdade
 mkdir -p "$W/c/scripts/deploy"; echo "# outra versao" > "$W/c/scripts/deploy/vps-deploy.sh"
 g add scripts/deploy/vps-deploy.sh; g commit -q -m D; g push -q origin HEAD:master; D=$(g rev-parse HEAD)
@@ -105,12 +189,14 @@ cat > .fake-docker <<'EOF'
 echo "docker $*" >> "$STATE/calls"
 case "$1" in
   build) exit "${FAKE_BUILD_FAIL:-0}" ;;
+  # #3323: pull do GHCR; FAKE_PULL_FAIL=1 simula o registro fora. FAKE_IMG_SHA troca o GIT_SHA da imagem puxada.
+  pull) [ "${FAKE_PULL_FAIL:-0}" = 1 ] && exit 1; echo "$3 $3" >> "$STATE/tags" ;;
   # #3117: o psql le o sinal de ponte muda; FAKE_PONTE_MUDA = lojas com incidente aberto, FAKE_PSQL_FAIL=1 = banco nao responde.
   exec) case "$*" in
           *psql*) [ "${FAKE_PSQL_FAIL:-0}" = 1 ] && exit 1; echo "${FAKE_PONTE_MUDA:-0}" ;;
           *) echo DUMP ;;
         esac ;;
-  image) grep -q "^$3 " "$STATE/tags" 2>/dev/null ;;
+  image) if [ "$3" = -f ]; then echo "GIT_SHA=${FAKE_IMG_SHA:-$SHA_FULL}"; else grep -q "^$3 " "$STATE/tags" 2>/dev/null; fi ;;
   tag) src=$(grep "^$2 " "$STATE/tags" | cut -d' ' -f2); sed -i "\#^$3 #d" "$STATE/tags"; echo "$3 ${src:-$2}" >> "$STATE/tags" ;;
   compose) : ;;
   logs) : ;;
@@ -164,6 +250,10 @@ echo "imagem=$(grep '^easystok-api:vps ' $STATE/tags | cut -d' ' -f2)"
 echo "current=$(cat $BUILD_ROOT/easystok-current 2>/dev/null)"
 echo "dump=$(ls $BACKUP_DIR | wc -l)"
 echo "up=$(grep -c 'compose up' $STATE/calls 2>/dev/null)"
+echo "pulls=$(grep -c '^docker pull' $STATE/calls)"
+echo "builds=$(grep -c '^docker build ' $STATE/calls)"
+echo "fonte=$(ls -d $BUILD_ROOT/easystok-$SHA 2>/dev/null | wc -l)"
+echo "ghcr_sobra=$(grep -c '^ghcr.io/' $STATE/tags)"
 echo "hist=$(cat $BUILD_ROOT/deploy-history.log 2>/dev/null)"
 echo "log_worker=$(grep -c 'logs --tail 40 ez-worker' $STATE/calls 2>/dev/null)"
 echo "prev=$(grep -c '^easystok-web:vps-prev-' $STATE/tags)"
@@ -190,6 +280,28 @@ r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "
                               confere "sucesso: remove as de rollback antigas" "prev_velha=0" "$r"
                               confere "sucesso: remove as tags de sha antigas" "shas=0" "$r"
                               confere "sucesso: poda o cache de build"   "poda=1" "$r"
+                              confere "sucesso: builda as 3 imagens na VPS" "builds=3" "$r"
+                              confere "sucesso: sem pull no build local" "pulls=0" "$r"
+                              confere "sucesso: fonte extraida"          "fonte=1" "$r"
+                              confere "sucesso: historico traz imagens e duracao" "imagens=build	dur=[0-9]*s" "$r"
+# #3323: IMAGENS=pull usa as imagens do CI e nao toca na fonte nem no docker build.
+r=$(run IMAGENS=pull);       confere "pull: exit 0"                     "rc=0" "$r"
+                              confere "pull: promove a imagem do GHCR"   "imagem=ghcr.io/michel-az-de/easystok-api:" "$r"
+                              confere "pull: 3 pulls e nenhum build"     "pulls=3" "$r"
+                              confere "pull: nenhum docker build"        "builds=0" "$r"
+                              confere "pull: nao extrai a fonte"         "fonte=0" "$r"
+                              confere "pull: tira a tag do GHCR"         "ghcr_sobra=0" "$r"
+                              confere "pull: marca current"              "current=novo0001" "$r"
+                              confere "pull: historico diz imagens=pull" "imagens=pull	dur=[0-9]*s" "$r"
+r=$(run2 IMAGENS=pull FAKE_PULL_FAIL=1); confere "pull falho: exit 9"   "rc=9" "$r"
+                              confere "pull falho: nao troca a imagem"   "imagem=easystok-api:vps-antiga" "$r"
+                              confere "pull falho: nao faz dump"         "dump=0" "$r"
+                              confere "pull falho: nao sobe nada"        "up=0" "$r"
+r=$(run2 IMAGENS=pull FAKE_IMG_SHA=outro); confere "GIT_SHA errado: exit 9" "rc=9" "$r"
+                              confere "GIT_SHA errado: nao troca a imagem" "imagem=easystok-api:vps-antiga" "$r"
+                              confere "GIT_SHA errado: nao sobe nada"    "up=0" "$r"
+r=$(run2 IMAGENS=pull FAKE_BAD=1); confere "pull + health falho: exit 6" "rc=6" "$r"
+                              confere "pull + health falho: volta a imagem" "imagem=easystok-api:vps-antiga" "$r"
 r=$(run RETEM_PREV=5);       confere "RETEM_PREV=5: guarda 5"           "prev=5" "$r"
 r=$(run FAKE_FAXINA_FAIL=1); confere "faxina falha: deploy segue exit 0" "rc=0" "$r"
                               confere "faxina falha: marca current"      "current=novo0001" "$r"

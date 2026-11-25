@@ -35,8 +35,9 @@ COPY design/ design/
 
 WORKDIR /src/EasyStock.Web
 RUN npm run css:build
+# #3323: sem analisadores no publish (o ci.yml roda -warnaserror com eles).
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish -c Release -o /app/publish /p:SkipTailwind=true
+    dotnet publish -c Release -o /app/publish /p:SkipTailwind=true -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS runtime
