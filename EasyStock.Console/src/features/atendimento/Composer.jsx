@@ -482,10 +482,11 @@ export function Composer({
               ) : (
                 // #2185 (R15): o microfone ocupa o lugar do Enviar com o mesmo tamanho e o mesmo desenho (ícone e
                 // palavra), para o botão da direita não mudar de largura quando o campo esvazia.
+                // #3355: secundário. Com o campo vazio o próximo passo é escrever; o laranja fica com Assumir ou Enviar.
                 <Tooltip texto={motivoDeFormato(canal, 'audio') ?? 'Gravar áudio'}>
                   <Botao
-                    variante="primario"
-                    className={css.enviar}
+                    variante="secundario"
+                    className={`${css.enviar} ${css.gravar}`}
                     aria-label="Gravar áudio"
                     icone="mic"
                     disabled={!podeEscrever || !podeAudio}
