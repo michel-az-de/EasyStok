@@ -232,6 +232,7 @@ function PainelDaConversa({
         pausado={pausado}
         bloqueada={bloqueada}
         podeReabrir={podeReabrir}
+        agora={agora}
         acoes={acoesTela}
         aoAssumir={() => assumirAtendimento(selecionada.id)}
       />

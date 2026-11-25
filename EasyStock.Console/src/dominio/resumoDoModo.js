@@ -5,7 +5,7 @@
 // (provadas em prova-f07 e prova-r12); aqui só muda o tamanho da frase. A
 // frase inteira continua em `detalhe`, que a tela põe no `title`.
 
-import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponder } from './automatico'
+import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponder, sinalUrgente } from './automatico'
 import { AGUARDANDO_EQUIPE, origemDaPassagem } from './passagem'
 import { naFilaSemResponsavel } from './acoesDaConversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
@@ -46,7 +46,7 @@ function rotuloDoModo(modo, conversa, outro) {
 // #2185 (E22): quem não pode reabrir não recebe a ordem "reabra"; o botão nem existe para ela.
 const LINHA_ENCERRADA_SEM_PERMISSAO = 'Peça a quem pode reabrir a conversa.'
 
-export function resumoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true } = {}) {
+export function resumoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true, agora = null } = {}) {
   const modo = modoDoAtendimento(conversa, pausado, bloqueada)
   const outro = modo.chave === MODOS.PAUSADO && pausado === PAUSA_POR_OUTRO
   // #2185 (E20): "Você respondeu" só vale quando a pausa é minha; a conversa de um colega não é.
@@ -63,10 +63,18 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
   else if (proximo) linha = LINHA_DO_PROXIMO[proximo.chave] ?? linha
   else if (modo.chave === MODOS.PAUSADO && motivo) linha = motivo
 
+  // #3300 (F1): o cartão sobe para "Precisa de você" pelo texto das mensagens (`sinalUrgente`) antes de o servidor
+  // gravar a passagem. A barra lê o mesmo sinal, senão diz "Assistente respondendo" numa conversa que pede você.
+  const urgente = agora != null && modo.chave === MODOS.LIGADO && !automaticoDesligadoNaConversa(conversa)
+    ? sinalUrgente(conversa, agora)
+    : null
+  if (urgente) linha = urgente.texto
+
   return {
     chave: modo.chave,
-    tom: modo.tom,
-    rotulo: rotuloDoModo(modo, conversa, outro),
+    tom: urgente ? 'aviso' : modo.tom,
+    rotulo: urgente ? 'Precisa de você' : rotuloDoModo(modo, conversa, outro),
+    urgente: Boolean(urgente),
     linha,
     detalhe,
     proximo,

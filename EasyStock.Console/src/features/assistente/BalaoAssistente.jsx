@@ -21,6 +21,11 @@ import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
 } from '../../dominio/assistente'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
+
+// #3300 (F5): Ctrl+Enter é a convenção do Assistente, das confirmações e da nota. Em tela de toque não há Ctrl,
+// então a dica some ali (Enter segue criando linha e o botão Perguntar envia).
+const TELA_DE_TOQUE = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches)
+const DICA_DO_ATALHO = TELA_DE_TOQUE ? undefined : 'Ctrl+Enter para perguntar. Enter cria uma nova linha.'
 import { acoesPropostasVisiveis, executarAcaoDoAssistente } from '../../dominio/acoesDoAssistente'
 import {
   CartaoCDC, CartaoCliente, CartaoFotoSuspeita, CartaoOrtografia, CartaoPadraoDeCompra, CartaoSentimento,
@@ -414,7 +419,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 placeholder="Ex.: sugira uma resposta ou prepare uma nota"
                 rows={2}
                 limite={LIMITE_PERGUNTA}
-                dica="Ctrl+Enter para perguntar. Enter cria uma nova linha."
+                dica={DICA_DO_ATALHO}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
                 }}

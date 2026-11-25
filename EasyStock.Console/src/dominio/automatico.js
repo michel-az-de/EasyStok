@@ -151,7 +151,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, o Assistente não responde isso',
+  restricao: 'Restrição alimentar, confira a ficha do prato antes de responder',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
   'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
@@ -391,7 +391,7 @@ function aguardandoAbertura(conversa, aberta) {
 // mensagens ainda sem resposta. Sem texto carregado (resumo da API), não opina.
 const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
 
-function sinalUrgente(conversa, agora) {
+export function sinalUrgente(conversa, agora) {
   const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
   if (pendentes.length === 0) return null
   const pedido = conversa.pedido
