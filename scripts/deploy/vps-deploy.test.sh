@@ -11,6 +11,7 @@ SCRIPT="$(pwd)/vps-deploy.sh"
 
 falhas=0
 confere() { if grep -q -- "$2" <<<"$3"; then echo "ok   $1"; else echo "FAIL $1: esperava '$2'"; echo "$3" | sed 's/^/     /'; falhas=$((falhas+1)); fi; }
+confere_sem() { if grep -q -- "$2" <<<"$3"; then echo "FAIL $1: nao esperava '$2'"; echo "$3" | sed 's/^/     /'; falhas=$((falhas+1)); else echo "ok   $1"; fi; }
 
 # ---------------------------------------------------------------- parte 1
 # origin com A <- B (master); clone local com C descendente nao publicado.
@@ -153,7 +154,7 @@ r=$(local_run FAKE_GHCR=1 "ROLLBACK_CONFIRMA=${A:0:8}" -- --rollback "$A" --moti
                                           confere "rollback com imagem no GHCR: nao consulta o gh" "gh=nao" "$r"
 r=$(local_run FAKE_GHCR=1 FAKE_SSH_RC=6 -- "$B")
                                           confere "pull com rc 6 na VPS: devolve 6"     "rc=6" "$r"
-                                          confere "pull com rc 6 na VPS: nao refaz em build" "imagens: pull)" "$r"
+                                          confere_sem "pull com rc 6 na VPS: nao refaz em build" "refazendo em build" "$r"
 r=$(local_run "FAKE_GH_SEQ=in_progress null|in_progress null|in_progress null" FAKE_GHCR_APOS=3 -- "$B")
                                           confere "espera o build do CI: exit 0"        "rc=0" "$r"
                                           confere "espera o build do CI: esperou"       "esperando o build-images" "$r"
@@ -302,7 +303,7 @@ r=$(run IMAGENS=pull);       confere "pull: exit 0"                     "rc=0" "
                               confere "pull: tira a tag do GHCR"         "ghcr_sobra=0" "$r"
                               confere "pull: marca current"              "current=novo0001" "$r"
                               confere "pull: historico diz imagens=pull" "imagens=pull	dur=[0-9]*s" "$r"
-                              confere "pull: historico guarda o digest de cada imagem" "digests=api=abcdef012345,worker=abcdef012345,web=abcdef012345" "$r"
+                              confere "pull: historico guarda o digest de cada imagem" "digests=api=abcdef0123456789,worker=abcdef0123456789,web=abcdef0123456789" "$r"
 r=$(run2 IMAGENS=pull FAKE_PULL_FAIL=1); confere "pull falho: exit 9"   "rc=9" "$r"
                               confere "pull falho: nao troca a imagem"   "imagem=easystok-api:vps-antiga" "$r"
                               confere "pull falho: nao faz dump"         "dump=0" "$r"

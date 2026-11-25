@@ -33,7 +33,7 @@
 # de proposito a uma versao anterior so com --rollback, que exige motivo e
 # confirmacao. Tambem recusa rodar a partir de uma copia deste script diferente
 # da do origin/master (worktree antigo). Cada execucao grava uma linha em
-# $BUILD_ROOT/deploy-history.log na VPS: data, modo, sha, rc, quem, motivo.
+# $BUILD_ROOT/deploy-history.log na VPS: data, modo, sha, rc, quem, motivo, imagens (pull ou build), dur (s) e digests (16 hex por imagem puxada).
 #
 # Uso:
 #   scripts/deploy/vps-deploy.sh                 # origin/master
@@ -121,7 +121,7 @@ REGISTRO="${REGISTRO:-ghcr.io/michel-az-de}"
 # vps-<sha>. Falha ou GIT_SHA diferente devolve 1 e o script sai com 9: nada foi trocado e o script
 # local refaz o deploy em build local (so ai a fonte sobe).
 puxa_imagens() {
-  local s ref sha_img p pids="" ok=1
+  local s ref sha_img p pids="" ok=1 dg
   for s in $SERVICES; do
     docker pull -q "$REGISTRO/easystok-$s:$SHA_FULL" >/dev/null &
     pids="$pids $!"
@@ -139,7 +139,7 @@ puxa_imagens() {
   DIGESTS=""
   for s in $SERVICES; do
     ref="$REGISTRO/easystok-$s:$SHA_FULL"
-    dg="$(docker image inspect -f '{{index .RepoDigests 0}}' "$ref" 2>/dev/null | sed -n 's/.*@sha256:\(.\{12\}\).*/\1/p' | head -1)"
+    dg="$(docker image inspect -f '{{index .RepoDigests 0}}' "$ref" 2>/dev/null | sed -n 's/.*@sha256:\(.\{16\}\).*/\1/p' | head -1)"
     DIGESTS="$DIGESTS${DIGESTS:+,}$s=${dg:-?}"
     docker tag "$ref" "easystok-$s:vps-$SHA" || return 1
     docker rmi "$ref" >/dev/null 2>&1 || true
