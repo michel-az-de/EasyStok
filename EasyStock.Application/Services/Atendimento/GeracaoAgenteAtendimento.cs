@@ -293,7 +293,9 @@ public static class GeracaoAgenteAtendimento
 
     private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
-    // #3340 (R2I-02): recusa é o JSON com "erro" ou com "linkGerado":false, o que as ferramentas devolvem quando não fazem o que foi pedido.
+    // #3340 (R2I-02): recusa que conta como falha do turno são só as ações que comprometem algo com o cliente: o link que
+    // não saiu ("linkGerado":false) e o pedido que não foi criado ("itens_invalidos", "pedido_recusado"). Os demais "erro"
+    // (consulta sem resultado, dado que falta) são conversa normal: o modelo pergunta ao cliente e não escala.
     private static bool FerramentaRecusou(string resultado)
     {
         try
@@ -301,8 +303,24 @@ public static class GeracaoAgenteAtendimento
             using var doc = System.Text.Json.JsonDocument.Parse(resultado);
             var raiz = doc.RootElement;
             if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
-            return raiz.TryGetProperty("erro", out _)
+            return (raiz.TryGetProperty("erro", out var erro) && erro.ValueKind == System.Text.Json.JsonValueKind.String
+                    && erro.GetString() is "itens_invalidos" or "pedido_recusado")
                 || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
+    // Qualquer "erro" devolvido (consulta sem resultado, dado que falta) invalida a resposta verificada de uma ferramenta
+    // anterior, como antes da #3340; só não escala.
+    private static bool ResultadoTemErro(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object && doc.RootElement.TryGetProperty("erro", out _);
         }
         catch (System.Text.Json.JsonException)
         {
@@ -331,6 +349,7 @@ public static class GeracaoAgenteAtendimento
                 contexto.RegistrarFalhaDeFerramenta();
                 return new BlocoResultadoFerramentaLlm(uso.Id, resultado, EhErro: true);
             }
+            if (ResultadoTemErro(resultado)) contexto.LimparRespostaVerificada();
             contexto.ResultadosDasFerramentas.Add(resultado);
             return new BlocoResultadoFerramentaLlm(uso.Id, resultado);
         }

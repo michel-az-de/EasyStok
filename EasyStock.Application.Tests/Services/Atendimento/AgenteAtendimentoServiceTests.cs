@@ -994,6 +994,22 @@ public partial class AgenteAtendimentoServiceTests
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // #3340: consulta sem resultado ou dado que falta é conversa normal: o modelo pergunta ao cliente, sem escalar.
+    [Theory]
+    [InlineData("""{"erro":"pedido_nao_encontrado"}""")]
+    [InlineData("""{"erro":"informe_endereco"}""")]
+    public async Task ErroDeConsultaOuDadoFaltandoNaoEscala(string erro)
+    {
+        _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>()).Returns(erro);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("consultar_pedido"), Texto("Não achei esse pedido. Pode me passar o número ou o endereço?"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("Pode me passar")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
     // #3340 (R2I-03): o link de pagamento sobrevive a uma ferramenta posterior na mesma volta.
     [Fact]
     public async Task LinkDePagamentoSobreviveAFerramentaPosteriorNaMesmaVolta()
