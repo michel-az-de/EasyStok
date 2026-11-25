@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -122,8 +123,8 @@ public class MobileOrdersController(
                 Itens: itens,
                 CriadoPorUserId: ResolveUserId(),
                 CriadoPorNome: mobile.LastOperatorName,
-                // F5 — propaga agendamento do mobile pro ERP.
-                AgendadoParaEm: mobile.ScheduledDeliveryAt,
+                // F5 — propaga agendamento do mobile pro ERP. #3328: a que já passou segue sem agenda, como no vínculo automático.
+                AgendadoParaEm: OrderLinker.AgendaQueAindaVaiAcontecer(mobile.ScheduledDeliveryAt, DateTime.UtcNow),
                 Canal: mobile.Channel
             ));
             erpPedidoId = result.Id;

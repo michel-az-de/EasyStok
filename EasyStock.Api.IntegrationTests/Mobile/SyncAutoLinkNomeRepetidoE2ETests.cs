@@ -15,6 +15,10 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 /// #2911: um produto do app que não vira Produto do ERP (nome de produto inativo, nome repetido no mesmo envio,
 /// nome longo demais) violava o índice único e derrubava o vínculo do envio inteiro: clientes e pedidos ficavam
 /// só no aparelho. O envio seguinte também não os tentava de novo.
+/// <para>
+/// #3328: a venda agendada no aparelho cuja hora passou antes do envio (o APK chegou a atrasar de 5 a 29 dias) era
+/// recusada pelo CriarPedidoUseCase ("Data agendada precisa ser no futuro.") e ficava órfã para sempre.
+/// </para>
 /// </summary>
 [Collection("MobileE2E")]
 public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
@@ -100,6 +104,71 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
         (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().CountAsync(p => p.MobileOrderId == pedido))).Should().Be(1);
     }
 
+    [SkippableFact]
+    public async Task PedidoComAgendaJaVencidaNoEnvio_ViraPedidoSemAgenda()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (_, aparelho) = await AparelhoAsync();
+        var (produto, pedido) = (NovoId("p"), NovoId("o"));
+        var agenda = DateTime.UtcNow.AddDays(-7);
+
+        await PushAsync(aparelho, Produto(produto, "Canelone de Frango"), Pedido(pedido, null, produto, agenda));
+
+        (await ErpDoPedidoAsync(pedido)).Should().NotBeNull("a hora marcada já passou, mas a venda existe e precisa chegar ao ERP");
+        (await AgendaDoPedidoNoErpAsync(pedido)).Should().BeNull();
+        (await LerAsync(db => db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+            .Where(o => o.Id == pedido).Select(o => o.ScheduledDeliveryAt).SingleAsync()))
+            .Should().BeCloseTo(agenda, TimeSpan.FromSeconds(1), "o aparelho guarda a hora que o cliente marcou");
+    }
+
+    [SkippableFact]
+    public async Task PedidoComAgendaFutura_ContinuaAgendadoNoErp()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (_, aparelho) = await AparelhoAsync();
+        var (produto, pedido) = (NovoId("p"), NovoId("o"));
+        var agenda = DateTime.UtcNow.AddDays(3);
+
+        await PushAsync(aparelho, Produto(produto, "Canelone de Frango"), Pedido(pedido, null, produto, agenda));
+
+        (await ErpDoPedidoAsync(pedido)).Should().NotBeNull();
+        (await AgendaDoPedidoNoErpAsync(pedido)).Should().BeCloseTo(agenda, TimeSpan.FromSeconds(1));
+    }
+
+    [SkippableFact]
+    public async Task EnvioSeguinte_VinculaOPedidoDeAgendaVencidaQueFicouOrfao_SemTocarOutraEmpresa()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaId, aparelho) = await AparelhoAsync();
+        var (outraEmpresaId, _) = await fixture.SeedEmpresaELojaAsync();
+        var (orfao, orfaoDaOutraEmpresa) = (NovoId("o"), NovoId("o"));
+        var agenda = DateTime.UtcNow.AddDays(-20);
+        await PedidoOrfaoAsync(empresaId, aparelho.DeviceId, orfao, agenda);
+        // Mesmo id de aparelho em outra empresa: só o EmpresaId separa as duas.
+        await PedidoOrfaoAsync(outraEmpresaId, aparelho.DeviceId, orfaoDaOutraEmpresa, agenda);
+
+        await PushAsync(aparelho, Produto(NovoId("p"), "Talharim Fresco"));
+
+        (await ErpDoPedidoAsync(orfao)).Should().NotBeNull("o pedido de 20 dias atrás é de um envio anterior do mesmo aparelho");
+        (await AgendaDoPedidoNoErpAsync(orfao)).Should().BeNull();
+        (await ErpDoPedidoAsync(orfaoDaOutraEmpresa)).Should().BeNull("o órfão de outra empresa nunca é tocado");
+
+        // Reenvio: não vira um segundo Pedido.
+        await PushAsync(aparelho, Produto(NovoId("p"), "Talharim Fresco"));
+        (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().CountAsync(p => p.MobileOrderId == orfao))).Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task EnvioSemOrfaos_NaoCriaPedido()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaId, aparelho) = await AparelhoAsync();
+
+        await PushAsync(aparelho, Produto(NovoId("p"), "Talharim Fresco"));
+
+        (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().CountAsync(p => p.EmpresaId == empresaId))).Should().Be(0);
+    }
+
     // ---------- preparo ----------
 
     private sealed record Aparelho(string DeviceId, HttpClient Http);
@@ -141,6 +210,21 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
         await db.SaveChangesAsync();
     }
 
+    /// <summary>Pedido gravado pelo aparelho num envio cujo vínculo caiu, com a hora marcada que depois venceu.</summary>
+    private async Task PedidoOrfaoAsync(Guid empresaId, string deviceId, string id, DateTime agenda)
+    {
+        using var scope = fixture.Factory!.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
+        db.Set<Order>().Add(new Order
+        {
+            Id = id, ClientSnapshotName = "Thatiane", Total = 30m, Status = "aguardando", EmpresaId = empresaId, LastDeviceId = deviceId,
+            ScheduledDeliveryAt = agenda,
+            Items = [new OrderItem { OrderId = id, ProductId = "p-x", Name = "Lasanha", Unit = "300g", Qty = 1, UnitPrice = 30m }]
+        });
+        await db.SaveChangesAsync();
+    }
+
     // ---------- HTTP e mutations como o PWA manda ----------
 
     private static async Task PushAsync(Aparelho aparelho, params Envio[] mutations)
@@ -165,14 +249,15 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
     private static Envio Cliente(string id, string nome) => Mutation("client.upsert",
         new { id, name = nome, apt = (string?)null, address = (string?)null, phone = "11988887777" });
 
-    private static Envio Pedido(string id, string? cliente, string produto)
+    private static Envio Pedido(string id, string? cliente, string produto, DateTime? agenda = null)
     {
         var hora = Ms(DateTime.UtcNow);
         return Mutation("order.upsert", new
         {
             id, clientId = cliente, clientSnapshot = new { name = "Thatiane", @ref = (string?)null },
             items = new[] { new { productId = produto, name = "Lasanha", emoji = (string?)null, unit = "300g", qty = 1, unitPrice = 30m } },
-            notes = (string?)null, total = 30m, status = "aguardando", createdAt = hora, updatedAt = hora
+            notes = (string?)null, total = 30m, status = "aguardando", createdAt = hora, updatedAt = hora,
+            scheduledDeliveryAt = agenda is { } a ? Ms(a) : (long?)null
         });
     }
 
@@ -197,4 +282,7 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
 
     private Task<Guid?> ErpDoPedidoAsync(string id) => LerAsync(db =>
         db.Set<Order>().IgnoreQueryFilters().AsNoTracking().Where(o => o.Id == id).Select(o => o.ErpPedidoId).SingleAsync());
+
+    private Task<DateTime?> AgendaDoPedidoNoErpAsync(string mobileOrderId) => LerAsync(db =>
+        db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking().Where(p => p.MobileOrderId == mobileOrderId).Select(p => p.AgendadoParaEm).SingleAsync());
 }
