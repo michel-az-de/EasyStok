@@ -11,7 +11,6 @@ namespace EasyStock.Api.UnitTests.BackgroundServices;
 public class AtendimentoFilaTurnoAgenteAgendamentoTests
 {
     private static readonly TimeSpan Teto = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan JanelaDeNegacao = TimeSpan.FromMilliseconds(300);
 
     private static TaskCompletionSource Sinal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -58,9 +57,21 @@ public class AtendimentoFilaTurnoAgenteAgendamentoTests
         Agendar(executor, loja, segunda, liberar.Task);
         await Task.WhenAll(primeira.Task, segunda.Task).WaitAsync(Teto);
 
-        Agendar(executor, loja, terceira, liberar.Task);
-        var terminouPrimeiro = await Task.WhenAny(terceira.Task, Task.Delay(JanelaDeNegacao));
-        terminouPrimeiro.Should().NotBeSameAs(terceira.Task, "o teto da loja é 2 e a terceira conversa espera vaga");
+        // A terceira anda até o teto da loja na thread do teste e para ali: quando Esvaziar volta, ela já esperou ou já rodou.
+        var fila = new FilaManual();
+        var contexto = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(fila);
+        try
+        {
+            Agendar(executor, loja, terceira, liberar.Task);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(contexto);
+        }
+
+        fila.Esvaziar().Should().Be(1, "a volta do Task.Yield da terceira passa pela fila");
+        terceira.Task.IsCompleted.Should().BeFalse("o teto da loja é 2 e as duas primeiras seguem rodando");
 
         liberar.SetResult();
         await terceira.Task.WaitAsync(Teto);
