@@ -36,6 +36,15 @@ public sealed class EnviarCardapioImagemFerramenta(
         // #2516: cada envio gera link novo e vence o anterior; item dito na conversa não é motivo para reenviar.
         var reenviar = entrada.ValueKind == JsonValueKind.Object
             && entrada.TryGetProperty("reenviar", out var r) && r.ValueKind == JsonValueKind.True;
+        // #3340 (R2I-07): o cliente que não consegue usar a comanda recebe um reenvio; o segundo na janela vai para a equipe.
+        if (reenviar && await linkCardapio.ContarNaJanelaAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct) >= 2)
+            return FerramentaJson.Serializar(new
+            {
+                enviado = false,
+                linkGerado = false,
+                motivo = "comanda_nao_funcionou",
+                orientacao = "A comanda já foi reenviada nesta conversa e o cliente segue sem conseguir usar. Use escalar_para_dona agora; não diga que o link vai chegar.",
+            });
         if (await ComandaEntregueAsync(contexto, ct) is { } entregue)
         {
             if (!reenviar)
