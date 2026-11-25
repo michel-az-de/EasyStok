@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -9,6 +9,7 @@ import { inicioDoDiaNoFuso, rotuloDoDia } from '../../dominio/formato'
 import { intercalarNotas } from '../../dominio/notas'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { Balao } from './Balao'
+import { MS_DE_SILENCIO_DO_FIO, novoSilencio, proximoSilencio } from './silencioDoFio'
 import { useRolagemDoFio } from './useRolagemDoFio'
 import css from './atendimento.module.css'
 
@@ -87,6 +88,15 @@ export function Thread({
     setBase({ chave: chaveRolagem, ultima: ultimaEm(mensagens) })
   }
   const novo = (m) => base.ultima !== null && emMs(m) !== null && emMs(m) > base.ultima
+  // #3330 (F21): o fio calado no commit que traz as mensagens e vivo de novo logo depois (silencioDoFio.js).
+  const [silencio, setSilencio] = useState(() => novoSilencio(chaveRolagem, mensagens.length))
+  const seguinteSilencio = proximoSilencio(silencio, chaveRolagem, mensagens.length)
+  if (seguinteSilencio !== silencio) setSilencio(seguinteSilencio)
+  useEffect(() => {
+    const rodada = silencio.rodada
+    const espera = setTimeout(() => setSilencio((s) => (s.rodada === rodada ? { ...s, calado: false } : s)), MS_DE_SILENCIO_DO_FIO)
+    return () => clearTimeout(espera)
+  }, [silencio.rodada])
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
   const abrirDefinicaoAutomatica = useChamadaEstavel(aoAbrirDefinicaoAutomatica)
   const reenviar = useChamadaEstavel(aoReenviar)
@@ -192,7 +202,7 @@ export function Thread({
   }
 
   return (
-    <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
+    <div className={css.thread} role="log" aria-live={silencio.calado ? 'off' : 'polite'} aria-label="Mensagens da conversa">
       {/* #2005 (console-09): o fio traz as 100 mais recentes; as de antes abrem sob demanda. */}
       {temAnteriores && aoVerAnteriores && (
         <div className={css.verAnteriores}>

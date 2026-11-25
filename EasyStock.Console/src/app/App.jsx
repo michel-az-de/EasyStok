@@ -657,7 +657,8 @@ export function App() {
   }
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} entrarPorCodigo={entrarPorCodigo} google={google} avisoSaida={avisoSaida} retomando={retomando} erroRetomada={erroRetomada} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
-  if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} />
+  // #3330 (F23): a demonstração também tem o "Pular para o conteúdo" que o modo API já monta (o Ctrl+K não: a Busca na Casa só existe com a API).
+  if (!FONTE_API && rota.modulo) return <><NavegacaoDoConsole hash={hash} /><AppPrincipal rota={rota} sessao={sessao} /></>
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
   if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <AvisoCardapioDoSite /> : <TelaCardapioLink />
