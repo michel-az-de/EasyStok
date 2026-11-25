@@ -1,13 +1,14 @@
 # build-images — builda as imagens da VM (api/web/worker) no CI e pusha pro GHCR.
 # Poda P01 (#1169): a imagem do Admin saiu junto com o projeto.
-# Issue 605: as imagens prontas no registry servem de reserva e de prova de que o Dockerfile
-# builda no CI. A VPS hoje builda local pelo scripts/deploy/vps-deploy.sh (#1890).
+# #3323: a VPS puxa daqui a imagem do sha (scripts/deploy/vps-deploy.sh) em vez de buildar de
+# novo; o build local virou o fallback. Estas imagens sao o caminho do deploy.
 #
-# - Tags: :latest e :<sha do commit>.
+# - Tags: :<sha do commit> sempre; :latest so no master (rodada manual numa branch nao mexe nele).
 # - GIT_SHA via build-arg, declarado só no estágio runtime dos Dockerfiles —
 #   não invalida o cache de camadas (issue 572).
-# - Cache buildx type=gha com escopo por imagem (restore/publish do NuGet ficam
-#   quentes entre commits).
+# - Cache buildx type=gha mode=min, escopo v2 por imagem: so as camadas da imagem final.
+#   O mode=max exportava todo estagio de build e levava 123 s dos 296 s da api (medido).
+# - provenance: false: sem attestation, o manifesto fica simples e o push mais curto.
 name: build-images
 
 on:
@@ -61,11 +62,12 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          provenance: false
           build-args: |
             GIT_SHA=${{ github.sha }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}:latest
             ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=easystok-${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=easystok-${{ matrix.name }}
+            ${{ github.ref == 'refs/heads/master' && format('ghcr.io/{0}/easystok-{1}:latest', github.repository_owner, matrix.name) || '' }}
+          cache-from: type=gha,scope=easystok-v2-${{ matrix.name }}
+          cache-to: type=gha,mode=min,scope=easystok-v2-${{ matrix.name }}
 
