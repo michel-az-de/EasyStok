@@ -322,6 +322,9 @@ try {
   await page.keyboard.press('Escape')
   await modal.waitFor({ state: 'hidden' })
   assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).evaluate((no) => no === document.activeElement), true)
+  // #3331 (impeccable): com a conta escolhida, o resumo ao lado não repete o primário da linha.
+  assert.equal(await page.locator('[class*="primario"]:visible').filter({ hasText: 'Pagar a próxima parcela' }).count(), 0, '#3331: "Pagar a próxima parcela" não é primário')
+  assert.equal(await page.getByRole('button', { name: 'Pagar a próxima parcela', exact: true }).count(), 1, '#3331: o botão do resumo continua lá')
   await page.screenshot({ path: join(evidencias, 'financeiro-contas-desktop.png') })
   // #2095: "Pagar" na linha abre o registro da próxima parcela direto (2 cliques em vez de 3).
   await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).click()
@@ -370,6 +373,15 @@ try {
   await recebimentoDoPedido.getByText('R$ 19,00').waitFor()
   assert.equal(await recebimentoDoPedido.getByRole('link').count(), 0, '#2262: recebimento de pedido não tem conta para consultar')
   await page.keyboard.press('Escape')
+  // #3331 (impeccable): resultado negativo no extrato leva a cor de saída, como o valor da saída na lista.
+  const cores = await page.evaluate(() => {
+    const cor = (no) => getComputedStyle(no).color
+    const valorDe = (rotulo) => [...document.querySelectorAll('main [class*="indicador"]')].find((no) => no.querySelector(':scope > span')?.textContent.trim() === rotulo).querySelector(':scope > strong')
+    const saida = [...document.querySelectorAll('main span')].find((no) => /^R\$\s30,00$/.test(no.textContent.trim()))
+    return { resultado: cor(valorDe('Resultado dos movimentos')), saida: cor(saida), entradas: cor(valorDe('Entradas do período')) }
+  })
+  assert.notEqual(cores.resultado, cores.entradas, '#3331: resultado negativo não usa a tinta neutra')
+  assert.equal(cores.resultado, cores.saida, '#3331: resultado negativo em cor de saída')
   await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link', { name: 'Relatórios', exact: true }).click()
   await page.getByRole('button', { name: 'Ampliar relatório', exact: true }).click()
   await page.getByRole('dialog', { name: 'Relatório de fluxo de caixa', exact: true }).waitFor()
@@ -377,6 +389,9 @@ try {
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Exportar CSV', exact: true }).click()
   assert.match((await downloadPromise).suggestedFilename(), /^financeiro-.*\.csv$/)
+  // #3331 (impeccable): cada relatório tem o seu título à vista e só o "Gerar relatório" é primário na tela.
+  assert.equal(await page.getByRole('heading', { name: 'Fluxo de caixa', exact: true }).count(), 1, '#3331: o fluxo de caixa tem título visível')
+  assert.deepEqual(await page.locator('main [class*="primario"]:visible').allTextContents(), ['Gerar relatório'], '#3331: um primário só em Relatórios')
   await page.screenshot({ path: join(evidencias, 'financeiro-relatorios-desktop.png') })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: 'Menu de Financeiro', exact: true }).click()
@@ -463,6 +478,14 @@ try {
   await page.getByRole('heading', { name: /^Vence hoje/ }).first().waitFor()
   assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).isVisible(), true)
   assert.equal(await page.locator('a[href="#/m/financeiro/pagar/hoje"]').count(), 1)
+  // #3331 (impeccable): o título de cada lado pesa mais que o do bloco, e a frase de lista vazia não ganha respiro extra.
+  const hierarquia = await page.evaluate(() => {
+    const por = (tag, texto) => [...document.querySelectorAll(tag)].find((no) => no.textContent.trim().startsWith(texto))
+    const vazio = [...document.querySelectorAll('p')].find((no) => no.textContent.startsWith('Nada a pagar nos'))
+    return { lado: parseFloat(getComputedStyle(por('h2', 'A pagar')).fontSize), bloco: parseFloat(getComputedStyle(por('h3', 'Próximos 7 dias')).fontSize), margemDoVazio: parseFloat(getComputedStyle(vazio).marginTop) }
+  })
+  assert.ok(hierarquia.lado >= hierarquia.bloco + 4, `#3331: "A pagar" (${hierarquia.lado}px) deve ser ao menos 4px maior que "Próximos 7 dias" (${hierarquia.bloco}px)`)
+  assert.equal(hierarquia.margemDoVazio, 0, '#3331: a frase de lista vazia não leva margem de parágrafo')
   await escolherTema(page, 'Escuro')
   await page.screenshot({ path: join(evidencias, 'financeiro-visao-geral-escuro.png') })
   await page.goto(origem + '/#/m/atendimento/balcao')

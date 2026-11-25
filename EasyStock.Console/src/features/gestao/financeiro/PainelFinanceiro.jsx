@@ -40,7 +40,7 @@ function EstadoFinanceiro({ consulta, children }) {
   if (consulta.carregando && !consulta.dados) return <EsqueletoDeLista linhas={4} altura="var(--toque)">Carregando financeiro…</EsqueletoDeLista>
   return <div className={css.estado} aria-busy={consulta.carregando}>{children}</div>
 }
-function Indicador({ nome, valor, detalhe, children }) { return <div className={css.indicador}><span>{nome}</span><strong>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
+function Indicador({ nome, valor, detalhe, negativoEmErro = false, children }) { return <div className={css.indicador}><span>{nome}</span><strong className={negativoEmErro && valor < 0 ? css.valorSaida : undefined}>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
 // #3076 (E4, L3): pedidos sem conta a receber, em linha própria; o número do card segue só com as contas. Sem o campo
 // (API antiga) ou sem pedido, a linha não aparece.
 const SOBRE_PEDIDOS_A_RECEBER = 'Pedidos sem conta a receber e ainda não pagos, com dia da entrega até 30 dias à frente ou em qualquer dia passado. Saldo: total menos pagamentos. Não entra no valor acima.'
@@ -217,7 +217,7 @@ function ContasFinanceiras({ lado }) {
             ? <div><dt>Valor lançado</dt><dd>{moeda(valorLancado(selecionada))}</dd></div>
             : <><div><dt>Total</dt><dd>{moeda(selecionada.valorTotal)}</dd></div><div><dt>{palavras.feito}</dt><dd>{moeda(pagoNaConta(selecionada))}</dd></div><div><dt>Falta</dt><dd>{moeda(selecionada.pendente)}</dd></div></>}
             <div><dt>Emissão</dt><dd>{dataCurta(selecionada.dataEmissao)}</dd></div></dl>
-          {podeRegistrarNaConta(selecionada, podeGerenciar) && <Botao variante="primario" aria-haspopup="dialog" onClick={() => setPagamento({ conta: selecionada, parcela: proximaParcela(selecionada) })}>{palavras.verbo} a próxima parcela</Botao>}
+          {podeRegistrarNaConta(selecionada, podeGerenciar) && <Botao aria-haspopup="dialog" onClick={() => setPagamento({ conta: selecionada, parcela: proximaParcela(selecionada) })}>{palavras.verbo} a próxima parcela</Botao>}
           <Botao aria-haspopup="dialog" onClick={() => setDetalheId(selecionada.id)}>Parcelas e histórico</Botao>
         </aside>}
       </div>
@@ -291,7 +291,7 @@ function ExtratoFinanceiro() {
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}><PeriodoFinanceiro periodo={rascunho} aoMudar={setRascunho} /><Botao tipo="submit" variante="primario">Consultar extrato</Botao></form>
     <EstadoFinanceiro consulta={consulta}><div className={css.painel}>
       <p className={css.aviso}>Tudo que entrou e saiu no período: Caixa, pedidos, vendas e as contas que o seu perfil pode ver. O que veio do Caixa aparece uma vez só, e os estornos continuam no histórico.</p>
-      <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} /></div>
+      <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} negativoEmErro /></div>
       {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro período e toque em Consultar extrato.</Vazio>}
       <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.lado === 'pagar' ? css.valorSaida : ''}`}>{moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
@@ -319,6 +319,7 @@ function RelatoriosFinanceiros() {
     } catch (erro) { setErroExportacao(erro.message) } finally { setExportando(false) }
   }
   return <div className={css.painel}>
+    <h2>Fluxo de caixa</h2>
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setFiltros(rascunho) }}><PeriodoFinanceiro periodo={rascunho} aoMudar={setRascunho} />
       <CampoSelecao rotulo="Agrupar por" value={rascunho.periodicidade} onChange={(e) => campo('periodicidade', e.target.value)} opcoes={['Diario', 'Semanal', 'Mensal'].map((valor) => ({ valor, rotulo: { Diario: 'Dia', Semanal: 'Semana', Mensal: 'Mês' }[valor] }))} />
       <CampoSelecao rotulo="Categoria" value={rascunho.categoriaId} onChange={(e) => campo('categoriaId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todas' }, ...(cadastros.dados?.categorias ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
