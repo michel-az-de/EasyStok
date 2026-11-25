@@ -29,7 +29,7 @@
   font-size: var(--t-valor); line-height: var(--lh-compacto);
   color: var(--tinta);
 }
-.apoio { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.apoio { margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .preferencia { display: flex; justify-content: center; flex: none; padding-top: var(--e-4); }
 
 .formulario {

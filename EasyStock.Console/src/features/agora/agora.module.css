@@ -16,7 +16,7 @@
 .item:is(a, button):focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .item[data-tom="perigo"] { background: var(--erro-pastel); }
 .item[data-tom="perigo"] .selo { color: var(--erro); }
-/* Restrição alimentar é risco de saúde: ganha bloco de estado próprio, na cor de alerta, sem disputar com o vermelho do atraso. */
+/* Tom de aviso (restrição alimentar, passou para você, precisa de você): bloco na cor de alerta, distinto do vermelho do atraso. */
 .item[data-tom="aviso"] { background: var(--alerta-pastel); border-color: var(--alerta); }
 .item[data-tom="aviso"] .selo { color: var(--alerta); }
 .quem { min-width: 0; font-size: var(--t-corpo); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

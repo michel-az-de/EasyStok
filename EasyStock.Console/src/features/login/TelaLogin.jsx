@@ -47,7 +47,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
     if (!ocupado) tentar(() => entrarPorCodigo(codigo.replace(/\s+/g, '')), 'Código de acesso inválido ou expirado. Peça um novo à responsável.')
   }
 
-  const trocarModo = () => { setErro(null); setComCodigo((atual) => !atual) }
+  const trocarModo = () => { setErro(null); setSenhaVisivel(false); setComCodigo((atual) => !atual) }
 
   return (
     <main className={css.tela}>
@@ -84,7 +84,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
               value={email} onChange={(e) => setEmail(e.target.value)} readOnly={ocupado}
             />
             <CampoTexto
-              rotulo="Senha" tipo={senhaVisivel ? 'text' : 'password'} autoComplete="current-password" required
+              rotulo="Senha" tipo={senhaVisivel ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} required
               value={senha} onChange={(e) => setSenha(e.target.value)} readOnly={ocupado}
             />
             <label className={css.mostrar}>
