@@ -1,8 +1,10 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -200,6 +202,13 @@ public partial class AgenteAtendimentoServiceTests
         turno.Motivo.Should().Be(MotivoDoTurno.TetoSaida);
     }
 
+    private AgenteAtendimentoService CriarServicoComPrazoDeUmSegundo() => new(
+        _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
+        _cloudClient, _unitOfWork,
+        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+        _caderno, _log, _pedidos, turnos: _turnos,
+        prazoTurno: Microsoft.Extensions.Options.Options.Create(new PrazoDoTurnoAgenteOptions { Segundos = 1 }));
+
     [Fact]
     public async Task Motivo_PrazoDoTurnoEstouradoEscalaGravaMotivoProprioENaoChamaOModeloDeNovo()
     {
@@ -211,14 +220,9 @@ public partial class AgenteAtendimentoServiceTests
             await Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>());
             return Texto("nunca");
         });
-        var servico = new AgenteAtendimentoService(
-            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
-            _cloudClient, _unitOfWork,
-            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, _log, _pedidos, turnos: _turnos,
-            prazoTurno: Microsoft.Extensions.Options.Options.Create(new PrazoDoTurnoAgenteOptions { Segundos = 1 }));
 
-        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora).WaitAsync(TimeSpan.FromSeconds(15));
+        var resultado = await CriarServicoComPrazoDeUmSegundo()
+            .ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora).WaitAsync(TimeSpan.FromSeconds(15));
 
         resultado.Escalou.Should().BeTrue();
         chamadas.Should().Be(1);
@@ -227,6 +231,56 @@ public partial class AgenteAtendimentoServiceTests
         turno.Desfecho.Should().Be(DesfechoTurnoAgente.Escalou);
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
             Arg.Is<string>(m => m.StartsWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno)), Agora, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Motivo_PrazoEstouradoDepoisDeUmaFerramentaGravaOsTokensJaGastosEUmaSoEscalada()
+    {
+        // #3291 (R3): a primeira volta custou tokens e rodou a ferramenta; a segunda passa do prazo. O turno guarda o
+        // que foi gasto, escala uma vez e não manda texto nenhum ao cliente (a ferramenta não envia).
+        var chamadas = 0;
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(async c =>
+        {
+            if (++chamadas == 1) return UsoFerramenta("consultar_pedido");
+            await Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>());
+            return Texto("nunca");
+        });
+
+        var resultado = await CriarServicoComPrazoDeUmSegundo()
+            .ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora).WaitAsync(TimeSpan.FromSeconds(15));
+
+        resultado.Escalou.Should().BeTrue();
+        var turno = TurnoGravado();
+        turno.Motivo.Should().Be(MotivoDoTurno.PrazoTurno);
+        turno.TotalTokens.Should().BeGreaterThan(0, "a volta que terminou foi paga");
+        turno.Ferramentas.Should().Equal(new FerramentaDoTurno("consultar_pedido", true));
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Is<string>(t => t.Contains("nunca")),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Motivo_EnvioQueDemoraMaisQueOPrazoNaoEhCortado()
+    {
+        // #3291 (R3): o prazo é só das chamadas ao modelo. O modelo responde na hora, o envio ao cliente passa de 1 s e
+        // termina: o prazo (1 s) já não existe quando o envio roda.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("Oi! Já te respondo."));
+        var tokenDoEnvio = default(CancellationToken);
+        _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(async c =>
+            {
+                tokenDoEnvio = c.Arg<CancellationToken>();
+                await Task.Delay(1300, c.Arg<CancellationToken>());
+                return new EnvioWhatsAppResult("wamid.lento");
+            });
+
+        var resultado = await CriarServicoComPrazoDeUmSegundo()
+            .ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora).WaitAsync(TimeSpan.FromSeconds(15));
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+        tokenDoEnvio.IsCancellationRequested.Should().BeFalse();
+        TurnoGravado().Desfecho.Should().Be(DesfechoTurnoAgente.Respondeu);
     }
 
     [Fact]

@@ -98,6 +98,7 @@ public class GeracaoAgentePrazoDoTurnoTests
         terminou.Should().BeTrue("a ferramenta que já começou termina");
         tokenDaFerramenta.Should().Be(externo.Token, "o prazo do turno não corta ferramenta");
         chamadas.Should().Be(1, "o prazo já tinha vencido quando a ferramenta voltou");
+        geracao.Tokens.Should().Be(10 + 5, "a volta que terminou foi paga");
         geracao.Concluiu.Should().BeFalse();
         geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno);
         geracao.Consumo!.Ferramentas.Should().Equal(new FerramentaDoTurno("consultar_pedido", true));
