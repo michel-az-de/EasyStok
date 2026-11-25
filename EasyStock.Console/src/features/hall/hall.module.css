@@ -97,7 +97,7 @@
 
 
 /* Indisponibilidade usa texto e cadeado sem reduzir o contraste. */
-.emBreve { background: var(--papel); }
+.emBreve { background: transparent; border-style: dashed; border-color: var(--linha-media); }
 .emBreve .nome { color: var(--tinta-2); }
 .selo {
   grid-column: 2; display: inline-flex; align-items: center; gap: var(--e-1);
