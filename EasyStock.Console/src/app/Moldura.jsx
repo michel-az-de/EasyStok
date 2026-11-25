@@ -74,11 +74,12 @@ function Coluna({ variante, titulo, contagem, semTitulo = false, children }) {
 // Os grupos moram em `menuMais.js` (puro, provado em `prova-2232-topo.mjs`).
 function MenuMais({
   refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, atendente = null, celular = false,
+  lojaAberta = null, estadoAuto = null, aoAlternarLoja, aoAbrirAutomacoes,
 }) {
   const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const [tema] = useTema()
 
-  const grupos = gruposDoMenuMais({ tema, permite, aoSair, sessaoPersistente, atendente, casa: conta?.casa, celular })
+  const grupos = gruposDoMenuMais({ tema, permite, aoSair, sessaoPersistente, atendente, casa: conta?.casa, celular, lojaAberta, estadoAuto })
 
   function escolher(item) {
     if ([CHAVES_DO_MENU.entregas, CHAVES_DO_MENU.gestao, CHAVES_DO_MENU.ajuda].includes(item.chave)) refBotao.current?.focus()
@@ -93,6 +94,8 @@ function MenuMais({
     if (item.chave === CHAVES_DO_MENU.claro) trocarTema('light')
     if (item.chave === CHAVES_DO_MENU.escuro) trocarTema('dark')
     if (item.chave === CHAVES_DO_MENU.sair) aoSair?.()
+    if (item.chave === CHAVES_DO_MENU.loja) aoAlternarLoja?.()
+    if (item.chave === CHAVES_DO_MENU.automaticas) aoAbrirAutomacoes?.()
   }
 
   // `portal` (rodada 9, achado 1 da banca estética) vem do MenuDeAcoes: `.topo` tem backdrop-filter,
@@ -154,7 +157,7 @@ function Cabecalho({
         <Marca compacta />
       </a>
       <h1 className="sr">Casa da Baba</h1>
-      <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />
+      {!celular && <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />}
       <div className={css.controles}>
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
@@ -169,14 +172,15 @@ function Cabecalho({
             botão (caber em 390 px); `.rotuloCurto` mostra a abreviação com font-size próprio.
             #2232 (L3): o número cedeu lugar ao estado escrito ("ligadas"/"desligadas"); a contagem
             segue no nome acessível. Sem regras (modo API), sem estado e sem número. */}
-        <Botao className={css.automaticas} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)}>
+        {/* #3282: no celular as respostas automáticas moram no menu Mais, com o estado no nome do item. */}
+        {!celular && <Botao className={css.automaticas} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)}>
           <span className={css.autoTexto}>
             <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={20} />
             <span className={css.rotuloLongo}>{NOME_RESPOSTAS_AUTOMATICAS}</span>
             <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
             {estadoAuto && <span className={css.autoEstado} aria-hidden="true">{estadoAuto}</span>}
           </span>
-        </Botao>
+        </Botao>}
         {/* Casca da rodada 13 (issue das 5 frentes): mesmo lugar de
             Automáticas, ao lado dela. Rodada 13, achado da validação
             independente: no topo COMPACTO este botão empurrava "Mais" para
@@ -197,6 +201,10 @@ function Cabecalho({
             aoAbrirAjuda={aoAbrirAjuda}
             atendente={atendente}
             celular={celular}
+            lojaAberta={aberta}
+            estadoAuto={estadoAuto}
+            aoAlternarLoja={aoAlternarLoja}
+            aoAbrirAutomacoes={aoAbrirAutomacoes}
           />
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
@@ -412,6 +420,11 @@ function ConteudoMoldura({
   const botaoFichaRef = useRef(null)
 
   const irParaAtendimento = useCallback(() => setAba('atendimento'), [setAba])
+  // #3282: a seta da conversa do celular volta à lista e devolve o foco ao cartão da conversa aberta.
+  const voltarParaAsConversas = useCallback(() => {
+    setAba('balcao')
+    requestAnimationFrame(() => document.querySelector('button[aria-current="true"]')?.focus())
+  }, [setAba])
   // #2185 (F8): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; no celular a tela
   // da conversa é uma aba, e sem este passo a atendente seguia na lista com a conversa só marcada.
   useAoAbrirConversa(() => { if (tamanho === CELULAR) setAba('atendimento') })
@@ -479,6 +492,7 @@ function ConteudoMoldura({
         notaEmRascunho={notaEmRascunho}
         visivel={tamanho === DESKTOP || tamanho === TABLET || aba === 'atendimento'}
         focarAoTrocar={tamanho !== DESKTOP && tamanho !== TABLET}
+        aoVoltar={tamanho === CELULAR ? voltarParaAsConversas : null}
       />
     </LimiteDeErro>
   )

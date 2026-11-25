@@ -70,7 +70,7 @@ confere('L1  fechar a loja pede confirmação; abrir não; dentro do horário a 
   assert.match(moldura, /Cancelar/)
   assert.match(moldura, /fechamentoPedeConfirmacao\(/)
 })
-confere('L1  o controle diz "Loja aberta" / "Loja fechada" por escrito, com ponto de estado, também no celular', () => {
+confere('L1  o controle diz "Loja aberta" / "Loja fechada" por escrito, com ponto de estado (no celular, o item do menu Mais, #3282)', () => {
   const controle = moldura.slice(moldura.indexOf('function ControleLoja'), moldura.indexOf('const MODULO_ATENDIMENTO'))
   assert.match(controle, /Loja/)
   assert.match(controle, /aberta/)
@@ -78,6 +78,35 @@ confere('L1  o controle diz "Loja aberta" / "Loja fechada" por escrito, com pont
   assert.ok(!/'Aberta'|'Fechada'/.test(controle), 'a palavra solta "Aberta"/"Fechada" sem a loja continua')
   assert.match(controle, /css\.lojaPonto/, 'falta o ponto de estado')
   assert.ok(!/lojaTextoCurto|lojaTextoLongo/.test(molduraCss + moldura), 'o texto curto sem contexto do celular continua')
+})
+
+// #3282: no celular o topo leva só sino, Mais, filtro e Assistente (no máximo 4 controles); a loja e as
+// respostas automáticas viram itens do menu Mais, com o estado escrito, e a conversa ganha a seta de voltar.
+confere('N1  celular: Loja e Respostas automáticas saem do topo e viram itens do menu Mais com o estado', () => {
+  assert.match(moldura, /\{!celular && <ControleLoja /, 'a loja ainda ocupa o topo do celular')
+  assert.match(moldura, /\{!celular && <Botao className=\{css\.automaticas\}/, 'o Auto ainda ocupa o topo do celular')
+  const base = { tema: 'light', permite: () => true, aoSair: () => {}, celular: true, atendente: 'Thatiane', casa: 'Casa da Baba' }
+  const itens = (args) => menu.gruposDoMenuMais(args).flatMap((g) => g.itens)
+  const aberta = itens({ ...base, lojaAberta: true, estadoAuto: 'ligadas' })
+  assert.equal(aberta.find((i) => i.chave === '__loja')?.titulo, 'Loja aberta')
+  assert.equal(aberta.find((i) => i.chave === '__automaticas')?.titulo, 'Respostas ligadas')
+  const fechada = itens({ ...base, lojaAberta: false, estadoAuto: 'desligadas' })
+  assert.equal(fechada.find((i) => i.chave === '__loja')?.titulo, 'Loja fechada')
+  assert.equal(fechada.find((i) => i.chave === '__automaticas')?.titulo, 'Respostas desligadas')
+  assert.equal(itens({ ...base, lojaAberta: true, estadoAuto: null }).find((i) => i.chave === '__automaticas')?.titulo, 'Respostas automáticas', 'sem regras (API), sem estado')
+  assert.ok(!itens({ ...base, celular: false, lojaAberta: true, estadoAuto: 'ligadas' }).some((i) => ['__loja', '__automaticas'].includes(i.chave)), 'tablet e desktop não mudam')
+  assert.match(moldura, /CHAVES_DO_MENU\.loja\) aoAlternarLoja\?\.\(\)/, 'a loja alterna pelo mesmo caminho do topo (com confirmação ao fechar)')
+  assert.match(moldura, /CHAVES_DO_MENU\.automaticas\) aoAbrirAutomacoes\?\.\(\)/)
+  // A folha com os dois itens a mais continua sem rolagem: 48 px por linha, o grupo da loja e o da conta sem título visível.
+  const altura = menu.alturaDaFolha(menu.gruposDoMenuMais({ ...base, lojaAberta: true, estadoAuto: 'ligadas' }))
+  assert.ok(altura <= 667 - 96, `folha de ${altura} px não cabe em 667 px com a margem do topo`)
+})
+confere('N2  celular: a conversa tem a seta "Voltar para as conversas" (alvo de 44 px ou mais) que volta à aba da lista e devolve o foco', () => {
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  assert.match(painel, /aoVoltar && <BotaoIcone icone="arrow-left" rotulo="Voltar para as conversas"/)
+  assert.match(moldura, /aoVoltar=\{tamanho === CELULAR \? voltarParaAsConversas : null\}/, 'só o celular recebe a seta')
+  assert.match(moldura, /setAba\('balcao'\)[\s\S]{0,120}aria-current="true"\]'\)\?\.focus\(\)/, 'a seta volta à lista e foca a conversa aberta')
+  assert.match(fonte('componentes/BotaoIcone.jsx'), /minWidth: 'var\(--toque\)'/, 'o alvo da seta é o --toque (48 px no celular)')
 })
 
 // #2246: o contador passou de quadrado a pílula, com os cantos arredondados da banca.

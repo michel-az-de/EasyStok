@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { Vazio } from '../../componentes/Vazio'
@@ -40,7 +41,7 @@ export function PainelAtendimento(props) {
 
 function PainelDaConversa({
   aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
-  focarAoTrocar = false,
+  focarAoTrocar = false, aoVoltar = null,
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,
 }) {
   const {
@@ -179,6 +180,8 @@ function PainelDaConversa({
   return (
     <>
       <header className={css.cabecalho} data-cabecalho-conversa>
+        {/* #3282: no celular a conversa é uma tela inteira; a seta leva de volta à lista. */}
+        {aoVoltar && <BotaoIcone icone="arrow-left" rotulo="Voltar para as conversas" data-voltar-conversas onClick={aoVoltar} />}
         <span className={css.identidade}>
           <Avatar
             nome={selecionada.nome}
