@@ -47,6 +47,34 @@ public class DetectorReclamacaoClienteTests
     public void QueroSaberDoEstornoEhConsultaNaoCobranca(string texto) =>
         DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
 
+    // Revisão dos deltas (I1): outras formas da consulta ("status", "me avisem", "confirme") também não são cobrança.
+    [Theory]
+    [InlineData("Quero o status do meu estorno")]
+    [InlineData("Quero que me avisem quando cai o estorno")]
+    [InlineData("Preciso que você confirme o estorno")]
+    public void OutrasFormasDeConsultaDoEstornoNaoSaoCobranca(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
+
+    // Revisão dos deltas (I2): o "pode confirmar?" de outra oração (depois da vírgula) não anula a cobrança.
+    [Fact]
+    public void CobrancaComPedidoDeConfirmacaoNaOutraOracaoContinuaReclamacao() =>
+        DetectorReclamacaoCliente.EhReclamacao(["Quero meu estorno, pode confirmar?"]).Should().BeTrue();
+
+    // Revisão dos deltas (I3): "dinheiro" como forma de pagamento, perto de "não recebi/chegou" sobre o pedido, não é cobrança.
+    [Theory]
+    [InlineData("Não recebi o pedido, é em dinheiro?")]
+    [InlineData("Pago em dinheiro, o motoboy não chegou")]
+    [InlineData("Não recebi o pedido em dinheiro")]
+    public void DinheiroComoFormaDePagamentoNaoEhCobranca(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
+
+    [Theory]
+    [InlineData("meu dinheiro não voltou")]
+    [InlineData("o estorno não caiu")]
+    [InlineData("não caiu o dinheiro na conta")]
+    public void DemoraDoDinheiroDoClienteContinuaReclamacao(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
+
     [Theory]
     [InlineData("manda o link pra eu pagar")]
     [InlineData("quero uma lasanha")]

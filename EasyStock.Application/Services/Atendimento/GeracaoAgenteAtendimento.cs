@@ -239,7 +239,9 @@ public static class GeracaoAgenteAtendimento
             {
                 var resultado = await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct);
                 resultados.Add(resultado);
-                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido);
+                // #3340 (I4): "enviado:false" e "linkGerado:false" que só orienta não enviaram nada: não valem como ferramenta feita
+                // para a guarda do "já mandei".
+                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido && !NaoConfirmouEnvio(resultado.Conteudo));
                 if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou", consumo);
                 // Ferramenta que lançou pode ter agido (comanda que a Meta entregou, pedido gravado): devolver ao modelo o faria
                 // repetir o efeito. O turno acaba aqui e a finalização escala como falha de ferramenta.
@@ -337,6 +339,22 @@ public static class GeracaoAgenteAtendimento
     private static bool RecusaQueSoOrienta(System.Text.Json.JsonElement raiz) =>
         raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
         && motivo.GetString() is { } texto && MotivosQueSoOrientam.Contains(texto);
+
+    private static bool NaoConfirmouEnvio(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            var raiz = doc.RootElement;
+            return raiz.ValueKind == System.Text.Json.JsonValueKind.Object
+                && ((raiz.TryGetProperty("enviado", out var enviado) && enviado.ValueKind == System.Text.Json.JsonValueKind.False)
+                    || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
 
     // Qualquer "erro" devolvido (consulta sem resultado, dado que falta) invalida a resposta verificada de uma ferramenta
     // anterior, como antes da #3340; só não escala.

@@ -1021,6 +1021,22 @@ public partial class AgenteAtendimentoServiceTests
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // #3340 (revisão dos deltas, I4): a ferramenta que devolve "enviado:false" ou "linkGerado:false" que só orienta não enviou
+    // nada; o "já mandei" do modelo no mesmo turno é barrado pela guarda e a conversa vai à equipe.
+    [Theory]
+    [InlineData("enviar_resumo_pedido", """{"enviado":false,"motivo":"resumo_indisponivel","orientacao":"Chame a equipe."}""", "Já mandei o resumo do seu pedido!")]
+    [InlineData("enviar_link_pagamento", """{"linkGerado":false,"motivo":"aguardando_ok","orientacao":"Espere o cliente confirmar."}""", "Já enviei o link de pagamento pra você!")]
+    public async Task EnvioQueAFerramentaNaoConfirmouNaoViraJaMandei(string nome, string retorno, string fala)
+    {
+        var ferramenta = Ferramenta(nome, _ => retorno);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta(nome), Texto(fala));
+
+        var resultado = await CriarServico(ferramenta).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.StartsWith("Já ")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
     // #3340 (revisão da PR): recusa que só orienta a ordem dos passos (resumo antes do link, esperar o ok, pedido já pago)
     // o modelo resolve na própria volta; escalar o pedido comum à equipe por isso seria ruído.
     [Theory]
