@@ -204,8 +204,8 @@ public static class GeracaoAgenteAtendimento
 
             if (resposta.StopReason == RespostaLlm.StopMaxTokens)
             {
-                // Estourou de novo, ou o teto já era o máximo do modelo e não houve nova tentativa: o texto, se veio, está
-                // cortado e não vai ao cliente. A conversa vai para a equipe.
+                // Estourou de novo, ou não houve nova tentativa (o teto já era o máximo do modelo, ou a saída cortada já tinha
+                // 16384 tokens ou mais): o texto, se veio, está cortado e não vai ao cliente. A conversa vai para a equipe.
                 contexto.LimparRespostaVerificada();
                 logger.LogWarning("Agente de atendimento: o teto de saída estourou na conversa {ConversaId}, que vai para a equipe (nova tentativa feita: {NovaTentativa}).",
                     contexto.Conversa.Id, repetiu);
@@ -246,7 +246,7 @@ public static class GeracaoAgenteAtendimento
 
     /// <summary>
     /// #3273 (R1): começo do motivo quando a resposta é cortada por <c>max_tokens</c> sem nova tentativa (o teto já era o máximo do
-    /// modelo, #3313) ou quando a nova tentativa estoura também.
+    /// modelo, #3313, ou a saída cortada já tinha 16384 tokens ou mais) ou quando a nova tentativa estoura também.
     /// </summary>
     public const string MotivoTetoDeSaida = "o agente atingiu o teto de saída do modelo";
 

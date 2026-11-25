@@ -164,7 +164,8 @@ public class SugerirRespostaAgenteUseCaseTests
         var acao = () => Criar().ExecuteAsync(new SugerirRespostaAgenteCommand(_empresaId, _conversa.Id));
 
         (await acao.Should().ThrowAsync<AgenteIndisponivelException>())
-            .Which.Message.Should().Contain("não conseguiu sugerir").And.Contain("recusou responder").And.NotContain("Não posso ajudar");
+            .Which.Message.Should().Contain("recusou sugerir").And.Contain("Responda você")
+            .And.NotContain("Tente de novo").And.NotContain("refusal").And.NotContain("Não posso ajudar");
     }
 
     [Fact]
