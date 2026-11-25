@@ -6,6 +6,7 @@ import { Icone } from './Icone'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+const SELETOR_FOCAVEIS = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 const DISPOSICAO = { linha: css.linha, faixa: css.faixa }
 const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
   .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
@@ -179,6 +180,18 @@ export function Popover({
           && evento.relatedTarget !== origemRef.current) aoFechar()
       }}
       onKeyDown={(evento) => {
+        // #3317 (F20): o Tab que passa do último controle (ou o Shift+Tab do primeiro) sai do popover de diálogo. O
+        // `onBlur` acima não pega esse caso: o popover mora no fim do body e o foco sai para o navegador
+        // (`relatedTarget` nulo). O foco volta ao gatilho, e o Tab segue dali sem preventDefault.
+        if (papel === 'dialog' && evento.key === 'Tab' && !evento.altKey && !evento.ctrlKey && !evento.metaKey) {
+          const focaveis = [...caixaRef.current.querySelectorAll(SELETOR_FOCAVEIS)].filter((no) => no.getClientRects().length > 0)
+          const borda = evento.shiftKey ? focaveis[0] : focaveis.at(-1)
+          if (focaveis.length > 0 && document.activeElement !== borda) return
+          if (aoFechar() === false) return
+          if (origemRef.current?.isConnected) origemRef.current.focus()
+          if (evento.shiftKey) evento.preventDefault()
+          return
+        }
         if (papel !== 'menu' || evento.altKey || evento.ctrlKey || evento.metaKey
           || !evento.target.closest(SELETOR_ITENS)) return
         if (evento.key === 'Tab') {

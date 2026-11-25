@@ -94,6 +94,23 @@ function PainelDaConversa({
     if (focarAoTrocar && visivel) cabecalhoRef.current?.focus()
   }, [focarAoTrocar, selecionada?.id, visivel])
 
+  // #3317 (F06): o Assumir some da barra quando a conversa passa a ser dela, e o foco ia junto, para o body: a
+  // digitação seguinte se perdia. No desktop o foco volta ao campo de mensagem, depois que a tela já mudou. Só
+  // volta se o foco se perdeu (body, barra ou a reserva do título); no toque o teclado não abre sem ela pedir.
+  const [pedidosDeFoco, setPedidosDeFoco] = useState(0)
+  useEffect(() => {
+    if (pedidosDeFoco === 0 || focarAoTrocar) return
+    const atual = document.activeElement
+    const perdido = !atual || atual === document.body || atual === document.documentElement
+      || atual.matches('[data-foco-reserva]') || atual.closest('[data-controle-conversa]')
+    if (perdido) compositorPublicoRef.current?.querySelector('textarea:not(:disabled)')?.focus({ preventScroll: true })
+  }, [pedidosDeFoco, focarAoTrocar])
+  async function aoAssumirDaBarra() {
+    const resultado = await assumirAtendimento(selecionada.id)
+    if (resultado !== false) setPedidosDeFoco((n) => n + 1)
+    return resultado
+  }
+
   useEffect(() => {
     const anterior = contextoDaNota.current
     contextoDaNota.current = { id: selecionada?.id, visivel: editorNotaVisivel }
@@ -234,7 +251,7 @@ function PainelDaConversa({
         podeReabrir={podeReabrir}
         agora={agora}
         acoes={acoesTela}
-        aoAssumir={() => assumirAtendimento(selecionada.id)}
+        aoAssumir={aoAssumirDaBarra}
       />
       </div>
 
