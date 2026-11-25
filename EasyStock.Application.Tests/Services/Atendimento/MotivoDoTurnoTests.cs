@@ -39,9 +39,18 @@ public class MotivoDoTurnoTests
     public void FalhaDaGeracaoNaoLevaOTextoDoMotivo()
     {
         MotivoDoTurno.DaFalhaDaGeracao("o agente não conseguiu responder (falha ao chamar o LLM)", true).Should().Be("falha_llm");
+        MotivoDoTurno.DaFalhaDaGeracao("o agente não conseguiu responder (falha ao chamar o LLM)", true, true).Should().Be("falha_llm_definitiva");
+        MotivoDoTurno.DaFalhaDaGeracao("qualquer coisa com R$ 59", true, true).Should().Be("falha_llm_definitiva");
         MotivoDoTurno.DaFalhaDaGeracao("o agente não produziu resposta (stop_reason=max_tokens)", false).Should().Be("guarda:sem_resposta");
         MotivoDoTurno.DaFalhaDaGeracao("qualquer coisa com R$ 59", false).Should().Be("guarda:outro");
     }
+
+    // #3347 (D4): a falha que repetir não resolve não se confunde com a transitória no histórico dos turnos.
+    [Theory]
+    [InlineData(false, "falha_llm")]
+    [InlineData(true, "falha_llm_definitiva")]
+    public void FalhaDoLlmTemUmCodigoPorClasse(bool definitiva, string esperado) =>
+        MotivoDoTurno.DaFalhaDoLlm(definitiva).Should().Be(esperado);
 
     [Theory]
     [InlineData(GeracaoAgenteAtendimento.MotivoRecusa, "recusa_modelo")]
@@ -71,7 +80,7 @@ public class MotivoDoTurnoTests
 
     [Fact]
     public void CodigosFixosPassamNoDominio() =>
-        new[] { MotivoDoTurno.Iteracoes, MotivoDoTurno.Menu, MotivoDoTurno.FalhaLlm, MotivoDoTurno.TetoSaida, MotivoDoTurno.PrazoTurno,
+        new[] { MotivoDoTurno.Iteracoes, MotivoDoTurno.Menu, MotivoDoTurno.FalhaLlm, MotivoDoTurno.FalhaLlmDefinitiva, MotivoDoTurno.TetoSaida, MotivoDoTurno.PrazoTurno,
                 MotivoDoTurno.RecusaModelo, MotivoDoTurno.EscaladaModelo, MotivoDoTurno.Interrompido }
             .ToList().ForEach(ValidoNoDominio);
 }

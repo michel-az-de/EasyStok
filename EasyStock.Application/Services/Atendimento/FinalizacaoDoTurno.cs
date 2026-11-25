@@ -38,7 +38,8 @@ internal sealed class FinalizacaoDoTurno(
 
         // #3175: o codigo do motivo, nunca o texto dele nem o que o modelo escreveu.
         var codigoDoMotivo = geracao.MotivoFalha is null ? null
-            : MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha, geracao.Consumo?.FalhaLlm == true);
+            : MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha, geracao.Consumo?.FalhaLlm == true,
+                geracao.Consumo?.FalhaLlmDefinitiva == true);
 
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
@@ -133,7 +134,8 @@ internal sealed class FinalizacaoDoTurno(
         var falhouOModelo = turno.Geracao.Consumo?.FalhaLlm == true;
         var desfecho = falhouOModelo ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido;
         LogsDoAssistente.TurnoInterrompido(logger, turno.ConversaId, desfecho.ToString());
-        await RegistrarAsync(turno, desfecho, falhouOModelo ? MotivoDoTurno.FalhaLlm : MotivoDoTurno.Interrompido, ct);
+        await RegistrarAsync(turno, desfecho,
+            falhouOModelo ? MotivoDoTurno.DaFalhaDoLlm(turno.Geracao.Consumo?.FalhaLlmDefinitiva == true) : MotivoDoTurno.Interrompido, ct);
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, turno.Contexto.HouveEnvio, false);
     }

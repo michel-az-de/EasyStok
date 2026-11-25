@@ -159,14 +159,35 @@ public class GeracaoAgenteTetoESaidaTests
 
         capturadas.Should().HaveCount(2, "a de teto maior não se repete: o prazo seria estourado de novo");
         geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse("504 é transitória");
         geracao.Tokens.Should().Be(10 + 4096, "a chamada cortada foi paga");
     }
+
+    // #3347 (D4): a chamada de teto maior fica fora da nova tentativa e cai no mesmo catch: a classe vale nela também.
+    [Fact]
+    public async Task ChamadaDeTetoMaiorQueFalhaComErroDefinitivoGravaADefinitiva()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var chamadas = 0;
+        var llm = Llm(capturadas, () => ++chamadas == 1 ? Cortada("") : throw new HttpRequestException("sem crédito", null, HttpStatusCode.PaymentRequired));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(2);
+        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeTrue();
+    }
+
+    // #3347 (D4): definitiva é a falha que repetir não resolve (a regra da nova tentativa); a frase para a equipe é a mesma nas duas.
+    private const string FraseDaFalhaDoLlm = "o agente não conseguiu responder (falha ao chamar o LLM)";
 
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.PaymentRequired)]
     [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.Redirect)]
     public async Task FalhaDefinitivaNaoRepete(HttpStatusCode status)
     {
         var capturadas = new List<RequisicaoLlm>();
@@ -176,12 +197,15 @@ public class GeracaoAgenteTetoESaidaTests
 
         capturadas.Should().HaveCount(1);
         geracao.Concluiu.Should().BeFalse();
-        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.MotivoFalha.Should().Be(FraseDaFalhaDoLlm);
+        geracao.Consumo!.FalhaLlm.Should().BeTrue("o desfecho Erro depende dele");
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeTrue();
     }
 
     [Theory]
     [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
     [InlineData(HttpStatusCode.RequestTimeout)]
     [InlineData(HttpStatusCode.TooManyRequests)]
     public async Task FalhaTransitoriaRepeteUmaVez(HttpStatusCode status)
@@ -192,7 +216,9 @@ public class GeracaoAgenteTetoESaidaTests
         var geracao = await GerarAsync(llm);
 
         capturadas.Should().HaveCount(2);
+        geracao.MotivoFalha.Should().Be(FraseDaFalhaDoLlm);
         geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse();
     }
 
     [Fact]
@@ -201,8 +227,53 @@ public class GeracaoAgenteTetoESaidaTests
         var capturadas = new List<RequisicaoLlm>();
         var llm = Llm(capturadas, () => throw new HttpRequestException("connection reset"));
 
-        await GerarAsync(llm);
+        var geracao = await GerarAsync(llm);
 
         capturadas.Should().HaveCount(2);
+        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse();
+    }
+
+    // Resposta ilegível, tempo esgotado e afins não trazem status: a nova tentativa os repete e a classe é a transitória.
+    [Fact]
+    public async Task ExcecaoSemStatusRepeteUmaVezEContinuaTransitoria()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var llm = Llm(capturadas, () => throw new InvalidOperationException("resposta ilegível"));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(2);
+        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse();
+    }
+
+    // A falha que chega ao fim é a que decide: o 503 repete uma vez e o 401 da repetição é definitivo.
+    [Fact]
+    public async Task FalhaTransitoriaSeguidaDeDefinitivaGravaADefinitiva()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var chamadas = 0;
+        var llm = Llm(capturadas, () => throw new HttpRequestException("x", null,
+            ++chamadas == 1 ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Unauthorized));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(2);
+        geracao.Consumo!.FalhaLlmDefinitiva.Should().BeTrue();
+    }
+
+    // Sem chave, cota estourada ou disjuntor aberto: não traz status, não se repete e segue falha_llm (a razão fica fora desta classe).
+    [Fact]
+    public async Task ProvedorIndisponivelNaoRepeteENaoEhDefinitivo()
+    {
+        var capturadas = new List<RequisicaoLlm>();
+        var llm = Llm(capturadas, () => throw new ProvedorIaIndisponivelException("cota estourada"));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(1);
+        geracao.Consumo!.FalhaLlm.Should().BeTrue();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse();
     }
 }

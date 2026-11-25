@@ -11,6 +11,7 @@ public static class MotivoDoTurno
     public const string Iteracoes = "iteracoes";
     public const string Menu = "menu";
     public const string FalhaLlm = "falha_llm";
+    public const string FalhaLlmDefinitiva = "falha_llm_definitiva";
     public const string TetoSaida = "teto_saida";
     public const string PrazoTurno = "prazo_turno";
     public const string RecusaModelo = "recusa_modelo";
@@ -38,9 +39,15 @@ public static class MotivoDoTurno
         categoria == LogsDoAssistente.CategoriaValor ? GuardaValor
         : Slugs.GetValueOrDefault(categoria, GuardaOutro);
 
+    /// <summary>
+    /// #3347 (D4): o código da falha do LLM. Definitiva é a que repetir não resolve (<c>FalhaTransitoria</c> a recusa: chave,
+    /// crédito, modelo ou pedido recusados); o resto (rede, prazo, 5xx, 408, 429 e o provedor indisponível) é transitório.
+    /// </summary>
+    public static string DaFalhaDoLlm(bool definitiva) => definitiva ? FalhaLlmDefinitiva : FalhaLlm;
+
     /// <summary>Motivo que a geração devolve quando não chegou a uma resposta; o texto dele não é gravado.</summary>
-    public static string DaFalhaDaGeracao(string motivoDaGeracao, bool falhaLlm) =>
-        falhaLlm ? FalhaLlm
+    public static string DaFalhaDaGeracao(string motivoDaGeracao, bool falhaLlm, bool falhaLlmDefinitiva = false) =>
+        falhaLlm ? DaFalhaDoLlm(falhaLlmDefinitiva)
         : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida, StringComparison.Ordinal) ? TetoSaida
         : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno, StringComparison.Ordinal) ? PrazoTurno
         : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoRecusa, StringComparison.Ordinal) ? RecusaModelo

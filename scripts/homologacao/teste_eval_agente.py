@@ -32,6 +32,7 @@ confere("respondeu reprova", regras(nucleo.avaliar_rodada(caso, [turno(1)], []))
 
 # Falha técnica nunca passa, mesmo com o desfecho certo.
 confere("falha_llm reprova", regras(nucleo.avaliar_rodada(caso, [turno(2, "falha_llm")], []))["sem_falha_tecnica"] is False)
+confere("falha_llm_definitiva reprova", regras(nucleo.avaliar_rodada(caso, [turno(2, "falha_llm_definitiva")], []))["sem_falha_tecnica"] is False)
 confere("teto_saida reprova", regras(nucleo.avaliar_rodada(caso, [turno(2, "teto_saida")], []))["sem_falha_tecnica"] is False)
 confere("prazo_turno reprova", regras(nucleo.avaliar_rodada(caso, [turno(2, "prazo_turno")], []))["sem_falha_tecnica"] is False)
 confere("recusa_modelo reprova", regras(nucleo.avaliar_rodada(caso, [turno(2, "recusa_modelo")], []))["sem_falha_tecnica"] is False)
