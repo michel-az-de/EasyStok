@@ -30,7 +30,7 @@ public interface IRotasIa
     /// </summary>
     Task<RotaIa?> ObterAsync(Guid empresaId, string? modeloPedido, CancellationToken ct = default);
 
-    /// <summary>Soma de <c>custo_usd</c> do mês corrente (UTC) da loja nesse provedor.</summary>
+    /// <summary>Soma de <c>custo_usd</c> do mês corrente (de Brasília) da loja nesse provedor.</summary>
     Task<decimal> GastoDoMesAsync(Guid empresaId, Guid provedorId, DateTime agoraUtc, CancellationToken ct = default);
 }
 

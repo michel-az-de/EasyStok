@@ -4,11 +4,12 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { contextoCadastro, useContextoVisualCadastro } from '../../../aplicacao/cadastros'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../../aplicacao/novoPedidoDoCliente'
-import { cancelarPedido, obterPedido, useListaPedidos } from '../../../aplicacao/pedidosCadastro'
+import { cancelarPedido, obterPedido, useListaPedidos, useResumoPedidos } from '../../../aplicacao/pedidosCadastro'
 import { useAcaoDisponivel } from '../../../aplicacao/useAcaoDisponivel'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Combobox } from '../../../componentes/Combobox'
+import { MenuDeAcoes } from '../../../componentes/MenuDeAcoes'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
@@ -16,10 +17,11 @@ import { telefoneNaTela } from '../../../dominio/cadastros'
 import { horaCurta, moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import {
-  ENTREGAS_PEDIDO, ERRO_MOTIVO_CANCELAMENTO, MOTIVO_CANCELAMENTO_MAXIMO, motivoDoCancelamentoValido, motivoParaNaoCancelarPedido, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
-  quandoEntregar, situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
+  compraDoClienteNaLinha, ENTREGAS_PEDIDO, ERRO_MOTIVO_CANCELAMENTO, itensDaLinha, MOTIVO_CANCELAMENTO_MAXIMO, motivoDoCancelamentoValido, motivoParaNaoCancelarPedido, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO,
+  quandoEntregar, rotuloDaSituacao, rotuloDoCanal, rotuloDoRecorte, situacaoDoPagamento, situacaoPedeAcao, SITUACOES_PEDIDO, tempoNaSituacao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
+import { FaixaDePedidos } from './FaixaDePedidos'
 import { EscolherClienteDoPedido } from './EscolherClienteDoPedido'
 import { useRolagemDaLista } from './rolagemDaLista'
 import base from './cadastros.module.css'
@@ -45,6 +47,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const definir = (valores) => guardar({ ...memoria, ...valores })
   const filtrar = (valores) => definir({ ...valores, pagina: 1, posicao: 0 })
   const consulta = useListaPedidos({ busca, pagina, situacao, periodo, ordem, entrega }, contexto)
+  // #3294: os indicadores do recorte (sem situação nem página) recarregam junto com a lista.
+  const resumo = useResumoPedidos({ busca, periodo, entrega }, contexto, consulta.revisao)
   const [detalhe, mostrar] = useState(null)
   const [abrindo, abrir] = useState(null)
   const [erro, falhar] = useState(null)
@@ -114,6 +118,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
         <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_PEDIDO} aoMudar={(valor) => filtrar({ ordem: valor })} />
         <Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
+      <FaixaDePedidos {...resumo} recorte={rotuloDoRecorte({ periodo, entrega, busca })} periodo={periodo} situacao={situacao}
+        aoFiltrar={(valor) => filtrar({ situacao: valor })} aoTentar={consulta.recarregar} />
       {primeiraCarga ? <Vazio titulo="Carregando pedidos">Aguarde um instante.</Vazio>
         : lista.length === 0 && !consulta.erro ? <Vazio titulo={comFiltro ? 'Nenhum pedido com estes filtros' : 'Nenhum pedido ainda'}
           acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', entrega: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : <Botao onClick={() => { window.location.hash = hashDoModulo('atendimento', 'balcao') }}>Abrir Conversas</Botao>}>
@@ -121,23 +127,33 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
         : lista.length > 0 && <div ref={tabela} className={`${base.lista} ${css.tabela}`} aria-busy={consulta.carregando}>
           <table>
             <caption className="sr">Pedidos, página {pagina} de {paginas}</caption>
-            <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Situação</th><th scope="col">Entrega</th><th scope="col" className={css.valor}>Total</th><th scope="col"><span className="sr">Ações</span></th></tr></thead>
+            <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Itens</th><th scope="col">Situação</th><th scope="col">Entrega</th><th scope="col" className={css.valor}>Total</th><th scope="col"><span className="sr">Ações</span></th></tr></thead>
             <tbody>{lista.map((item) => {
               const pagamento = situacaoDoPagamento(item)
               const telefone = telefoneNaTela(item.clienteTelefone)
               const canal = rotuloDoCanal(item.origem)
               const nome = item.clienteNome || 'Cliente sem nome'
               const rotulo = rotuloDaSituacao(item.status)
-              const situacaoNaLinha = situacaoPedeAcao(item.status) ? <Pilula tom="aviso">{rotulo}</Pilula> : rotulo
-              return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (!e.target.closest('button, a')) verPedido(item) }}>
+              const situacaoNaLinha = situacaoPedeAcao(item.status) ? <Pilula tom="aviso">{rotulo}</Pilula> : <span>{rotulo}</span>
+              const atrasado = item.atrasado ? <Pilula tom="perigo">Atrasado</Pilula> : null
+              const itens = itensDaLinha(item)
+              const compra = compraDoClienteNaLinha(item)
+              const tempo = tempoNaSituacao(item)
+              const seloDaCompra = compra && <span className={compra.nova ? css.primeiraCompra : base.selo}>{compra.texto}</span>
+              const motivoSemCancelar = semCancelar(item)
+              return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (e.currentTarget.contains(e.target) && !e.target.closest('button, a')) verPedido(item) }}>
+                {/* O menu abre num portal: o clique nele sobe pela árvore do React até aqui, mas não está dentro da linha. */}
                 <td><strong>{numeroDoPedido(item)}</strong><small>{[item.criadoEm && horaCurta(item.criadoEm), canal].filter(Boolean).join(' · ')}</small>
-                  <span className={css.soCelular}><small>{nome}</small><small>{situacaoNaLinha}</small><small>Entrega: {quandoEntregar(item)}</small></span></td>
-                <td><span>{nome}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>
-                <td>{situacaoNaLinha}</td>
+                  <span className={css.soCelular}><small className={css.cliente}>{nome}{seloDaCompra}</small><small className={css.situacao}>{situacaoNaLinha}{atrasado}</small><small>Entrega: {quandoEntregar(item)}</small></span></td>
+                <td><span className={css.cliente}><span>{nome}</span>{seloDaCompra}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>
+                <td>{itens ? <span className={css.itensDaLinha} title={itens.texto}><span>{itens.texto}</span>{itens.resto && <span className={`${base.selo} ${css.restoDosItens}`}>{itens.resto}</span>}</span> : <small>Sem itens</small>}</td>
+                <td><span className={css.situacao}>{situacaoNaLinha}{atrasado}</span>{tempo && <small>{tempo}</small>}</td>
                 <td className={css.entrega}>{quandoEntregar(item)}</td>
                 <td className={css.valor}><span>{moeda(item.total)}</span>{(pagamento?.falta > 0 || pagamento?.sobra > 0) && <small className={css.falta}>{pagamento.texto}</small>}</td>
-                <td><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao>
-                  <Botao variante="texto" disabled={Boolean(semCancelar(item))} motivo={semCancelar(item) ?? undefined} onClick={() => cancelar({ item, motivo: '' })} aria-label={`Cancelar pedido ${tituloDoPedido(item)}, ${nome}`}>Cancelar pedido</Botao></td>
+                <td><div className={css.acoes}><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao>
+                  {/* #3294: cancelar mora no menu do pedido, como na Ficha; o motivo de não poder aparece ao abrir, não em toda linha. */}
+                  <MenuDeAcoes rotulo={`Mais opções do ${tituloDoPedido(item)}, ${nome}`} itens={[{ chave: 'cancelar', rotulo: 'Cancelar pedido', icone: 'circle-x', tom: 'perigo', abreJanela: true,
+                    desabilitado: Boolean(motivoSemCancelar), motivo: motivoSemCancelar ?? undefined, aoEscolher: () => cancelar({ item, motivo: '' }) }]} /></div></td>
               </tr>
             })}</tbody>
           </table>

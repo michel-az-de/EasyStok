@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,8 +36,8 @@ public sealed class RotasIaRepository(IServiceScopeFactory escopos) : IRotasIa
 
     public async Task<decimal> GastoDoMesAsync(Guid empresaId, Guid provedorId, DateTime agoraUtc, CancellationToken ct = default)
     {
-        var inicio = new DateTime(agoraUtc.Year, agoraUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var fim = inicio.AddMonths(1);
+        // #3295 (R6): o mês é o de Brasília, o mesmo da cota de tokens (PortoesDoAssistente.UsadosNoMesAsync).
+        var (inicio, fim) = HorarioBrasil.JanelaMesUtc(HorarioBrasil.DataOperacional(agoraUtc));
         await using var escopo = escopos.CreateAsyncScope();
         var db = escopo.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         db.SetMobileTenantContext(empresaId);

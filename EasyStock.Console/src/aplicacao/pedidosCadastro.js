@@ -23,7 +23,23 @@ export function useListaPedidos(filtros, contexto) {
     ), busca ? 250 : 0)
     return () => { clearTimeout(timer); abortar.abort() }
   }, [busca, pagina, situacao, periodo, ordem, entrega, contexto.empresaId, contexto.identidade, revisao])
-  return { ...resultado, novoId, recarregar: () => recarregar((r) => r + 1) }
+  return { ...resultado, novoId, revisao, recarregar: () => recarregar((r) => r + 1) }
+}
+
+// #3294: a faixa de indicadores acompanha a lista: mesmos filtros (menos situação e página) e recarrega junto
+// (`revisao` é a da lista). Falha só na faixa: a lista segue de pé.
+export function useResumoPedidos({ busca, periodo, entrega }, contexto, revisao) {
+  const [resultado, definir] = useState({ resumo: null, carregando: true, erro: null })
+  useEffect(() => {
+    const abortar = new AbortController()
+    definir((r) => ({ ...r, carregando: true, erro: null }))
+    const timer = setTimeout(() => api.obterResumoDePedidos({ busca, periodo, entrega }, contexto, abortar.signal).then(
+      (resumo) => { if (!abortar.signal.aborted) definir({ resumo, carregando: false, erro: null }) },
+      (e) => { if (!abortar.signal.aborted) definir({ resumo: null, carregando: false, erro: e.message || 'Os indicadores não carregaram.' }) },
+    ), busca ? 250 : 0)
+    return () => { clearTimeout(timer); abortar.abort() }
+  }, [busca, periodo, entrega, contexto.empresaId, contexto.identidade, revisao])
+  return resultado
 }
 
 // #3076 (E4, L1): o "Registrar pagamento" do detalhe de Pedidos é a mesma baixa da conversa. O detalhe só tem o

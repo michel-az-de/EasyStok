@@ -13,6 +13,10 @@ const URL_CONSOLE = process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'
 const HASH = '#/m/cadastros/pedidos'
 const HASH_FINANCEIRO = '#/m/financeiro/visao-geral'
 const agora = new Date()
+// O agendado da Ana precisa cair hoje no dia da loja (o cabeçalho diz "Hoje, HH:MM"). Agora + 1h vira "Amanhã" depois das
+// 23h de Brasília (UTC-3, sem horário de verão); limita ao último minuto do dia da loja.
+const ultimoMinutoDoDia = (() => { const sp = new Date(agora.getTime() - 3 * 3600000); return Date.UTC(sp.getUTCFullYear(), sp.getUTCMonth(), sp.getUTCDate() + 1, 3, 0) - 60000 })()
+const agendadoHoje = new Date(Math.min(agora.getTime() + 3600000, ultimoMinutoDoDia)).toISOString()
 const diaDaLoja = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(agora)
 const norm = (t) => t.replace(/\s/g, ' ')
 const ate = async (condicao, msg) => {
@@ -27,7 +31,7 @@ const base = (i, extra) => ({
   enderecoEntrega: extra.enderecoEntrega ?? null,
 })
 const modelo = () => [
-  base(1, { id: 'p-pronto', nome: 'Ana Paula', status: 'pronto', aReceber: 80, agendadoParaEm: new Date(agora.getTime() + 3600000).toISOString(), enderecoEntrega: 'Rua das Flores, 10' }),
+  base(1, { id: 'p-pronto', nome: 'Ana Paula', status: 'pronto', aReceber: 80, agendadoParaEm: agendadoHoje, enderecoEntrega: 'Rua das Flores, 10' }),
   base(2, { id: 'p-rascunho', nome: 'Bruno Lima', status: 'rascunho' }),
   base(3, { id: 'p-baba', nome: 'Carla Souza', status: 'aguardando_aprovacao_baba' }),
   base(4, { id: 'p-aguardando', nome: 'Diego Alves', status: 'aguardando_pagamento' }),
@@ -70,6 +74,8 @@ async function preparar({ largura = 1440, altura = 900, hash = HASH, dashboard =
       estado.consultas.push(Object.fromEntries(url.searchParams))
       return ok(estado.pedidos, { meta: { totalCount: estado.pedidos.length } })
     }
+    // #3294: a faixa de indicadores pede o resumo; esta prova não mede a faixa.
+    if (path === '/api/pedidos/resumo') return ok({ pedidos: 0, vendas: 0, vendido: 0, ticketMedio: 0, aReceber: { valor: 0, pedidos: 0 }, aguardandoPagamento: 0, aguardandoAprovacao: 0, emAndamento: 0, atrasados: 0, cancelados: { valor: 0, pedidos: 0 }, primeiraCompra: 0, recompra: 0, maisVendidos: [], anterior: null })
     const unico = path.match(/^\/api\/pedidos\/([^/]+)$/)
     if (unico) { estado.leituras.push(unico[1]); return ok(detalheDe(estado.pedidos.find((p) => p.id === unico[1]))) }
     if (path === '/api/cadastros/metodos-pagamento') return ok([{ codigo: 'pix', nome: 'Pix', ativo: true }, { codigo: 'dinheiro', nome: 'Dinheiro', ativo: true }])
@@ -168,9 +174,10 @@ const abrirDe = (painel, numero) => painel.getByRole('button', { name: new RegEx
   await linhas(page).nth(5).waitFor()
   await page.getByRole('columnheader', { name: 'Entrega', exact: true }).waitFor()
   const primeira = linhas(page).first()
-  assert.equal(await primeira.locator('td').nth(3).isVisible(), true, 'coluna Entrega visível no desktop')
-  assert.match(norm(await primeira.locator('td').nth(3).innerText()), /Hoje, \d\d:\d\d/)
-  assert.equal(norm(await linhas(page).nth(1).locator('td').nth(3).innerText()), 'Na hora', 'sem agendamento: Na hora')
+  // #3294: a coluna Itens entrou antes de Situação; Entrega passou a ser a 5ª célula.
+  assert.equal(await primeira.locator('td').nth(4).isVisible(), true, 'coluna Entrega visível no desktop')
+  assert.match(norm(await primeira.locator('td').nth(4).innerText()), /Hoje, \d\d:\d\d/)
+  assert.equal(norm(await linhas(page).nth(1).locator('td').nth(4).innerText()), 'Na hora', 'sem agendamento: Na hora')
   await page.screenshot({ path: `${pasta}/lista-1440.png`, fullPage: true })
   await contexto.close()
 }
@@ -178,7 +185,7 @@ const abrirDe = (painel, numero) => painel.getByRole('button', { name: new RegEx
   const { contexto, page } = await preparar({ largura: 390, altura: 844 })
   await linhas(page).nth(5).waitFor()
   const primeira = linhas(page).first()
-  assert.equal(await primeira.locator('td').nth(3).isVisible(), false, 'coluna Entrega escondida no celular')
+  assert.equal(await primeira.locator('td').nth(4).isVisible(), false, 'coluna Entrega escondida no celular')
   assert.ok(await primeira.locator('td').first().getByText(/^Entrega: /).isVisible(), '"Entrega:" na linha do número')
   const rolagem = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   assert.ok(rolagem <= 1, `sem rolagem lateral (${rolagem}px)`)

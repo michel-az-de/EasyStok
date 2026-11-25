@@ -49,6 +49,8 @@ async function preparar({ largura = 1280, altura = 800, verPedidos = true } = {}
       const tamanho = Number(q.pageSize), pagina = Number(q.page)
       return ok(filtrados.slice((pagina - 1) * tamanho, pagina * tamanho), { meta: { totalCount: filtrados.length } })
     }
+    // #3294: a faixa de indicadores pede o resumo; esta prova não mede a faixa.
+    if (path === '/api/pedidos/resumo') return ok({ pedidos: 0, vendas: 0, vendido: 0, ticketMedio: 0, aReceber: { valor: 0, pedidos: 0 }, aguardandoPagamento: 0, aguardandoAprovacao: 0, emAndamento: 0, atrasados: 0, cancelados: { valor: 0, pedidos: 0 }, primeiraCompra: 0, recompra: 0, maisVendidos: [], anterior: null })
     const unico = path.match(/^\/api\/pedidos\/([^/]+)$/)
     if (unico) return ok(detalheDe(pedidos.find((p) => p.id === unico[1])))
     if (path === '/api/atendimento/conversas') return ok([{ id: 'conversa-ana', contatoNome: 'Ana Paula', contatoIdExterno: '5511999990000', clienteId: 'cli-0', canal: 'WhatsApp', situacao: 'Assumida', ultimaMensagemEm: hoje.toISOString(), naoLidas: 0, pedidoEmAndamentoId: 'pedido-1', pedidoStatus: 'aguardando_pagamento' }])
@@ -79,7 +81,7 @@ const ultima = (consultas) => consultas.at(-1)
   await page.getByRole('navigation', { name: 'Telas de Cadastros', exact: true }).getByRole('link', { name: 'Pedidos' }).waitFor()
   await linhas(page).nth(19).waitFor()
   assert.equal(await linhas(page).count(), 20)
-  assert.deepEqual(ultima(consultas), { empresaId: 'empresa', page: '1', pageSize: '20', sort: 'criadoem', order: 'desc' })
+  assert.deepEqual(ultima(consultas), { empresaId: 'empresa', page: '1', pageSize: '20', sort: 'criadoem', order: 'desc', sinais: 'true' })
   await painel.getByRole('status').filter({ hasText: '25 pedidos' }).waitFor()
   await painel.getByText('Página 1 de 2', { exact: true }).waitFor()
   assert.match(await linhas(page).first().innerText(), /Nº 001/)
