@@ -124,7 +124,13 @@ confere('a ordem: urgente primeiro, por quanto falta; depois o que repõe; o res
 
 confere('o resumo do topo diz quantos pratos pedem e quanto falta; em dia só quando a sugestão veio', () => {
   const r = resumoDaLeitura(ler(), { sugestaoCarregada: true })
-  assert.deepEqual([r.texto, r.tom], ['5 pratos pedem produção · faltam 17 porções', 'perigo'])
+  assert.deepEqual([r.texto, r.tom], ['5 pratos pedem produção · faltam 17 porções', 'perigo'], 'sem a faixa, vale a soma dos cartões')
+  // Com a faixa "Falta produzir" o total é o dela (6+3+5+4+2): a Lasanha, que tem tamanhos, entra pela sugestão,
+  // e os dois cartões dela contam como um prato só.
+  const daFaixa = faltaProduzir(SUGESTAO.pratos, cartoes)
+  const comFaixa = resumoDaLeitura(ler(), { sugestaoCarregada: true, falta: daFaixa })
+  assert.equal(comFaixa.texto, '5 pratos pedem produção · faltam 20 porções')
+  assert.equal(daFaixa.reduce((soma, i) => soma + i.quantidade, 0), 20, 'o total do topo é a soma dos chips')
   const soRepor = resumoDaLeitura(leituraDaGrade(cartoes, { estoque: [estoquePrato('i-1', 4)], sugestao: { ate: '2026-11-27', pratos: [sug('i-1', 6, 4, 4, 0, 6)] } }), { sugestaoCarregada: true })
   assert.deepEqual([soRepor.texto, soRepor.tom], ['1 prato pede produção · faltam 6 porções', 'atencao'])
   const soVence = resumoDaLeitura(leituraDaGrade(cartoes, { estoque: [estoquePrato('i-5', 2, { lotes: [lote(1)] }), estoquePrato('i-10', 5, { lotes: [lote(-1)] })], sugestao: { ate: '2026-11-27', pratos: [] } }), { sugestaoCarregada: true })

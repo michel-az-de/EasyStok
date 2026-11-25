@@ -17,7 +17,7 @@ import {
   VALIDADES_RAPIDAS, cartoesDaGrade, categoriasDaGrade, definirNoLote, faltaProduzir, filtrarGrade, linhasIniciais, nomeDoCartao,
   mensagemDoPorTudo, ordenarPeloCardapio, porTudoNoLote, porcoesNoLote, quantidadeDigitada, resumoDoLote, somarNoLote, tamanhoNoCartao,
 } from '../../../dominio/gradeDeProducao'
-import { agruparPelaLeitura, leituraDaGrade, resumoDaLeitura } from '../../../dominio/leituraDaProducao'
+import { agruparPelaLeitura, diaCurto, leituraDaGrade, resumoDaLeitura } from '../../../dominio/leituraDaProducao'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { erroDaLinha, sobraDaLinha } from '../../../dominio/producao'
 import { linhaComPorcao } from '../../../dominio/porcoes'
@@ -37,7 +37,6 @@ const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', por
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
 // #2364: quanto tempo segurando o cartão abre o campo da quantidade.
 const SEGURAR_MS = 500
-const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
 // #3301: o tom da leitura (o que pede produção, o que vence) vira cor e ícone; a cor nunca vai sozinha.
 const TOM = { perigo: grade.tomPerigo, atencao: grade.tomAtencao, ok: grade.tomOk, neutro: grade.tomNeutro }
 const ICONE_DO_NIVEL = { urgente: 'circle-x', repor: 'alerta', vence: 'hourglass' }
@@ -206,7 +205,7 @@ export function AbaProducaoDoDiaApi() {
   // #3301: a leitura dos dados (urgência, motivo, ordem) não depende do lote: tocar nos cartões não
   // muda os grupos, só um estoque ou uma sugestão novos mudam.
   const leituras = useMemo(() => leituraDaGrade(cartoes, { estoque: estoque.pratos, sugestao }), [cartoes, estoque.pratos, sugestao])
-  const resumoDaTela = resumoDaLeitura(leituras, { sugestaoCarregada: sugestao != null })
+  const resumoDaTela = resumoDaLeitura(leituras, { sugestaoCarregada: sugestao != null, falta })
   const { pedem, emDia } = agruparPelaLeitura(visiveis, leituras)
   const ordenados = pedem.length === 0 ? visiveis : [
     { titulo: 'Pedem produção', chave: 'grupo-pedem', total: pedem.length },
@@ -225,7 +224,6 @@ export function AbaProducaoDoDiaApi() {
   }
   // #3301: o que falta de cada prato de um tamanho entra no lote de uma vez (o tamanho de prato com porções
   // ela escolhe na grade); nunca rebaixa o que já está no lote nem passa do teto.
-  const pendentes = falta.filter((item) => item.cartao && porcoesNoLote(linhas, item.cartao) < item.quantidade)
   const colocarTudo = () => {
     const feito = porTudoNoLote(linhas, falta, apoio)
     mexerNoLote(() => feito.linhas)
@@ -351,7 +349,7 @@ export function AbaProducaoDoDiaApi() {
 
       {/* #3301: o que os dados dizem, numa frase, antes da grade: quem pede produção, quanto falta, o que vence. */}
       {resumoDaTela && (
-        <p aria-live="polite" className={`${grade.leitura} ${TOM[resumoDaTela.tom]}`}>
+        <p className={`${grade.leitura} ${TOM[resumoDaTela.tom]}`}>
           <Icone nome={ICONE_DO_TOM[resumoDaTela.tom]} tamanho={20} />{resumoDaTela.texto}
         </p>
       )}
@@ -364,8 +362,10 @@ export function AbaProducaoDoDiaApi() {
               <p className={grade.contaDaFalta}>
                 Pedidos até {diaCurto(sugestao?.ate)}, estoque mínimo e vendas sem estoque. Toque para pôr no lote.
               </p>
+              {/* Sempre montada (vazia some sem ocupar linha): o leitor de tela só anuncia o que muda numa região que já existia. */}
+              <p aria-live="polite" className={`${css.detalhe} ${grade.avisoDoPorTudo}`}>{avisoDoPorTudo}</p>
             </div>
-            <Botao icone="package" disabled={enviando || pendentes.length === 0} onClick={colocarTudo}>Pôr tudo no lote</Botao>
+            <Botao icone="package" disabled={enviando} onClick={colocarTudo}>Pôr tudo no lote</Botao>
           </div>
           <div className={grade.chips}>
             {falta.map((item) => {
@@ -376,12 +376,13 @@ export function AbaProducaoDoDiaApi() {
               return (
                 <Chip key={item.sku} papel="acao" disabled={enviando} icone={feito ? 'check' : undefined}
                   title={parcial ? `Faltam ${restante} de ${item.quantidade}` : undefined} onClick={() => atender(item)}>
-                  {parcial ? restante : item.quantidade}× {item.nome}{feito && <span className="sr"> (já no lote)</span>}
+                  {parcial ? restante : item.quantidade}× {item.nome}
+                  {parcial && <span className="sr"> (faltam {restante} de {item.quantidade})</span>}
+                  {feito && <span className="sr"> (já no lote)</span>}
                 </Chip>
               )
             })}
           </div>
-          {avisoDoPorTudo && <p aria-live="polite" className={`${css.detalhe} ${grade.avisoDoPorTudo}`}>{avisoDoPorTudo}</p>}
           <a className={`${css.link} ${grade.verConta}`} href={hashDoModulo('producao', 'planejamento')}>Ver a conta no Planejamento</a>
         </section>
       )}

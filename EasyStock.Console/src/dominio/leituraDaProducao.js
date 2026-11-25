@@ -12,7 +12,7 @@ const PEDEM = { urgente: 0, repor: 1 }
 export const pedeProducao = (leitura) => leitura?.nivel in PEDEM
 
 const maiuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1)
-const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
+export const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
 
 // O lote que mais pesa: o vencido (já fora do saldo) e, entre os que vencem, o mais próximo.
 function avisoDoLote(lotes) {
@@ -55,7 +55,7 @@ export function leituraDaGrade(cartoes, { estoque = [], sugestao = null } = {}) 
   const doPrato = new Map((estoque ?? []).map((p) => [p.sku, p]))
   const daSugestao = new Map((sugestao?.pratos ?? []).map((s) => [s.sku, s]))
   const ate = diaCurto(sugestao?.ate)
-  return new Map((cartoes ?? []).map((c) => [c.chave, leituraDoCartao(c, doPrato.get(c.sku), daSugestao.get(c.sku), ate)]))
+  return new Map((cartoes ?? []).map((c) => [c.chave, { ...leituraDoCartao(c, doPrato.get(c.sku), daSugestao.get(c.sku), ate), sku: c.sku }]))
 }
 
 // Quem pede produção sobe para o primeiro bloco: o que acabou antes, e dentro de cada nível o que mais falta;
@@ -72,14 +72,18 @@ export function agruparPelaLeitura(cartoes, leituras) {
 }
 
 // A frase do topo. "Tudo em dia" só quando a sugestão veio: sem ela não há como saber dos pedidos.
-export function resumoDaLeitura(leituras, { sugestaoCarregada = false } = {}) {
+// `falta` é a lista da faixa "Falta produzir" (`{ sku, quantidade }`): o total e a contagem batem com ela, e o
+// prato com tamanhos, que não tem cartão que peça, entra pela sugestão. Sem ela, vale a soma dos cartões.
+export function resumoDaLeitura(leituras, { sugestaoCarregada = false, falta = null } = {}) {
   const lista = [...leituras.values()]
   if (lista.length === 0) return null
   const pedem = lista.filter(pedeProducao)
-  if (pedem.length > 0) {
-    const faltam = pedem.reduce((soma, l) => soma + l.falta, 0)
+  const daFaixa = (falta ?? pedem.map((l) => ({ sku: l.sku, quantidade: l.falta }))).filter((i) => i.quantidade > 0)
+  const pratos = new Set([...pedem.map((l) => l.sku), ...daFaixa.map((i) => i.sku)])
+  if (pratos.size > 0) {
+    const faltam = daFaixa.reduce((soma, i) => soma + i.quantidade, 0)
     return {
-      texto: `${plural(pedem.length, 'prato pede', 'pratos pedem')} produção${faltam > 0 ? ` · faltam ${plural(faltam, 'porção', 'porções')}` : ''}`,
+      texto: `${plural(pratos.size, 'prato pede', 'pratos pedem')} produção${faltam > 0 ? ` · faltam ${plural(faltam, 'porção', 'porções')}` : ''}`,
       tom: pedem.some((l) => l.nivel === 'urgente') ? 'perigo' : 'atencao',
     }
   }
