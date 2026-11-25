@@ -71,18 +71,18 @@ export function useRelacionamentoCliente(clienteId, contexto) {
 export function useListaCadastros(tela, filtros, contexto, habilitada = true) {
   const [resultado, definir] = useState({ itens: [], total: 0, carregando: true, erro: null })
   const [revisao, recarregar] = useState(0)
-  const { busca, pagina, filtro, relacionamento, ordem = '' } = filtros
+  const { busca, pagina, filtro, relacionamento, ordem = '', atencao = '' } = filtros
   useEffect(() => {
     if (!habilitada) { definir({ itens: [], total: 0, carregando: false, erro: null }); return undefined }
     const abortar = new AbortController()
     // #2734 (A12): a lista que está na tela fica até a nova chegar; zerar a cada busca fazia a tabela piscar.
     definir(r => ({ ...r, carregando: true, erro: null }))
-    const timer = setTimeout(() => api.listarCadastro(tela, { busca, pagina, filtro, relacionamento, ordem }, contexto, abortar.signal).then(
+    const timer = setTimeout(() => api.listarCadastro(tela, { busca, pagina, filtro, relacionamento, ordem, atencao }, contexto, abortar.signal).then(
       r => { if (!abortar.signal.aborted) definir({ ...r, carregando: false, erro: null }) },
       e => { if (!abortar.signal.aborted) definir({ itens: [], total: 0, carregando: false, erro: e.message }) },
     ), busca ? 250 : 0)
     return () => { clearTimeout(timer); abortar.abort() }
-  }, [tela, busca, pagina, filtro, relacionamento, ordem, contexto.empresaId, contexto.identidade, revisao, habilitada])
+  }, [tela, busca, pagina, filtro, relacionamento, ordem, atencao, contexto.empresaId, contexto.identidade, revisao, habilitada])
   return { ...resultado, revisao, recarregar: () => recarregar(r => r + 1) }
 }
 

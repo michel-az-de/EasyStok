@@ -23,9 +23,15 @@ function useLarga() {
   return larga
 }
 
-const Linha = ({ n, tom, children }) => <li className={n > 0 ? css[tom] : css.zero}><span className={css.n}>{n}</span> {children}</li>
+// #3303: contador com produto vira filtro da lista; apertado de novo, solta.
+const Linha = ({ n, tom, children, sinal, atencao, aoFiltrar }) => <li className={n > 0 ? css[tom] : css.zero}>
+  {n > 0 && sinal && aoFiltrar
+    ? <button type="button" className={css.filtro} aria-pressed={atencao === sinal} onClick={() => aoFiltrar(atencao === sinal ? '' : sinal)}><span className={css.n}>{n}</span> {children}</button>
+    : <><span className={css.n}>{n}</span> {children}</>}
+</li>
 
-export function FaixaDeProdutos({ desempenho, carregando, erro, aoTentar }) {
+export function FaixaDeProdutos({ desempenho, carregando, erro, aoTentar, atencao = '', aoFiltrar }) {
+  const filtro = { atencao, aoFiltrar }
   const larga = useLarga()
   const [escolha, escolher] = useState({ larga, aberta: larga })
   const aberta = escolha.larga === larga ? escolha.aberta : larga
@@ -39,13 +45,13 @@ export function FaixaDeProdutos({ desempenho, carregando, erro, aoTentar }) {
   const variacao = variacaoDaReceita(r.receita, r.receitaAnterior)
   const curva = r.curva ?? {}
   const maisVendidos = Array.isArray(r.maisVendidos) ? r.maisVendidos : []
-  const atencao = (r.parados ?? 0) + (r.nuncaVenderam ?? 0) + (r.abaixoDaTabela ?? 0)
+  const pedemAtencao = (r.parados ?? 0) + (r.nuncaVenderam ?? 0) + (r.abaixoDaTabela ?? 0)
   return <section className={css.faixa} aria-label={ROTULO} aria-busy={carregando}>
     <p className={css.recorte}>Últimos 90 dias · <strong>{plural(r.compras ?? 0, 'pedido', 'pedidos')}</strong> com {plural(r.produtosVendidos ?? 0, 'produto', 'produtos')} de {r.ativos ?? 0} ativos</p>
     <details className={css.detalhes} open={aberta} onToggle={(e) => { if (e.currentTarget.open !== aberta) escolher({ larga, aberta: e.currentTarget.open }) }}>
       <summary className={css.resumoMovel}>
         <span>{moedaCheia(r.receita)} em 90 dias</span>
-        {atencao > 0 && <span className={css.perigo}>{plural(atencao, 'pede atenção', 'pedem atenção')}</span>}
+        {pedemAtencao > 0 && <span className={css.perigo}>{plural(pedemAtencao, 'pede atenção', 'pedem atenção')}</span>}
         <span className={css.abrir}>{aberta ? 'Fechar' : 'Ver tudo'}<Icone nome={aberta ? 'chevron-up' : 'chevron-down'} tamanho={16} /></span>
       </summary>
       <div className={css.grupos}>
@@ -66,15 +72,15 @@ export function FaixaDeProdutos({ desempenho, carregando, erro, aoTentar }) {
         <div className={css.grupo}>
           <h3>Pede atenção</h3>
           <ul className={css.lista}>
-            <Linha n={r.parados ?? 0} tom="perigo">{(r.parados ?? 0) === 1 ? 'parado' : 'parados'}</Linha>
-            <Linha n={r.nuncaVenderam ?? 0} tom="atencao">nunca {(r.nuncaVenderam ?? 0) === 1 ? 'vendeu' : 'venderam'}</Linha>
-            <Linha n={r.abaixoDaTabela ?? 0} tom="atencao">vendido abaixo da tabela</Linha>
+            <Linha n={r.parados ?? 0} tom="perigo" sinal="Parado" {...filtro}>{(r.parados ?? 0) === 1 ? 'parado' : 'parados'}</Linha>
+            <Linha n={r.nuncaVenderam ?? 0} tom="atencao" sinal="NuncaVendeu" {...filtro}>nunca {(r.nuncaVenderam ?? 0) === 1 ? 'vendeu' : 'venderam'}</Linha>
+            <Linha n={r.abaixoDaTabela ?? 0} tom="atencao" sinal="AbaixoDaTabela" {...filtro}>vendido abaixo da tabela</Linha>
           </ul>
         </div>
         <div className={css.grupo}>
           <h3>Falta no cadastro</h3>
           <ul className={css.lista}>
-            <Linha n={r.semCusto ?? 0} tom="atencao">sem custo, sem margem</Linha>
+            <Linha n={r.semCusto ?? 0} tom="atencao" sinal="SemCusto" {...filtro}>sem custo, sem margem</Linha>
             <Linha n={r.semPreco ?? 0} tom="atencao">sem preço</Linha>
           </ul>
           <small>de {plural(r.ativos ?? 0, 'produto ativo', 'produtos ativos')} de venda</small>

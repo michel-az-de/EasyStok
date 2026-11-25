@@ -17,6 +17,10 @@
 .lista li.perigo { color: var(--erro); font-weight: 600; }
 .lista li.atencao { color: var(--alerta); font-weight: 600; }
 .zero { color: var(--tinta-3); }
+.filtro { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 28px; margin: 0 calc(-1 * var(--e-2)); padding: 0 var(--e-2); border: 1px solid transparent; border-radius: var(--r-1); background: none; color: inherit; font: inherit; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 3px; cursor: pointer; }
+.filtro:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.filtro:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
+.filtro[aria-pressed='true'] { border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent); text-decoration: none; }
 .falha { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--alerta-pastel); }
 .falha p { margin: 0; }
 .detalhes { min-width: 0; }

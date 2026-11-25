@@ -187,8 +187,18 @@ export const ORDENS_CADASTRO = {
   produtos: [
     { valor: '', rotulo: 'Mais recentes', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
     { valor: 'alterados', rotulo: 'Alterados há pouco', sort: 'alteradoem', order: 'desc' }, NOME_AZ, NOME_ZA,
+    // #3303: ordens que dependem das vendas; o servidor calcula com a mesma regra da faixa.
+    { valor: 'maior-receita', rotulo: 'Maior receita (90 dias)', sort: 'receita90', order: 'desc' },
+    { valor: 'sem-vender', rotulo: 'Sem vender há mais tempo', sort: 'semvender', order: 'asc' },
   ],
 }
+// #3303: os contadores da faixa que filtram a lista de produtos (valor = sinal da API) e como a tela os diz.
+export const ATENCAO_DE_PRODUTOS = { Parado: 'parados', NuncaVendeu: 'que nunca venderam', AbaixoDaTabela: 'vendidos abaixo da tabela', SemCusto: 'sem custo' }
+const ORDENS_POR_VENDAS = ['receita90', 'semvender']
+// A rota das vendas é de Operador: sem ela, as ordens por vendas somem da escolha (e uma guardada vira a padrão).
+export const ordemPorVendas = (tela, valor) => ORDENS_POR_VENDAS.includes(ordemEscolhida(tela, valor)?.sort)
+export const ordensDaTela = (tela, comVendas) => (comVendas ? ORDENS_CADASTRO[tela] : ORDENS_CADASTRO[tela]?.filter(o => !ORDENS_POR_VENDAS.includes(o.sort)))
+export const listaPorVendas = (tela, ordem, atencao) => tela === 'produtos' && (Boolean(ATENCAO_DE_PRODUTOS[atencao]) || ORDENS_POR_VENDAS.includes(ordemEscolhida(tela, ordem)?.sort))
 const ordemEscolhida = (tela, valor) => ORDENS_CADASTRO[tela]?.find((o) => o.valor === valor) ?? ORDENS_CADASTRO[tela]?.[0] ?? null
 export function parametrosDaOrdem(tela, valor) {
   const ordem = ordemEscolhida(tela, valor)

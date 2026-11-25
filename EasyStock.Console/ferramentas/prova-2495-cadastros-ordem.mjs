@@ -14,8 +14,9 @@ registerHooks({
 })
 const { ORDENS_CADASTRO, ordemDoCabecalhoNome, parametrosDaOrdem, sortDoNome } = await import('../src/dominio/cadastros.js')
 
-// Só valores que o repositório da API conhece (ClienteRepository, FornecedorRepository, ProdutoRepository).
-const ACEITOS = { clientes: ['nome', 'criadoem', 'lastorderat', 'ordercount'], fornecedores: ['nome', 'criadoem'], produtos: ['nome', 'criadoem', 'alteradoem'] }
+// Só valores que a API conhece (ClienteRepository, FornecedorRepository, ProdutoRepository; #3303: receita90 e
+// semvender vão a ListarProdutosPorDesempenhoUseCase).
+const ACEITOS = { clientes: ['nome', 'criadoem', 'lastorderat', 'ordercount'], fornecedores: ['nome', 'criadoem'], produtos: ['nome', 'criadoem', 'alteradoem', 'receita90', 'semvender'] }
 for (const [tela, aceitos] of Object.entries(ACEITOS)) {
   const ordens = ORDENS_CADASTRO[tela]
   assert.ok(ordens.length >= 3, `${tela}: tem escolha de ordem`)
