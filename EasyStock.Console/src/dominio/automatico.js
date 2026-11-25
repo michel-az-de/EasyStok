@@ -12,12 +12,12 @@
 
 import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
-import { duracao } from './formato'
+import { duracao, moeda } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
 import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
-import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
+import { MOTIVO_PERGUNTA_FORA_DO_ROTEIRO, ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { INTENCOES, classificarIntencao, sinalDoCliente } from './agente.js'
 
@@ -285,10 +285,21 @@ const foraDeAlcance = (conversa) =>
 // "obrigada" ou uma frase qualquer não pode virar pendência só por ele não
 // ter respondido nada depois. Pausado (RN-04, ela escreveu ou assumiu) o
 // silêncio já é dela: qualquer mensagem pendente conta, pergunta ou não.
+// #3339 (R1D-04, R2F-02): reclamação e devolução já têm dona e prazo mesmo com o automático ligado;
+// palavras de impedimento ("não consigo abrir o link") são pergunta sem resposta, sem o "?".
+// Só o impedimento de usar o link ou a comanda (não "não consigo decidir"), para não encher a fila.
+const IMPEDIMENTO = /n[aã]o (consigo (abrir|acessar|pagar|entrar|ver|enviar|copiar|usar|finalizar|fechar)|abre|funciona|carrega)/
+
 function esperaDoCliente(conversa, agora, pausado = true, expediente = null) {
   const ultima = ultimaSemResposta(conversa)
   if (!ultima) return null
-  if (!pausado && !ehPerguntaSemResposta(ultima.texto ?? '')) return null
+  if (!pausado) {
+    const texto = (ultima.texto ?? '').toLowerCase()
+    const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
+    const urgente = sinalDoCliente({ ...conversa, mensagens: pendentes }).paraDona === 'devolucao'
+    const impedido = IMPEDIMENTO.test(texto)
+    if (!urgente && !impedido && !ehPerguntaSemResposta(ultima.texto ?? '')) return null
+  }
   const sla = slaDaConversa(conversa)
   if (minutosDeEspera(ultima.em, agora, sla, expediente) <= sla) return null
   return {
@@ -385,6 +396,19 @@ function aguardandoAbertura(conversa, aberta) {
   }
 }
 
+// #3339 (R3R-01): Pix pago a menos que a dona ainda não aceitou ou cobrou sobe na fila. A ficha já
+// mostra "Valor diferente"; sem isto o cartão e a barra ficavam em "Assistente respondendo".
+function valorDiferente(conversa, agora) {
+  const cobranca = conversa.pedido?.cobranca
+  if (!cobranca || situacaoDaCobranca(cobranca, agora).chave !== 'divergente') return null
+  return {
+    chave: 'valor-diferente',
+    rotulo: 'Valor diferente',
+    tom: 'aviso',
+    texto: `Pagou ${moeda(cobranca.valorPago)} de ${moeda(cobranca.valor)} do pedido ${conversa.pedido.numero}, confira`,
+  }
+}
+
 // #1606: fala pendente que a casa nunca resolve sozinha sobe NA HORA, sem
 // esperar o SLA e sem depender de terminar em "?" ou de a passagem ter sido
 // gravada. É o mesmo classificador do agente (dominio/agente.js), lido só nas
@@ -464,17 +488,17 @@ function leituraDaPergunta(mensagem) {
 export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
   if (foraDeAlcance(conversa)) return null
-  if (passagemPendente(conversa)) {
-    return {
-      chave: 'passagem',
-      rotulo: 'Precisa de você',
-      tom: 'aviso',
-      texto: conversa.passagem.motivo ?? MOTIVO_PADRAO,
-    }
-  }
+  // #3339 (R2F-03): o motivo genérico "Pergunta fora do roteiro" não vence um sinal específico
+  // (cobrança, devolução, valor). Só cede a eles; qualquer outro motivo da passagem segue na frente.
+  const passagem = passagemPendente(conversa)
+    ? { chave: 'passagem', rotulo: 'Precisa de você', tom: 'aviso', texto: conversa.passagem.motivo ?? MOTIVO_PADRAO }
+    : null
+  if (passagem && passagem.texto !== MOTIVO_PERGUNTA_FORA_DO_ROTEIRO) return passagem
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? sinalUrgente(conversa, agora)
+    ?? valorDiferente(conversa, agora)
+    ?? passagem
     ?? aguardandoAprovacao(conversa)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
     ?? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)

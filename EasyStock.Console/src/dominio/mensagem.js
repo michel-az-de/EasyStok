@@ -46,10 +46,17 @@ export const MOTIVO_PERGUNTA_FORA_DO_ROTEIRO = 'Pergunta fora do roteiro do Assi
 // (achado da varredura R13, issue #41).
 const ehAvisoDeEsteira = (mensagem) => Boolean(mensagem?.automatica) && (mensagem?.regra ?? '').startsWith('esteira-')
 
+// #3339 (R1C-03): o balão automático de cobrança (link ou Pix reenviado) também é aviso, não
+// conversa. Na demonstração vem com `regra` `cobranca-*`; na API o aviso sai como `Sistema`, que o
+// servidor já trata como não-resposta (RetomadaDoAssistente.cs), então `origemAutomatica` `sistema`.
+const ehAvisoDeCobranca = (mensagem) => Boolean(mensagem?.automatica)
+  && ((mensagem?.regra ?? '').startsWith('cobranca') || mensagem?.origemAutomatica === 'sistema')
+
 // Resposta que conversa de verdade com o cliente: a dona escrevendo, ou o
-// automático respondendo alguma coisa que não seja aviso de esteira (FAQ,
+// automático respondendo alguma coisa que não seja aviso de esteira nem de cobrança (FAQ,
 // captura de lead, agradecimento pós-entrega...). Nota de sistema não conta.
-export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falhou', 'enviando'].includes(mensagem.status) && !ehAvisoDeEsteira(mensagem)
+export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falhou', 'enviando'].includes(mensagem.status)
+  && !ehAvisoDeEsteira(mensagem) && !ehAvisoDeCobranca(mensagem)
 
 // Mensagens do cliente ainda sem essa resposta, na ordem em que chegaram.
 // Anda de trás para frente: aviso de esteira e nota de sistema são
