@@ -2,6 +2,7 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -41,6 +42,19 @@ public sealed class OrderLinker(
 {
     /// <summary>Até quanto tempo depois a entrega feita no aparelho ainda avisa o cliente (#3075).</summary>
     public static readonly TimeSpan JanelaDoAvisoDeEntrega = TimeSpan.FromHours(2);
+
+    /// <summary>
+    /// #3328: o <see cref="CriarPedidoUseCase"/> recusa agenda que já passou ("Data agendada precisa ser no futuro."),
+    /// regra certa para o pedido criado no console. A venda feita no aparelho cuja hora marcada venceu antes do envio
+    /// (o APK chegou a atrasar de 5 a 29 dias) não pode ficar sem Pedido por isso: leva ao ERP só a agenda que ainda
+    /// vai acontecer, e a vencida segue sem agendamento. Mesma leitura de Kind do use case (sem Kind é UTC).
+    /// </summary>
+    /// <returns>A agenda em UTC se for depois de <paramref name="agoraUtc"/>; senão <c>null</c>.</returns>
+    public static DateTime? AgendaQueAindaVaiAcontecer(DateTime? agendadoNoAparelho, DateTime agoraUtc)
+    {
+        var agenda = DataUtc.ParaUtcOpcional(agendadoNoAparelho);
+        return agenda.HasValue && agenda.Value > agoraUtc ? agenda : null;
+    }
 
     public async Task ExecuteAsync(IEnumerable<string> mobileOrderIds, Guid? empresaId)
     {
@@ -124,6 +138,11 @@ public sealed class OrderLinker(
                         var clienteNomeFinal = !string.IsNullOrWhiteSpace(mobileO.ClientSnapshotName)
                             ? mobileO.ClientSnapshotName
                             : (mClient?.Name ?? "Avulso");
+                        var agenda = AgendaQueAindaVaiAcontecer(mobileO.ScheduledDeliveryAt, DateTime.UtcNow);
+                        if (mobileO.ScheduledDeliveryAt.HasValue && agenda is null)
+                            log.LogInformation(
+                                "AutoLink Pedido: agenda {Agenda:o} do aparelho ja passou, pedido criado sem agendamento mobile={MobileId}",
+                                mobileO.ScheduledDeliveryAt, oid);
                         var result = await criarPedidoUseCase.ExecuteAsync(new CriarPedidoCommand(
                             EmpresaId: empresaId.Value,
                             LojaId: mobileO.LojaId,
@@ -137,7 +156,7 @@ public sealed class OrderLinker(
                             Itens: itens,
                             CriadoPorUserId: null,
                             CriadoPorNome: mobileO.LastOperatorName,
-                            AgendadoParaEm: mobileO.ScheduledDeliveryAt,
+                            AgendadoParaEm: agenda,
                             CriadoEmOriginal: mobileO.CreatedAt,
                             Canal: mobileO.Channel
                         ));

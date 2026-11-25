@@ -42,9 +42,10 @@ COPY EasyStock.Infra.Integrations/  EasyStock.Infra.Integrations/
 COPY EasyStock.Contracts/           EasyStock.Contracts/
 
 # Publish direto (publish ja faz build — etapa intermediaria removida)
+# #3323: sem analisadores no publish (o ci.yml roda -warnaserror com eles).
 WORKDIR "/src/EasyStock.Worker"
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish "EasyStock.Worker.csproj" -c Release -o /app/publish /p:UseAppHost=false
+    dotnet publish "EasyStock.Worker.csproj" -c Release -o /app/publish /p:UseAppHost=false -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false
 
 FROM base AS final
 WORKDIR /app

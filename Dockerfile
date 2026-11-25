@@ -47,9 +47,11 @@ RUN if [ -f EasyStock.Api/wwwroot/pwa/sw.js ]; then \
       fi; \
     fi
 
+# #3323: sem analisadores no publish. O ci.yml roda -warnaserror com eles; aqui so geram
+# diagnostico, e a DLL sai byte a byte igual (medido), com o publish 35% mais curto.
 WORKDIR /src/EasyStock.Api
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish -c Release -o /app/publish
+    dotnet publish -c Release -o /app/publish -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 # Migrations sao aplicadas pelo proprio app no startup (Program.cs com logging
