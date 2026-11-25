@@ -161,15 +161,17 @@ public static class GeracaoAgenteAtendimento
                 { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento, TurnoAgenteId = turnoAgenteId };
                 resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, prazo.Token);
                 // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
+                // Com saida_max do modelo abaixo do piso, o cliente limita o pedido ao máximo do modelo e a repetição sai com o
+                // mesmo teto (#3304); pular essa repetição pede o teto usado na resposta (#3313).
                 if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)
                 {
                     // #3273 (R1): o teto acabou antes do modelo terminar (com modelo que raciocina, o pensamento come o teto).
-                    // A chamada cortada foi paga: entra na conta. Uma nova tentativa com teto maior; texto cortado nunca segue.
-                    logger.LogWarning("Agente de atendimento: o modelo estourou o teto de saída na conversa {ConversaId}; tenta com {Teto} tokens.",
+                    // A chamada cortada foi paga: entra na conta. Uma nova tentativa pedindo teto maior; texto cortado nunca segue.
+                    logger.LogWarning("Agente de atendimento: o modelo estourou o teto de saída na conversa {ConversaId}; tenta de novo pedindo {Teto} tokens (o máximo cadastrado do modelo, se menor, prevalece).",
                         contexto.Conversa.Id, MaxTokensNovaTentativa);
                     tokens += TotalDeTokens(resposta);
                     consumo.Somar(resposta);
-                    // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o mesmo pedido o estouraria de novo.
+                    // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o pedido sem teto maior o estouraria de novo.
                     resposta = await llm.EnviarAsync(requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, prazo.Token);
                 }
             }
