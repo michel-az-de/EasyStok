@@ -239,8 +239,13 @@ public static class GeracaoAgenteAtendimento
             {
                 var resultado = await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct);
                 resultados.Add(resultado);
-                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido);
+                // #3340 (I4): "enviado:false" e "linkGerado:false" que só orienta não enviaram nada: não valem como ferramenta feita
+                // para a guarda do "já mandei".
+                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido && !NaoConfirmouEnvio(resultado.Conteudo));
                 if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou", consumo);
+                // Ferramenta que lançou pode ter agido (comanda que a Meta entregou, pedido gravado): devolver ao modelo o faria
+                // repetir o efeito. O turno acaba aqui e a finalização escala como falha de ferramenta.
+                if (contexto.FerramentaLancou) return new GeracaoAgente(null, tokens, true, null, consumo);
                 if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
                 {
                     if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();
@@ -306,13 +311,80 @@ public static class GeracaoAgenteAtendimento
 
     private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
+    // #3340 (R2I-02): recusa que conta como falha do turno são só as ações que comprometem algo com o cliente: o link que
+    // não saiu ("linkGerado":false) e o pedido que não foi criado ("itens_invalidos", "pedido_recusado"). Os demais "erro"
+    // (consulta sem resultado, dado que falta) são conversa normal: o modelo pergunta ao cliente e não escala.
+    private static bool FerramentaRecusou(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            var raiz = doc.RootElement;
+            if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+            return (raiz.TryGetProperty("erro", out var erro) && erro.ValueKind == System.Text.Json.JsonValueKind.String
+                    && erro.GetString() is "itens_invalidos" or "pedido_recusado")
+                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False
+                    && !RecusaQueSoOrienta(raiz));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
+    // Recusa do link que só diz ao modelo qual é o próximo passo (resumo antes do link, esperar o ok, pedido já pago):
+    // ele resolve na própria volta, então não é falha do turno e não escala o pedido comum.
+    private static readonly HashSet<string> MotivosQueSoOrientam = ["resumo_nao_enviado", "aguardando_ok", "pedido_ja_pago"];
+
+    private static bool RecusaQueSoOrienta(System.Text.Json.JsonElement raiz) =>
+        raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
+        && motivo.GetString() is { } texto && MotivosQueSoOrientam.Contains(texto);
+
+    // Recusa que diz que o envio JÁ aconteceu antes na conversa: o "já mandei" do modelo é verdade e continua valendo.
+    private static readonly HashSet<string> MotivosDeEnvioJaFeito = ["comanda_ja_enviada", "comanda_recem_enviada", "resumo_ja_enviado"];
+
+    private static bool NaoConfirmouEnvio(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            var raiz = doc.RootElement;
+            if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+            if (raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
+                && motivo.GetString() is { } texto && MotivosDeEnvioJaFeito.Contains(texto))
+                return false;
+            return (raiz.TryGetProperty("enviado", out var enviado) && enviado.ValueKind == System.Text.Json.JsonValueKind.False)
+                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
+    // Qualquer "erro" devolvido (consulta sem resultado, dado que falta) invalida a resposta verificada de uma ferramenta
+    // anterior, como antes da #3340; só não escala.
+    private static bool ResultadoTemErro(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object && doc.RootElement.TryGetProperty("erro", out _);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
     private static async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
         BlocoUsoFerramentaLlm uso, ILogger logger, CancellationToken ct)
     {
-        contexto.LimparRespostaVerificada();
+        contexto.DescartarRespostaDeConsulta();
         if (!ferramentas.TryGetValue(uso.Nome, out var ferramenta))
         {
+            contexto.LimparRespostaVerificada();
             contexto.RegistrarFalhaDeFerramenta();
             return new BlocoResultadoFerramentaLlm(uso.Id, $"Ferramenta desconhecida: {uso.Nome}.", EhErro: true);
         }
@@ -320,13 +392,22 @@ public static class GeracaoAgenteAtendimento
         try
         {
             var resultado = await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct);
+            // #3340 (R2I-02): recusa devolvida pela ferramenta é falha: o "já enviei" do modelo não sai ao cliente.
+            if (FerramentaRecusou(resultado))
+            {
+                contexto.LimparRespostaVerificada();
+                contexto.RegistrarFalhaDeFerramenta();
+                return new BlocoResultadoFerramentaLlm(uso.Id, resultado, EhErro: true);
+            }
+            if (ResultadoTemErro(resultado)) contexto.DescartarRespostaDeConsulta();
             contexto.ResultadosDasFerramentas.Add(resultado);
             return new BlocoResultadoFerramentaLlm(uso.Id, resultado);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             contexto.LimparRespostaVerificada();
-            contexto.RegistrarFalhaDeFerramenta();
+            contexto.RegistrarFalhaDeFerramenta(lancou: !FalhaDeBanco.Eh(ex));
+            if (FalhaDeBanco.Eh(ex)) contexto.Interromper(); // banco: interrompe como antes da #3340, entradas pendentes
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
             return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);

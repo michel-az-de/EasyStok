@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 
@@ -215,20 +216,45 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         // #1290: o número pode estar só na lista de telefones do cadastro (ex.: WhatsApp como segundo número).
-        public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone) =>
-            db.Clientes
+        public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone)
+        {
+            // #3341: o cadastro pode ter o número em outra grafia; casa pelo DDD e os 8 últimos dígitos.
+            // Replace encadeado (e não TraduzirTexto) para o predicado também rodar no provedor em memória.
+            var formas = TelefoneE164.FormasDeBusca(telefone);
+            return db.Clientes
                 .Where(c => c.EmpresaId == empresaId
-                            && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)))
-                .OrderBy(c => c.Telefone == telefone ? 0 : 1) // o telefone principal vence a lista
+                            && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)
+                                || (formas.Count > 0
+                                    && ((c.Telefone != null && formas.Contains(c.Telefone.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))
+                                        || c.Telefones.Any(t => formas.Contains(t.Numero.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))))))
+                // Número idêntico vence a grafia só de dígitos, que vence a mascarada; entre iguais, o cadastro mais
+                // antigo (sem depender da ordem do banco).
+                .OrderBy(c => c.Telefone == telefone ? 0 : c.Telefones.Any(t => t.Numero == telefone) ? 1
+                    : (c.Telefone != null && formas.Contains(c.Telefone)) || c.Telefones.Any(t => formas.Contains(t.Numero)) ? 2 : 3)
+                .ThenBy(c => c.CriadoEm).ThenBy(c => c.Id)
                 .FirstOrDefaultAsync();
+        }
 
         public async Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
-            IReadOnlyList<string> hashes, CancellationToken ct = default) =>
-            await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
+            IReadOnlyList<string> hashes, CancellationToken ct = default)
+        {
+            var identicos = await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
                 && ((c.TelefoneHash != null && hashes.Contains(c.TelefoneHash))
                     || (c.Telefone != null && telefones.Contains(c.Telefone))
                     || c.Telefones.Any(t => telefones.Contains(t.Numero))))
+                .Select(c => c.Id).Take(2).CountAsync(ct);
+            // Cadastro idêntico vence na busca: um só resolve, dois são compartilhado.
+            if (identicos > 0) return identicos > 1;
+
+            // #3341: sem idêntico, a busca cai nas outras grafias (mascarada). Dois cadastros assim são duas pessoas no
+            // mesmo número, e a conversa não pode ir ao mais antigo sem aviso (a mesma equivalência da busca).
+            var formas = telefones.SelectMany(TelefoneE164.FormasDeBusca).Distinct().ToArray();
+            if (formas.Length == 0) return false;
+            return await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
+                && ((c.Telefone != null && formas.Contains(c.Telefone.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))
+                    || c.Telefones.Any(t => formas.Contains(t.Numero.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))))
                 .Select(c => c.Id).Take(2).CountAsync(ct) > 1;
+        }
 
         public Task AddAsync(Cliente cliente) { db.Clientes.Add(cliente); return Task.CompletedTask; }
         public Task UpdateAsync(Cliente cliente) { db.Clientes.Update(cliente); return Task.CompletedTask; }

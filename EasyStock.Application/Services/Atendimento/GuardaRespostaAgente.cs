@@ -15,7 +15,8 @@ public static partial class GuardaRespostaAgente
 {
     /// <param name="nomeDaDona">#3278 (R4): <c>ConfiguracaoAtendimento.NomeDona</c>. Promessa feita em nome dela ("a Fulana vai
     /// combinar com você") conta como promessa da equipe. Sem nome, valem só os papéis (dona, equipe, responsável, atendente, ela).</param>
-    public static string? Avaliar(string? texto, IEnumerable<string> fontes, IEnumerable<string> nomesDeFerramentas, string? nomeDaDona = null)
+    public static string? Avaliar(string? texto, IEnumerable<string> fontes, IEnumerable<string> nomesDeFerramentas, string? nomeDaDona = null,
+        IEnumerable<string>? ferramentasOk = null)
     {
         if (string.IsNullOrWhiteSpace(texto)) return "o agente não produziu resposta";
 
@@ -27,6 +28,7 @@ public static partial class GuardaRespostaAgente
 
         var originais = fontes.ToList();
         var conhecidas = originais.Select(SemAcento).ToList();
+        var feitas = ferramentasOk?.ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
         // #2516: "frete combinado" só passa quando a ferramenta mostra o frete combinado.
         var acaoDaEquipe = AcaoDaEquipeDe(nomeDaDona);
         var freteCombinadoNaFonte = conhecidas.Any(f => f.Contains("fretecombinado", StringComparison.Ordinal) || FreteCombinado().IsMatch(f));
@@ -35,9 +37,15 @@ public static partial class GuardaRespostaAgente
         {
             if (Encaminhamento().IsMatch(frase) || AfirmaSemNegacao(frase, acaoDaEquipe))
                 return "promete encaminhamento sem acionar a equipe";
+            if (AfirmaAcaoSemFerramenta(frase, AvisoFeito(), feitas, "escalar_para_dona", "avisar_gestao", "encaminhar_para_responsavel"))
+                return "promete encaminhamento sem acionar a equipe";
+            if (AfirmaAcaoSemFerramenta(frase, EnvioComanda(), feitas, "enviar_cardapio_imagem")
+                || AfirmaAcaoSemFerramenta(frase, EnvioResumo(), feitas, "enviar_resumo_pedido")
+                || AfirmaAcaoSemFerramenta(frase, EnvioLink(), feitas, "enviar_link_pagamento", "enviar_cardapio_imagem"))
+                return "afirma envio sem a ferramenta confirmar";
             if (AfirmaSemCondicao(frase, PedidoFeito()) || AfirmaSemCondicao(frase, FizPedido()))
                 return "afirma situação do pedido sem a ferramenta confirmar";
-            if (AfirmaSemCondicao(frase, PagamentoFeito()) || AfirmaSemCondicao(frase, RecebemosPagamento()))
+            if (AfirmaSemCondicao(frase, PagamentoFeito()) || AfirmaSemCondicao(frase, RecebemosPagamento()) || AfirmaSemNegacao(frase, Estorno()))
                 return "afirma pagamento ou devolução sem a ferramenta confirmar";
             if (Cortesia().Match(frase) is { Success: true } c && !Negacao().IsMatch(frase[..c.Index]))
                 return "promete frete grátis ou desconto, que é decisão da equipe";
@@ -72,6 +80,10 @@ public static partial class GuardaRespostaAgente
     /// <summary>#2516: "o frete ainda não foi combinado" e "a equipe não vai ligar" negam, não afirmam.</summary>
     private static bool AfirmaSemNegacao(string frase, Regex afirmacao) =>
         AfirmaSemCondicao(frase, afirmacao) && afirmacao.Match(frase) is var m && !Nao().IsMatch(frase[..(m.Index + m.Length)]);
+
+    /// <summary>#3340 (R2I-01, R2I-05): ação que só vale se alguma das ferramentas dela rodou com ok no turno.</summary>
+    private static bool AfirmaAcaoSemFerramenta(string frase, Regex afirmacao, ISet<string> feitas, params string[] ferramentas) =>
+        AfirmaSemNegacao(frase, afirmacao) && !ferramentas.Any(f => feitas.Contains(f));
 
     private static decimal Reais(Match m)
     {
@@ -150,6 +162,22 @@ public static partial class GuardaRespostaAgente
     }
 
     // Só frete ou taxa acordados: "a entrega está definida para amanhã" e "a taxa é definida pelo CEP" são conversa.
+    [GeneratedRegex(@"\b(avisei|avisamos|chamei|encaminhei|passei)\b.{0,30}\b(equipe|dona|responsavel|atendente|humano|gestao)\b")]
+    private static partial Regex AvisoFeito();
+
+    [GeneratedRegex(@"\b(mandei|enviei|reenviei|mandamos|enviamos|reenviamos)\b.{0,30}\b(comanda|cardapio)\b")]
+    private static partial Regex EnvioComanda();
+
+    [GeneratedRegex(@"\b(mandei|enviei|reenviei|mandamos|enviamos|reenviamos)\b.{0,30}\bresumo\b")]
+    private static partial Regex EnvioResumo();
+
+    [GeneratedRegex(@"\b(mandei|enviei|reenviei|mandamos|enviamos|reenviamos)\b.{0,30}\blink\b")]
+    private static partial Regex EnvioLink();
+
+    // #3340 (R2I-05): nenhuma ferramenta devolve dinheiro, então a promessa de estorno ou devolução barra sempre.
+    [GeneratedRegex(@"\b(estornei|estornamos|reembolsei|reembolsamos|ressarci)\b|\b(vou|vamos|irei|ja)\s+(providenciar|estornar|devolver|reembolsar|ressarcir)\b.{0,25}\b(estorno|dinheiro|valor|reembolso|devolucao)\b|\b(dinheiro|valor|estorno|reembolso)\b.{0,25}\b(sera|vai ser|ficara)\s+devolvid[oa]\b")]
+    private static partial Regex Estorno();
+
     [GeneratedRegex(@"\b(frete|taxa)\b.{0,25}\b(combinad[oa]|acertad[oa])\b")]
     private static partial Regex FreteCombinado();
 

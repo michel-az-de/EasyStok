@@ -149,6 +149,11 @@ public sealed class AgenteAtendimentoService(
 
         // #3149: dicionário gravado que a leitura descarta não some calado (uma linha por turno, sem o conteúdo).
         if (DicionarioDaLoja.Descartado(configuracao.DicionarioJson)) LogsDoAssistente.DicionarioDescartado(logger, conversaId);
+        // #3340 (R2I-05): cliente que cobra dinheiro ou fala em Procon vai à dona sem chamar o modelo, como a cota.
+        if (DetectorReclamacaoCliente.EhReclamacao(pendentes.Select(m => m.Texto)))
+            return await EscalarPeloPortaoAsync(EtapaAssistente.Barrou("reclamacao", "Reclamação",
+                "O cliente cobra dinheiro ou fala em reclamar fora: a dona atende.",
+                "cliente cobra dinheiro ou fala em reclamar fora (estorno, Procon)"));
         var system = await GeracaoAgenteAtendimento.MontarSystemTurnoAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
@@ -300,6 +305,13 @@ public sealed class AgenteAtendimentoService(
             // Depois desse commit, o histórico impede correção. A cobrança precisa rodar fora da transação.
             if (await ExecutarAsync(_ => Task.FromResult("validado"), ct, gravar: false) is null) return null;
             try { return await efeito(ct); }
+            // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não interrupção. Falha do banco segue
+            // interrompendo, como antes: as entradas seguem pendentes para o próximo turno.
+            catch (Exception ex) when (!ct.IsCancellationRequested && !FalhaDeBanco.Eh(ex))
+            {
+                uow.DescartarAlteracoesPendentes();
+                throw;
+            }
             catch
             {
                 contexto.Interromper();
@@ -311,6 +323,7 @@ public sealed class AgenteAtendimentoService(
         public async Task<T?> ExecutarAsync<T>(Func<CancellationToken, Task<T>> efeito, CancellationToken ct, bool gravar = true) where T : class
         {
             if (contexto.Interrompido) return null;
+            var falhouNaFerramenta = false;
             try
             {
                 return await uow.ExecuteInTransactionSemRetryAsync(async token =>
@@ -324,7 +337,11 @@ public sealed class AgenteAtendimentoService(
                         contexto.Interromper();
                         return null;
                     }
-                    var resultado = await efeito(token);
+                    if (!ReferenceEquals(atual, contexto.Conversa)) contexto.Reanexar(atual);
+                    T resultado;
+                    try { resultado = await efeito(token); }
+                    // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não troca de dona.
+                    catch (Exception ex) when (!ct.IsCancellationRequested && !FalhaDeBanco.Eh(ex)) { falhouNaFerramenta = true; throw; }
                     if (gravar) await uow.CommitAsync();
                     _situacao = contexto.Conversa.Situacao;
                     return resultado;
@@ -334,7 +351,7 @@ public sealed class AgenteAtendimentoService(
             {
                 // Rollback SQL não limpa as entidades rastreadas, inclusive quando a ferramenta
                 // chama CommitAsync por dentro. Nenhuma delas pode vazar para o commit de consumo.
-                contexto.Interromper();
+                if (!falhouNaFerramenta) contexto.Interromper();
                 uow.DescartarAlteracoesPendentes();
                 throw;
             }

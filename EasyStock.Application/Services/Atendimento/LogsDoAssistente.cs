@@ -28,6 +28,7 @@ public static partial class LogsDoAssistente
         "afirma pagamento ou devolução sem a ferramenta confirmar",
         "promete frete grátis ou desconto, que é decisão da equipe",
         "afirma frete combinado sem a ferramenta confirmar",
+        "afirma envio sem a ferramenta confirmar",
         "link sem origem em ferramenta",
         CategoriaFerramentaFalhou,
     };

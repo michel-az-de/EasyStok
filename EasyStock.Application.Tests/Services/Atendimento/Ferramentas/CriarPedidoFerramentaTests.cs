@@ -150,6 +150,24 @@ public class CriarPedidoFerramentaTests
         resultado.Should().Contain("cliente_nao_identificado");
     }
 
+    // #3340 (revisão da PR): a resposta verificada soma o que cada ferramenta registra, mas o pedido novo muda a situação
+    // que uma consulta da mesma volta descreveu; o status velho não pode sair no lugar do texto do pedido.
+    [Fact]
+    public async Task PedidoCriadoApagaOStatusVelhoDeUmaConsultaDaMesmaVolta()
+    {
+        var c = new Cenario();
+        var contexto = new ContextoTurnoAgente(c.Checkout.Storefront.EmpresaId, c.Conversa, Agora);
+        contexto.RegistrarRespostaVerificada("Seu pedido 41 está em preparo.");
+        var resultado = await c.Ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new
+        {
+            itens = new[] { new { cardapio_item_id = c.Checkout.CardapioItemId, quantidade = 1 } },
+            data_entrega = c.Checkout.DataEntrega.ToString("yyyy-MM-dd"), janela_id = c.Checkout.JanelaId,
+        }));
+
+        resultado.Should().NotContain("\"erro\"");
+        contexto.RespostaVerificada.Should().BeNull();
+    }
+
     [Fact]
     public async Task Snapshot_do_turno_recusa_pedido_apos_retirar_e_restaurar_a_mesma_pessoa()
     {

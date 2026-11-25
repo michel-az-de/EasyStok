@@ -110,6 +110,8 @@ public sealed class CriarPedidoFerramenta(
             return FerramentaJson.Serializar(new { erro = "pedido_recusado", motivo = ex.Message });
         }
 
+        // #3340: o pedido novo muda o que uma consulta da mesma volta descreveu; o status velho não sai no lugar do texto dele.
+        contexto.LimparRespostaVerificada();
         return FerramentaJson.Serializar(new
         {
             pedido_id = reservado.Pedido.Id,

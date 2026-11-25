@@ -31,8 +31,10 @@ internal sealed class FinalizacaoDoTurno(
     public async Task<ResultadoTurnoAgente> FinalizarAsync(Turno turno, CancellationToken ct)
     {
         var (empresaId, conversaId, agora) = (turno.EmpresaId, turno.ConversaId, turno.Agora);
-        var (conversa, configuracao, gravacao) = (turno.Conversa, turno.Configuracao, turno.Gravacao);
         var (geracao, contexto) = (turno.Geracao, turno.Contexto);
+        // #3340: a conversa do contexto, não a do início do turno. Depois de uma ferramenta que lançou, o contexto soltou as
+        // entidades e a proteção do vínculo travou a conversa de novo; só a instância relida é gravada pelo commit.
+        var (conversa, configuracao, gravacao) = (contexto.Conversa, turno.Configuracao, turno.Gravacao);
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 
@@ -65,8 +67,9 @@ internal sealed class FinalizacaoDoTurno(
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
             // #2515: sem texto do agente, o menu adiado basta como resposta. #2544: a foto do produto também.
+            // #3340: ferramenta que falhou no turno não deixa um envio anterior valer como resposta.
             var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto)
-                && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
+                && !contexto.FerramentaFalhou && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
             else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
@@ -77,7 +80,8 @@ internal sealed class FinalizacaoDoTurno(
                     : GuardaRespostaAgente.Avaliar(geracao.Texto,
                         contexto.ResultadosDasFerramentas,
                         turno.Ferramentas,
-                        configuracao.NomeDona);
+                        configuracao.NomeDona,
+                        geracao.Consumo?.Ferramentas.Where(f => f.Ok).Select(f => f.Nome));
                 if (concluiu && motivoEscalada is null && barrada is null)
                     respondeu = await EnviarRespostaAsync(gravacao, conversa, geracao.Texto!, ct) || respondeu;
                 else

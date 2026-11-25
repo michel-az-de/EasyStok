@@ -28,6 +28,7 @@ public static class MotivoDoTurno
         ["afirma pagamento ou devolução sem a ferramenta confirmar"] = "guarda:pagamento_devolucao",
         ["promete frete grátis ou desconto, que é decisão da equipe"] = "guarda:frete_desconto",
         ["afirma frete combinado sem a ferramenta confirmar"] = "guarda:frete_combinado",
+        ["afirma envio sem a ferramenta confirmar"] = "guarda:envio_sem_ferramenta",
         ["link sem origem em ferramenta"] = "guarda:link_sem_origem",
         [LogsDoAssistente.CategoriaFerramentaFalhou] = "guarda:ferramenta_falhou",
     };

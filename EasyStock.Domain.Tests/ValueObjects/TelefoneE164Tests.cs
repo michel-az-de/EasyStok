@@ -23,6 +23,8 @@ public class TelefoneE164Tests
     [InlineData("1133334444", "+551133334444")]
     [InlineData("5511997573992", "+5511997573992")]
     [InlineData("551133334444", "+551133334444")]
+    [InlineData("011 99757-3992", "+5511997573992")]
+    [InlineData("0 11 3333-4444", "+551133334444")]
     public void AceitaFormatosComunsENormalizaParaE164(string entrada, string esperado) =>
         TelefoneE164.From(entrada).Value.Should().Be(esperado);
 
@@ -38,6 +40,25 @@ public class TelefoneE164Tests
         FluentActions.Invoking(() => TelefoneE164.From(entrada)).Should().Throw<TelefoneInvalidoException>();
         TelefoneE164.TryFrom(entrada).Should().BeNull();
     }
+
+    [Fact]
+    public void FormasDeBuscaCobremAsGrafiasDoMesmoCelularENaoDeOutroDdd()
+    {
+        var formas = TelefoneE164.FormasDeBusca("(11) 99757-3992");
+
+        formas.Should().Contain(["1197573992", "11997573992", "5511997573992", "011997573992"]);
+        formas.Should().NotContain("21997573992");
+    }
+
+    [Theory]
+    [InlineData("(11) 3299-7573", "11932997573")]
+    [InlineData("(11) 93299-7573", "1132997573")]
+    public void FormasDeBuscaNaoJuntamFixoComCelularDeFinalIgual(string telefone, string outro) =>
+        TelefoneE164.FormasDeBusca(telefone).Should().NotContain(outro);
+
+    [Fact]
+    public void FormasDeBuscaVaziaQuandoNaoHaDddENumero() =>
+        TelefoneE164.FormasDeBusca("abc").Should().BeEmpty();
 
     [Fact]
     public void CabeNaColuna() =>
