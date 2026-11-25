@@ -57,6 +57,7 @@ import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalCompartilharComanda } from '../features/atendimento/CompartilharComanda'
+import { focarCampoDeMensagem, focaOCampoAoAbrir, temPonteiroFino } from '../features/caixa-de-entrada/focoDoCampo'
 import { ModalHorariosDaSemana } from '../features/automacoes/ModalHorariosDaSemana'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
@@ -167,6 +168,14 @@ function Composicao({ rota }) {
     conversaDaNota.current = selecionada?.id
   }, [celular, selecionada?.id, memoriaNotas])
 
+  // #3317 (F07): a nota salva fecha a janela (ou o editor) e o foco ia para o body; no desktop ele volta ao campo de
+  // mensagem. Só depois do commit: o Modal devolve o foco ao acionador ao desmontar, e isto vem depois.
+  const devolverFocoAoCampo = useRef(false)
+  useEffect(() => {
+    if (modal === 'nota' || !devolverFocoAoCampo.current) return
+    devolverFocoAoCampo.current = false
+    if (focaOCampoAoAbrir({ celular, ponteiroFino: temPonteiroFino() })) focarCampoDeMensagem()
+  }, [modal, celular])
   const precisaCadastrarParaNota = (id) => FONTE_API && !conversas.find((conversa) => conversa.id === id)?.clienteId
   const pausarNota = (chave, aba = 'atendimento', destino = 'comanda') => {
     if (memoriaNotas.ler().ativa !== chave) return
@@ -199,6 +208,7 @@ function Composicao({ rota }) {
           if (memoriaNotas.concluir(nota.chave, confirmado) && eraAtiva) {
             setModal((atual) => atual === 'nota' ? null : atual)
             if (celular) solicitarPainel('atendimento')
+            else if (nota.id === selecionada?.id) devolverFocoAoCampo.current = true
           }
           if (!confirmado) memoriaNotas.falharGravacao(nota.chave, 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.')
           return confirmado

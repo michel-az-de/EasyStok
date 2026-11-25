@@ -297,10 +297,13 @@ export function Composer({
           titulo="Enviar e assumir esta conversa?"
           descricao={`O Assistente está atendendo ${primeiroNomeDaConversa(conversa)}. Ao enviar, você assume a conversa e o Assistente para de responder.`}
           aoFechar={() => setConfirmandoEnvio(false)}
+          // #3317 (F07): o foco vai ao botão que confirma, então Enter envia. Sem isto ia ao título (#2857) e o
+          // Enter não fazia nada; no botão o tooltip "Fechar" do X também não reaparece.
+          focarCampo
           rodape={(
             <>
               <Botao onClick={() => setConfirmandoEnvio(false)}>Cancelar</Botao>
-              <Botao variante="primario" onClick={confirmarEnvioAssumindo}>Enviar e assumir</Botao>
+              <Botao variante="primario" data-foco-inicial onClick={confirmarEnvioAssumindo}>Enviar e assumir</Botao>
             </>
           )}
         />
@@ -463,7 +466,12 @@ export function Composer({
                   icone="enviar"
                   aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || excedeLimite || Boolean(variavelSobrando) || !(temTexto || anexo)}
-                  onClick={() => enviarComposer()}
+                  onClick={() => {
+                    // #3317 (F06): ao esvaziar o campo o Enviar dá lugar ao Gravar áudio, e o foco ia junto. No toque o
+                    // foco fica onde está: devolvê-lo abriria o teclado sem ela pedir (#2135).
+                    if (window.matchMedia?.('(pointer: fine)').matches) textareaDoCampo()?.focus({ preventScroll: true })
+                    enviarComposer()
+                  }}
                 >{enviaAssumindo ? 'Enviar e assumir' : 'Enviar'}</Botao>
                 </Tooltip>
               ) : (
