@@ -1,6 +1,7 @@
 /* A alça aparece no hover, foco e arrasto, deixando o vão livre em repouso. */
 .alca {
-  flex-shrink: 0; width: 12px; align-self: stretch;
+  /* #3300: alvo de 24 px (WCAG 2.5.8); a margem negativa mantém o vão de 12 px entre as colunas. */
+  flex-shrink: 0; width: 24px; margin-inline: -6px; align-self: stretch;
   display: flex; align-items: center; justify-content: center;
   cursor: col-resize; touch-action: none;
 }

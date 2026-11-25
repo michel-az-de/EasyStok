@@ -56,7 +56,8 @@ export function ModalProgramarMensagem({
   useEffect(() => {
     montada.current = true
     recarregar()
-    return () => { montada.current = false; consulta.current++ }
+    const versoes = consulta
+    return () => { montada.current = false; versoes.current++ }
   }, [recarregar])
 
   const comModelo = usarModelo && canal.aceitaModelo

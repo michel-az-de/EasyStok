@@ -189,7 +189,10 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         {vazia && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
+        {/* #3300 (F7): lista para o leitor de tela ("lista, 11 itens"); `display: contents` não muda o layout. */}
+        <div role="list" aria-label="Conversas" className={css.listaSemCaixa}>
         {lista.map((conversa) => (
+          <div role="listitem" key={conversa.id} className={css.listaSemCaixa}>
           <CartaoConversa
             key={conversa.id}
             conversa={conversa}
@@ -205,7 +208,9 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             fonteApi={fonteApi}
             usuario={sessao?.usuario}
           />
+          </div>
         ))}
+        </div>
         {filtros.aba === 'todas' && (
           <>
             <GrupoRecolhido

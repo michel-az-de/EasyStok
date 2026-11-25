@@ -78,8 +78,8 @@
   background:
     linear-gradient(var(--elevado) 30%, transparent) center top / 100% 16px local no-repeat,
     linear-gradient(transparent, var(--elevado) 70%) center bottom / 100% 16px local no-repeat,
-    linear-gradient(rgb(0 0 0 / .16), transparent) center top / 100% 8px scroll no-repeat,
-    linear-gradient(transparent, rgb(0 0 0 / .16)) center bottom / 100% 8px scroll no-repeat;
+    linear-gradient(color-mix(in srgb, var(--tinta) 16%, transparent), transparent) center top / 100% 8px scroll no-repeat,
+    linear-gradient(transparent, color-mix(in srgb, var(--tinta) 16%, transparent)) center bottom / 100% 8px scroll no-repeat;
 }
 
 /* Elementos vazios que só existem para a árvore de acessibilidade (listbox e grupos assumem as opções por aria-owns). */

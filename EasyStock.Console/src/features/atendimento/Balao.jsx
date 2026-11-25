@@ -131,7 +131,7 @@ const TITULO_DO_ASSISTENTE = Object.freeze({
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
 export const Balao = memo(function Balao({
-  mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null, aoReagir, aoApagar,
+  mensagem, trocaDeVoz, novo = false, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null, aoReagir, aoApagar,
   // #3234 (C1): envios seguidos iguais que falharam viram um balão. `tentativas` > 1 é o balão do grupo
   // (aviso único e o botão das tentativas); `rotuloDaTentativa` marca uma de antes, aberta a pedido, que não repete o aviso.
   // `chaveDoGrupo` é a tentativa mais antiga: o grupo segue aberto quando uma nova falha igual vira a mais recente.
@@ -164,7 +164,7 @@ export const Balao = memo(function Balao({
 
   if (mensagem.dir === 'sistema') {
     return (
-      <p className={`${css.balao} ${css.sistema} ${avisoDePedido(mensagem.texto) ? css.sistemaPedido : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
+      <p className={`${css.balao} ${css.sistema} ${avisoDePedido(mensagem.texto) ? css.sistemaPedido : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''}`}>
         <Icone nome="check" /> {mensagem.texto}
       </p>
     )
@@ -177,14 +177,14 @@ export const Balao = memo(function Balao({
   const apagada = fraseDaApagada(mensagem, horaCurta)
   if (apagada) {
     return (
-      <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${css.apagada} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
+      <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${css.apagada} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''}`}>
         <p><Icone nome="circle-x" tamanho={16} /><span>{apagada}</span></p>
       </div>
     )
   }
   const reagivel = Boolean(aoReagir) && podeReagir(mensagem)
   return (
-    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
+    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
       {(aoReagir || aoApagar) && (
         <MenuDaMensagem
           mensagem={mensagem} podeReagir={reagivel} alinhamento={mensagem.dir === 'out' ? 'direita' : 'esquerda'}

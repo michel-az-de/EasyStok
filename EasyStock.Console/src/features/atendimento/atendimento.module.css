@@ -53,8 +53,10 @@
   /* #2232 (A6): 75% da coluna no máximo; o enviado deixa de ocupar a largura cheia. */
   max-width: min(75%, 62ch); padding: var(--e-3) var(--e-4);
   border-radius: var(--r-2); box-shadow: none; position: relative;
-  margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
+  margin-top: 4px;
 }
+/* #3300 (F8): só o balão que chega com a conversa aberta entra animado; abrir a conversa não anima o fio inteiro. */
+.balao.novo { animation: entradaBalao var(--dur-media) var(--ease-saida); }
 @keyframes entradaBalao {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
