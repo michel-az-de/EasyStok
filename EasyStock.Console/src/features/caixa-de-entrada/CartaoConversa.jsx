@@ -7,7 +7,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
-import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
+import { motivoDePrecisar, respostaAtrasada, tomDoMotivo } from '../../dominio/automatico'
 import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/linhaDoBalcao'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
@@ -27,7 +27,7 @@ function motivoDaLinha(motivo, origem) {
   const resumido = motivoResumido(motivo.chave, origem)
   return {
     ...motivo,
-    tom: motivo.chave === 'cobranca' ? 'neutro' : motivo.tom,
+    tom: tomDoMotivo(motivo),
     rotulo: resumido?.texto ?? motivo.rotulo,
     icone: resumido?.icone ?? null,
     texto: motivo.texto ?? resumido?.titulo ?? null,

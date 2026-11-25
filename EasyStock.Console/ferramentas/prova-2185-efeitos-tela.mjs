@@ -473,7 +473,8 @@ try {
     await p.locator('input[type="file"]').setInputFiles({ name: 'bolo.png', mimeType: 'image/png', buffer: png })
     await p.getByText('bolo.png', { exact: true }).waitFor()
     await p.evaluate(() => window.trocar('robo'))
-    await p.getByText('Assistente respondendo').first().waitFor()
+    // #3318: "robo" tem pergunta sem resposta há 10 min; a barra diz o mesmo "Precisa de você" do cartão.
+    await p.locator('[data-controle-conversa]').getByText('Precisa de você').first().waitFor()
     assert.equal(await p.getByText('bolo.png', { exact: true }).count(), 0, 'a prévia é da outra conversa')
     await p.evaluate(() => window.trocar('meu'))
     await p.getByText('bolo.png', { exact: true }).waitFor({ timeout: 3000 })

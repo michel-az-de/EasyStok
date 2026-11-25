@@ -9,6 +9,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { motivoDePrecisar } from '../../dominio/automatico'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
@@ -46,12 +47,13 @@ function PainelDaConversa({
 }) {
   const {
     selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao, sessao,
+    aberta, horarioDaLoja,
   } = useAtendimento()
   const {
     enviar, reabrir, assumirAtendimento, devolverAutomatico,
     selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores, transferirConversa, reagir, apagar,
   } = useAcoes()
-  const { canais } = useCatalogo()
+  const { canais, janelas } = useCatalogo()
   const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
   const { acoes: capacidades } = useAcessoModulos()
   const reabrirLigado = useAcaoDisponivel()('reabrir')
@@ -178,6 +180,8 @@ function PainelDaConversa({
   // porque você escreveu" de "pausado porque você assumiu". O Boolean() de
   // antes apagava a diferença e a barra dizia a frase errada.
   const pausado = automaticoPausado[selecionada.id] ?? false
+  // #3318: a barra diz o mesmo motivo do cartão da lista, com os mesmos dados (CartaoConversa).
+  const motivoDaFila = motivoDePrecisar(selecionada, agora, pausado, aberta, janelas, horarioDaLoja)
   const encerrada = conversaEncerrada(selecionada)
   // Uma conta só na tela: quem diz que a conversa está bloqueada é a mesma
   // permissao de escrita que decide o composer e o reducer.
@@ -250,6 +254,7 @@ function PainelDaConversa({
         bloqueada={bloqueada}
         podeReabrir={podeReabrir}
         agora={agora}
+        motivo={motivoDaFila}
         acoes={acoesTela}
         aoAssumir={aoAssumirDaBarra}
       />
