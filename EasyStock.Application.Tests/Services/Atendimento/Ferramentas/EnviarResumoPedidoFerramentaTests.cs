@@ -63,6 +63,8 @@ public class EnviarResumoPedidoFerramentaTests
                 .Returns(new EnvioWhatsAppResult("wamid.resumo"));
             var conversas = Substitute.For<IConversaRepository>();
             conversas.AddMensagemAsync(Arg.Do<Mensagem>(Mensagens.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+            conversas.ListarMensagensDepoisAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(ci => (IReadOnlyList<Mensagem>)Mensagens.ToList());
             var configuracao = new ConfigurationBuilder().AddInMemoryCollection(
                 new Dictionary<string, string?> { ["App:BaseUrl"] = "https://loja.exemplo" }).Build();
 
@@ -203,5 +205,19 @@ public class EnviarResumoPedidoFerramentaTests
 
         resultado.GetProperty("motivo").GetString().Should().Be("pedido_finalizado");
         await c.Cloud.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task SegundoResumoDoMesmoPedido_NaoEnviaDeNovo()
+    {
+        var c = new Cenario();
+        await c.ExecutarAsync();
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeFalse();
+        resultado.GetProperty("motivo").GetString().Should().Be("resumo_ja_enviado");
+        resultado.TryGetProperty("linkGerado", out _).Should().BeFalse();
+        await c.Cloud.Received(1).EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

@@ -51,6 +51,12 @@ public sealed class EnviarResumoPedidoFerramenta(
         if (!noSite && (renderizador is null || armazenamento is null))
             return Recusa("resumo_indisponivel", "O resumo não pode sair agora; use escalar_para_dona.");
 
+        // #3340 (R2I-09): o mesmo resumo do mesmo pedido, nesta conversa, não sai duas vezes.
+        var mensagens = await conversaRepository.ListarMensagensDepoisAsync(contexto.EmpresaId, contexto.Conversa.Id, null, 500, ct);
+        if (mensagens.Any(m => m.Direcao == DirecaoMensagem.Saida && m.Status != StatusMensagem.Falhou
+            && ResumoPedidoAtendimento.EhResumo(m.Texto, pedido.Id)))
+            return Recusa("resumo_ja_enviado", "O resumo deste pedido já foi enviado nesta conversa. Peça o ok ao cliente; com o ok, use enviar_link_pagamento.");
+
         var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
         var resumo = ResumoPedidoAtendimento.Montar(pedido, storefront?.TituloPublico);
 

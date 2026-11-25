@@ -197,4 +197,22 @@ public class EnviarCardapioImagemFerramentaTests
         json.GetProperty("enviado").GetBoolean().Should().BeTrue();
         c.Links.Links.Should().HaveCount(2);
     }
+
+    [Fact]
+    public async Task SegundoReenvioNaJanela_NaoGeraLinkEEscala()
+    {
+        var c = new Cenario(null);
+        await c.ExecutarAsync();
+        await c.ExecutarAsync(new { reenviar = true }, c.NovoContexto(Agora.AddMinutes(15)));
+        c.Cloud.ClearReceivedCalls();
+
+        var json = await c.ExecutarAsync(new { reenviar = true }, c.NovoContexto(Agora.AddMinutes(30)));
+
+        json.GetProperty("enviado").GetBoolean().Should().BeFalse();
+        json.GetProperty("linkGerado").GetBoolean().Should().BeFalse();
+        json.GetProperty("motivo").GetString().Should().Be("comanda_nao_funcionou");
+        json.GetProperty("orientacao").GetString().Should().Contain("escalar_para_dona");
+        c.Links.Links.Should().HaveCount(2);
+        c.Cloud.ReceivedCalls().Should().BeEmpty();
+    }
 }

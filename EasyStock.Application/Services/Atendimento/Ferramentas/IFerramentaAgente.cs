@@ -33,7 +33,13 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     Func<CancellationToken, Task>? gravarSaida = null)
 {
     public Guid EmpresaId { get; } = empresaId;
-    public Conversa Conversa { get; } = conversa;
+    public Conversa Conversa { get; private set; } = conversa;
+
+    /// <summary>
+    /// #3340: depois de uma ferramenta que lançou, o serviço solta as entidades rastreadas e a conversa relida pelo lock é
+    /// outra instância. O contexto passa a apontar para ela, a única que o commit grava.
+    /// </summary>
+    public void Reanexar(Conversa relida) => Conversa = relida;
     public Guid? ClienteIdEsperado { get; } = conversa.ClienteId;
     public long VinculoRevisaoEsperada { get; } = conversa.VinculoRevisao;
     public EasyStock.Domain.Enums.Atendimento.SituacaoConversa SituacaoEsperada { get; } = conversa.Situacao;
@@ -70,14 +76,39 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     /// <summary>Resultados das ferramentas do turno: de onde o texto livre pode tirar valor e link (#1704).</summary>
     public List<string> ResultadosDasFerramentas { get; } = [];
 
-    public void RegistrarFalhaDeFerramenta() => FerramentaFalhou = true;
+    /// <summary>#3340: uma ferramenta lançou exceção: o que ela fez no mundo é incerto e o turno não volta ao modelo para repeti-la.</summary>
+    public bool FerramentaLancou { get; private set; }
+
+    public void RegistrarFalhaDeFerramenta(bool lancou = false)
+    {
+        FerramentaFalhou = true;
+        if (lancou) FerramentaLancou = true;
+    }
 
     /// <summary>#2249: a conversa foi para a responsável porque o contato não é cliente; sai o molde de encaminhamento.</summary>
     public bool Encaminhou { get; private set; }
 
     public void RegistrarEncaminhamento() => Encaminhou = true;
 
-    public void RegistrarRespostaVerificada(string texto) => RespostaVerificada = texto;
+    // O que só existe na resposta verificada, e não no JSON que volta ao modelo (a URL do link de pagamento): sobrevive à ferramenta seguinte.
+    private string? _respostaDuravel;
+
+    /// <summary>
+    /// #3340 (R2I-03): cada ferramenta do turno soma o que o cliente deve receber. <paramref name="duravel"/> é o que o modelo
+    /// não reproduz (o link de pagamento): a ferramenta seguinte não o apaga. O resto (consulta de pedido ou de entrega) vale
+    /// só até a próxima ferramenta, para o status de uma consulta antiga não tomar o lugar do texto do modelo.
+    /// </summary>
+    public void RegistrarRespostaVerificada(string texto, bool duravel = false)
+    {
+        RespostaVerificada = Somar(RespostaVerificada, texto);
+        if (duravel) _respostaDuravel = Somar(_respostaDuravel, texto);
+    }
+
+    private static string Somar(string? atual, string texto) =>
+        atual is null ? texto : atual.Contains(texto, StringComparison.Ordinal) ? atual : $"{atual}\n\n{texto}";
+
+    /// <summary>Começo de cada ferramenta: cai o que uma consulta anterior respondeu; fica o link de pagamento.</summary>
+    public void DescartarRespostaDeConsulta() => RespostaVerificada = _respostaDuravel;
 
     public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;
 
@@ -102,6 +133,7 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     public void LimparRespostaVerificada()
     {
         RespostaVerificada = null;
+        _respostaDuravel = null;
         EnvioVerificado = false;
     }
 }

@@ -50,6 +50,10 @@ public sealed partial class LinkCardapioConversaService(ILinkCardapioConversaRep
         return uow is null ? await Gerar(ct) : await uow.ExecuteInTransactionSemRetryAsync(Gerar, ct);
     }
 
+    /// <summary>Quantos links de comanda a conversa gerou na janela de 24 h (#3340: o segundo reenvio para de gerar).</summary>
+    public async Task<int> ContarNaJanelaAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default) =>
+        (await repository.ListarDaConversaAsync(empresaId, conversaId, agora.AddDays(-1), ct)).Count;
+
     /// <summary>Comanda aberta mais recente da conversa (não usada e não vencida), ou <c>null</c> (#2516).</summary>
     public async Task<LinkCardapioConversa?> VigenteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default) =>
         (await repository.ListarDaConversaAsync(empresaId, conversaId, agora - LinkCardapioConversa.Validade, ct))

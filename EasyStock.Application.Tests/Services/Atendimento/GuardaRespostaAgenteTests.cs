@@ -65,6 +65,32 @@ public class GuardaRespostaAgenteTests
     public void ValorSoPassaQuandoVemExatamenteDaFonte(string texto, string fonte, bool passa) =>
         (Avaliar(texto, fonte) is null).Should().Be(passa);
 
+    // #3340 (R2I-01, R2I-05): ação de envio, aviso à equipe ou devolução de dinheiro que nenhuma ferramenta do turno fez.
+    [Theory]
+    [InlineData("Pronto, já te mandei o link de pagamento! É só pagar por ele.")]
+    [InlineData("Ok, já reenviei a comanda pra você.")]
+    [InlineData("Já avisei a equipe, aguarde.")]
+    [InlineData("Vou providenciar o estorno do seu dinheiro ainda hoje.")]
+    [InlineData("Já estornei o valor e ele cai em até 2 dias úteis.")]
+    [InlineData("Seu dinheiro será devolvido em até 2 dias úteis, pode confiar.")]
+    public void AcaoQueNenhumaFerramentaFezEBarrada(string texto) =>
+        GuardaRespostaAgente.Avaliar(texto, [], Ferramentas, null, []).Should().NotBeNull();
+
+    [Theory]
+    [InlineData("Pronto, já te mandei o link de pagamento!", "enviar_link_pagamento")]
+    [InlineData("Ok, já reenviei a comanda pra você.", "enviar_cardapio_imagem")]
+    [InlineData("Já avisei a equipe, aguarde.", "escalar_para_dona")]
+    public void AcaoQueAFerramentaDoTurnoFezPassa(string texto, string ferramenta) =>
+        GuardaRespostaAgente.Avaliar(texto, [], Ferramentas, null, [ferramenta]).Should().BeNull();
+
+    // Oferta, pergunta e negação não afirmam ação: passam mesmo sem ferramenta.
+    [Theory]
+    [InlineData("Posso te mandar o link de pagamento, quer?")]
+    [InlineData("Se quiser, eu reenvio a comanda.")]
+    [InlineData("Quer que eu avise a equipe?")]
+    [InlineData("Ainda não mandei o link, já te passo.")]
+    public void OfertaEPerguntaDeAcaoPassam(string texto) => Avaliar(texto).Should().BeNull();
+
     [Fact]
     public void FreteCombinadoSoPassaQuandoAFerramentaMostra()
     {
