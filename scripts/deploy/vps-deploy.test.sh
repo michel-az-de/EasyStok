@@ -362,5 +362,12 @@ r=$(run FAKE_BUILD_FAIL=1);  confere "build falho: exit 4"              "rc=4" "
                               confere "build falho: nao faz dump"        "dump=0" "$r"
                               confere "build falho: imagem intacta"      "imagem=easystok-api:vps-antiga" "$r"
 
+# #3323: o pull so vale com GIT_SHA igual ao sha; toda imagem que o build-images publica precisa declarar o ENV.
+for d in Dockerfile Dockerfile.Web EasyStock.Worker/Dockerfile; do
+  r=$(grep -E "^(ARG GIT_SHA|ENV GIT_SHA)" "../../$d" || true)
+  confere "$d declara ARG GIT_SHA" "^ARG GIT_SHA" "$r"
+  confere "$d declara ENV GIT_SHA" "^ENV GIT_SHA" "$r"
+done
+
 rm -f .remote.sh .fake-docker .caso.sh
 [ "$falhas" = 0 ] && echo "TODOS OS CASOS PASSARAM" || { echo "$falhas FALHA(S)"; exit 1; }
