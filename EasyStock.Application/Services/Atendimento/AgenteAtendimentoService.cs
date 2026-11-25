@@ -245,9 +245,8 @@ public sealed class AgenteAtendimentoService(
             : null;
         var portoes = new PortoesDoAssistente(llm, conversaRepository, turnos, limiteRespostas, equipe);
         // Todos os portões menos "quem atende", na ordem do turno, parando no primeiro que barra.
-        var barra = PortoesDoAssistente.DaConversa(conversa, agora).FirstOrDefault(e => e.Barra && e.Codigo != PortoesDoAssistente.Situacao)
-            ?? (await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct)).FirstOrDefault(e => e.Barra)
-            ?? await portoes.PrimeiraQueBarraDoClienteEDoCustoAsync(empresaId, conversa.Id, configuracao, cliente, agora, ct);
+        var barra = await portoes.EtapasAsync(empresaId, conversa, configuracao, cliente, agora, ct)
+            .FirstOrDefaultAsync(e => e.Barra && e.Codigo != PortoesDoAssistente.Situacao, ct);
         if (barra is not null)
         {
             LogsDoAssistente.RetomadaDispensada(logger, conversa.Id, barra.Codigo);

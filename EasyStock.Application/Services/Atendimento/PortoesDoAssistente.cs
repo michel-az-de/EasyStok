@@ -214,4 +214,21 @@ public sealed class PortoesDoAssistente(
             if (etapa.Barra) return etapa;
         return null;
     }
+
+    /// <summary>
+    /// #3356 (R11): todas as etapas na ordem do <see cref="Catalogo"/> (conversa, loja, pessoa, limite e cota), lidas só
+    /// quando quem consome chega nelas: a tela consome até o fim, a retomada para na primeira que barra e não lê o grupo
+    /// seguinte. A preguiça é entre grupos; o da loja sai inteiro (modelo, canal e contato da equipe), como no turno. O
+    /// turno segue em etapas de propósito: entre um grupo e outro ele lê a mensagem, a configuração e o cadastro e, ao
+    /// barrar, escala com o motivo do portão.
+    /// </summary>
+    public async IAsyncEnumerable<EtapaAssistente> EtapasAsync(
+        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, Cliente? cliente, DateTime agora,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        foreach (var etapa in DaConversa(conversa, agora)) yield return etapa;
+        foreach (var etapa in await DaLojaAsync(empresaId, configuracao, conversa, ct)) yield return etapa;
+        await foreach (var etapa in EtapasDoClienteEDoCustoAsync(empresaId, conversa.Id, configuracao, cliente, agora, ct))
+            yield return etapa;
+    }
 }
