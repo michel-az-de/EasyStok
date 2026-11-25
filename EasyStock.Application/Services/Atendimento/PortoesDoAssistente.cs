@@ -222,7 +222,7 @@ public sealed class PortoesDoAssistente(
     /// seguinte. A preguiça é entre grupos; o da loja sai inteiro (modelo, canal e contato da equipe), como no turno. O
     /// turno e a resposta sem modelo seguem em etapas de propósito: leem a configuração e o cadastro só depois de o grupo
     /// anterior passar e, no turno, ainda conferem se há o que responder (as entradas pendentes antes da loja, a conversação
-    /// montada antes do cadastro) e ignoram sem escalar quando não há. Numa chamada só, a loja e o cadastro poderiam escalar
+    /// montada antes do cadastro) e ignoram sem escalar quando não há. Numa chamada só, no turno, a loja e o cadastro poderiam escalar
     /// uma conversa que não tinha o que responder.
     /// </summary>
     public async IAsyncEnumerable<EtapaAssistente> EtapasAsync(

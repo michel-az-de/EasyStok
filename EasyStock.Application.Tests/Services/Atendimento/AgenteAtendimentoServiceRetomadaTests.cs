@@ -3,10 +3,10 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
-using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -25,7 +25,7 @@ public partial class AgenteAtendimentoServiceTests
     private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais) =>
         CriarServicoComRetomada(null, segundos, adicionais);
 
-    /// <summary>Com o contato da equipe que o grupo da loja consulta; sem ele, o portão da equipe não se aplica.</summary>
+    /// <summary>Com o contato da equipe que o grupo da loja consulta; sem ele, o portão da equipe sempre passa.</summary>
     private AgenteAtendimentoService CriarServicoComRetomada(
         IContatoDaEquipeAvisada? equipe, int segundos = 60, params IFerramentaAgente[] adicionais)
     {
