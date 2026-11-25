@@ -43,7 +43,7 @@ public sealed class DesempenhoDosProdutosUseCase(IProdutosDesempenhoQuery consul
             ReceitaAnterior: naAnterior.Sum(v => v.Receita),
             Compras: naJanela.Select(v => v.PedidoId).Distinct().Count(),
             ComprasAnterior: naAnterior.Select(v => v.PedidoId).Distinct().Count(),
-            ProdutosVendidos: naJanela.Select(v => v.ProdutoId).Distinct().Count(),
+            ProdutosVendidos: naJanela.Select(v => v.ProdutoId).Where(ativos.Contains).Distinct().Count(),
             ReceitaSemProduto: receitaSemProduto,
             Ativos: ativos.Count,
             Parados: linhas.Count(l => l.Parado),

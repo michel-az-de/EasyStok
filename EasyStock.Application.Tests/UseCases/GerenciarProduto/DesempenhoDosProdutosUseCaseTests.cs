@@ -101,7 +101,7 @@ public sealed class DesempenhoDosProdutosUseCaseTests
         f.Receita.Should().Be(r.Produtos.Sum(p => p.Receita)).And.Be(335m);
         f.ReceitaAnterior.Should().Be(r.Produtos.Sum(p => p.ReceitaAnterior)).And.Be(177m);
         f.Compras.Should().Be(5, "pedidos distintos com produto na janela");
-        f.ProdutosVendidos.Should().Be(2);
+        f.ProdutosVendidos.Should().Be(1, "numerador e denominador são os ativos de venda: o Molho inativo não conta");
         f.ReceitaSemProduto.Should().Be(12m);
         f.Ativos.Should().Be(3, "insumo e inativo fora");
         f.Parados.Should().Be(1);
