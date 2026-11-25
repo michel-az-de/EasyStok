@@ -1,5 +1,5 @@
 // #3299: Produtos com desempenho. Chromium, componentes reais e HTTP controlado (não usa API real).
-// Confere a faixa, as colunas novas, os sinais e o recolhimento no celular; tira as capturas de 1440, 390 e escuro.
+// Confere a faixa, as colunas novas, os sinais e o recolhimento no celular; tira as capturas de 1920, 1440, 390 e escuro.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -37,7 +37,7 @@ const desempenho = { janelaDias: 90, hoje: '2026-11-24', resumo: { receita: 1478
     D(10, { curva: 'C', ultimaVenda: '2026-05-07', diasSemVender: 201, pedidosNoHistorico: 1, precoVendido: 69 })] }
 const resultado = {}
 const browser = await chromium.launch({ headless: true })
-for (const [w, h, esquema] of [[1440, 900, 'light'], [390, 844, 'light'], [1440, 900, 'dark']]) {
+for (const [w, h, esquema] of [[1920, 1080, 'light'], [1440, 900, 'light'], [390, 844, 'light'], [1440, 900, 'dark']]) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'pt-BR', colorScheme: esquema, reducedMotion: 'reduce' })
   await ctx.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture', empresa: { id: 'empresa' }, usuario: { id: 'op' }, expiraEm: Date.now() + 600000 })))
   await ctx.route('**/api/**', r => { const p = new URL(r.request().url()).pathname; if (!p.startsWith("/api/")) return r.continue()
