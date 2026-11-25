@@ -521,7 +521,15 @@ try {
     await esperarPainel(p)
     assert.equal(await p.getByRole('button', { name: 'Gravar áudio' }).count(), 0)
     await p.evaluate(() => window.trocar('meu'))
-    await p.getByRole('button', { name: 'Gravar áudio' }).waitFor()
+    const gravar = p.getByRole('button', { name: 'Gravar áudio' })
+    await gravar.waitFor()
+    // #3355: com o campo vazio o próximo passo é escrever; o Gravar é opção e não disputa o laranja com Assumir e Itens.
+    const cor = (alvo, prop) => alvo.evaluate((e, prop) => getComputedStyle(e)[prop], prop)
+    const token = (nome) => p.evaluate((nome) => { const d = document.createElement('i'); d.style.background = `var(${nome})`; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c }, nome)
+    assert.notEqual(await cor(gravar, 'backgroundColor'), await token('--acao'), 'o Gravar não é laranja cheio')
+    await gravar.hover()
+    await p.waitForTimeout(250)
+    assert.notEqual(await cor(gravar, 'backgroundColor'), await token('--preenchimento-forte'), 'o hover não se confunde com o desabilitado')
     await ctx.close()
   })
 

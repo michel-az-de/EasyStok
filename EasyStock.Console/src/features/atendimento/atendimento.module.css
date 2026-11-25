@@ -357,6 +357,8 @@
   border-radius: var(--r-2);
 }
 .acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
+/* #3355: o Gravar é secundário; o hover dele não pode ter a cor do Enviar desabilitado (--preenchimento-forte). */
+.acoes .gravar:hover:not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta)); }
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
 @keyframes enviarPronto { from { transform: scale(.8); } to { transform: none; } }
 @media (max-width: 759px) {
