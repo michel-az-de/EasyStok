@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
+import { AjusteLargura } from '../../componentes/AjusteLargura'
 import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoArea } from '../../componentes/Campo'
@@ -261,15 +262,16 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   }
   const classePainel = [css.painel, !celular && lado === 'esquerda' ? css.painelEsquerda : '', solto ? css.painelSolto : '']
     .filter(Boolean).join(' ')
+  // #3322: alça e botão Largura mudam a largura pela mesma função.
+  const mudarLargura = (valor) => definirPosicaoPainel({ largura: valor })
+  const limitesLargura = { min: ASSISTENTE.min, max: larguraMaximaPainel, padrao: Math.min(ASSISTENTE.padrao, larguraMaximaPainel) }
   const alca = celular ? null : (
     <AlcaLargura
       rotulo="Redimensionar assistente"
       valor={larguraPainel}
-      min={ASSISTENTE.min}
-      max={larguraMaximaPainel}
-      padrao={Math.min(ASSISTENTE.padrao, larguraMaximaPainel)}
+      {...limitesLargura}
       invertida={lado === 'direita'}
-      aoMudar={(valor) => definirPosicaoPainel({ largura: valor })}
+      aoMudar={mudarLargura}
     />
   )
 
@@ -335,6 +337,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 rótulo (alterna Abrir/Fechar assistente), e o landmark
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
+            {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
             <BotaoIcone rotulo="Fechar" icone="x" onClick={fechar} />
           </div>
 
