@@ -57,11 +57,11 @@ const MOTIVOS = [
     'o agente não conseguiu responder (falha ao chamar o LLM)', 'Assistente falhou'],
   [`${ATD}GeracaoAgenteAtendimento.cs`, '$"o agente não produziu resposta (stop_reason=',
     'o agente não produziu resposta (stop_reason=max_tokens)', 'Assistente sem resposta'],
-  [`${ATD}AgenteAtendimentoService.cs`, '$"resposta do agente barrada ({barrada}); precisa de conferência humana"',
+  [`${ATD}FinalizacaoDoTurno.cs`, '$"resposta do agente barrada ({barrada}); precisa de conferência humana"',
     'resposta do agente barrada (preço fora da tabela); precisa de conferência humana', 'Resposta para conferir'],
-  [`${ATD}AgenteAtendimentoService.cs`, '$"o agente atingiu o limite de {MaximoIteracoes} iterações',
+  [`${ATD}FinalizacaoDoTurno.cs`, '$"o agente atingiu o limite de {AgenteAtendimentoService.MaximoIteracoes} iterações',
     'o agente atingiu o limite de 8 iterações sem concluir a resposta', 'Assistente não concluiu'],
-  [`${ATD}AgenteAtendimentoService.cs`, '"o menu de janelas não saiu ao cliente;',
+  [`${ATD}FinalizacaoDoTurno.cs`, '"o menu de janelas não saiu ao cliente;',
     'o menu de janelas não saiu ao cliente; precisa de conferência humana', 'Menu não enviado'],
   [`${ATD}PortoesDoAssistente.cs`, '$"o canal {conversa.Canal} não tem agente"',
     'o canal Instagram não tem agente', 'Canal sem Assistente'],
@@ -115,7 +115,7 @@ caso('nenhum ponto de escalada novo na API sem rótulo curto', () => {
   const saida = execSync('git grep -c -E "EscalarAsync\\(|\\.Escalar\\(" -- "EasyStock.Application/*.cs" "EasyStock.Domain/*.cs"',
     { cwd: new URL(raiz).pathname.replace(/^\/([A-Za-z]:)/, '$1'), encoding: 'utf8' })
   const total = saida.trim().split('\n').reduce((soma, linha) => soma + Number(linha.split(':').pop()), 0)
-  assert.equal(total, 24, 'mudou o número de chamadas de escalada: mapeie o motivo novo em motivoDeEscalada.js e ajuste este número')
+  assert.equal(total, 21, 'mudou o número de chamadas de escalada: mapeie o motivo novo em motivoDeEscalada.js e ajuste este número')
 })
 
 console.log(`\n${ok} ok, ${falhas.length} falha(s)`)
