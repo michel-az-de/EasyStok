@@ -44,12 +44,9 @@ public sealed class ProdutosDesempenhoController(
         CancellationToken ct = default)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        if (!ListarProdutosPorDesempenhoUseCase.OrdemConhecida(sort)) return DataBadRequest($"Ordem desconhecida: {sort}.");
         var (p, ps) = NormalisePage(page, pageSize);
-        try
-        {
-            var (produtos, total) = await lista.ExecuteAsync(emp, new FiltroPorDesempenho(sort, order, sinal, status, categoriaId), p, ps, ct);
-            return DataPaged(produtos, total, p, ps);
-        }
-        catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+        var (produtos, total) = await lista.ExecuteAsync(emp, new FiltroPorDesempenho(sort, order, sinal, status, categoriaId), p, ps, ct);
+        return DataPaged(produtos, total, p, ps);
     }
 }

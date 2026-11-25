@@ -14,14 +14,15 @@ public sealed class ListarProdutosPorDesempenhoUseCase(DesempenhoDosProdutosUseC
     public const string SemVender = "semvender";
     private static readonly string[] Ordens = [Receita90, SemVender, "nome", "criadoem", "alteradoem"];
 
-    public static bool OrdemPorVendas(string? sort) => sort?.ToLowerInvariant() is Receita90 or SemVender;
+    /// <summary>A ordem é uma das aceitas (vazia vale <c>receita90</c>).</summary>
+    public static bool OrdemConhecida(string? sort) => sort is null || Ordens.Contains(sort.ToLowerInvariant());
 
     public async Task<(IReadOnlyList<Produto> Produtos, int Total)> ExecuteAsync(
         Guid empresaId, FiltroPorDesempenho filtro, int page, int pageSize, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         var sort = (filtro.Sort ?? Receita90).ToLowerInvariant();
-        if (!Ordens.Contains(sort)) throw new ArgumentException($"Ordem desconhecida: {filtro.Sort}.", nameof(filtro));
+        if (!OrdemConhecida(sort)) throw new ArgumentException($"Ordem desconhecida: {filtro.Sort}.", nameof(filtro));
         var desc = !string.Equals(filtro.Order, "asc", StringComparison.OrdinalIgnoreCase);
 
         var linhas = (await desempenho.ExecuteAsync(empresaId, ct)).Produtos
@@ -49,9 +50,10 @@ public sealed class ListarProdutosPorDesempenhoUseCase(DesempenhoDosProdutosUseC
             SemVender => lista.OrderBy(p => GrupoSemVender(linhas[p.Id])).ThenBy(p => linhas[p.Id].UltimaVenda).ThenBy(p => p.Nome, porNome),
             "nome" => desc ? lista.OrderByDescending(p => p.Nome, porNome) : lista.OrderBy(p => p.Nome, porNome),
             "criadoem" => desc ? lista.OrderByDescending(p => p.CriadoEm) : lista.OrderBy(p => p.CriadoEm),
-            _ => desc ? lista.OrderByDescending(p => p.AlteradoEm) : lista.OrderBy(p => p.AlteradoEm),
+            _ => desc ? lista.OrderByDescending(p => p.AlteradoEm).ThenByDescending(p => p.CriadoEm) : lista.OrderBy(p => p.AlteradoEm),
         };
-        return ordem.ThenBy(p => p.Id);
+        // Desempate como o da lista padrão (ProdutoRepository.GetProdutosPaginadosAsync): id decrescente.
+        return ordem.ThenByDescending(p => p.Id);
     }
 
     private static int GrupoSemVender(DesempenhoDeUmProduto l) => !l.AtivoDeVenda ? 2 : l.UltimaVenda is null ? 1 : 0;

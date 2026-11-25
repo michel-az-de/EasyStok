@@ -16,7 +16,7 @@ import {ContextoRascunhosDosAjustes,useGravacoesDosAjustes} from '../../../src/a
 import {PainelCadastros} from '../../../src/features/gestao/cadastros/PainelCadastros';
 import '../../../src/estilos/base.css';
 document.body.style.cssText='margin:0;padding:16px;box-sizing:border-box;background:var(--fundo);font-family:var(--f-corpo);color:var(--tinta)';
-function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{verCadastrosProdutos:true,editarCadastrosProdutos:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={{}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela="produtos"/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
+function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{verCadastrosProdutos:true,editarCadastrosProdutos:!location.search.includes('visualizador')},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={{}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela="produtos"/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
 for (const e of [document.documentElement, document.body, document.getElementById('root')]) { e.style.height = 'auto'; e.style.overflow = 'visible' } // a app real rola no layout; aqui a página rola
 createRoot(document.getElementById('root')).render(<Cena/>);
 `)
@@ -91,5 +91,20 @@ for (const [w, h, esquema] of [[1440, 900, 'light'], [390, 844, 'light'], [1440,
   await pg.screenshot({ path: resolve(pasta, `depois-${w}-${esquema}.png`), fullPage: true })
   resultado.pedidos.push(...pedidas); await ctx.close()
 }
+// Visualizador (sem editar produtos, a porta Operador da API): sem números, sem ordens por vendas e sem chamar as rotas delas.
+{ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'pt-BR' })
+  await ctx.addInitScript(() => { sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture', empresa: { id: 'empresa' }, usuario: { id: 'op' }, expiraEm: Date.now() + 600000 })) })
+  const pedidas = []
+  await ctx.route('**/api/**', r => { const u = new URL(r.request().url()); if (!u.pathname.startsWith('/api/')) return r.continue(); pedidas.push(u.pathname); return r.fulfill({ json: { data: u.pathname === '/api/produtos' ? produtos : [], meta: { totalCount: 12 } } }) })
+  const pg = await ctx.newPage(); const erros = []; pg.on('pageerror', e => erros.push(e.message))
+  await pg.goto(`${url}/.build/3303/depois/index.html?visualizador`)
+  await pg.getByRole('row').filter({ hasText: 'Linguini 700g' }).waitFor()
+  const ordem = pg.getByRole('combobox', { name: 'Ordem' }); await ordem.focus(); await ordem.fill('')
+  await pg.keyboard.press('ArrowDown')
+  await pg.getByRole('option', { name: 'Mais recentes' }).waitFor()
+  assert.equal(await pg.getByRole('option', { name: 'Maior receita (90 dias)' }).count(), 0, 'visualizador sem ordem por vendas')
+  assert.equal(await pg.getByRole('region', { name: 'Números dos produtos' }).count(), 0, 'visualizador sem faixa')
+  assert.ok(!pedidas.some(p => p.startsWith('/api/produtos/desempenho')), 'visualizador não chama as rotas de Operador')
+  assert.deepEqual(erros, []); resultado.visualizador = pedidas; await ctx.close() }
 writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ ok: true, ...resultado }, null, 2))
 await browser.close(); console.log('prova 3303 ok:', pasta)

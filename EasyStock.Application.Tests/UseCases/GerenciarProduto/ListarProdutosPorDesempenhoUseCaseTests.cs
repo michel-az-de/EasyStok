@@ -50,6 +50,8 @@ public sealed class ListarProdutosPorDesempenhoUseCaseTests
             Entidade(Novo, "Novo", StatusProduto.Ativo, Massas),
             Entidade(Farinha, "Farinha", StatusProduto.Ativo, Insumos),
             Entidade(Agnolotti, "Agnolotti", StatusProduto.Ativo, Massas),
+            // Mesmo id de um produto da casa, mas de outra empresa: nunca pode entrar na lista.
+            new() { Id = Lasanha, EmpresaId = Guid.NewGuid(), Nome = "Lasanha de outra empresa", Status = StatusProduto.Ativo, CategoriaId = Massas },
         };
         var repo = Substitute.For<IProdutoRepository>();
         // O banco devolve fora de ordem: quem ordena é o caso de uso.
@@ -136,7 +138,10 @@ public sealed class ListarProdutosPorDesempenhoUseCaseTests
     public async Task So_le_produtos_da_empresa_pedida()
     {
         var (useCase, _, repo) = Montar();
-        await Listar(useCase, "receita90");
+        var (produtos, total) = await Listar(useCase, "receita90");
+
+        produtos.Should().OnlyContain(p => p.EmpresaId == Empresa);
+        total.Should().Be(6);
 
         await repo.Received(1).GetByIdsAsync(Empresa, Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>());
         await repo.DidNotReceive().GetByIdsAsync(Arg.Is<Guid>(g => g != Empresa), Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>());
