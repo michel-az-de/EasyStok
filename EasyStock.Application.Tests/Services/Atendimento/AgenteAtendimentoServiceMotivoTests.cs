@@ -187,6 +187,22 @@ public partial class AgenteAtendimentoServiceTests
         turno.Motivo.Should().Be(MotivoDoTurno.TetoSaida);
     }
 
+    [Fact]
+    public async Task Motivo_RecusaDoModeloEscalaSemEnviarOTextoDaRecusaEChamaOModeloUmaVezSo()
+    {
+        // #3321 (D4): refusal é desfecho próprio: o texto dela nunca vai ao cliente e o pedido não se repete.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm(RespostaLlm.StopRefusal, [new BlocoTextoLlm("Não posso ajudar com isso.")], 10, 20));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(Arg.Any<string>(), Arg.Is<string>(t => t.Contains("Não posso ajudar")),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        TurnoGravado().Motivo.Should().Be(MotivoDoTurno.RecusaModelo);
+    }
+
     private AgenteAtendimentoService CriarServicoComPrazoDeUmSegundo() => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
         _cloudClient, _unitOfWork,

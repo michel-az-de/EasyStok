@@ -19,7 +19,7 @@ public sealed record ResultadoTurnoAgente(bool ChamouLlm, bool Respondeu, bool E
 /// <summary>
 /// Turno do agente de atendimento (S06): monta o contexto (últimas 20 mensagens, dossiê do cliente,
 /// notas <c>[interno]</c>, tom de S08), chama o LLM com as ferramentas, executa as ferramentas pedidas
-/// e repete até a resposta final, no máximo <see cref="MaximoIteracoes"/> chamadas. Grava a resposta
+/// e repete até a resposta final, no máximo <see cref="MaximoIteracoes"/> voltas. Grava a resposta
 /// como <c>Mensagem(Saida, Agente)</c>, envia pela Cloud API e registra o turno e o consumo dele em <c>TurnoAgente</c>.
 ///
 /// <para>Guardas: conversa que não está <see cref="SituacaoConversa.Automatica"/> (RN-04), fora da janela

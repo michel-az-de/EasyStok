@@ -101,4 +101,13 @@ public sealed record RespostaLlm(
 
     /// <summary>#3273 (R1): o modelo parou porque o teto de saída acabou; o texto, se houver, está cortado.</summary>
     public const string StopMaxTokens = "max_tokens";
+
+    /// <summary>#3321 (D4): o modelo recusou responder; o texto, se houver, não é resposta e nunca vai ao cliente.</summary>
+    public const string StopRefusal = "refusal";
+
+    /// <summary>
+    /// #3313: o teto desta chamada já era o máximo que o modelo aceita (o <c>saida_max</c> cadastrado), então pedir um teto
+    /// maior não o sobe e repetir depois de <c>max_tokens</c> sairia igual. Falso quando o cliente não sabe (caminho do <c>.env</c>).
+    /// </summary>
+    public bool TetoNoMaximo { get; init; }
 }

@@ -85,7 +85,8 @@ public sealed class ClienteProvedorIa(
             throw new HttpRequestException($"O provedor de IA respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
-        var resposta = AnthropicMessagesClient.LerResposta(corpo, destino.Modelo);
+        // #3313: com saida_max cadastrado toda chamada saiu com ele (o piso da nova tentativa não o passa); a geração não repete.
+        var resposta = AnthropicMessagesClient.LerResposta(corpo, destino.Modelo) with { TetoNoMaximo = destino.SaidaMax is not null };
         logger.LogInformation("IA uso: provedor={ProvedorId} modelo={Modelo} entrada={Entrada} saida={Saida} cache_lido={CacheLido}",
             destino.ProvedorId, resposta.Modelo, resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheLido);
         return resposta;

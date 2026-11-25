@@ -6,7 +6,7 @@ import statistics
 
 DESFECHOS = {1: "Respondeu", 2: "Escalou", 3: "Cota", 4: "Erro", 5: "Interrompido", 6: "SemIa"}
 # Falha do harness, não do cliente: nenhuma rodada de eval pode terminar assim (MotivoDoTurno.cs).
-FALHAS_TECNICAS = {"falha_llm", "teto_saida", "prazo_turno", "iteracoes", "interrompido"}
+FALHAS_TECNICAS = {"falha_llm", "teto_saida", "prazo_turno", "recusa_modelo", "iteracoes", "interrompido"}
 MINIMO_APROVACAO = 0.8
 
 

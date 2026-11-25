@@ -92,9 +92,12 @@ public sealed class SugerirRespostaAgenteUseCase(
             "Sugestão do agente para a dona: empresa {EmpresaId}, conversa {ConversaId}, {Tokens} tokens, {LatenciaMs} ms.",
             command.EmpresaId, command.ConversaId, geracao.Tokens, cronometro.ElapsedMilliseconds);
 
+        // #3321: repetir o pedido tende a repetir a recusa; a dona escreve a resposta, sem "Tente de novo" nem o termo técnico.
         if (string.IsNullOrWhiteSpace(geracao.Texto))
             throw new AgenteIndisponivelException(
-                $"O agente não conseguiu sugerir agora ({geracao.MotivoFalha ?? "sem resposta final"}). Tente de novo.");
+                geracao.MotivoFalha?.StartsWith(GeracaoAgenteAtendimento.MotivoRecusa, StringComparison.Ordinal) == true
+                    ? "O agente recusou sugerir uma resposta para esta conversa. Responda você."
+                    : $"O agente não conseguiu sugerir agora ({geracao.MotivoFalha ?? "sem resposta final"}). Tente de novo.");
 
         return new SugestaoAgenteResult(TextoWhatsApp.SemTravessao(geracao.Texto), geracao.Tokens, cronometro.ElapsedMilliseconds);
     }
