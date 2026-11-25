@@ -30,8 +30,6 @@
    no ícone ao lado da hora (`.sinalPrazo` em erro, `.sinalAtencao` em alerta, #2258 T7), na hora em
    vermelho do prazo estourado e no nome acessível (WCAG 1.4.1). */
 .cartao { position: relative; }
-/* #3300 (F8): o cartão fora da tela não é desenhado; a altura reservada evita o salto da barra de rolagem. */
-.cartao { content-visibility: auto; contain-intrinsic-size: auto 92px; }
 .listaSemCaixa { display: contents; }
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }

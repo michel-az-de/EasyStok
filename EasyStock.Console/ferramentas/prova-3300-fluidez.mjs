@@ -14,9 +14,6 @@ await caso('F7: a lista de conversas é uma lista para o leitor de tela', () => 
   assert.match(painel, /role="list"/)
   assert.match(painel, /role="listitem"/)
 })
-await caso('F8: o cartão da lista fora da tela não é desenhado (content-visibility)', () => {
-  assert.match(caixa, /content-visibility: auto/)
-})
 await caso('F8: só o balão novo anima; abrir a conversa não anima o fio inteiro', () => {
   assert.doesNotMatch(css, /\.balao \{[^}]*animation: entradaBalao/)
   assert.match(css, /\.balao\.novo \{[^}]*animation: entradaBalao/)
