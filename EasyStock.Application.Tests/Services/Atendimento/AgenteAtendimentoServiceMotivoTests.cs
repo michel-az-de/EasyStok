@@ -90,7 +90,7 @@ public partial class AgenteAtendimentoServiceTests
         ClienteVinculado(c => c.Bloquear("golpe", Agora.AddHours(-1)));
         var semTurnos = new AgenteAtendimentoService(
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
-            _cloudClient, _usoIaRepository, _unitOfWork,
+            _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, _log, _pedidos);
 
@@ -198,6 +198,35 @@ public partial class AgenteAtendimentoServiceTests
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         var turno = TurnoGravado();
         turno.Motivo.Should().Be(MotivoDoTurno.TetoSaida);
+    }
+
+    [Fact]
+    public async Task Motivo_PrazoDoTurnoEstouradoEscalaGravaMotivoProprioENaoChamaOModeloDeNovo()
+    {
+        // #3291 (R3): modelo que não responde não prende a conversa: no prazo do turno ela vai para a equipe, uma chamada só.
+        var chamadas = 0;
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(async c =>
+        {
+            chamadas++;
+            await Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>());
+            return Texto("nunca");
+        });
+        var servico = new AgenteAtendimentoService(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
+            _cloudClient, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, _log, _pedidos, turnos: _turnos,
+            prazoTurno: Microsoft.Extensions.Options.Options.Create(new PrazoDoTurnoAgenteOptions { Segundos = 1 }));
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora).WaitAsync(TimeSpan.FromSeconds(15));
+
+        resultado.Escalou.Should().BeTrue();
+        chamadas.Should().Be(1);
+        var turno = TurnoGravado();
+        turno.Motivo.Should().Be(MotivoDoTurno.PrazoTurno);
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Escalou);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            Arg.Is<string>(m => m.StartsWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno)), Agora, Arg.Any<CancellationToken>());
     }
 
     [Fact]

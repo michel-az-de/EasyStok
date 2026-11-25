@@ -20,7 +20,7 @@ public sealed record ResultadoTurnoAgente(bool ChamouLlm, bool Respondeu, bool E
 /// Turno do agente de atendimento (S06): monta o contexto (últimas 20 mensagens, dossiê do cliente,
 /// notas <c>[interno]</c>, tom de S08), chama o LLM com as ferramentas, executa as ferramentas pedidas
 /// e repete até a resposta final, no máximo <see cref="MaximoIteracoes"/> chamadas. Grava a resposta
-/// como <c>Mensagem(Saida, Agente)</c>, envia pela Cloud API e registra o consumo em <c>UsoIa</c>.
+/// como <c>Mensagem(Saida, Agente)</c>, envia pela Cloud API e registra o turno e o consumo dele em <c>TurnoAgente</c>.
 ///
 /// <para>Guardas: conversa que não está <see cref="SituacaoConversa.Automatica"/> (RN-04), fora da janela
 /// de 24 h, ou sem entrada pendente do cliente (job repetido) → não chama o LLM nem envia nada. Atendimento
@@ -36,7 +36,6 @@ public sealed class AgenteAtendimentoService(
     IEnumerable<IFerramentaAgente> ferramentas,
     IEscaladorConversa escalador,
     IWhatsAppCloudClient cloudClient,
-    IUsoIaRepository usoIaRepository,
     IUnitOfWork unitOfWork,
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
@@ -48,7 +47,8 @@ public sealed class AgenteAtendimentoService(
     IOptions<PrecosModelosAgenteOptions>? precos = null,
     IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
     IOptions<RetomadaAssistenteOptions>? retomadaOpcoes = null,
-    IOperacaoEventPublisher? eventos = null)
+    IOperacaoEventPublisher? eventos = null,
+    IOptions<PrazoDoTurnoAgenteOptions>? prazoTurno = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -196,21 +196,22 @@ public sealed class AgenteAtendimentoService(
             modelos?.Value.DoTurno(configuracao.ModeloAgente), // S68: modelo da loja só se aprovado
             // #2862: data e dossiê fora do bloco cacheado. #3068: a orientação da retomada vai junto, só neste turno.
             systemVolatil: system.Volatil + (entradaRetomada is null ? string.Empty : RetomadaDoAssistente.Orientacao(prazoRetomada)),
-            turnoAgenteId: turnoId);
-        var tokens = geracao.Tokens;
+            turnoAgenteId: turnoId,
+            // #3291 (R3): prazo total só das chamadas ao modelo; ferramenta e envio terminam com o ct do serviço.
+            prazoTotal: (prazoTurno?.Value ?? new PrazoDoTurnoAgenteOptions()).Prazo);
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 
         var final = await protecao.ExecutarAsync(Finalizar, ct, gravar: false);
         if (final is not null) return final;
-        if (tokens > 0) await RegistrarUsoAsync(empresaId, tokens, agora);
         var desfechoSemResposta = geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido;
         LogsDoAssistente.TurnoInterrompido(logger, conversaId, desfechoSemResposta.ToString());
         await RegistrarTurnoAsync(desfechoSemResposta, geracao.Consumo?.FalhaLlm == true ? MotivoDoTurno.FalhaLlm : MotivoDoTurno.Interrompido, ct);
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
 
-        // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids; vai no mesmo commit do consumo.
+        // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids. #3291 (D2): é a única fonte do
+        // consumo do turno; o agregado mensal UsoIa saiu do caminho (o gasto mensal vem de TurnoAgente e chamada_ia).
         // #3175: turno de portao que escala nao chama o modelo: 0 tokens e o codigo do portao como motivo.
         async Task RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente desfecho, string codigoDoPortao)
         {
@@ -309,9 +310,6 @@ public sealed class AgenteAtendimentoService(
 
         if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);
-
-        if (tokens > 0)
-            await RegistrarUsoAsync(empresaId, tokens, agora);
 
         var escalou = motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida;
         // Escalou sem codigo de falha, guarda, iteracao ou menu: foi o modelo, pela ferramenta escalar_para_dona.
@@ -516,30 +514,6 @@ public sealed class AgenteAtendimentoService(
         gravacao.UltimaSaidaId = saida.Id;
         await gravacao.GravarAsync(ct);
         return enviou;
-    }
-
-    private async Task RegistrarUsoAsync(Guid empresaId, int tokens, DateTime agora)
-    {
-        var uso = await usoIaRepository.GetAsync(empresaId, agora.Year, agora.Month);
-        if (uso is null)
-        {
-            await usoIaRepository.AddAsync(new UsoIa
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = empresaId,
-                Ano = agora.Year,
-                Mes = agora.Month,
-                TotalGeracoes = 1,
-                TotalTokens = tokens,
-                AtualizadoEm = agora
-            });
-            return;
-        }
-
-        uso.TotalGeracoes++;
-        uso.TotalTokens += tokens;
-        uso.AtualizadoEm = agora;
-        await usoIaRepository.UpdateAsync(uso);
     }
 
     /// <summary>

@@ -70,6 +70,9 @@ public static partial class ServiceCollectionExtensions
         // #3068: prazo da equipe antes de o Assistente retomar; o padrão (60 s) vale sem a seção na configuração.
         services.AddOptions<RetomadaAssistenteOptions>()
             .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));
+        // #3291: prazo total das chamadas ao modelo em um turno; o padrão (180 s) vale sem a chave na configuração.
+        services.AddOptions<PrazoDoTurnoAgenteOptions>()
+            .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));
         // S67: custo estimado do turno pela tabela Anthropic:Precos; sem a tabela, custo nulo.
         services.AddOptions<PrecosModelosAgenteOptions>()
             .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));

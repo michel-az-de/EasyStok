@@ -29,7 +29,7 @@ public partial class AgenteAtendimentoServiceTests
             .Returns(c => c.Arg<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>()(c.Arg<CancellationToken>()));
         return new(
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, _log, _pedidos,
             eventos: _eventos, retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));

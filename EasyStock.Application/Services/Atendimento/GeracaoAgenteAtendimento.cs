@@ -122,7 +122,8 @@ public static class GeracaoAgenteAtendimento
         CancellationToken ct,
         string? modelo = null,
         string? systemVolatil = null,
-        Guid? turnoAgenteId = null)
+        Guid? turnoAgenteId = null,
+        TimeSpan? prazoTotal = null)
     {
         // #2862: ordem fixa (ordinal, não de cultura) para o prefixo de ferramentas ser igual entre turnos.
         var definicoes = ferramentas.Values
@@ -133,14 +134,31 @@ public static class GeracaoAgenteAtendimento
         var consumo = new ConsumoGeracaoAgente();
         var situacaoInicial = contexto.Conversa.Situacao;
 
+        // #3291 (R3): o prazo total corta só a espera pelo modelo. Ferramenta e envio seguem com o ct de quem chamou:
+        // turno que já mexeu no mundo não é cortado no meio. O desligamento do serviço (ct cancelado) segue subindo
+        // como cancelamento e nunca vira prazo.
+        using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (prazoTotal is { } total && total > TimeSpan.Zero) prazo.CancelAfter(total);
+        bool PrazoEstourou() => prazo.IsCancellationRequested && !ct.IsCancellationRequested;
+        GeracaoAgente SemPrazo()
+        {
+            contexto.LimparRespostaVerificada();
+            logger.LogWarning("Agente de atendimento: a conversa {ConversaId} passou do prazo do turno ({Prazo}); vai para a equipe.",
+                contexto.Conversa.Id, prazoTotal);
+            return new GeracaoAgente(null, tokens, false, MotivoDoPrazo(prazoTotal), consumo);
+        }
+
         for (var iteracao = 0; iteracao < maximoIteracoes; iteracao++)
         {
+            // A ferramenta da volta anterior pode ter levado o turno além do prazo: sem outra chamada ao modelo.
+            if (PrazoEstourou()) return SemPrazo();
+
             RespostaLlm resposta;
             try
             {
                 var requisicao = new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
                 { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento, TurnoAgenteId = turnoAgenteId };
-                resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, ct);
+                resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, prazo.Token);
                 // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
                 if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)
                 {
@@ -151,8 +169,13 @@ public static class GeracaoAgenteAtendimento
                     tokens += TotalDeTokens(resposta);
                     consumo.Somar(resposta);
                     // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o mesmo pedido o estouraria de novo.
-                    resposta = await llm.EnviarAsync(requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, ct);
+                    resposta = await llm.EnviarAsync(requisicao with { MaxTokensMinimo = MaxTokensNovaTentativa }, prazo.Token);
                 }
+            }
+            // O prazo é do turno, não do provedor: não é falha do modelo e não se repete.
+            catch (Exception) when (PrazoEstourou())
+            {
+                return SemPrazo();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -209,7 +232,13 @@ public static class GeracaoAgenteAtendimento
     /// <summary>#3273 (R1): começo do motivo quando o teto de saída estoura na nova tentativa também.</summary>
     public const string MotivoTetoDeSaida = "o agente atingiu o teto de saída do modelo";
 
-    // #2862: cache lido e escrito contam no total da cota (UsoIa); sem eles o número cai com o cache ligado.
+    /// <summary>#3291 (R3): começo do motivo quando as chamadas ao modelo passam do prazo total do turno.</summary>
+    public const string MotivoPrazoDoTurno = "o agente passou do prazo do turno";
+
+    private static string MotivoDoPrazo(TimeSpan? prazo) =>
+        prazo is { } p ? $"{MotivoPrazoDoTurno} ({(int)p.TotalSeconds} s)" : MotivoPrazoDoTurno;
+
+    // #2862: cache lido e escrito contam no total da cota (lida do TurnoAgente); sem eles o número cai com o cache ligado.
     private static int TotalDeTokens(RespostaLlm r) => r.TokensEntrada + r.TokensSaida + r.TokensCacheLido + r.TokensCacheEscrito;
 
     /// <summary>

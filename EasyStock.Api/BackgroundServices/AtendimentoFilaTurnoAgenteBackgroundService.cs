@@ -23,12 +23,15 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
             configuration.GetValue("Atendimento:FilaTurnoAgente:PollingIntervalMs", defaultValue: 500));
 
         var paralelismo = Math.Max(1, configuration.GetValue("Atendimento:FilaTurnoAgente:Paralelismo", defaultValue: 4));
-        var executor = new ExecutorPorChave(paralelismo, (empresaId, ex) =>
-            logger.LogError(ex, "AtendimentoFilaTurnoAgenteBackgroundService: turno da loja {EmpresaId} falhou.", empresaId));
+        var paralelismoPorLoja = Math.Clamp(
+            configuration.GetValue("Atendimento:FilaTurnoAgente:ParalelismoPorLoja", defaultValue: 2), 1, paralelismo);
+        var executor = new ExecutorPorChave(paralelismo, (conversaId, ex) =>
+            logger.LogError(ex, "AtendimentoFilaTurnoAgenteBackgroundService: turno da conversa {ConversaId} falhou.", conversaId),
+            paralelismoPorLoja);
 
         logger.LogInformation(
-            "AtendimentoFilaTurnoAgenteBackgroundService iniciado — polling={Intervalo}, paralelismo={Paralelismo}.",
-            intervalo, paralelismo);
+            "AtendimentoFilaTurnoAgenteBackgroundService iniciado — polling={Intervalo}, paralelismo={Paralelismo}, porLoja={PorLoja}.",
+            intervalo, paralelismo, paralelismoPorLoja);
 
         await RecuperarTurnosPerdidosAsync(stoppingToken);
 
@@ -40,9 +43,12 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
                     FilaAtendimentoNomes.TurnoAgente,
                     job =>
                     {
-                        // #2863: a chave é a loja, não a conversa. Dois turnos da mesma loja em paralelo disputariam
-                        // o registro mensal de uso (leitura e gravação sem trava) e a conferência da cota.
-                        executor.Agendar(job.EmpresaId, async ct =>
+                        // #3291 (R3): a chave é a conversa e o grupo é a loja. Antes (#2863) a chave era a loja, porque dois
+                        // turnos da mesma loja disputavam o agregado mensal UsoIa (ler, somar, gravar sem trava); com a
+                        // gravação fora do turno, uma conversa lenta não segura as outras da loja. Dentro da conversa a
+                        // ordem fica. O teto por loja limita o gasto em paralelo e a folga da cota suave (a conferência
+                        // da cota não é atômica: no máximo "teto menos um" turnos passam juntos pelo limite).
+                        executor.Agendar(job.ConversaId, job.EmpresaId, async ct =>
                         {
                             using var scope = serviceProvider.CreateScope();
                             var useCase = scope.ServiceProvider.GetRequiredService<ProcessarTurnoAgenteUseCase>();
