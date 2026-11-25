@@ -75,6 +75,25 @@ public class DetectorReclamacaoClienteTests
     public void DemoraDoDinheiroDoClienteContinuaReclamacao(string texto) =>
         DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
 
+    // Revisão final (C1): a demora do dinheiro com palavras no meio, e a cobrança seguida de "me avisa", continuam reclamação.
+    [Theory]
+    [InlineData("O estorno do cartão não caiu")]
+    [InlineData("O reembolso do pix não chegou")]
+    [InlineData("Meu estorno no cartão não caiu até agora")]
+    [InlineData("Não caiu dinheiro na conta")]
+    [InlineData("dinheiro não voltou, quero de volta")]
+    [InlineData("O dinheiro do pedido não caiu no cartão")]
+    [InlineData("Quero o estorno agora e me avisa quando cai")]
+    public void DemoraDoDinheiroComPalavrasNoMeioContinuaReclamacao(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
+
+    [Theory]
+    [InlineData("Pago em dinheiro e o motoboy não chegou")]
+    [InlineData("o troco não voltou")]
+    [InlineData("não recebi o pedido")]
+    public void EntregaETrocoNaoSaoCobrancaDeDinheiro(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
+
     [Theory]
     [InlineData("manda o link pra eu pagar")]
     [InlineData("quero uma lasanha")]

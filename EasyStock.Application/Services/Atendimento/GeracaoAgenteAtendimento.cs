@@ -340,15 +340,21 @@ public static class GeracaoAgenteAtendimento
         raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
         && motivo.GetString() is { } texto && MotivosQueSoOrientam.Contains(texto);
 
+    // Recusa que diz que o envio JÁ aconteceu antes na conversa: o "já mandei" do modelo é verdade e continua valendo.
+    private static readonly HashSet<string> MotivosDeEnvioJaFeito = ["comanda_ja_enviada", "comanda_recem_enviada", "resumo_ja_enviado"];
+
     private static bool NaoConfirmouEnvio(string resultado)
     {
         try
         {
             using var doc = System.Text.Json.JsonDocument.Parse(resultado);
             var raiz = doc.RootElement;
-            return raiz.ValueKind == System.Text.Json.JsonValueKind.Object
-                && ((raiz.TryGetProperty("enviado", out var enviado) && enviado.ValueKind == System.Text.Json.JsonValueKind.False)
-                    || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False));
+            if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+            if (raiz.TryGetProperty("motivo", out var motivo) && motivo.ValueKind == System.Text.Json.JsonValueKind.String
+                && motivo.GetString() is { } texto && MotivosDeEnvioJaFeito.Contains(texto))
+                return false;
+            return (raiz.TryGetProperty("enviado", out var enviado) && enviado.ValueKind == System.Text.Json.JsonValueKind.False)
+                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False);
         }
         catch (System.Text.Json.JsonException)
         {
