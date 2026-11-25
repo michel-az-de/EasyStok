@@ -26,7 +26,7 @@
 .valor { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .falta { color: var(--alerta); font-weight: 600; }
 /* O saldo é a pergunta da dona: vence o cinza de `.lista td small` da base. */
-.tabela td small.falta { color: var(--alerta); font-weight: 600; }
+.tabela td small.falta { color: var(--alerta); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .tabela .soCelular { display: none; }
 
 .detalhe { display: grid; gap: var(--e-5); min-width: 0; color: var(--tinta); }
