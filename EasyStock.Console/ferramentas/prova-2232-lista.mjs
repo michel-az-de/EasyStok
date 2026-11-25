@@ -120,6 +120,8 @@ confere('L11 cabeçalho sem número repetido; o contador mora no segmento', () =
   assert.doesNotMatch(jsxBarra, /<h2>Conversas <span>/)
 })
 
+// O nome curto, sem a prévia, é de propósito: o axe acusa `label-content-name-mismatch` e a exceção está
+// decidida e documentada na #3336 (docs/dev/excecoes-acessibilidade-console.md). Não "conserte" o nome sem decisão.
 confere('X1  nome acessível composto do item da lista', () => {
   assert.equal(typeof cartao.rotuloDoCartao, 'function')
   assert.equal(
