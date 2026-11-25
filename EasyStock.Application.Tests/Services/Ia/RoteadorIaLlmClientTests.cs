@@ -363,6 +363,41 @@ public class RoteadorIaLlmClientTests
     }
 
     [Fact]
+    public async Task GastoDoMesESomadoUmaVezPorEscopo()
+    {
+        // #3287 (R10): até 7 somas num turno de 6 voltas; o gasto lido no começo vale pelo escopo (cota suave, D6).
+        var roteador = Roteador();
+        for (var i = 0; i < 3; i++)
+        {
+            await roteador.DisponivelAsync(Empresa);
+            await roteador.EnviarAsync(Requisicao());
+        }
+
+        await _rotas.Received(1).GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FalhaAoSomarOGastoNaoFicaGuardadaNoMemo()
+    {
+        _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<decimal>(new TimeoutException("banco lento")), Task.FromResult(0m));
+        var roteador = Roteador();
+
+        (await roteador.DisponivelAsync(Empresa)).Should().BeFalse();
+        (await roteador.DisponivelAsync(Empresa)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ChamadaDoTurnoGravaOIdDoTurno()
+    {
+        var turno = Guid.NewGuid();
+
+        await Roteador().EnviarAsync(Requisicao() with { TurnoAgenteId = turno });
+
+        _gravadas.Should().ContainSingle().Which.TurnoAgenteId.Should().Be(turno);
+    }
+
+    [Fact]
     public async Task AChaveNaoApareceEmLogExcecaoNemChamadaIa()
     {
         _provedores.EnviarAsync(Arg.Any<DestinoIa>(), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())

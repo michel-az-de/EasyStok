@@ -70,8 +70,11 @@ public sealed class TurnoAgente
         DesfechoTurnoAgente desfecho,
         int duracaoMs,
         DateTime agora,
-        string? motivo = null)
+        string? motivo = null,
+        Guid? id = null)
     {
+        if (id == Guid.Empty)
+            throw new RegraDeDominioVioladaException("O id do turno, quando informado, não pode ser vazio.");
         if (empresaId == Guid.Empty || conversaId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Empresa e conversa são obrigatórias no registro do turno.");
         if (tokensEntrada < 0 || tokensSaida < 0 || tokensCacheLido < 0 || passos < 0 || duracaoMs < 0)
@@ -86,7 +89,7 @@ public sealed class TurnoAgente
 
         return new TurnoAgente
         {
-            Id = Guid.NewGuid(),
+            Id = id ?? Guid.NewGuid(),
             EmpresaId = empresaId,
             ConversaId = conversaId,
             MensagemClienteId = mensagemClienteId,

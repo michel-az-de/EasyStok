@@ -49,6 +49,9 @@ public sealed record RequisicaoLlm(
     /// </summary>
     public int? MaxTokensMinimo { get; init; }
 
+    /// <summary>#3287 (R5): turno do agente que fez a chamada, para ligar <c>chamada_ia</c> ao <c>TurnoAgente</c>. Nulo fora do turno.</summary>
+    public Guid? TurnoAgenteId { get; init; }
+
     /// <summary>#3063: para que a chamada serve, no registro de uso.</summary>
     public EasyStock.Domain.Enums.Ia.FinalidadeIa Finalidade { get; init; } = EasyStock.Domain.Enums.Ia.FinalidadeIa.Outra;
 }
