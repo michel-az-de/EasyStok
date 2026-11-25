@@ -127,6 +127,34 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
     }
 
     [SkippableFact]
+    public async Task GastoDoMesSegueOMesDeBrasiliaNasTresUltimasHorasDoMes()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        // #3295 (R6): o mês da cota em US$ é o de Brasília, o mesmo da cota de tokens. 01/12 01:30 UTC ainda é 30/11 22:30 lá.
+        var empresa = Guid.NewGuid();
+        var (provedor, padrao, _) = await SemearLojaAsync(empresa, 10m);
+        await using var sp = Provedor();
+        var registro = sp.GetRequiredService<IRegistroChamadaIa>();
+        foreach (var (instante, custo) in new[]
+                 {
+                     (new DateTime(2026, 11, 30, 12, 0, 0, DateTimeKind.Utc), 1m),
+                     (new DateTime(2026, 12, 1, 1, 30, 0, DateTimeKind.Utc), 2m),
+                     (new DateTime(2026, 12, 1, 2, 59, 59, 999, DateTimeKind.Utc), 8m),
+                     (new DateTime(2026, 12, 1, 3, 0, 0, DateTimeKind.Utc), 16m),
+                     (new DateTime(2026, 12, 1, 3, 30, 0, DateTimeKind.Utc), 4m),
+                 })
+            await registro.RegistrarAsync(ChamadaIa.Registrar(empresa, provedor, padrao, "deepseek-flash", FinalidadeIa.Atendimento,
+                null, 100, 20, 0, 0, custo, 10, DesfechoChamadaIa.Ok, instante));
+
+        var rotas = sp.GetRequiredService<IRotasIa>();
+        // Último milissegundo de 30/11 em Brasília (02:59:59.999 UTC de 01/12): ainda novembro. Entram 1 + 2 + 8 (a desse
+        // mesmo milissegundo); a da meia-noite exata (03:00:00 UTC, 16) fica de fora.
+        (await rotas.GastoDoMesAsync(empresa, provedor, new DateTime(2026, 12, 1, 2, 59, 59, 999, DateTimeKind.Utc))).Should().Be(11m);
+        // 00:45 de 01/12 em Brasília (03:45 UTC): dezembro, a da meia-noite exata (03:00:00 UTC, 16) e a de 03:30 (4).
+        (await rotas.GastoDoMesAsync(empresa, provedor, new DateTime(2026, 12, 1, 3, 45, 0, DateTimeKind.Utc))).Should().Be(20m);
+    }
+
+    [SkippableFact]
     public async Task ModeloPedidoCasaComIdExternoESemCasamentoCaiNoPadrao()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

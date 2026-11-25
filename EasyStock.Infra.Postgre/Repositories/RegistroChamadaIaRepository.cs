@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Domain.Entities.Ia;
 using EasyStock.Infra.Postgre.Data;
@@ -22,8 +23,8 @@ public sealed class RegistroChamadaIaRepository(IServiceScopeFactory escopos) : 
 
     public async Task<UsoMensalIa> SomarMesAsync(Guid empresaId, DateTime agoraUtc, CancellationToken ct = default)
     {
-        var inicio = new DateTime(agoraUtc.Year, agoraUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var fim = inicio.AddMonths(1);
+        // #3295 (R6): o mês é o de Brasília, o mesmo da cota de tokens (PortoesDoAssistente.UsadosNoMesAsync).
+        var (inicio, fim) = HorarioBrasil.JanelaMesUtc(HorarioBrasil.DataOperacional(agoraUtc));
         await using var escopo = escopos.CreateAsyncScope();
         var db = escopo.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         db.SetMobileTenantContext(empresaId);
