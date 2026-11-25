@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 
@@ -215,12 +216,20 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         // #1290: o número pode estar só na lista de telefones do cadastro (ex.: WhatsApp como segundo número).
-        public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone) =>
-            db.Clientes
+        public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone)
+        {
+            // #3341: o cadastro pode ter o número em outra grafia; casa pelo DDD e os 8 últimos dígitos.
+            // Replace encadeado (e não TraduzirTexto) para o predicado também rodar no provedor em memória.
+            var formas = TelefoneE164.FormasDeBusca(telefone);
+            return db.Clientes
                 .Where(c => c.EmpresaId == empresaId
-                            && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)))
+                            && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)
+                                || (formas.Count > 0
+                                    && ((c.Telefone != null && formas.Contains(c.Telefone.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))
+                                        || c.Telefones.Any(t => formas.Contains(t.Numero.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))))))
                 .OrderBy(c => c.Telefone == telefone ? 0 : 1) // o telefone principal vence a lista
                 .FirstOrDefaultAsync();
+        }
 
         public async Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
             IReadOnlyList<string> hashes, CancellationToken ct = default) =>

@@ -65,6 +65,37 @@ public sealed class ClienteRepositoryTelefoneTests : IDisposable
         achado!.Id.Should().Be(cliente.Id);
     }
 
+    // #3341: o cadastro antigo pode ter o número em outra grafia (sem o nono dígito, com máscara ou com
+    // o zero do tronco). A chave é DDD + 8 últimos dígitos; o nono dígito e o DDI não contam.
+    [Theory]
+    [InlineData("1197573992")]
+    [InlineData("11 99757-3992")]
+    [InlineData("(11) 99757-3992")]
+    [InlineData("011 99757-3992")]
+    [InlineData("5511997573992")]
+    public async Task AchaOMesmoCelularEmQualquerGrafiaDoCadastro(string gravado)
+    {
+        var cliente = await GravarAsync(_empresaId, gravado);
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992"))!.Id.Should().Be(cliente.Id);
+    }
+
+    [Fact]
+    public async Task AchaCadastroComNonoDigitoQuandoWhatsAppVemSemEle()
+    {
+        var cliente = await GravarAsync(_empresaId, "11997573992");
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+551197573992"))!.Id.Should().Be(cliente.Id);
+    }
+
+    [Fact]
+    public async Task NaoJuntaNumerosDeDddsDiferentes()
+    {
+        await GravarAsync(_empresaId, "21997573992");
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992")).Should().BeNull();
+    }
+
     [Fact]
     public async Task NaoAchaNumeroDeOutraEmpresa()
     {

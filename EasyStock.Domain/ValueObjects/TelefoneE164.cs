@@ -59,6 +59,10 @@ public sealed record TelefoneE164
 
         var normalizado = digitos.ToString();
 
+        // #3341: o zero do tronco antes do DDD (011 99757-3992) não faz parte do número.
+        if (normalizado.StartsWith('0'))
+            normalizado = normalizado[1..];
+
         // Sem prefixo: DDD + número BR puro (10 ou 11 dígitos) ganha o +55; "55" + DDD + número (12 ou 13 dígitos,
         // como o VO Telefone grava o que foi digitado sem '+') ganha só o '+'. Os comprimentos não se cruzam:
         // número nacional nunca passa de 11 dígitos (#1290).
@@ -83,6 +87,33 @@ public sealed record TelefoneE164
         if (string.IsNullOrWhiteSpace(telefone)) return null;
         try { return From(telefone); }
         catch (TelefoneInvalidoException) { return null; }
+    }
+
+    /// <summary>
+    /// #3341: grafias, só dígitos, em que um celular BR pode estar gravado no cadastro: com ou sem o zero do tronco,
+    /// com ou sem o DDI 55 e com ou sem o nono dígito, sempre com o mesmo DDD e os 8 últimos dígitos. Vazio quando o
+    /// texto não traz DDD e número.
+    /// </summary>
+    public static IReadOnlyList<string> FormasDeBusca(string? telefone)
+    {
+        var nacional = NacionalBr(SoDigitos(telefone));
+        if (nacional is null) return [];
+
+        var formas = new List<string>(8);
+        foreach (var prefixo in new[] { "", "0", "55", "055" })
+        foreach (var nono in new[] { "", "9" })
+            formas.Add(prefixo + nacional[..2] + nono + nacional[^8..]);
+        return formas;
+    }
+
+    /// <summary>DDD + número nacional (10 ou 11 dígitos), sem o zero do tronco e sem o DDI 55; null se não couber.</summary>
+    private static string? NacionalBr(string digitos)
+    {
+        var semTronco = digitos.StartsWith('0') ? digitos[1..] : digitos;
+        var semDdi = semTronco.Length is 12 or 13 && semTronco.StartsWith("55", StringComparison.Ordinal)
+            ? semTronco[2..]
+            : semTronco;
+        return semDdi.Length is 10 or 11 ? semDdi : null;
     }
 
     public static implicit operator string(TelefoneE164 t) => t.Value;
