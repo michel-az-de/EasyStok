@@ -78,7 +78,7 @@
 .prefixo { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--tinta-3); vertical-align: -2px; }
 /* #3363 (S4): o prefixo desce 2 px da linha de base e, sozinho, alongava o cartão em 2 px na hora em que a atendente
    responde (a prévia passa a começar por "Você:"). A margem negativa devolve esses 2 px: o cartão não muda de altura. */
-.prefixo { margin-bottom: -2px; }
+.cartao .prefixo { margin-bottom: -2px; }
 
 @keyframes estalarPonto { from { transform: scale(0); } to { transform: none; } }
 

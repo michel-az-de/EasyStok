@@ -132,30 +132,36 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     return [...ordenada, ...novas]
   }, [visiveis, ordemCongelada])
 
-  // #3363 (S4): enquanto a mesma conversa fica aberta, a ordem dos cartões é a de quando ela abriu. Responder muda o
-  // motivo e a hora dela e, sem isto, o cartão sai do lugar e os de baixo sobem de uma vez (hoje 365 px e 6 × 93,2 px).
-  // Ela fica no lugar, atenuada se já não pertence a esta lista, até a troca de conversa; só então a lista reordena.
-  // Mudar aba, canal, busca, ordem ou responsável recomeça a conta. Estado no render, como `buscaVista`, sem efeito.
+  // #3363 (S4): responder muda o motivo e a hora da conversa aberta e, sem isto, o cartão dela sai do lugar e os de baixo
+  // sobem de uma vez (hoje 365 px e 6 × 93,2 px). Só o cartão da conversa aberta é preso: fica logo abaixo do vizinho que
+  // tinha (ou no mesmo índice, se o vizinho saiu), atenuado se já não pertence a esta lista, até a troca de conversa. O resto
+  // da lista ordena e recebe as novas como sempre. Mudar aba, canal, busca, ordem ou responsável recomeça a conta, e a âncora
+  // é refeita se nasceu antes de a conversa estar na lista (primeira carga, aberta por fora). Estado no render, como `buscaVista`.
   const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
   const [ancora, setAncora] = useState(null)
-  const ancoraValeu = ancora?.id === selecionadaId && ancora.chave === chaveDaLista
+  const indiceNaBase = selecionadaId == null ? -1 : listaBase.findIndex((c) => c.id === selecionadaId)
+  const ancoraValeu = ancora?.id === selecionadaId && ancora.chave === chaveDaLista && !(ancora.indice < 0 && indiceNaBase >= 0)
   if (!ancoraValeu && (selecionadaId != null || ancora != null)) {
-    setAncora(selecionadaId == null ? null : { id: selecionadaId, chave: chaveDaLista, ordem: listaBase.map((c) => c.id) })
+    setAncora(selecionadaId == null ? null : { id: selecionadaId, chave: chaveDaLista, indice: indiceNaBase, acima: indiceNaBase > 0 ? listaBase[indiceNaBase - 1].id : null })
   }
   const lista = useMemo(() => {
-    if (!ancoraValeu || !ancora.ordem.includes(selecionadaId)) return listaBase
-    const porId = new Map(listaBase.map((c) => [c.id, c]))
-    const tinha = new Set(ancora.ordem)
-    const ordenada = ancora.ordem.map((id) => porId.get(id) ?? (id === selecionadaId ? conversas.find((c) => c.id === id) : undefined)).filter(Boolean)
-    return [...ordenada, ...listaBase.filter((c) => !tinha.has(c.id))]
+    if (!ancoraValeu || ancora.indice < 0) return listaBase
+    const aberta = listaBase.find((c) => c.id === selecionadaId) ?? conversas.find((c) => c.id === selecionadaId)
+    if (!aberta) return listaBase
+    const resto = listaBase.filter((c) => c.id !== selecionadaId)
+    const abaixoDe = ancora.acima == null ? -1 : resto.findIndex((c) => c.id === ancora.acima)
+    const posicao = ancora.acima == null ? 0 : abaixoDe >= 0 ? abaixoDe + 1 : Math.min(ancora.indice, resto.length)
+    return [...resto.slice(0, posicao), aberta, ...resto.slice(posicao)]
   }, [listaBase, ancora, ancoraValeu, selecionadaId, conversas])
-  const foraDaLista = ancoraValeu && !listaBase.some((c) => c.id === selecionadaId) ? selecionadaId : null
+  const foraDaLista = ancoraValeu && ancora.indice >= 0 && indiceNaBase < 0 ? selecionadaId : null
 
   // #3363 (S1): a lista é uma parada de Tab só (foco itinerante). A parada é o cartão aberto; sem aberto, o último que teve
   // foco; sem ele, o primeiro. ↑ ↓ j k Home End andam entre os cartões. Estado, não ref: o id entra na conta do render.
+  // Com o foco dentro da lista a parada é o cartão focado (senão o Tab de um cartão qualquer cairia no aberto, dentro da lista).
   const [focoId, setFocoId] = useState(null)
+  const [focoNaLista, setFocoNaLista] = useState(false)
   const naLista = (id) => id != null && lista.some((c) => String(c.id) === String(id))
-  const ativoId = String(naLista(selecionadaId) ? selecionadaId : naLista(focoId) ? focoId : lista[0]?.id)
+  const ativoId = String(focoNaLista && naLista(focoId) ? focoId : naLista(selecionadaId) ? selecionadaId : naLista(focoId) ? focoId : lista[0]?.id)
   function aoTeclarNaLista(e) {
     // Só com o foco num cartão e sem modificador (WCAG 2.1.4): j e k em campo de texto continuam escrevendo.
     if (!e.target.matches?.('button[data-conversa-id]') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
@@ -227,7 +233,8 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- #3363: as setas valem em qualquer cartão; a lista é o único ancestral comum. */}
         <div
           role="list" aria-label="Conversas" className={css.listaSemCaixa}
-          onFocus={(e) => { const id = e.target.dataset?.conversaId; if (id) setFocoId(id) }}
+          onFocus={(e) => { const id = e.target.dataset?.conversaId; if (id) { setFocoId(id); setFocoNaLista(true) } }}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocoNaLista(false) }}
           onKeyDown={aoTeclarNaLista}
         >
         {lista.map((conversa) => (

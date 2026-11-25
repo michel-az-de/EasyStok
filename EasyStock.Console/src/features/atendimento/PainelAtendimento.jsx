@@ -62,6 +62,10 @@ function PainelDaConversa({
   const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
   const cabecalhoRef = useRef(null)
   const compositorPublicoRef = useRef(null)
+  // #3363 (S3): o envio pode terminar depois de a atendente trocar de conversa (assumir leva um tempo); o avanço lê a conversa
+  // aberta e a fila de AGORA, não as do render em que ela apertou a tecla.
+  const aoVivoRef = useRef(null)
+  useEffect(() => { aoVivoRef.current = { id: selecionada?.id, proximaDaFila } })
   const contextoDaNota = useRef({ id: selecionada?.id, visivel: editorNotaVisivel })
   // #2185 (F22): "Reabrindo…" e "Abrindo…" são da conversa que pediu; o Painel não remonta por conversa, e
   // o botão da outra nascia desabilitado até a primeira terminar.
@@ -307,7 +311,9 @@ function PainelDaConversa({
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
         // #3363 (S3): Ctrl+Enter envia e abre o topo de "Precisa de você"; sem outra na fila, fica nesta conversa.
         aoAvancar={() => {
-          const proxima = proximaDaFila(selecionada.id)
+          const aoVivo = aoVivoRef.current
+          if (aoVivo?.id !== selecionada.id) return
+          const proxima = aoVivo.proximaDaFila(selecionada.id)
           if (proxima) { selecionar(proxima); devolverFocoAoCampoDepoisDeFechar() }
         }}
         // #2134: responder com o Assistente atendendo é assumir, pelo mesmo caminho do botão Assumir.

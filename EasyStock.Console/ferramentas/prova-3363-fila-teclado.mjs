@@ -64,19 +64,20 @@ async function contextoNovo() {
 }
 
 // 35 conversas assumidas pela própria atendente, como na medição: a rede simulada responde só o que o Balcão pede.
-async function abrirApi({ quantas = 35, naoLidas = 11, todas = true, abrir = 'Pessoa 05', naFilaDaEquipe = false } = {}) {
+async function abrirApi({ quantas = 35, naoLidas = 11, todas = true, abrir = 'Pessoa 05', naFilaDaEquipe = false, atrasoAssumirMs = 0, primeiraAutomatica = false } = {}) {
   const contexto = await contextoNovo()
   await contexto.addInitScript(() => {
     sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja da fila' }, usuario: { id: 'dona', nome: 'Dona' } }))
     sessionStorage.setItem('easystok.confirmouEnviarAssumindo.v1:empresa:dona', '1')
   })
   const agora = Date.now()
-  const conversas = Array.from({ length: quantas }, (_, i) => ({ id: `c${i}`, contatoNome: `Pessoa ${String(i).padStart(2, '0')}`, contatoIdExterno: `551199999${String(i).padStart(4, '0')}`, canal: 'WhatsApp', situacao: 'Assumida', assumidaPorUsuarioId: naFilaDaEquipe ? null : 'dona', ultimaMensagemEm: new Date(agora - i * 60000).toISOString(), naoLidas: i < naoLidas ? 1 : 0 }))
-  await contexto.route('**/api/**', (route) => {
+  const conversas = Array.from({ length: quantas }, (_, i) => ({ id: `c${i}`, contatoNome: `Pessoa ${String(i).padStart(2, '0')}`, contatoIdExterno: `551199999${String(i).padStart(4, '0')}`, canal: 'WhatsApp', situacao: i === 0 && primeiraAutomatica ? 'Automatica' : 'Assumida', assumidaPorUsuarioId: naFilaDaEquipe ? null : 'dona', ultimaMensagemEm: new Date(agora - i * 60000).toISOString(), naoLidas: i < naoLidas ? 1 : 0 }))
+  await contexto.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (!path.startsWith('/api/')) return route.continue()
     const metodo = route.request().method()
     const ok = (data) => route.fulfill({ json: { data } })
+    if (atrasoAssumirMs && path.endsWith('/assumir')) await new Promise((resolver) => setTimeout(resolver, atrasoAssumirMs))
     if (path === '/api/auth/me/modulos') return ok({ modulos: ['atendimento', 'cadastros'].map((id) => ({ id, liberado: true })), acoes: {} })
     if (path === '/api/atendimento/conversas') return ok(conversas)
     if (path.endsWith('/mensagens') && metodo === 'GET') return ok([{ id: `${path}-m`, direcao: 'Entrada', texto: 'Bom dia, tudo bem?', enviadaEm: new Date(agora - 120000).toISOString(), tipoConteudo: 'Texto' }])
@@ -448,6 +449,42 @@ try {
       await pagina.waitForTimeout(500)
       assert.equal(await pagina.locator(`${CARTOES}[aria-label*="saiu desta lista"]`).count(), 0, 'sobrou cartão marcado como fora da lista depois de mudar a aba')
       assert.ok((await pagina.locator(CARTOES).count()) >= 35, 'a aba Todas não mostrou as 35 conversas')
+    } finally { await contexto.close() }
+  })
+  await confere('S1e (API): depois de andar pelas setas, o Tab sai da lista (a parada é o cartão focado, não o aberto)', async () => {
+    const { contexto, pagina } = await abrirApi()
+    try {
+      const cartoes = pagina.locator(CARTOES)
+      await cartoes.nth(2).focus()
+      await pagina.keyboard.press('ArrowDown')
+      assert.equal(await indiceDoFoco(pagina), 3, 'a seta não moveu o foco para o cartão 3')
+      await pagina.keyboard.press('Tab')
+      assert.equal(await pagina.evaluate(() => Boolean(document.activeElement?.closest('[role=list]'))), false, 'o Tab caiu em outro cartão da lista em vez de sair dela')
+      // Voltando à lista, a parada é o cartão da conversa aberta (S1).
+      await pagina.keyboard.press('Shift+Tab')
+      assert.ok(await focoNoCartaoAberto(pagina), 'o Shift+Tab de volta não parou no cartão da conversa aberta')
+    } finally { await contexto.close() }
+  })
+
+  await confere('S3h (modo API): trocar de conversa enquanto o envio assume cancela o avanço e não leva o foco', async () => {
+    // c0 com o Assistente atendendo (enviar assume antes, 1,5 s) e c1, c2 na fila da equipe (a mais antiga, c2, é o topo).
+    // Ctrl+Enter na c0 e, no meio, ela abre a c1: o avanço é da c0 e iria ao topo (c2), não à c1 que ela escolheu.
+    const { contexto, pagina } = await abrirApi({ quantas: 3, naoLidas: 3, todas: true, abrir: 'Pessoa 00', naFilaDaEquipe: true, primeiraAutomatica: true, atrasoAssumirMs: 1500 })
+    try {
+      assert.equal(await idAberto(pagina), 'c0', 'a c0 não estava aberta')
+      let assumiu = 0
+      pagina.on('request', (r) => { if (r.method() === 'POST' && new URL(r.url()).pathname.endsWith('/assumir')) assumiu += 1 })
+      const campo = campoDe(pagina)
+      await campo.click(); await campo.fill(FRASE)
+      await pagina.keyboard.press('Control+Enter')
+      await pagina.waitForTimeout(300)
+      assert.equal(assumiu, 1, 'o envio não pediu para assumir: o cenário não reproduz a espera')
+      await pagina.locator(`${CARTOES}[data-conversa-id="c1"]`).click()
+      await campoDe(pagina).waitFor()
+      await pagina.keyboard.type('para a c1')
+      await pagina.waitForTimeout(2500)
+      assert.equal(await idAberto(pagina), 'c1', 'o avanço da c0 trocou a conversa que a atendente tinha aberto depois')
+      assert.equal(await campoDe(pagina).inputValue(), 'para a c1', 'o que ela digitou na c1 foi perdido ou foi para outra conversa')
     } finally { await contexto.close() }
   })
 } finally {
