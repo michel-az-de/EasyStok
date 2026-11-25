@@ -33,6 +33,13 @@ public sealed class ConsumoGeracaoAgente
     /// <summary>A chamada ao modelo falhou (depois da nova tentativa).</summary>
     public bool FalhaLlm { get; private set; }
 
+    /// <summary>
+    /// #3347 (D4): a falha foi definitiva: o provedor respondeu com um status que a nova tentativa não repete
+    /// (<c>FalhaTransitoria</c> devolve falso: 400, 401, 402, 403, 404, 3xx e afins). Só vale junto de <see cref="FalhaLlm"/>,
+    /// que continua verdadeiro nas duas classes: o desfecho Erro depende dele.
+    /// </summary>
+    public bool FalhaLlmDefinitiva { get; private set; }
+
     public IReadOnlyList<FerramentaDoTurno> Ferramentas => _ferramentas;
 
     internal void Somar(RespostaLlm resposta)
@@ -48,7 +55,11 @@ public sealed class ConsumoGeracaoAgente
 
     internal void RegistrarFerramenta(string nome, bool ok) => _ferramentas.Add(new FerramentaDoTurno(nome, ok));
 
-    internal void RegistrarFalhaLlm() => FalhaLlm = true;
+    internal void RegistrarFalhaLlm(bool definitiva)
+    {
+        FalhaLlm = true;
+        FalhaLlmDefinitiva = definitiva;
+    }
 }
 
 /// <summary>
@@ -184,7 +195,8 @@ public static class GeracaoAgenteAtendimento
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 contexto.LimparRespostaVerificada();
-                consumo.RegistrarFalhaLlm();
+                // #3347 (D4): a regra da nova tentativa decide a classe gravada: status que ela não repete é falha definitiva.
+                consumo.RegistrarFalhaLlm(definitiva: !FalhaTransitoria(ex));
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", contexto.Conversa.Id);
                 return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);
             }
@@ -264,6 +276,7 @@ public static class GeracaoAgenteAtendimento
 
     /// <summary>
     /// #3273 (R2): só o que pode mudar em 300 ms se repete (rede, prazo, 5xx, 408, 429). 400, 401, 402 e afins são definitivos.
+    /// #3347 (D4): a mesma regra escolhe o motivo gravado no turno (<c>falha_llm</c> ou <c>falha_llm_definitiva</c>): mudá-la muda os dois.
     /// </summary>
     internal static bool FalhaTransitoria(Exception ex) =>
         ex is not HttpRequestException { StatusCode: { } status } || (int)status >= 500

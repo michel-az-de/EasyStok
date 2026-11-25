@@ -62,6 +62,7 @@ public class TurnoAgenteTests
     [InlineData("portao:limite")]
     [InlineData("guarda:valor")]
     [InlineData("falha_llm")]
+    [InlineData("falha_llm_definitiva")]
     [InlineData("escalada_modelo")]
     public void GuardaOMotivoEmCodigoValido(string motivo) => Registrar(motivo: motivo).Motivo.Should().Be(motivo);
 

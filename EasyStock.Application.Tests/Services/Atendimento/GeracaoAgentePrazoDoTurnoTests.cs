@@ -72,6 +72,29 @@ public class GeracaoAgentePrazoDoTurnoTests
         tokens.Should().ContainSingle("depois do prazo não há nova tentativa");
     }
 
+    // #3347 (D4): o prazo vence mesmo quando o que chega depois dele é uma falha definitiva do provedor.
+    [Fact]
+    public async Task PrazoEstouradoVenceUmaFalhaDefinitivaQueChegaDepois()
+    {
+        var chamadas = 0;
+        var llm = Substitute.For<IAgenteLlmClient>();
+        llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(async c =>
+        {
+            chamadas++;
+            try { await Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>()); }
+            catch (OperationCanceledException) { throw new HttpRequestException("não autorizado", null, System.Net.HttpStatusCode.Unauthorized); }
+            return Fim("nunca");
+        });
+
+        var geracao = await GerarAsync(llm, PrazoCurto).WaitAsync(TimeSpan.FromSeconds(10));
+
+        geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno);
+        geracao.Consumo!.FalhaLlm.Should().BeFalse();
+        geracao.Consumo.FalhaLlmDefinitiva.Should().BeFalse();
+        chamadas.Should().Be(1, "o 401 saiu da chamada que o prazo cortou: sem ela o teste não prova nada");
+        MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha!, geracao.Consumo.FalhaLlm, geracao.Consumo.FalhaLlmDefinitiva).Should().Be(MotivoDoTurno.PrazoTurno);
+    }
+
     [Fact]
     public async Task FerramentaEmCursoTerminaComOTokenDeQuemChamouEOProximoModeloNaoEhChamadoDepoisDoPrazo()
     {

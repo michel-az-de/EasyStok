@@ -171,6 +171,23 @@ public partial class AgenteAtendimentoServiceTests
         turno.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
     }
 
+    // #3347 (D4): a falha com status que a nova tentativa não repete (chave, crédito, modelo) tem código próprio; o desfecho segue Erro e a frase é a mesma.
+    [Fact]
+    public async Task Motivo_FalhaDefinitivaDaGeracaoGravaFalhaLlmDefinitiva()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("chave inválida", null, System.Net.HttpStatusCode.Unauthorized));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        turno.Motivo.Should().Be(MotivoDoTurno.FalhaLlmDefinitiva);
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, "o agente não conseguiu responder (falha ao chamar o LLM)", Agora,
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Motivo_TetoDeSaidaEstouradoEscalaSemEnviarTextoCortado()
     {
@@ -317,6 +334,41 @@ public partial class AgenteAtendimentoServiceTests
         var gravado = TurnoGravado();
         gravado.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
         gravado.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
+    }
+
+    // #3347 (D4): o turno interrompido grava o motivo direto, sem passar pela geração: a classe da falha tem de chegar lá também.
+    [Fact]
+    public async Task Motivo_TurnoInterrompidoComFalhaDefinitivaDoModeloGravaErroComFalhaLlmDefinitiva()
+    {
+        var aguardando = new TaskCompletionSource<RespostaLlm>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chamou = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ => { chamou.TrySetResult(); return aguardando.Task; });
+        var turno = CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        await chamou.Task;
+        _conversa.VincularCliente(Guid.NewGuid());
+        aguardando.SetException(new HttpRequestException("chave inválida", null, System.Net.HttpStatusCode.Unauthorized));
+        await turno;
+
+        var gravado = TurnoGravado();
+        gravado.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        gravado.Motivo.Should().Be(MotivoDoTurno.FalhaLlmDefinitiva);
+        // O fim normal do turno escalaria; só o InterrompidoAsync não escala: é o que prende este teste a ele.
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    // #3347 (D4): sem chave, cota estourada ou disjuntor aberto não trazem status do provedor: seguem falha_llm.
+    [Fact]
+    public async Task Motivo_ProvedorIndisponivelGravaFalhaLlm()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new ProvedorIaIndisponivelException("cota estourada"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var turno = TurnoGravado();
+        turno.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        turno.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
