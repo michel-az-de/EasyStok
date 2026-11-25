@@ -155,6 +155,19 @@ public class SugerirRespostaAgenteUseCaseTests
     }
 
     [Fact]
+    public async Task RecusaDoModeloNaoViraSugestao()
+    {
+        // #3321 (D4): o texto da recusa não é sugestão para a dona colar na conversa; ela recebe o aviso de que o agente não conseguiu.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm(RespostaLlm.StopRefusal, [new BlocoTextoLlm("Não posso ajudar com isso.")], 10, 20));
+
+        var acao = () => Criar().ExecuteAsync(new SugerirRespostaAgenteCommand(_empresaId, _conversa.Id));
+
+        (await acao.Should().ThrowAsync<AgenteIndisponivelException>())
+            .Which.Message.Should().Contain("não conseguiu sugerir").And.Contain("recusou responder").And.NotContain("Não posso ajudar");
+    }
+
+    [Fact]
     public void InstrucaoSugestao_CurtaEObjetiva()
     {
         // #1445 (homologação 07/10): a sugestão saía prolixa. WhatsApp pede de 1 a 3 frases, sem floreio.

@@ -108,7 +108,7 @@ public static class GeracaoAgenteAtendimento
 
     /// <summary>
     /// Laço do LLM com as <paramref name="ferramentas"/>: executa as ferramentas pedidas e repete até a
-    /// resposta final, no máximo <paramref name="maximoIteracoes"/> chamadas. Falha do LLM não sobe:
+    /// resposta final, no máximo <paramref name="maximoIteracoes"/> voltas (cada uma com até 3 chamadas ao modelo). Falha do LLM não sobe:
     /// volta em <see cref="GeracaoAgente.MotivoFalha"/>.
     /// </summary>
     public static async Task<GeracaoAgente> GerarAsync(
@@ -155,20 +155,21 @@ public static class GeracaoAgenteAtendimento
             if (PrazoEstourou()) return SemPrazo();
 
             RespostaLlm resposta;
+            var repetiu = false;
             try
             {
                 var requisicao = new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
                 { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento, TurnoAgenteId = turnoAgenteId };
                 resposta = await EnviarComUmaNovaTentativaAsync(llm, requisicao, contexto.Conversa.Id, logger, prazo.Token);
-                // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274).
-                // Com saida_max do modelo abaixo do piso, o cliente limita o pedido ao máximo do modelo e a repetição sai com o
-                // mesmo teto (#3304); pular essa repetição pede o teto usado na resposta (#3313).
-                if (resposta.StopReason == RespostaLlm.StopMaxTokens && resposta.TokensSaida < MaxTokensNovaTentativa)
+                // Só sobe o teto quando há para onde subir: a saída da chamada cortada é o teto que ela usou (revisão da #3274), e
+                // com saida_max cadastrado o cliente já pediu o máximo do modelo (TetoNoMaximo): a repetição sairia igual (#3313).
+                if (resposta.StopReason == RespostaLlm.StopMaxTokens && !resposta.TetoNoMaximo && resposta.TokensSaida < MaxTokensNovaTentativa)
                 {
                     // #3273 (R1): o teto acabou antes do modelo terminar (com modelo que raciocina, o pensamento come o teto).
                     // A chamada cortada foi paga: entra na conta. Uma nova tentativa pedindo teto maior; texto cortado nunca segue.
-                    logger.LogWarning("Agente de atendimento: o modelo estourou o teto de saída na conversa {ConversaId}; tenta de novo pedindo {Teto} tokens (o máximo cadastrado do modelo, se menor, prevalece).",
+                    logger.LogWarning("Agente de atendimento: o modelo estourou o teto de saída na conversa {ConversaId}; tenta de novo pedindo {Teto} tokens.",
                         contexto.Conversa.Id, MaxTokensNovaTentativa);
+                    repetiu = true;
                     tokens += TotalDeTokens(resposta);
                     consumo.Somar(resposta);
                     // Uma chamada só: com teto 4 vezes maior o prazo de 60 s é o risco, e repetir o pedido sem teto maior o estouraria de novo.
@@ -191,12 +192,23 @@ public static class GeracaoAgenteAtendimento
             tokens += TotalDeTokens(resposta);
             consumo.Somar(resposta);
 
+            if (resposta.StopReason == RespostaLlm.StopRefusal)
+            {
+                // #3321 (D4): o modelo recusou. O texto, se veio, é a recusa e não a resposta: nunca vai ao cliente, e repetir o
+                // mesmo pedido tende a repetir a recusa. A conversa vai para a equipe, com motivo próprio.
+                contexto.LimparRespostaVerificada();
+                logger.LogWarning("Agente de atendimento: o modelo recusou responder na conversa {ConversaId}; vai para a equipe.",
+                    contexto.Conversa.Id);
+                return new GeracaoAgente(null, tokens, false, MotivoRecusa + " (refusal)", consumo);
+            }
+
             if (resposta.StopReason == RespostaLlm.StopMaxTokens)
             {
-                // Estourou de novo: o texto, se veio, está cortado e não vai ao cliente. A conversa vai para a equipe.
+                // Estourou de novo, ou o teto já era o máximo do modelo e não houve nova tentativa: o texto, se veio, está
+                // cortado e não vai ao cliente. A conversa vai para a equipe.
                 contexto.LimparRespostaVerificada();
-                logger.LogWarning("Agente de atendimento: o teto de saída estourou também na nova tentativa, conversa {ConversaId}.",
-                    contexto.Conversa.Id);
+                logger.LogWarning("Agente de atendimento: o teto de saída estourou na conversa {ConversaId}, que vai para a equipe (nova tentativa feita: {NovaTentativa}).",
+                    contexto.Conversa.Id, repetiu);
                 return new GeracaoAgente(null, tokens, false, MotivoTetoDeSaida + " (max_tokens)", consumo);
             }
 
@@ -232,11 +244,17 @@ public static class GeracaoAgenteAtendimento
     /// <summary>#3273 (R1): teto da chamada que repete depois de <c>max_tokens</c>; sobe só o piso, nunca baixa o configurado.</summary>
     public const int MaxTokensNovaTentativa = 16384;
 
-    /// <summary>#3273 (R1): começo do motivo quando o teto de saída estoura na nova tentativa também.</summary>
+    /// <summary>
+    /// #3273 (R1): começo do motivo quando a resposta é cortada por <c>max_tokens</c> sem nova tentativa (o teto já era o máximo do
+    /// modelo, #3313) ou quando a nova tentativa estoura também.
+    /// </summary>
     public const string MotivoTetoDeSaida = "o agente atingiu o teto de saída do modelo";
 
     /// <summary>#3291 (R3): começo do motivo quando o turno passa do prazo, contado desde a primeira volta.</summary>
     public const string MotivoPrazoDoTurno = "o agente passou do prazo do turno";
+
+    /// <summary>#3321 (D4): começo do motivo quando o modelo recusa responder (<c>stop_reason</c> <c>refusal</c>).</summary>
+    public const string MotivoRecusa = "o modelo recusou responder";
 
     private static string MotivoDoPrazo(TimeSpan? prazo) =>
         prazo is { } p ? $"{MotivoPrazoDoTurno} ({(int)p.TotalSeconds} s)" : MotivoPrazoDoTurno;

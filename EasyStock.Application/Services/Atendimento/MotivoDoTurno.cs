@@ -13,6 +13,7 @@ public static class MotivoDoTurno
     public const string FalhaLlm = "falha_llm";
     public const string TetoSaida = "teto_saida";
     public const string PrazoTurno = "prazo_turno";
+    public const string RecusaModelo = "recusa_modelo";
     public const string EscaladaModelo = "escalada_modelo";
     public const string Interrompido = "interrompido";
 
@@ -42,6 +43,7 @@ public static class MotivoDoTurno
         falhaLlm ? FalhaLlm
         : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida, StringComparison.Ordinal) ? TetoSaida
         : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoPrazoDoTurno, StringComparison.Ordinal) ? PrazoTurno
+        : motivoDaGeracao.StartsWith(GeracaoAgenteAtendimento.MotivoRecusa, StringComparison.Ordinal) ? RecusaModelo
         : Slugs.FirstOrDefault(par => motivoDaGeracao.StartsWith(par.Key, StringComparison.Ordinal)) is { Value: { } slug } ? slug
         : GuardaOutro;
 }

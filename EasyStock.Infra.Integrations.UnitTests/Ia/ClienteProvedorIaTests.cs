@@ -105,6 +105,20 @@ public class ClienteProvedorIaTests
             "o saida_max cadastrado é o máximo que o modelo aceita: o piso da nova tentativa depois de max_tokens não o ultrapassa");
     }
 
+    [Theory]
+    [InlineData(2048, true)]
+    [InlineData(32000, true)]
+    [InlineData(null, false)]
+    public async Task RespostaDizSeOTetoJaEraOMaximoDoModelo(int? saidaMax, bool noMaximo)
+    {
+        // #3313: com saida_max cadastrado toda chamada sai com ele, então a geração não repete depois de max_tokens; sem ele o teto sobe.
+        var handler = new FilaHandler((HttpStatusCode.OK, RespostaTexto));
+
+        var resposta = await Criar(handler).EnviarAsync(Destino() with { SaidaMax = saidaMax }, Requisicao());
+
+        resposta.TetoNoMaximo.Should().Be(noMaximo);
+    }
+
     [Fact]
     public async Task SemTetoDoModeloOPisoDaNovaTentativaSobeOGlobalComoAntes()
     {

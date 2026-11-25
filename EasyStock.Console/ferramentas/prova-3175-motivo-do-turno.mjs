@@ -15,7 +15,7 @@ assert.equal(motivoDoTurno('falha_llm'), 'falha no modelo de IA')
 const conhecidos = ['portao:chave', 'portao:modelo', 'portao:canal', 'portao:equipe', 'portao:bloqueado', 'portao:pausado', 'portao:limite', 'portao:cota',
   'guarda:valor', 'guarda:outro', 'guarda:sem_resposta', 'guarda:texto_de_ferramenta', 'guarda:promete_encaminhar', 'guarda:situacao_pedido',
   'guarda:pagamento_devolucao', 'guarda:frete_desconto', 'guarda:frete_combinado', 'guarda:link_sem_origem', 'guarda:ferramenta_falhou',
-  'iteracoes', 'menu', 'falha_llm', 'teto_saida', 'prazo_turno', 'escalada_modelo', 'interrompido']
+  'iteracoes', 'menu', 'falha_llm', 'teto_saida', 'prazo_turno', 'recusa_modelo', 'escalada_modelo', 'interrompido']
 for (const codigo of conhecidos) assert.notEqual(motivoDoTurno(codigo), codigo, codigo + ' sem texto')
 assert.equal(new Set(conhecidos.map(motivoDoTurno)).size, conhecidos.length, 'cada código tem o seu texto')
 

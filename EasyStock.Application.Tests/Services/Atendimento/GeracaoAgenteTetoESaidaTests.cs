@@ -21,13 +21,15 @@ public class GeracaoAgenteTetoESaidaTests
     private static RespostaLlm Cortada(string texto) =>
         new(RespostaLlm.StopMaxTokens, texto.Length == 0 ? [] : [new BlocoTextoLlm(texto)], 10, 4096);
 
-    private Task<GeracaoAgente> GerarAsync(IAgenteLlmClient llm)
-    {
-        var conversa = Conversa.Abrir(_empresaId, "5511988887777", Agora);
-        return GeracaoAgenteAtendimento.GerarAsync(llm, "s",
+    private static RespostaLlm Recusa(string texto) =>
+        new(RespostaLlm.StopRefusal, texto.Length == 0 ? [] : [new BlocoTextoLlm(texto)], 10, 20);
+
+    private ContextoTurnoAgente NovoContexto() => new(_empresaId, Conversa.Abrir(_empresaId, "5511988887777", Agora), Agora);
+
+    private Task<GeracaoAgente> GerarAsync(IAgenteLlmClient llm, ContextoTurnoAgente? contexto = null) =>
+        GeracaoAgenteAtendimento.GerarAsync(llm, "s",
             [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], new Dictionary<string, IFerramentaAgente>(),
-            new ContextoTurnoAgente(_empresaId, conversa, Agora), 3, NullLogger.Instance, CancellationToken.None);
-    }
+            contexto ?? NovoContexto(), 3, NullLogger.Instance, CancellationToken.None);
 
     private static IAgenteLlmClient Llm(List<RequisicaoLlm> capturadas, params Func<RespostaLlm>[] respostas)
     {
@@ -93,6 +95,57 @@ public class GeracaoAgenteTetoESaidaTests
         capturadas.Should().HaveCount(1, "repetir com o mesmo teto só dobraria o custo");
         geracao.Concluiu.Should().BeFalse();
         geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida);
+    }
+
+    [Fact]
+    public async Task TetoJaNoMaximoDoModeloNaoRepeteMesmoAbaixoDoPiso()
+    {
+        // #3313: com saida_max cadastrado o teto usado É o máximo do modelo; pedir 16384 não o sobe e a repetição sairia igual.
+        var capturadas = new List<RequisicaoLlm>();
+        var llm = Llm(capturadas, () => Cortada("corta") with { TetoNoMaximo = true });
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(1, "repetir com o mesmo teto só dobraria o custo");
+        geracao.Concluiu.Should().BeFalse();
+        geracao.Texto.Should().BeNull();
+        geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoTetoDeSaida);
+        geracao.Tokens.Should().Be(10 + 4096, "a chamada cortada foi paga");
+        MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha!, geracao.Consumo!.FalhaLlm).Should().Be(MotivoDoTurno.TetoSaida);
+    }
+
+    [Theory]
+    [InlineData("Não posso ajudar com isso.")]
+    [InlineData("")]
+    public async Task RecusaDoModeloNaoVaiAoClienteNemRepeteEEscalaComMotivoProprio(string texto)
+    {
+        // #3321 (D4): o texto da recusa não é resposta, e repetir o mesmo pedido tende a repetir a recusa.
+        var capturadas = new List<RequisicaoLlm>();
+        var llm = Llm(capturadas, () => Recusa(texto));
+
+        var geracao = await GerarAsync(llm);
+
+        capturadas.Should().HaveCount(1);
+        geracao.Concluiu.Should().BeFalse();
+        geracao.Texto.Should().BeNull("o texto da recusa nunca vai ao cliente");
+        geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoRecusa);
+        geracao.Tokens.Should().Be(10 + 20, "a chamada recusada foi paga");
+        MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha!, geracao.Consumo!.FalhaLlm).Should().Be(MotivoDoTurno.RecusaModelo);
+    }
+
+    [Fact]
+    public async Task RecusaDepoisDeEnvioNoTurnoLimpaARespostaVerificadaEAindaEscala()
+    {
+        // #3321: texto vazio depois de um envio é o fim normal do turno; recusa não é. A equipe confere e a resposta verificada não sai.
+        var contexto = NovoContexto();
+        contexto.RegistrarRespostaVerificada("Seu pedido sai às 12h.");
+        contexto.RegistrarEnvio();
+
+        var geracao = await GerarAsync(Llm([], () => Recusa("")), contexto);
+
+        geracao.Concluiu.Should().BeFalse();
+        geracao.MotivoFalha.Should().StartWith(GeracaoAgenteAtendimento.MotivoRecusa);
+        contexto.RespostaVerificada.Should().BeNull();
     }
 
     [Fact]
