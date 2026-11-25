@@ -1,0 +1,44 @@
+/* #3294: faixa de indicadores de Pedidos. Uma faixa densa, não quatro cartões iguais: grupos lado a lado separados
+   por linha neutra de 1px (o fundo da grade aparece no vão). Destaque por cor do texto e fundo tingido, nunca barra lateral. */
+.faixa { display: grid; gap: var(--e-2); padding: var(--e-4) var(--e-4) var(--e-3); border-bottom: 1px solid var(--linha); }
+.recorte { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.recorte strong { color: var(--tinta); font-variant-numeric: tabular-nums; }
+.grupos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--linha); border: 1px solid var(--linha); border-radius: var(--r-2); overflow: hidden; }
+.grupo { display: grid; align-content: start; justify-items: start; gap: var(--e-1); min-width: 0; padding: var(--e-3) var(--e-4); background: var(--papel); }
+.grupo h3 { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; }
+.grupo small { color: var(--tinta-2); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
+.numero { font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--tinta); }
+.numero.atencao { color: var(--alerta); }
+.itens { overflow-wrap: anywhere; }
+.grupo small.sobe { color: var(--sucesso); font-weight: 600; }
+.grupo small.desce { color: var(--erro); font-weight: 600; }
+.acao { display: grid; gap: 2px; width: 100%; margin: 0; padding: 0; list-style: none; font-size: var(--t-apoio); }
+.acao li { display: flex; align-items: center; gap: var(--e-2); min-height: 28px; }
+.n { min-width: 2ch; font-family: var(--f-dado); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.acao li.perigo { color: var(--erro); font-weight: 600; }
+.zero { color: var(--tinta-3); }
+.filtro { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 28px; margin-inline: calc(-1 * var(--e-2)); padding: 0 var(--e-2); border: 1px solid transparent; border-radius: var(--r-1); background: none; color: var(--tinta); font: inherit; font-size: var(--t-apoio); text-align: start; cursor: pointer; }
+.filtro.atencao { color: var(--alerta); font-weight: 600; }
+.filtro:hover:not(:disabled) { background: var(--elevado); text-decoration: underline; text-underline-offset: 3px; }
+.filtro:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 1px; }
+.filtro[aria-pressed='true'] { border-color: var(--marca); background: var(--marca-claro); color: var(--tinta); }
+.filtro:disabled { color: var(--tinta-3); cursor: default; }
+.falha { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--alerta-pastel); }
+.falha p { margin: 0; }
+.detalhes { min-width: 0; }
+.resumoMovel { display: none; }
+@media (max-width: 700px) {
+  .resumoMovel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-1) var(--e-3); min-height: var(--toque); padding: var(--e-2) var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--elevado); font-size: var(--t-apoio); font-variant-numeric: tabular-nums; cursor: pointer; }
+  .resumoMovel .perigo { color: var(--erro); font-weight: 600; }
+  .abrir { display: inline-flex; align-items: center; gap: var(--e-1); margin-left: auto; color: var(--marca); font-weight: 600; }
+  .detalhes[open] .resumoMovel { margin-bottom: var(--e-2); }
+  .faixa:has(.detalhes:not([open])) .legenda { display: none; }
+}
+.legenda { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); max-width: 110ch; }
+@media (pointer: coarse) { .filtro, .acao li { min-height: var(--toque); } }
+@media (max-width: 1100px) { .grupos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .faixa { padding: var(--e-3); }
+  .grupo { padding: var(--e-3); }
+  .numero { font-size: var(--t-titulo); }
+}

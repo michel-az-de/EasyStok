@@ -97,6 +97,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.ResumoPedidosUseCase>(); // #3294: indicadores da tela Pedidos
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
         services.AddScoped<TrocarJanelaPedidoUseCase>();
 

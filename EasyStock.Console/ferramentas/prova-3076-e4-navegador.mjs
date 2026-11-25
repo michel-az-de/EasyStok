@@ -70,6 +70,8 @@ async function preparar({ largura = 1440, altura = 900, hash = HASH, dashboard =
       estado.consultas.push(Object.fromEntries(url.searchParams))
       return ok(estado.pedidos, { meta: { totalCount: estado.pedidos.length } })
     }
+    // #3294: a faixa de indicadores pede o resumo; esta prova não mede a faixa.
+    if (path === '/api/pedidos/resumo') return ok({ pedidos: 0, vendas: 0, vendido: 0, ticketMedio: 0, aReceber: { valor: 0, pedidos: 0 }, aguardandoPagamento: 0, aguardandoAprovacao: 0, emAndamento: 0, atrasados: 0, cancelados: { valor: 0, pedidos: 0 }, primeiraCompra: 0, recompra: 0, maisVendidos: [], anterior: null })
     const unico = path.match(/^\/api\/pedidos\/([^/]+)$/)
     if (unico) { estado.leituras.push(unico[1]); return ok(detalheDe(estado.pedidos.find((p) => p.id === unico[1]))) }
     if (path === '/api/cadastros/metodos-pagamento') return ok([{ codigo: 'pix', nome: 'Pix', ativo: true }, { codigo: 'dinheiro', nome: 'Dinheiro', ativo: true }])

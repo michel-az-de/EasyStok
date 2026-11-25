@@ -113,7 +113,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
             "AtendimentoAvisos", "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
             "AtendimentoLembretes", "AtendimentoModelosLocais", "AtendimentoRespostasProntas","Clientes", "ClientesFoto", "ClientesFrete", "ClientesViagem", "ClientesCrm", "ClienteInteresses",
-            "Ocorrencias", "Pedidos", "PedidosCobranca");
+            "Ocorrencias", "Pedidos", "PedidosCobranca", "PedidosResumo");
         Associar(Modulo.Atendimento, "AtendimentoVinculoCliente");
         Associar(Modulo.Caixa, "CadastrosFinanceiros");
         Associar(Modulo.Cozinha, "Kds");
