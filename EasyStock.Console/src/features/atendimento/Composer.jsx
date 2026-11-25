@@ -18,6 +18,7 @@ import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
 import { useRascunhoLocal } from '../../aplicacao/useRascunhoLocal'
 import { aceitaFormato, motivoDeAnexo, motivoDeAudio, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
+import { motivoDoCampoFechado } from '../../dominio/janela'
 import { restoDoEnvio } from '../../dominio/rascunho'
 import { anexosEmEspera, chaveDoAnexo } from '../../aplicacao/anexosEmEspera'
 import {
@@ -353,7 +354,7 @@ export function Composer({
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
                   // #3234 (C2): "Janela fechada" fica só na faixa acima; aqui, só o caminho.
-                  ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa')
+                  ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : motivoDoCampoFechado(motivo))
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão

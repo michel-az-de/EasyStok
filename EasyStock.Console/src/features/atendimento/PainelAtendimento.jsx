@@ -21,6 +21,7 @@ import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
 import { BarraModo } from './BarraModo'
+import { motivoDaBarra } from '../../dominio/resumoDoModo'
 import { Composer } from './Composer'
 import { ModalCompartilharComanda } from './CompartilharComanda'
 import { ModalAssistente } from './ModalAssistente'
@@ -259,7 +260,7 @@ function PainelDaConversa({
         bloqueada={bloqueada}
         podeReabrir={podeReabrir}
         agora={agora}
-        motivo={motivoDaFila}
+        motivo={motivoDaBarra(motivoDaFila, motivo, pausado)}
         acoes={acoesTela}
         aoAssumir={aoAssumirDaBarra}
       />

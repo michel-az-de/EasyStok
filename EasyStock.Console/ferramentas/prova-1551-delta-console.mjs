@@ -127,7 +127,7 @@ confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica n�
   // só no fim de janela. A dica promete Respostas, e Respostas abre os modelos com o mesmo sinal.
   assert.match(composer, /\{modelosFixos && podeEnviarModelo && podeEscrever && <Botao className=\{css\.abrirModelos\}/)
   // #3234 (C2): "Janela fechada" fica só na faixa; a dica do campo guarda a promessa de Respostas.
-  assert.match(composer, /podeEnviarModelo \? 'Escolha uma mensagem padrão em Respostas' : 'Mensagem indisponível nesta conversa'/)
+  assert.match(composer, /podeEnviarModelo \? 'Escolha uma mensagem padrão em Respostas' : motivoDoCampoFechado\(motivo\)/)
   assert.match(composer, /disabled=\{!podeEscrever && !podeEnviarModelo\}/)
   assert.match(composer, /onClick=\{podeEscrever \? \(barra\.aberto \? barra\.fechar : barra\.abrir\) : \(modeloAberto \? aoFecharModelos : aoAbrirModelos\)\}/)
   assert.match(composer, /aria-expanded=\{podeEscrever \? barra\.aberto : modeloAberto\}/)
