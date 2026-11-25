@@ -329,6 +329,29 @@ await confere('Produção do dia: "Falta produzir" põe a quantidade no lote; pr
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Lasanha/)
 })
 
+await confere('Produção do dia: a grade põe no topo o que pede produção, com o motivo; "Pôr tudo no lote" respeita o que já está no lote (#3301)', async () => {
+  zerarProducao()
+  montarFetch(rotasDaProducao())
+  const t = montar(AbaProducaoDoDiaApi)
+  await t.assentar()
+  const titulos = () => andar(t.renderizar(), (n) => n.type === 'li' && String(n.props.className).includes('tituloDoGrupo')).map(limpo)
+  assert.deepEqual(titulos(), ['Pedem produção 1', 'Em dia 3'], 'o Talharim pede (faltam 6); o resto fica em dia')
+  assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*4 no estoque.*4 em pedidos até 12\/10 · abaixo do mínimo \(6\)/)
+  assert.match(limpo(andar(t.arvore, (n) => n.type === 'p' && String(n.props.className).includes('leitura'))[0]), /2 pratos pedem produção · faltam 9 porções/)  // 6 do Talharim + 3 da Lasanha, a soma dos chips de "Falta produzir"
+  const botao = () => doTipo(t.renderizar(), 'Botao').find((b) => texto(b) === 'Pôr tudo no lote')
+  tocar(t, 'Talharim 500 g')
+  botao().props.onClick()
+  revisar(t)
+  assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '6', 'com 1 no lote, o que falta (6) vira 6')
+  assert.equal(itensDoLote(t.renderizar()).length, 1, 'só o Talharim entra: a Lasanha tem tamanhos e ela escolhe')
+  assert.equal(botao().props.disabled, false, 'segue ativo: desabilitado com o foco nele, o foco cairia no corpo da página')
+  const avisos = () => andar(t.renderizar(), (n) => n.type === 'p' && n.props['aria-live'] === 'polite' && /Lasanha tem tamanhos: escolha na grade/.test(texto(n)))
+  assert.equal(avisos().length, 1, 'a Lasanha tem tamanhos: ela escolhe')
+  botao().props.onClick()
+  assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '6', 'tocar de novo não soma nem repete')
+  assert.equal(itensDoLote(t.renderizar()).length, 1)
+})
+
 await confere('Produção do dia: validade em um toque; confirmar manda o corpo de sempre, mostra o lote e relê o saldo', async () => {
   zerarProducao()
   // A segunda leitura do estoque já traz o lote somado: 4 + 8.

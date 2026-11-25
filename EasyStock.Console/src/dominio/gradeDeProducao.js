@@ -2,6 +2,7 @@
 // uma porção, vê o saldo no cartão e confere o lote antes de confirmar. Aqui ficam as contas da
 // grade; a linha do lote continua a mesma que a API recebe (dominio/producao.js, dominio/porcoes.js).
 import { categoriasComContagem, daCategoria } from './categorias.js'
+import { listaEmPortugues, plural } from './formato.js'
 import { linhaComPorcao, linhaComPrato, pesoDeReferenciaDoPrato } from './porcoes.js'
 
 export const VALIDADES_RAPIDAS = [3, 5, 7, 10, 15]
@@ -149,4 +150,37 @@ export function faltaProduzir(sugestoes, cartoes) {
     // O nome é o do cardápio (o da sugestão vem do estoque, em minúsculas).
     return [{ sku: s.sku, nome: doPrato[0].nome, quantidade: s.sugestao, agendados: s.agendados ?? 0, cartao: doPrato.length === 1 ? doPrato[0] : null }]
   })
+}
+
+// #3301: "Pôr tudo no lote". Cada prato de um tamanho só entra com o que falta, sem nunca ficar abaixo do
+// que ela já pôs (o `Math.max` do toque em "Falta produzir") e sem passar do teto do lote: o que não cabe fica
+// em `cortados`. Prato com porções fica em `semTamanho`: o tamanho não se adivinha, ela escolhe na grade.
+export function porTudoNoLote(linhas, falta, apoio) {
+  let atual = linhas
+  const postos = []
+  const semTamanho = []
+  const cortados = []
+  for (const item of falta) {
+    if (!item.cartao) { semTamanho.push(item); continue }
+    const jaNoLote = porcoesNoLote(atual, item.cartao)
+    const alvo = Math.max(item.quantidade, jaNoLote)
+    if (alvo === jaNoLote) continue
+    const cabe = TETO_PORCOES_POR_LOTE - (resumoDoLote(atual).porcoes - jaNoLote)
+    const final = Math.min(alvo, cabe)
+    if (final < alvo) cortados.push(item)
+    if (final <= jaNoLote) continue
+    atual = definirNoLote(atual, item.cartao, final, apoio)
+    postos.push(item)
+  }
+  return { linhas: atual, postos, semTamanho, cortados }
+}
+
+export function mensagemDoPorTudo({ postos, semTamanho, cortados }) {
+  const nomes = (itens) => listaEmPortugues(itens.map((i) => i.nome))
+  const frases = [
+    postos.length > 0 && `${plural(postos.length, 'prato', 'pratos')} no lote.`,
+    semTamanho.length > 0 && `${nomes(semTamanho)} ${semTamanho.length === 1 ? 'tem' : 'têm'} tamanhos: escolha na grade.`,
+    cortados.length > 0 && `O lote vai até ${TETO_PORCOES_POR_LOTE.toLocaleString('pt-BR')} porções: ${nomes(cortados)} ${cortados.length === 1 ? 'ficou' : 'ficaram'} com menos.`,
+  ].filter(Boolean)
+  return frases.length > 0 ? frases.join(' ') : 'O lote já cobre o que falta.'
 }
