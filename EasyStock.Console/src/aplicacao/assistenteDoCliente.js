@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { listarPedidosDoCliente, obterPedido } from './pedidosCadastro'
+import { combinarSinais } from './sinais'
 import { pedidoValido } from '../dominio/pratosParaOferecer'
 
 // #3344: o Assistente age na Ficha só no clique da atendente. A pergunta já leva o que precisa, então vai sem conversa:
@@ -8,7 +9,7 @@ import { pedidoValido } from '../dominio/pratosParaOferecer'
 // ações propostas não rodam aqui, e a espera tem teto de 15 s (sem isso o botão ficaria preso em "Pensando…").
 const PRAZO_MS = 15_000
 export async function perguntarSobreOCliente(pergunta, { sinal } = {}) {
-  const { texto } = await perguntarAssistente(pergunta, null, { sinal: AbortSignal.any([sinal, AbortSignal.timeout(PRAZO_MS)].filter(Boolean)) })
+  const { texto } = await perguntarAssistente(pergunta, null, { sinal: combinarSinais([sinal, AbortSignal.timeout(PRAZO_MS)].filter(Boolean)) })
   const limpo = String(texto ?? '').trim()
   if (!limpo) throw new Error('O Assistente não respondeu. Tente de novo.')
   return limpo
