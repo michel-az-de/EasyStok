@@ -383,7 +383,7 @@ public static class GeracaoAgenteAtendimento
         {
             contexto.LimparRespostaVerificada();
             contexto.RegistrarFalhaDeFerramenta(lancou: !FalhaDeBanco.Eh(ex));
-            if (FalhaDeBanco.Eh(ex)) contexto.Interromper(); // banco: a retomada refaz o turno, como antes da #3340
+            if (FalhaDeBanco.Eh(ex)) contexto.Interromper(); // banco: interrompe como antes da #3340, entradas pendentes
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
             return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);

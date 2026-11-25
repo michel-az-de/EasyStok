@@ -67,8 +67,9 @@ internal sealed class FinalizacaoDoTurno(
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
             // #2515: sem texto do agente, o menu adiado basta como resposta. #2544: a foto do produto também.
+            // #3340: ferramenta que falhou no turno não deixa um envio anterior valer como resposta.
             var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto)
-                && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
+                && !contexto.FerramentaFalhou && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
             else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))

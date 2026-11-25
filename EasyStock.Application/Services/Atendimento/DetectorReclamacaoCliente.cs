@@ -11,8 +11,10 @@ public static partial class DetectorReclamacaoCliente
     public static bool EhReclamacao(IEnumerable<string?> textos) =>
         textos.Any(t => !string.IsNullOrWhiteSpace(t) && Padrao().IsMatch(t));
 
-    // Cobrança, não consulta: "quero/preciso/exijo ... estorno", o verbo no imperativo ("estorne", "reembolsem"), "dinheiro de
-    // volta" e Procon. "Meu estorno foi confirmado?" é pergunta de status, e o assistente a responde pelo histórico do pedido.
-    [GeneratedRegex(@"\b(procon|dinheiro de volta|estorne\w*|reembolse\w*|(quero|preciso|exijo|exigimos)\b[^.?!]{0,30}\b(estorno|reembolso))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Cobrança, não consulta: "quero/preciso/exijo/vou pedir ... estorno" (e "estornar", "reembolsada"), o verbo no imperativo
+    // ("estorne", "reembolsem"), a demora ("não recebi o reembolso", "o dinheiro não voltou"), "dinheiro de volta" e Procon.
+    // "Quero saber/ver/conferir ... estorno" e "Meu estorno foi confirmado?" são perguntas de status, e o assistente as responde
+    // pelo histórico do pedido.
+    [GeneratedRegex(@"\b(procon|dinheiro de volta|estorne\w*|reembolse\w*|(quero|preciso|exijo|exigimos|vou pedir|vou solicitar)\b(?![^.?!]{0,30}\b(saber|ver|consultar|perguntar|conferir|checar|confirmar)\b)[^.?!]{0,30}\b(estorn\w*|reembols\w*)|n[aã]o (recebi|caiu|voltou|devolveram)\b[^.?!]{0,30}\b(estorno|reembolso|dinheiro)|(estorno|reembolso|dinheiro)\b[^.?!]{0,20}\bn[aã]o (voltou|caiu|chegou))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Padrao();
 }

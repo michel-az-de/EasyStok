@@ -307,7 +307,7 @@ public sealed class AgenteAtendimentoService(
             if (await ExecutarAsync(_ => Task.FromResult("validado"), ct, gravar: false) is null) return null;
             try { return await efeito(ct); }
             // #3340 (R2I-04): ferramenta que lança é falha do turno (escala com motivo), não interrupção. Falha do banco segue
-            // interrompendo: a retomada refaz o turno.
+            // interrompendo, como antes: as entradas seguem pendentes para o próximo turno.
             catch (Exception ex) when (!ct.IsCancellationRequested && !FalhaDeBanco.Eh(ex))
             {
                 uow.DescartarAlteracoesPendentes();

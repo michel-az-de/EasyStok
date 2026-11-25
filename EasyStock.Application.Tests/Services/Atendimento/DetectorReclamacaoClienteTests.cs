@@ -28,6 +28,25 @@ public class DetectorReclamacaoClienteTests
     public void PedidoDeEstornoEmImperativoEhReclamacao(string texto) =>
         DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
 
+    // Revisão dos deltas: outras formas da mesma cobrança (infinitivo, particípio, ameaça de pedir no cartão, demora do
+    // estorno) também vão à dona.
+    [Theory]
+    [InlineData("quero estornar")]
+    [InlineData("quero ser reembolsada")]
+    [InlineData("vou pedir o estorno no cartão")]
+    [InlineData("ainda não recebi o reembolso, já faz 10 dias")]
+    [InlineData("o dinheiro não voltou")]
+    public void OutrasFormasDaCobrancaTambemSaoReclamacao(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeTrue();
+
+    // Revisão dos deltas: "quero/preciso" seguido de "saber/ver/conferir" é consulta, não cobrança.
+    [Theory]
+    [InlineData("Quero saber do meu estorno")]
+    [InlineData("Preciso saber quando cai o estorno")]
+    [InlineData("quero conferir o reembolso")]
+    public void QueroSaberDoEstornoEhConsultaNaoCobranca(string texto) =>
+        DetectorReclamacaoCliente.EhReclamacao([texto]).Should().BeFalse();
+
     [Theory]
     [InlineData("manda o link pra eu pagar")]
     [InlineData("quero uma lasanha")]

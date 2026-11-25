@@ -1139,7 +1139,8 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue();
     }
 
-    // #3340: falha do banco numa ferramenta não escala: o turno é interrompido e a retomada o refaz (como antes da #3340).
+    // #3340: falha do banco numa ferramenta não escala: o turno é interrompido, como antes da #3340, e as entradas seguem
+    // pendentes para o próximo turno.
     [Fact]
     public async Task FalhaDoBancoNaFerramentaInterrompeSemEscalar()
     {
@@ -1154,6 +1155,28 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     private sealed class BancoFalso(string mensagem) : System.Data.Common.DbException(mensagem);
+
+    // #3340 (revisão dos deltas): uma ferramenta que já mandou algo ao cliente (resumo, foto) e outra que lança no mesmo
+    // turno: o envio anterior não pode valer como "o turno respondeu". O cliente ficaria com o resumo sem o link, na
+    // conversa automática, e a falha só apareceria no log.
+    [Fact]
+    public async Task ExcecaoDepoisDeUmEnvioNoMesmoTurnoEscalaMesmoAssim()
+    {
+        var resumo = Ferramenta("enviar_resumo_de_teste", c =>
+        {
+            c.Arg<ContextoTurnoAgente>().RegistrarEnvio();
+            return """{"enviado":true}""";
+        });
+        var comanda = Ferramenta("enviar_cardapio_imagem",
+            _ => throw new WhatsAppCloudException(131000, "Meta fora do ar", ehPermanente: false, statusHttp: 502));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("enviar_resumo_de_teste"), UsoFerramenta("enviar_cardapio_imagem", "toolu_2"), Texto("Pronto!"));
+
+        var resultado = await CriarServico(resumo, comanda).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
 
     // #3340 (R2I-04): exceção do envio da comanda (Meta fora do ar) escala com o molde, uma vez, sem a frase do modelo.
     [Fact]
