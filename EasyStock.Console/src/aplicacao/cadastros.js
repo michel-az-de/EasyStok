@@ -83,5 +83,25 @@ export function useListaCadastros(tela, filtros, contexto, habilitada = true) {
     ), busca ? 250 : 0)
     return () => { clearTimeout(timer); abortar.abort() }
   }, [tela, busca, pagina, filtro, relacionamento, ordem, contexto.empresaId, contexto.identidade, revisao, habilitada])
-  return { ...resultado, recarregar: () => recarregar(r => r + 1) }
+  return { ...resultado, revisao, recarregar: () => recarregar(r => r + 1) }
+}
+
+// #3299: o desempenho acompanha a lista de produtos e recarrega com ela (`revisao`). Falha só nos números: a lista segue.
+export function useDesempenhoDosProdutos(contexto, revisao, habilitado = true) {
+  // O número guardado é da empresa em `chave`: trocar de empresa nunca mostra o da anterior, nem quando a nova falha.
+  const chave = `${contexto.empresaId ?? ''}|${contexto.identidade ?? ''}`
+  const [resultado, definir] = useState({ chave, desempenho: null, carregando: habilitado, erro: null })
+  const [tentativa, tentar] = useState(0)
+  useEffect(() => {
+    if (!habilitado) return undefined
+    const abortar = new AbortController()
+    definir(r => ({ chave, desempenho: r.chave === chave ? r.desempenho : null, carregando: true, erro: null }))
+    api.obterDesempenhoDosProdutos(contexto, abortar.signal).then(
+      desempenho => { if (!abortar.signal.aborted) definir({ chave, desempenho, carregando: false, erro: null }) },
+      e => { if (!abortar.signal.aborted) definir(r => ({ chave, desempenho: r.chave === chave ? r.desempenho : null, carregando: false, erro: e.message || 'Os números dos produtos não carregaram.' })) },
+    )
+    return () => abortar.abort()
+  }, [chave, revisao, tentativa, habilitado])
+  const daEmpresa = resultado.chave === chave
+  return { desempenho: daEmpresa ? resultado.desempenho : null, carregando: daEmpresa ? resultado.carregando : habilitado, erro: daEmpresa ? resultado.erro : null, tentar: () => tentar(n => n + 1) }
 }

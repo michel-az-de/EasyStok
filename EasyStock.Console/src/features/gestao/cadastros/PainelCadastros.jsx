@@ -5,7 +5,7 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useNovoPedidoDoCliente } from '../../../aplicacao/novoPedidoDoCliente'
 import { useConviteDeRecompra } from '../../../aplicacao/conviteDeRecompra'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
-import { contextoCadastro, obterCadastro, salvarCadastro, useContextoVisualCadastro, useListaCadastros } from '../../../aplicacao/cadastros'
+import { contextoCadastro, obterCadastro, salvarCadastro, useContextoVisualCadastro, useDesempenhoDosProdutos, useListaCadastros } from '../../../aplicacao/cadastros'
 import { useFotoCliente } from '../../../aplicacao/useFotoCliente'
 import { useChegouNaTela } from '../../../hooks/useChegouNaTela'
 import { Avatar } from '../../../componentes/Avatar'
@@ -28,7 +28,9 @@ import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsV
 import { rotuloDaTag } from '../../../dominio/tag'
 import { clienteSemNome, nomeExibido } from '../../../dominio/nomeDoContato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { CURVAS, numero, porProduto, sinalDoProduto, TENDENCIAS, textoDosDias as diasDaVenda } from '../../../dominio/desempenhoDoProduto'
 import { EditorCadastro } from './EditorCadastro'
+import { FaixaDeProdutos } from './FaixaDeProdutos'
 import { PedirCelularDoPedido } from './CelularDoPedido'
 import { useRolagemDaLista } from './rolagemDaLista'
 import { CategoriasCadastro } from './CategoriasCadastro'
@@ -75,6 +77,40 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
       {tags.length > 0 && <ul className={css.tagsDaLinha}>{tags.slice(0, 3).map(t => <li key={t} className={css.selo} title={rotuloDaTag(t)}>{rotuloDaTag(t)}</li>)}</ul>}
       {!(r.ocorrenciasTotal > 0) && !(r.notasTotal > 0) && !tags.length && <Traco />}</div></td>
   </>
+}
+
+// #3299: vendas de 90 dias, curva, última venda e preço com margem. Tudo vem da API (item.desempenho); sem o dado,
+// traço. "Sem venda" e "sem custo" são ditos por extenso, porque são a resposta, não a falta dela.
+function CelulasDoDesempenho({ d, precoTabela }) {
+  if (!d) return <><td><Traco /></td><td><Traco /></td><td><Traco /></td><td>{precoTabela > 0 ? moeda(precoTabela) : <Traco />}</td></>
+  const tendencia = TENDENCIAS[d.tendencia]
+  const sinal = sinalDoProduto(d)
+  const vendeu = d.receita > 0
+  const preco = d.precoVendido ?? d.precoTabela
+  return <>
+    <td><div className={css.gasto}>
+      <strong>{vendeu ? moedaCheia(d.receita) : 'Sem venda'}</strong>
+      {vendeu && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${Math.max(d.fatiaDaReceita, 2)}%` }} /></span>}
+      {vendeu && <small>{plural(d.pedidos, 'pedido', 'pedidos')} · {numero(d.unidades)} {d.unidades === 1 ? 'vendido' : 'vendidos'}</small>}
+      {Number.isFinite(d.ritmoDe30Dias) && <small>previsão ~{numero(d.ritmoDe30Dias)} {d.ritmoDe30Dias === 1 ? 'vendido' : 'vendidos'} em 30 dias</small>}
+      {tendencia && <Pilula tom={tendencia.tom} tamanho="inline" titulo={tendencia.titulo} icone={tendencia.icone ?? undefined}>{tendencia.rotulo}</Pilula>}</div></td>
+    <td>{d.curva ? <span className={css.curva} data-curva={d.curva} title={CURVAS[d.curva]}><span aria-hidden="true">{d.curva}</span><span className="sr">{CURVAS[d.curva]}</span></span> : <Traco />}</td>
+    <td><div className={css.gasto}>
+      <strong>{d.ultimaVenda ? diasDaVenda(d.diasSemVender) : 'Nunca vendido'}</strong>
+      {d.pedidosNoHistorico > 0 && <small>{plural(d.pedidosNoHistorico, 'pedido', 'pedidos')} no total</small>}
+      {sinal && <Pilula tom={sinal.tom} tamanho="inline" titulo={sinal.titulo}>{sinal.rotulo}</Pilula>}</div></td>
+    <td><div className={css.gasto}>
+      <strong>{preco > 0 ? moeda(preco) : 'Sem preço'}</strong>
+      {d.precoVendido > 0 && <small>{d.precoTabela > 0 && Math.abs(d.precoVendido - d.precoTabela) >= 0.01 ? `média vendida · tabela ${moeda(d.precoTabela)}` : 'média vendida'}</small>}
+      {Number.isFinite(d.margem) ? <small className={d.margem < 0 ? css.negativo : undefined}>margem {numero(d.margem)}%</small> : preco > 0 && <small className={css.semDado}>sem custo, sem margem</small>}
+      {d.abaixoDaTabela && <Pilula tom="aviso" tamanho="inline" titulo="O preço médio vendido no ano ficou mais de 2% abaixo do preço de cadastro.">Abaixo da tabela</Pilula>}</div></td>
+  </>
+}
+// #3299: no celular as colunas somem e o essencial vai sob o nome.
+function resumoMovelDoProduto(d, precoTabela) {
+  if (!d) return precoTabela > 0 ? moeda(precoTabela) : 'Sem preço'
+  const partes = [d.receita > 0 ? `${moedaCheia(d.receita)} em 90 dias` : 'sem venda em 90 dias', d.curva && `curva ${d.curva}`, sinalDoProduto(d)?.rotulo, d.abaixoDaTabela && 'Abaixo da tabela']
+  return partes.filter(Boolean).join(' · ')
 }
 
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
@@ -146,6 +182,9 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const leads = filtrarSemCadastro(conversas ?? [], busca)
   const lista = soLeads ? leads : consulta.itens
   const comRelacao = tela === 'clientes' && !soLeads
+  const comDesempenho = tela === 'produtos'
+  const desempenho = useDesempenhoDosProdutos(contexto, consulta.revisao, comDesempenho)
+  const indice = porProduto(desempenho.desempenho)
   const leitura = leituraDaLista(consulta, soLeads)
   // #2495 (S1, I6): a busca de produto usa outra rota, sem ordem; ali a escolha fica parada.
   const ordenavel = !soLeads && !emRecompra && Boolean(ORDENS_CADASTRO[tela]) && !(tela === 'produtos' && busca.trim())
@@ -231,7 +270,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   }
   return <section className={css.painel} aria-labelledby={idTitulo}>
     <header className={css.cabecalho}>
-      <div><h2 id={idTitulo}>{TITULOS_CADASTROS[tela]}</h2><p>{({ clientes: 'Pessoas, contatos e histórico de relacionamento.', produtos: 'Dados dos produtos usados no cardápio e na operação.', fornecedores: 'Contatos e condições de compra.', bancos: 'Contas usadas pela loja.' })[tela]}</p></div>
+      <div><h2 id={idTitulo}>{TITULOS_CADASTROS[tela]}</h2><p>{({ clientes: 'Pessoas, contatos e histórico de relacionamento.', produtos: 'O que cada produto vende, quanto pesa na receita e o que pede atenção.', fornecedores: 'Contatos e condições de compra.', bancos: 'Contas usadas pela loja.' })[tela]}</p></div>
       {podeEditar && !soLeads && <Botao variante="primario" icone="mais" onClick={novo}>{tela === 'clientes' && conversa && !conversa.clienteId ? 'Cadastrar pessoa da conversa' : TEXTOS_CADASTRO[tela].novo}</Botao>}
     </header>
     {conversa && <div className={css.contexto}><Icone nome="conversa" tamanho={20} /><span>Atendimento de <strong>{nome(conversa)}</strong></span>
@@ -249,6 +288,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {/* #2792: abas de verdade (tablist, aria-selected e setas), como em Modelos. */}
       {tela === 'clientes' && <BarraDeAbas rotulo="Tipos de cadastro" abas={abas} ativa={tipo} aoTrocar={valor => definir({ tipo: valor, pagina: 1, filtro: '', posicao: 0 })} idPainel="cadastros-painel" prefixoId="cadastros-aba" />}
       <div id="cadastros-painel" role={tela === 'clientes' ? 'tabpanel' : undefined} aria-labelledby={tela === 'clientes' ? `cadastros-aba-${tipo}` : undefined}>
+{comDesempenho && <FaixaDeProdutos desempenho={desempenho.desempenho} carregando={desempenho.carregando} erro={desempenho.erro} aoTentar={desempenho.tentar} />}
       {/* #3193: loja desligada, o motivo aparece uma vez aqui e cada "Novo pedido" da lista aponta para ele. */}
       {podeNovoPedido && novoPedido.motivo && lista.length > 0 && <p id={ID_MOTIVO_NOVO_PEDIDO} className={css.contexto} role="status">{novoPedido.motivo}</p>}
       <div className={!soLeads && !emRecompra && ORDENS_CADASTRO[tela] ? `${css.filtros} ${css.comOrdem}` : tela === 'bancos' ? `${css.filtros} ${css.soBusca}` : css.filtros}>
@@ -264,8 +304,8 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {leitura === 'carregando' && lista.length === 0 ? <EsqueletoDeLista linhas={6}>Carregando cadastros…</EsqueletoDeLista> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : emRecompra ? 'Ninguém para chamar agora' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
         acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads && !emRecompra ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : undefined}>
         {busca ? 'Tente outro nome ou contato.' : emRecompra ? 'Aparece aqui quem já comprou 2 vezes ou mais e está há 30 dias sem pedir.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} aria-busy={leitura === 'carregando'}>
-        <table className={comRelacao ? css.comRelacao : undefined}><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
-          : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}{comRelacao ? ['Estágio', 'Gasto', 'Última compra', 'Sinais'].map(t => <th key={t} scope="col">{t}</th>) : <><th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th></>}<th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
+        <table className={comRelacao ? css.comRelacao : comDesempenho ? css.comDesempenho : undefined}><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
+          : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}{comRelacao ? ['Estágio', 'Gasto', 'Última compra', 'Sinais'].map(t => <th key={t} scope="col">{t}</th>) : comDesempenho ? ['Vendas em 90 dias', 'Curva do ano', 'Última venda', 'Preço e margem no ano'].map(t => <th key={t} scope="col">{t}</th>) : <><th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th></>}<th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
           const id = item.id ?? item.produtoId
           const c = soLeads ? item : (conversas ?? []).find(c => c.clienteId === id)
           const situacao = situacaoDaLinha(tela, item, soLeads)
@@ -274,9 +314,10 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
           const link = emRecompra ? linkDoConvite(telefoneCadastro(item), nome(item) === 'Contato sem nome' ? '' : nome(item), conta?.casa) : null
           // #2457 (U9): a linha inteira abre o cadastro; o botão Editar continua sendo o alvo do teclado.
           return <tr key={id} className={soLeads ? undefined : css.clicavel} onClick={soLeads ? undefined : e => { if (!e.target.closest('button, a')) editar(item) }}>
-            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div>{comRelacao ? <span className={css.nomeDaLinha}><button type="button" className={css.nomeFicha} disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`Abrir ficha de ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : nome(item)}</button>{semNome && <span className={css.selo}>Sem nome</span>}</span> : <strong>{nome(item)}</strong>}<small>{soLeads ? item.canal : emRecompra ? (Number.isFinite(item.relacao?.compras) ? plural(item.relacao.compras, 'compra', 'compras') : resumoDaRecompra(item.orderCount, item.lastOrderAt)) : item.nomeFantasia || item.marca || item.contato || item.titular || (comRelacao && Number.isFinite(item.relacao?.compras) ? (item.relacao.compras ? `${item.relacao.compras} compra${item.relacao.compras === 1 ? '' : 's'}` : '') : item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small>{!(semNome && !emailCadastro(item)) && <small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : (semNome ? '' : telefone(item)) || emailCadastro(item) || item.instituicao || (comRelacao ? 'Contato não informado' : '')}</small>}{comRelacao && !semNome && telefone(item) && emailCadastro(item) && <small className={css.contatoMovel}>{emailCadastro(item)}</small>}{comRelacao && (!Number.isFinite(item.relacao?.compras) || !emAtividadeCadastro(item)) && <span className={css.situacaoNoNome}>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</span>}</div></div></td>
+            <td><div className={css.identidade}>{tela === 'clientes' ? <FotoDaLinha nome={nome(item)} fotoUrl={item.fotoUrl} /> : <span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span>}<div>{comRelacao ? <span className={css.nomeDaLinha}><button type="button" className={css.nomeFicha} disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`Abrir ficha de ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : nome(item)}</button>{semNome && <span className={css.selo}>Sem nome</span>}</span> : <strong>{nome(item)}</strong>}<small>{soLeads ? item.canal : emRecompra ? (Number.isFinite(item.relacao?.compras) ? plural(item.relacao.compras, 'compra', 'compras') : resumoDaRecompra(item.orderCount, item.lastOrderAt)) : item.nomeFantasia || item.marca || item.contato || item.titular || (comRelacao && Number.isFinite(item.relacao?.compras) ? (item.relacao.compras ? `${item.relacao.compras} compra${item.relacao.compras === 1 ? '' : 's'}` : '') : item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small>{!(semNome && !emailCadastro(item)) && <small className={css.contatoMovel}>{tela === 'produtos' ? resumoMovelDoProduto(indice.get(id), item.precoReferencia) : (semNome ? '' : telefone(item)) || emailCadastro(item) || item.instituicao || (comRelacao ? 'Contato não informado' : '')}</small>}{comRelacao && !semNome && telefone(item) && emailCadastro(item) && <small className={css.contatoMovel}>{emailCadastro(item)}</small>}{comRelacao && (!Number.isFinite(item.relacao?.compras) || !emAtividadeCadastro(item)) && <span className={css.situacaoNoNome}>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</span>}{comDesempenho && !emAtividadeCadastro(item) && <span className={css.situacaoNoNome}><Pilula tom="neutro" tamanho="inline">{situacao.texto}</Pilula></span>}</div></div></td>
             {comRelacao && <CelulasDaRelacao relacao={item.relacao} totalDaCarteira={consulta.gastoTotalDaCarteira} />}
-            {!comRelacao && <>
+            {comDesempenho && <CelulasDoDesempenho d={indice.get(id)} precoTabela={item.precoReferencia} />}
+{!comRelacao && !comDesempenho && <>
             <td>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : tela === 'bancos' ? item.instituicao || 'Não informada' : <><span>{telefone(item) || emailCadastro(item) || 'Contato não informado'}</span>{telefone(item) && <small>{emailCadastro(item)}</small>}</>}</td>
             <td>{situacao.tom ? <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</td>
             </>}

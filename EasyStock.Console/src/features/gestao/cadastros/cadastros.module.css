@@ -204,3 +204,24 @@
   .lista .comRelacao .acoes button, .lista .comRelacao .acoes .chamar { min-height: var(--toque); }
   .passos { max-width: 64px; }
 }
+/* #3299: Produtos com desempenho. Mesmo desenho das células de Leads e clientes; a curva é um selo de letra. */
+.lista .comDesempenho { table-layout: fixed; }
+.lista .comDesempenho th, .lista .comDesempenho td { padding-inline: var(--e-3); }
+.lista .comDesempenho td { padding-block: var(--e-2); overflow-wrap: normal; }
+.lista .comDesempenho td:first-child { overflow-wrap: anywhere; }
+.lista .comDesempenho th:nth-child(1) { width: 30%; }
+.lista .comDesempenho th:nth-child(2) { width: 19%; }
+.lista .comDesempenho th:nth-child(3) { width: 8%; }
+.lista .comDesempenho th:nth-child(4) { width: 16%; }
+.lista .comDesempenho th:nth-child(5) { width: 17%; }
+.lista .comDesempenho th:nth-child(6) { width: 10%; }
+.curva { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--e-1); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2); font-family: var(--f-dado); font-weight: 700; }
+.curva[data-curva='A'] { border-color: var(--tinta); background: var(--tinta); color: var(--elevado); }
+.negativo { color: var(--erro); font-weight: 600; }
+.semDado { color: var(--tinta-3); }
+@media (max-width: 700px) {
+  .lista .comDesempenho th:nth-child(1) { width: 66%; }
+  .lista .comDesempenho th:nth-child(n+2):nth-child(-n+5), .lista .comDesempenho td:nth-child(n+2):nth-child(-n+5) { display: none; }
+  .lista .comDesempenho th:nth-child(6) { width: 34%; }
+}
+

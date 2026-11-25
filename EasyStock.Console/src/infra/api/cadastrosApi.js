@@ -93,3 +93,9 @@ export const aprovarModeloCadastro = (id, contexto) => chamarApi(`${rotas.modelo
 export const definirEtiquetaPadrao = (item, contexto) => chamarApi(`${rotas.etiquetas}/${item.origem}/${item.id}/set-default`, { ...opcoes(contexto), metodo: 'POST', corpo: { empresaId: contexto.empresaId } })
 export const duplicarEtiquetaCadastro = (item, nome, contexto) => chamarApi(rotas.etiquetas, { ...opcoes(contexto), metodo: 'POST', corpo: { empresaId: contexto.empresaId, nome, layoutJson: item.layoutJson, baseSistemaId: item.origem === 'Sistema' ? item.id : item.baseSistemaId, definirComoPadrao: false } })
 export const editarEtiquetaCadastro = (item, nome, contexto) => chamarApi(`${rotas.etiquetas}/${encodeURIComponent(item.id)}`, { ...opcoes(contexto), metodo: 'PUT', corpo: { empresaId: contexto.empresaId, id: item.id, nome, layoutJson: item.layoutJson } })
+// #3299: o desempenho dos produtos (vendas de 90 dias, tendência, curva, parado e margem) e a faixa da tela Produtos.
+export async function obterDesempenhoDosProdutos(contexto, sinal) {
+  const r = await chamarApi(`${rotas.produtos}/desempenho?${query({ empresaId: contexto.empresaId })}`, opcoes(contexto, sinal))
+  if (!r?.resumo || !Array.isArray(r?.produtos)) throw new Error('Os números dos produtos não carregaram.')
+  return r
+}

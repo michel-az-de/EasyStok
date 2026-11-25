@@ -72,6 +72,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.ITenantContextAccessor, EasyStock.Infra.Postgre.TenantContextAccessor>();
             services.AddScoped<IProdutoRepository, ProdutoRepository>();
+            services.AddScoped<IProdutosDesempenhoQuery, ProdutosDesempenhoQuery>(); // #3299: desempenho da tela Produtos
             services.AddScoped<IProdutoVariacaoRepository, ProdutoVariacaoRepository>();
             services.AddScoped<IProdutoCaracteristicaRepository, ProdutoCaracteristicaRepository>();
             services.AddScoped<IProdutoEmbalagemRepository, ProdutoEmbalagemRepository>();

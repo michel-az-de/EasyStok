@@ -161,6 +161,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterDetalheProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarProdutoUseCase>();
         services.AddScoped<GerenciarProdutoUseCase>();
+        services.AddScoped<DesempenhoDosProdutosUseCase>(); // #3299: desempenho da tela Produtos
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Acervo.AcervoUseCase>();
