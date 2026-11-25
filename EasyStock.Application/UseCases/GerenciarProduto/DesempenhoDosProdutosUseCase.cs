@@ -46,10 +46,10 @@ public sealed class DesempenhoDosProdutosUseCase(IProdutosDesempenhoQuery consul
             ProdutosVendidos: naJanela.Select(v => v.ProdutoId).Where(ativos.Contains).Distinct().Count(),
             ReceitaSemProduto: receitaSemProduto,
             Ativos: ativos.Count,
-            Parados: linhas.Count(l => l.Parado),
-            NuncaVenderam: linhas.Count(l => l.NuncaVendeu),
-            AbaixoDaTabela: linhas.Count(l => l.AbaixoDaTabela && ativos.Contains(l.ProdutoId)),
-            SemCusto: catalogo.Count(p => ativos.Contains(p.Id) && !(p.Custo > 0m)),
+            Parados: linhas.Count(l => TemSinal(l, SinalDoProduto.Parado)),
+            NuncaVenderam: linhas.Count(l => TemSinal(l, SinalDoProduto.NuncaVendeu)),
+            AbaixoDaTabela: linhas.Count(l => TemSinal(l, SinalDoProduto.AbaixoDaTabela)),
+            SemCusto: linhas.Count(l => TemSinal(l, SinalDoProduto.SemCusto)),
             SemPreco: catalogo.Count(p => ativos.Contains(p.Id) && !(p.PrecoTabela > 0m)),
             Curva: new CurvaDosProdutos(
                 ProdutosA: anoA.Count,
@@ -61,6 +61,16 @@ public sealed class DesempenhoDosProdutosUseCase(IProdutosDesempenhoQuery consul
 
         return new DesempenhoDosProdutosResult(janela, hoje, resumo, linhas);
     }
+
+    /// <summary>#3303: o mesmo teste conta o sinal na faixa e filtra a lista, para os dois nunca divergirem.</summary>
+    public static bool TemSinal(DesempenhoDeUmProduto linha, SinalDoProduto sinal) => sinal switch
+    {
+        SinalDoProduto.Parado => linha.Parado,
+        SinalDoProduto.NuncaVendeu => linha.NuncaVendeu,
+        SinalDoProduto.AbaixoDaTabela => linha.AbaixoDaTabela,
+        SinalDoProduto.SemCusto => linha.AtivoDeVenda && linha.Custo is null,
+        _ => throw new ArgumentOutOfRangeException(nameof(sinal), sinal, "Sinal desconhecido."),
+    };
 
     private static DesempenhoDeUmProduto Linha(
         ProdutoDoCatalogo p, DateOnly hoje, List<VendaDoProdutoNoPedido> naJanela, List<VendaDoProdutoNoPedido> naAnterior,
@@ -99,7 +109,8 @@ public sealed class DesempenhoDosProdutosUseCase(IProdutosDesempenhoQuery consul
             PrecoTabela: p.PrecoTabela > 0m ? p.PrecoTabela : null,
             Custo: p.Custo > 0m ? p.Custo : null,
             Margem: DesempenhoDoProduto.Margem(precoVendido ?? p.PrecoTabela ?? 0m, p.Custo),
-            AbaixoDaTabela: ativoDeVenda && precoVendido is { } pv && DesempenhoDoProduto.AbaixoDaTabela(pv, p.PrecoTabela));
+            AbaixoDaTabela: ativoDeVenda && precoVendido is { } pv && DesempenhoDoProduto.AbaixoDaTabela(pv, p.PrecoTabela),
+            AtivoDeVenda: ativoDeVenda);
     }
 }
 
@@ -146,4 +157,8 @@ public sealed record DesempenhoDeUmProduto(
     decimal? PrecoTabela,
     decimal? Custo,
     decimal? Margem,
-    bool AbaixoDaTabela);
+    bool AbaixoDaTabela,
+    bool AtivoDeVenda);
+
+/// <summary>#3303: os contadores da faixa que viram filtro da lista.</summary>
+public enum SinalDoProduto { Parado, NuncaVendeu, AbaixoDaTabela, SemCusto }
