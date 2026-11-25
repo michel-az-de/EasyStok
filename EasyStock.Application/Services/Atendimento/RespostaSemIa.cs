@@ -23,8 +23,8 @@ public sealed class RespostaSemIa(
     ResolvedorCanal canais,
     IUnitOfWork unitOfWork,
     ILogger<RespostaSemIa> logger,
-    IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null)
+    IOptions<LimiteRespostasAgenteOptions> limiteRespostas,
+    IContatoDaEquipeAvisada? equipe = null)
 {
     /// <summary>Modelo gravado no turno registrado sem chamar o modelo.</summary>
     public const string Modelo = "sem-ia";
@@ -130,15 +130,11 @@ public sealed class RespostaSemIa(
         if (PortoesDoAssistente.DaConversa(conversa, agoraUtc).Any(e => e.Barra)) return (false, null);
 
         var configuracao = await configuracoes.GetByEmpresaIdAsync(empresaId) ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
-        var portoes = new PortoesDoAssistente(llm, conversas, equipe, limiteRespostas);
+        var portoes = new PortoesDoAssistente(llm, conversas, turnos, limiteRespostas, equipe);
         if ((await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct)).Any(e => e.Barra)) return (false, null);
 
         var cliente = conversa.ClienteId is { } clienteId ? await clientes.GetByIdAsync(empresaId, clienteId) : null;
-        if (PortoesDoAssistente.DaPessoa(cliente).Any(e => e.Barra)) return (false, cliente);
-
-        if ((await portoes.DoLimiteAsync(empresaId, conversa.Id, agoraUtc, ct)).Barra) return (false, cliente);
-        if ((await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agoraUtc, ct)).Barra) return (false, cliente);
-
-        return (true, cliente);
+        var barrou = await portoes.PrimeiraQueBarraDoClienteEDoCustoAsync(empresaId, conversa.Id, configuracao, cliente, agoraUtc, ct);
+        return (barrou is null, cliente);
     }
 }

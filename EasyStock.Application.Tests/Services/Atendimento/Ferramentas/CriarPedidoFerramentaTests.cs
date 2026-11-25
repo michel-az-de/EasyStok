@@ -68,7 +68,10 @@ public class CriarPedidoFerramentaTests
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), Conversas);
             return new AgenteAtendimentoService(llm, Conversas, Checkout.ConfiguracaoAtendimentoRepo, Clientes,
                 [Ferramenta], Substitute.For<IEscaladorConversa>(), cloud, Uow,
-                dossie, Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
+                dossie, Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance,
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository>(),
+                Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+                Microsoft.Extensions.Options.Options.Create(new PrecosModelosAgenteOptions()));
         }
 
         public ContextoTurnoAgente? Contexto { get; private set; }

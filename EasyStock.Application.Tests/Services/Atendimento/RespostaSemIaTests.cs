@@ -52,7 +52,8 @@ public class RespostaSemIaTests
         _configuracoes.GetByEmpresaIdAsync(Empresa).Returns(configuracao);
 
         _sut = new RespostaSemIa(_regras, _configuracoes, _conversas, _clientes, _turnos, _llm,
-            new ResolvedorCanal([_canal]), _uow, NullLogger<RespostaSemIa>.Instance);
+            new ResolvedorCanal([_canal]), _uow, NullLogger<RespostaSemIa>.Instance,
+            Options.Create(new LimiteRespostasAgenteOptions()));
     }
 
     private Task<bool> Tentar(Mensagem? entrada = null) => _sut.TentarAsync(Empresa, _conversa, entrada ?? _entrada, Agora);
@@ -268,7 +269,7 @@ public class RespostaSemIaTests
     {
         const int limite = 4;
         var sut = new RespostaSemIa(_regras, _configuracoes, _conversas, _clientes, _turnos, _llm,
-            new ResolvedorCanal([_canal]), _uow, NullLogger<RespostaSemIa>.Instance, null,
+            new ResolvedorCanal([_canal]), _uow, NullLogger<RespostaSemIa>.Instance,
             Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = limite }));
         var enviadas = 0;
         _conversas.ContarRespostasDoAgenteDesdeAsync(Empresa, _conversa.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
