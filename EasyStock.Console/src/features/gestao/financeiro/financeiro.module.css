@@ -2,6 +2,8 @@
 .painel { grid-template-columns: minmax(0, 1fr); }
 /* #2762 (VI7): o botão de "Tentar de novo" não estica a linha toda do grid. */
 .painel > button { justify-self: start; }
+/* #3331: o título de cada relatório fica colado nos filtros dele; a margem de h2 somava ao gap do grid. */
+.painel > h2 { margin: 0; }
 /* #2762 (F5): recarregando, o conteúdo anterior esmaece em vez de ficar parado sem sinal. */
 .estado > * { transition: opacity var(--dur-curta) var(--ease-padrao); }
 .estado[aria-busy='true'] > * { opacity: .6; }
@@ -76,7 +78,8 @@
 .novaCategoria > :nth-child(2) { flex: 1 1 220px; }
 .dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
 .ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: 0; border: 0; border-radius: var(--r-2); }
-.ladoDia h2 { margin: 0; font-size: var(--t-forte); }
+/* #3331: o título de cada lado manda no bloco que ele abre (20 px contra 15 px do "Vence hoje"). */
+.ladoDia h2 { margin: 0; font-size: var(--t-titulo); }
 .ladoDia h3 { margin: 0; font-size: var(--t-corpo); }
 .cartaoVencidas { transition: background-color var(--dur-curta) var(--ease-padrao); display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
 .cartaoVencidas > strong { font-family: var(--f-dado); font-size: var(--t-forte); }
@@ -88,6 +91,8 @@
 /* #2258 (F9): o bloco todo leva à lista por este link (cobre o bloco; "Pagar" fica acima dele). */
 .blocoDia { position: relative; display: grid; gap: var(--e-2); }
 .blocoDia:hover .verLista { text-decoration: underline; }
+/* #3331: a frase de lista vazia já tem o gap do bloco; a margem de parágrafo abria 14 px a mais. */
+.blocoDia > .apoio { margin: 0; }
 .blocoDia .itemDia button { position: relative; z-index: 1; }
 .verLista { color: var(--marca); font-weight: 600; font-size: var(--t-apoio); }
 .verLista::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-2); }
@@ -115,6 +120,8 @@
 .aviso { color: var(--tinta-2); font-size: var(--t-apoio); margin: 0; }
 .avisoAtencao { display: block; margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta); background: var(--alerta-pastel); border-radius: var(--r-1); }
 .escolha { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
+/* #3331: a explicação de uma caixa de marcar fica colada nela, não solta no meio do formulário. */
+.escolha + .aviso { margin-top: calc(var(--e-3) * -1); }
 .parcelas { margin: 0; padding-left: var(--e-5); max-height: 180px; overflow-y: auto; }
 .tabelaRolavel { min-width: 0; overflow-x: auto; }
 /* #2762 (VI5): primeira coluna fixa e uma sombra na borda dizem que a tabela rola para o lado. */

@@ -21,7 +21,7 @@ export function PedidosPorAnuncio() {
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}>
       <CampoTexto rotulo="De" tipo="date" required value={rascunho.inicio} onChange={(e) => setRascunho({ ...rascunho, inicio: e.target.value })} />
       <CampoTexto rotulo="Até" tipo="date" required min={rascunho.inicio} value={rascunho.fim} onChange={(e) => setRascunho({ ...rascunho, fim: e.target.value })} />
-      <Botao tipo="submit" variante="primario">Consultar anúncios</Botao>
+      <Botao tipo="submit">Consultar anúncios</Botao>
     </form>
     {consulta.erro && <div className={css.painel}><p role="alert">{consulta.erro}</p><Botao icone="refresh-cw" onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
     {consulta.carregando && !consulta.dados && <EsqueletoDeLista linhas={3} altura="var(--toque)">Carregando anúncios…</EsqueletoDeLista>}
