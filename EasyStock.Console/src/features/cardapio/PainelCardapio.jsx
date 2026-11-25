@@ -656,7 +656,9 @@ export function PainelCardapio({
       <AlcaLargura
         rotulo="Redimensionar painel do cardápio"
         valor={largura}
-        {...limitesLargura}
+        min={LARGURA_MINIMA}
+        max={larguraMaxima}
+        padrao={limitesLargura.padrao}
         invertida={!ladoDoBalcao}
         aoMudar={aoRedimensionar}
       />

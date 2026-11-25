@@ -27,6 +27,9 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // escolha curta como as reações da bolha; `folha` faz o menu `abaixo` abrir como folha inferior de largura cheia no celular,
 // sem rolagem interna para o conteúdo atual (o chamador mantém os itens curtos).
 //
+// `remedir` (#3322): mudar o valor mede o gatilho de novo; serve quando ele anda sem rolagem nem resize da
+// janela, como o botão Largura numa barra que cresce.
+//
 // `portal` (achado do Composer, generalizado aqui): um ancestral com
 // overflow-y ou overflow-x diferente de `visible` recorta este popover
 // mesmo quando ele sai por um eixo que não é o da rolagem, porque a spec de
@@ -42,7 +45,7 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
   rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false,
-  alinhamento = 'direita', largura: larguraPedida = 360,
+  alinhamento = 'direita', largura: larguraPedida = 360, remedir,
 }) {
   const aEsquerda = alinhamento === 'esquerda'
   const caixaRef = useRef(null)
@@ -105,7 +108,7 @@ export function Popover({
       viewport?.removeEventListener('resize', agendar)
       if (quadro !== null) window.cancelAnimationFrame(quadro)
     }
-  }, [portal])
+  }, [portal, remedir])
 
   useLayoutEffect(() => {
     if (!retangulo || posicao !== 'abaixo') return

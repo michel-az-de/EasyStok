@@ -27,7 +27,7 @@ export function AjusteLargura(props) {
       <BotaoIcone rotulo={`Largura ${props.nome}`} dica="Largura" icone="largura" aria-expanded={aberto} aria-haspopup="dialog"
         onClick={() => setAberto(!aberto)} />
       {aberto && (
-        <Popover rotulo={`Largura ${props.nome}`} papel="dialog" portal posicao="abaixo" largura={280} aoFechar={() => setAberto(false)}>
+        <Popover rotulo={`Largura ${props.nome}`} papel="dialog" portal posicao="abaixo" largura={280} remedir={props.valor} aoFechar={() => setAberto(false)}>
           <PainelLargura {...props} />
         </Popover>
       )}
