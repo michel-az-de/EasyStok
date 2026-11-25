@@ -94,7 +94,7 @@ function CelulasDoDesempenho({ d, precoTabela }) {
       {vendeu && <small>{plural(d.pedidos, 'pedido', 'pedidos')} · {numero(d.unidades)} {d.unidades === 1 ? 'vendido' : 'vendidos'}</small>}
       {Number.isFinite(d.ritmoDe30Dias) && <small>previsão ~{numero(d.ritmoDe30Dias)} {d.ritmoDe30Dias === 1 ? 'vendido' : 'vendidos'} em 30 dias</small>}
       {tendencia && <Pilula tom={tendencia.tom} tamanho="inline" titulo={tendencia.titulo} icone={tendencia.icone ?? undefined}>{tendencia.rotulo}</Pilula>}</div></td>
-    <td>{d.curva ? <span className={css.curva} data-curva={d.curva} title={CURVAS[d.curva]} aria-label={CURVAS[d.curva]}>{d.curva}</span> : <Traco />}</td>
+    <td>{d.curva ? <span className={css.curva} data-curva={d.curva} title={CURVAS[d.curva]}><span aria-hidden="true">{d.curva}</span><span className="sr">{CURVAS[d.curva]}</span></span> : <Traco />}</td>
     <td><div className={css.gasto}>
       <strong>{d.ultimaVenda ? diasDaVenda(d.diasSemVender) : 'Nunca vendido'}</strong>
       {d.pedidosNoHistorico > 0 && <small>{plural(d.pedidosNoHistorico, 'pedido', 'pedidos')} no total</small>}
@@ -108,7 +108,7 @@ function CelulasDoDesempenho({ d, precoTabela }) {
 }
 // #3299: no celular as colunas somem e o essencial vai sob o nome.
 function resumoMovelDoProduto(d, precoTabela) {
-  if (!d) return moeda(precoTabela ?? 0)
+  if (!d) return precoTabela > 0 ? moeda(precoTabela) : 'Sem preço'
   const partes = [d.receita > 0 ? `${moedaCheia(d.receita)} em 90 dias` : 'sem venda em 90 dias', d.curva && `curva ${d.curva}`, sinalDoProduto(d)?.rotulo, d.abaixoDaTabela && 'Abaixo da tabela']
   return partes.filter(Boolean).join(' · ')
 }

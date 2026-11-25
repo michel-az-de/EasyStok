@@ -22,7 +22,7 @@ public sealed class DesempenhoDosProdutosUseCaseTests
         {
             new(Lasanha, "Lasanha", true, DiasAtras(300), true, 45m, 15m),
             new(Linguini, "Linguini", true, DiasAtras(300), true, 19m, null),
-            new(Molho, "Molho", false, DiasAtras(300), true, 15m, null),
+            new(Molho, "Molho", false, DiasAtras(300), true, 18m, null),
             new(Novo, "Novo", true, DiasAtras(40), true, null, null),
             new(Insumo, "Farinha", true, DiasAtras(300), false, null, null),
         });
@@ -89,6 +89,7 @@ public sealed class DesempenhoDosProdutosUseCaseTests
         r.Produtos.Single(p => p.ProdutoId == Novo).NuncaVendeu.Should().BeTrue();
         r.Produtos.Single(p => p.ProdutoId == Insumo).NuncaVendeu.Should().BeFalse("insumo não se vende");
         r.Produtos.Single(p => p.ProdutoId == Molho).Margem.Should().BeNull("sem custo");
+        r.Produtos.Single(p => p.ProdutoId == Molho).AbaixoDaTabela.Should().BeFalse("vendido a 15 com tabela 18, mas inativo não pede atenção: a linha bate com a faixa");
     }
 
     [Fact]

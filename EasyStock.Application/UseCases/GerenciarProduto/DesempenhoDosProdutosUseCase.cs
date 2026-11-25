@@ -99,7 +99,7 @@ public sealed class DesempenhoDosProdutosUseCase(IProdutosDesempenhoQuery consul
             PrecoTabela: p.PrecoTabela > 0m ? p.PrecoTabela : null,
             Custo: p.Custo > 0m ? p.Custo : null,
             Margem: DesempenhoDoProduto.Margem(precoVendido ?? p.PrecoTabela ?? 0m, p.Custo),
-            AbaixoDaTabela: precoVendido is { } pv && DesempenhoDoProduto.AbaixoDaTabela(pv, p.PrecoTabela));
+            AbaixoDaTabela: ativoDeVenda && precoVendido is { } pv && DesempenhoDoProduto.AbaixoDaTabela(pv, p.PrecoTabela));
     }
 }
 

@@ -88,17 +88,20 @@ export function useListaCadastros(tela, filtros, contexto, habilitada = true) {
 
 // #3299: o desempenho acompanha a lista de produtos e recarrega com ela (`revisao`). Falha só nos números: a lista segue.
 export function useDesempenhoDosProdutos(contexto, revisao, habilitado = true) {
-  const [resultado, definir] = useState({ desempenho: null, carregando: habilitado, erro: null })
+  // O número guardado é da empresa em `chave`: trocar de empresa nunca mostra o da anterior, nem quando a nova falha.
+  const chave = `${contexto.empresaId ?? ''}|${contexto.identidade ?? ''}`
+  const [resultado, definir] = useState({ chave, desempenho: null, carregando: habilitado, erro: null })
   const [tentativa, tentar] = useState(0)
   useEffect(() => {
     if (!habilitado) return undefined
     const abortar = new AbortController()
-    definir(r => ({ ...r, carregando: true, erro: null }))
+    definir(r => ({ chave, desempenho: r.chave === chave ? r.desempenho : null, carregando: true, erro: null }))
     api.obterDesempenhoDosProdutos(contexto, abortar.signal).then(
-      desempenho => { if (!abortar.signal.aborted) definir({ desempenho, carregando: false, erro: null }) },
-      e => { if (!abortar.signal.aborted) definir(r => ({ desempenho: r.desempenho, carregando: false, erro: e.message || 'Os números dos produtos não carregaram.' })) },
+      desempenho => { if (!abortar.signal.aborted) definir({ chave, desempenho, carregando: false, erro: null }) },
+      e => { if (!abortar.signal.aborted) definir(r => ({ chave, desempenho: r.chave === chave ? r.desempenho : null, carregando: false, erro: e.message || 'Os números dos produtos não carregaram.' })) },
     )
     return () => abortar.abort()
-  }, [contexto.empresaId, contexto.identidade, revisao, tentativa, habilitado])
-  return { ...resultado, tentar: () => tentar(n => n + 1) }
+  }, [chave, revisao, tentativa, habilitado])
+  const daEmpresa = resultado.chave === chave
+  return { desempenho: daEmpresa ? resultado.desempenho : null, carregando: daEmpresa ? resultado.carregando : habilitado, erro: daEmpresa ? resultado.erro : null, tentar: () => tentar(n => n + 1) }
 }
