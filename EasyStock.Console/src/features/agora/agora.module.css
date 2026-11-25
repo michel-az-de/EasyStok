@@ -1,7 +1,7 @@
 .painel { margin-bottom: var(--e-6); padding-bottom: var(--e-6); border-bottom: 0; }
 .filas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e-4); }
 
-.fila { display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; padding: var(--e-4); background: var(--papel); border: 0; border-radius: var(--r-2); }
+.fila { display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; padding: var(--e-4); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
 .cabeca { display: grid; gap: var(--e-1); }
 .numero { margin-left: var(--e-1); font-variant-numeric: tabular-nums; color: var(--marca-forte); }
 .numero[data-vazio="true"] { color: var(--tinta-2); }
@@ -16,6 +16,9 @@
 .item:is(a, button):focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .item[data-tom="perigo"] { background: var(--erro-pastel); }
 .item[data-tom="perigo"] .selo { color: var(--erro); }
+/* Tom de aviso (restrição alimentar, passou para você, precisa de você): bloco na cor de alerta, distinto do vermelho do atraso. */
+.item[data-tom="aviso"] { background: var(--alerta-pastel); border-color: var(--alerta); }
+.item[data-tom="aviso"] .selo { color: var(--alerta); }
 .quem { min-width: 0; font-size: var(--t-corpo); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .selo { font-size: var(--t-apoio); font-weight: 700; color: var(--marca-forte); white-space: nowrap; }
 .detalhe { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); }

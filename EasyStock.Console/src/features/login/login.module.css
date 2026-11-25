@@ -2,7 +2,8 @@
   height: 100%; overflow-y: auto;
   display: flex; flex-direction: column; align-items: center;
   padding: var(--e-4);
-  background: var(--fundo);
+  /* Um calor discreto no topo, da cor da marca, tira o cartão do vazio sem competir com ele. */
+  background: radial-gradient(120% 55% at 50% 0, color-mix(in srgb, var(--marca) 10%, var(--fundo)), var(--fundo) 72%);
 }
 
 .cartao {
@@ -19,19 +20,24 @@
   animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
 
+.marca { display: flex; justify-content: center; }
+/* O logo lidera; o nome do produto vira legenda abaixo dele em vez de uma segunda marca ao lado. */
+.marca > span { flex-direction: column; gap: var(--e-2); }
 .titulo {
-  margin: 0;
+  margin: 0; text-align: center;
   font-family: var(--f-corpo); font-weight: 700;
   font-size: var(--t-valor); line-height: var(--lh-compacto);
   color: var(--tinta);
 }
 .apoio { margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
-.preferencia { display: flex; justify-content: center; padding-top: var(--e-3); border-top: 0; }
+.preferencia { display: flex; justify-content: center; flex: none; padding-top: var(--e-4); }
 
 .formulario {
   display: grid;
   gap: var(--e-4);
 }
+/* O botão de enviar é a ação da tela: peso e corpo de ação, para não parecer desabilitado. */
+.formulario > button[type='submit'] { font-size: var(--t-forte); font-weight: 700; }
 
 .erro {
   margin: 0;

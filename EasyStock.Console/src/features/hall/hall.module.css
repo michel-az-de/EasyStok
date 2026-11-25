@@ -71,7 +71,7 @@
   position: relative;
   display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; gap: var(--e-1) var(--e-3);
   min-width: 0; padding: var(--e-3) var(--e-4);
-  border: var(--b-1) solid transparent; border-radius: var(--r-2);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   background: var(--papel);
   transition: background var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao);
 }
@@ -97,7 +97,7 @@
 
 
 /* Indisponibilidade usa texto e cadeado sem reduzir o contraste. */
-.emBreve { background: var(--papel); }
+.emBreve { background: transparent; border-style: dashed; }
 .emBreve .nome { color: var(--tinta-2); }
 .selo {
   grid-column: 2; display: inline-flex; align-items: center; gap: var(--e-1);

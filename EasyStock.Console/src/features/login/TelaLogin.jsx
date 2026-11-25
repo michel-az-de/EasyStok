@@ -12,6 +12,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
   const [senha, setSenha] = useState('')
   const [codigo, setCodigo] = useState('')
   const [comCodigo, setComCodigo] = useState(false)
+  const [senhaVisivel, setSenhaVisivel] = useState(false)
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const tentativaEmCurso = useRef(false)
@@ -46,12 +47,12 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
     if (!ocupado) tentar(() => entrarPorCodigo(codigo.replace(/\s+/g, '')), 'Código de acesso inválido ou expirado. Peça um novo à responsável.')
   }
 
-  const trocarModo = () => { setErro(null); setComCodigo((atual) => !atual) }
+  const trocarModo = () => { setErro(null); setSenhaVisivel(false); setComCodigo((atual) => !atual) }
 
   return (
     <main className={css.tela}>
       <section className={css.cartao} aria-labelledby="titulo-login">
-        <Marca />
+        <div className={css.marca}><Marca /></div>
         <div>
           <h1 id="titulo-login" className={css.titulo}>{retomando ? 'Abrindo sua conta…' : erroRetomada ? 'Retomar Atendimento' : 'Entrar na Casa da Baba'}</h1>
         </div>
@@ -70,6 +71,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
               rotulo="Código de acesso" autoComplete="one-time-code" autoCapitalize="off" autoCorrect="off" spellCheck={false}
               required value={codigo} onChange={(e) => setCodigo(e.target.value)} readOnly={ocupado}
             />
+            <p className={css.apoio}>Peça o código à responsável pela loja. Ele vale uma vez.</p>
             <Botao variante="primario" tipo="submit" largo disabled={ocupado || !codigo.trim()}>
               {ocupado ? 'Entrando…' : 'Entrar com o código'}
             </Botao>
@@ -82,9 +84,13 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
               value={email} onChange={(e) => setEmail(e.target.value)} readOnly={ocupado}
             />
             <CampoTexto
-              rotulo="Senha" tipo="password" autoComplete="current-password" required
+              rotulo="Senha" tipo={senhaVisivel ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} required
               value={senha} onChange={(e) => setSenha(e.target.value)} readOnly={ocupado}
             />
+            <label className={css.mostrar}>
+              <input type="checkbox" checked={senhaVisivel} disabled={ocupado} onChange={(e) => setSenhaVisivel(e.target.checked)} />
+              Mostrar a senha
+            </label>
             <Botao variante="primario" tipo="submit" largo disabled={ocupado}>
               {ocupado ? 'Entrando…' : 'Entrar'}
             </Botao>
@@ -101,8 +107,8 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
           </div>
         )}
 
-        <div className={css.preferencia}><InterruptorTema /></div>
       </section>
+      <div className={css.preferencia}><InterruptorTema /></div>
     </main>
   )
 }
