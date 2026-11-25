@@ -27,7 +27,7 @@ import { mesPorExtenso, moeda, moedaCheia, plural } from '../../../dominio/forma
 import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsVisiveis } from '../../../dominio/relacionamento'
 import { rotuloDaTag } from '../../../dominio/tag'
 import { clienteSemNome, nomeExibido } from '../../../dominio/nomeDoContato'
-import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { abrirEdicaoCadastro, ATENCAO_DE_PRODUTOS, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { CURVAS, numero, porProduto, sinalDoProduto, TENDENCIAS, textoDosDias as diasDaVenda } from '../../../dominio/desempenhoDoProduto'
 import { EditorCadastro } from './EditorCadastro'
 import { FaixaDeProdutos } from './FaixaDeProdutos'
@@ -148,12 +148,12 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const idTitulo = useId()
   const chave = chaveContextoCadastro(tela, conversa?.id)
   const [editor, guardarEditor] = useRascunhoDoAjuste(chave)
-  const [memoria, guardarVisual] = useContextoVisualCadastro(chave, contexto.identidade, { busca: '', pagina: 1, filtro: '', tipo: 'todos', ordem: '', posicao: 0 })
-  const { busca, pagina, filtro, tipo, ordem = '' } = memoria
+  const [memoria, guardarVisual] = useContextoVisualCadastro(chave, contexto.identidade, { busca: '', pagina: 1, filtro: '', tipo: 'todos', ordem: '', atencao: '', posicao: 0 })
+  const { busca, pagina, filtro, tipo, ordem = '', atencao = '' } = memoria
   const definir = (valores) => {
     const { editor: novoEditor, ...visuais } = valores
     if (Object.hasOwn(valores, 'editor')) guardarEditor(novoEditor)
-    if (['busca', 'pagina', 'filtro', 'tipo', 'ordem'].some(campo => Object.hasOwn(visuais, campo))) aoFixarConsulta()
+    if (['busca', 'pagina', 'filtro', 'tipo', 'ordem', 'atencao'].some(campo => Object.hasOwn(visuais, campo))) aoFixarConsulta()
     if (Object.keys(visuais).length) guardarVisual({ ...memoria, ...visuais })
   }
   const soLeads = tela === 'clientes' && tipo === 'sem-cadastro'
@@ -165,7 +165,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const podeNovoPedido = tela === 'clientes' && !soLeads && novoPedido.disponivel
   // #2930: cliente sem telefone pede o celular antes de abrir o pedido, em vez de parar no erro do topo.
   const [celularDe, pedirCelular] = useState(null)
-  const consulta = useListaCadastros(tela, { busca, pagina, filtro: emRecompra ? '' : filtro, ordem: emRecompra ? 'sem-comprar' : ordem, relacionamento: emRecompra ? 'recompra' : tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
+  const consulta = useListaCadastros(tela, { busca, pagina, filtro: emRecompra ? '' : filtro, ordem: emRecompra ? 'sem-comprar' : ordem, atencao: tela === 'produtos' ? atencao : '', relacionamento: emRecompra ? 'recompra' : tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
   // #3076: o sucesso vai ao Aviso, que some sozinho; só o que pede ação (endereço não gravado) fica na tela.
   const avisoDaTela = useAviso()
   // Orientação ("Volte à conversa…") pede leitura: fica o tempo do aviso com ação.
@@ -188,7 +188,9 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const leitura = leituraDaLista(consulta, soLeads)
   // #2495 (S1, I6): a busca de produto usa outra rota, sem ordem; ali a escolha fica parada.
   const ordenavel = !soLeads && !emRecompra && Boolean(ORDENS_CADASTRO[tela]) && !(tela === 'produtos' && busca.trim())
-  const comFiltro = Boolean(filtro) || tipo !== 'todos'
+  const comFiltro = Boolean(filtro) || tipo !== 'todos' || (tela === 'produtos' && Boolean(atencao))
+  // #3303: o contador da faixa filtra a lista; a busca de texto vai por outra rota, então um tira o outro.
+  const filtrarAtencao = (valor) => definir({ atencao: valor, filtro: '', pagina: 1, posicao: 0, ...(valor ? { busca: '' } : {}) })
   const ordenar = (valor) => definir({ ordem: valor, pagina: 1, posicao: 0 })
   useEffect(() => () => pedido.current?.abort(), [])
   // #2792: uma rolagem só, a da página; a posição da lista é a dela.
@@ -288,13 +290,14 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {/* #2792: abas de verdade (tablist, aria-selected e setas), como em Modelos. */}
       {tela === 'clientes' && <BarraDeAbas rotulo="Tipos de cadastro" abas={abas} ativa={tipo} aoTrocar={valor => definir({ tipo: valor, pagina: 1, filtro: '', posicao: 0 })} idPainel="cadastros-painel" prefixoId="cadastros-aba" />}
       <div id="cadastros-painel" role={tela === 'clientes' ? 'tabpanel' : undefined} aria-labelledby={tela === 'clientes' ? `cadastros-aba-${tipo}` : undefined}>
-{comDesempenho && <FaixaDeProdutos desempenho={desempenho.desempenho} carregando={desempenho.carregando} erro={desempenho.erro} aoTentar={desempenho.tentar} />}
+{comDesempenho && <FaixaDeProdutos desempenho={desempenho.desempenho} carregando={desempenho.carregando} erro={desempenho.erro} aoTentar={desempenho.tentar} atencao={atencao} aoFiltrar={filtrarAtencao} />}
+      {comDesempenho && ATENCAO_DE_PRODUTOS[atencao] && <output className={css.contexto}><span>Mostrando só os produtos <strong>{ATENCAO_DE_PRODUTOS[atencao]}</strong>.</span><Botao variante="texto" onClick={() => filtrarAtencao('')}>Mostrar todos</Botao></output>}
       {/* #3193: loja desligada, o motivo aparece uma vez aqui e cada "Novo pedido" da lista aponta para ele. */}
       {podeNovoPedido && novoPedido.motivo && lista.length > 0 && <p id={ID_MOTIVO_NOVO_PEDIDO} className={css.contexto} role="status">{novoPedido.motivo}</p>}
       <div className={!soLeads && !emRecompra && ORDENS_CADASTRO[tela] ? `${css.filtros} ${css.comOrdem}` : tela === 'bancos' ? `${css.filtros} ${css.soBusca}` : css.filtros}>
-        {soLeads ? <CampoTexto rotulo="Buscar" placeholder="Nome ou telefone" value={busca} onChange={e => definir({ busca: e.target.value, pagina: 1, posicao: 0 })} /> : <BuscaComSugestoes placeholder={TEXTOS_CADASTRO[tela].busca} valor={busca} aoMudar={valor => definir({ busca: valor, pagina: 1, posicao: 0 })} carregando={consulta.carregando}
+        {soLeads ? <CampoTexto rotulo="Buscar" placeholder="Nome ou telefone" value={busca} onChange={e => definir({ busca: e.target.value, pagina: 1, posicao: 0 })} /> : <BuscaComSugestoes placeholder={TEXTOS_CADASTRO[tela].busca} valor={busca} aoMudar={valor => definir({ busca: valor, pagina: 1, posicao: 0, ...(valor.trim() ? { atencao: '' } : {}) })} carregando={consulta.carregando}
           opcoes={consulta.busca === busca ? lista.slice(0, 6).map(item => ({ id: item.id ?? item.produtoId, rotulo: nome(item), descricao: telefone(item) || emailCadastro(item) || item.marca || item.instituicao, item })) : []} aoEscolher={editar} />}
-        {!soLeads && !emRecompra && ['clientes', 'produtos', 'fornecedores'].includes(tela) && <Combobox rotulo="Situação" valor={filtro} opcoes={FILTROS} aoMudar={valor => definir({ filtro: valor, pagina: 1, posicao: 0 })} />}
+        {!soLeads && !emRecompra && ['clientes', 'produtos', 'fornecedores'].includes(tela) && <Combobox rotulo="Situação" valor={filtro} opcoes={FILTROS} disabled={tela === 'produtos' && Boolean(ATENCAO_DE_PRODUTOS[atencao])} aoMudar={valor => definir({ filtro: valor, pagina: 1, posicao: 0 })} />}
         {!soLeads && !emRecompra && ORDENS_CADASTRO[tela] && <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_CADASTRO[tela]} disabled={!ordenavel} aoMudar={ordenar} />}
         <Botao icone="refresh-cw" disabled={consulta.carregando || soLeads} motivo={consulta.carregando ? 'Atualizando…' : 'Esta lista não recarrega'} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
@@ -302,7 +305,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
           Os limites são os da API (spec 3237, seção 4, item 1); mudou lá, muda aqui. */}
       {comRelacao && lista.length > 0 && <p className={`${css.legenda} ${css.legendaDaLista}`}>Estágio pelas compras: Sem pedido: nenhuma · Primeira compra: 1 · Recorrente: 2 a 4 · Fiel: 5 compras ou mais. A barra do gasto é a parte da pessoa no gasto de todos os clientes (% da carteira).</p>}
       {leitura === 'carregando' && lista.length === 0 ? <EsqueletoDeLista linhas={6}>Carregando cadastros…</EsqueletoDeLista> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : emRecompra ? 'Ninguém para chamar agora' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
-        acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads && !emRecompra ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : undefined}>
+        acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads && !emRecompra ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', atencao: '', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : undefined}>
         {busca ? 'Tente outro nome ou contato.' : emRecompra ? 'Aparece aqui quem já comprou 2 vezes ou mais e está há 30 dias sem pedir.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} aria-busy={leitura === 'carregando'}>
         <table className={comRelacao ? css.comRelacao : comDesempenho ? css.comDesempenho : undefined}><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
           : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}{comRelacao ? ['Estágio', 'Gasto', 'Última compra', 'Sinais'].map(t => <th key={t} scope="col">{t}</th>) : comDesempenho ? ['Vendas em 90 dias', 'Curva do ano', 'Última venda', 'Preço e margem no ano'].map(t => <th key={t} scope="col">{t}</th>) : <><th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th></>}<th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {

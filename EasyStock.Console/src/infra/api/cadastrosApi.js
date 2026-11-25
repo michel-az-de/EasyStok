@@ -1,24 +1,28 @@
 import { chamarApi } from './cliente'
 import { identidadeDaSessao, lerSessao } from './sessao'
 import { gastoDaCarteiraDoMeta, notaDaApi, relacaoDoCliente, relacionamentoDoDossie } from './traducaoCliente'
-import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, parametrosDaOrdem, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
+import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, listaPorVendas, parametrosDaOrdem, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
 
 const rotas = { clientes: '/api/clientes', produtos: '/api/produtos', fornecedores: '/api/fornecedores', bancos: '/api/cadastros/contas-bancarias', pagamentos: '/api/cadastros/metodos-pagamento', modelos: '/api/notificacoes/templates', etiquetas: '/api/etiquetas/templates' }
 export const contextoCadastro = () => { const sessao = lerSessao(); return { empresaId: sessao?.empresa?.id, identidade: identidadeDaSessao(sessao) } }
 const opcoes = (contexto, sinal) => ({ identidadeEsperada: contexto.identidade, sinal, prazoComCancelamento: true })
 const query = (dados) => new URLSearchParams(Object.entries(dados).filter(([, v]) => v !== '' && v !== null && v !== undefined)).toString()
 
-export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = '', relacionamento = '', ordem = '' }, contexto, sinal) {
+export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = '', relacionamento = '', ordem = '', atencao = '' }, contexto, sinal) {
   const simples = ['bancos', 'pagamentos', 'etiquetas'].includes(tela)
   const pesquisaProduto = tela === 'produtos' && busca.trim()
+  // #3303: ordem por vendas ou contador da faixa vão à rota do desempenho; sem ordem escolhida, segue "Mais recentes".
+  const porVendas = !pesquisaProduto && listaPorVendas(tela, ordem, atencao)
+  const ordemDaLista = parametrosDaOrdem(tela, ordem)
   const parametros = simples ? '' : query({ empresaId: contexto.empresaId, page: pagina, pageSize: TAMANHO_PAGINA_CADASTRO,
-    ...(pesquisaProduto ? { termo: busca, limite: 100 } : { search: termoBuscaCadastro(busca), ...parametrosDaOrdem(tela, ordem) }),
+    ...(pesquisaProduto ? { termo: busca, limite: 100 } : { search: termoBuscaCadastro(busca), ...(porVendas && !ordemDaLista.sort ? { sort: 'criadoem', order: 'desc' } : ordemDaLista) }),
+    ...(porVendas && atencao ? { sinal: atencao } : {}),
     ...(['clientes', 'fornecedores'].includes(tela) && filtro ? { ativo: filtro === 'ativos' } : {}),
     ...(tela === 'clientes' && relacionamento ? { relacionamento } : {}),
     ...(tela === 'produtos' && filtro ? { status: filtro === 'ativos' ? 'Ativo' : 'Inativo' } : {}),
     ...(tela === 'modelos' ? { apenasAtuais: true, ...(filtro ? { canal: filtro } : {}) } : {}),
   })
-  const r = await chamarApi(`${rotas[tela]}${pesquisaProduto ? '/search' : ''}${parametros ? `?${parametros}` : ''}`, { ...opcoes(contexto, sinal), envelope: true })
+  const r = await chamarApi(`${rotas[tela]}${pesquisaProduto ? '/search' : porVendas ? '/desempenho/lista' : ''}${parametros ? `?${parametros}` : ''}`, { ...opcoes(contexto, sinal), envelope: true })
   let itens = r?.data ?? []
   if (!Array.isArray(itens)) throw new Error('A lista não foi recebida. Tente carregar novamente.')
   if (simples && busca) itens = itens.filter(x => `${x.nome} ${x.instituicao ?? ''}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))

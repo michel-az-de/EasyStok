@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 const raiz = resolve(import.meta.dirname, '..'), url = process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'
-const { chromium } = createRequire(resolve(raiz, 'package.json'))('playwright')
+const { chromium } = createRequire(resolve(raiz, 'package.json'))(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const pasta = resolve(raiz, '.build/3299/depois'); mkdirSync(pasta, { recursive: true })
 writeFileSync(resolve(pasta, 'index.html'), '<html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="./cena.jsx"></script></html>')
 writeFileSync(resolve(pasta, 'cena.jsx'), `
