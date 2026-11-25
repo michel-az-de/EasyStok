@@ -383,7 +383,7 @@ espera_build_ci() {
       "") echo "    imagens: sem run do build-images para $SHA; build na VPS"; return 0 ;;
       "completed cancelled") echo "    imagens: build-images cancelado (push mais novo no master?); build na VPS"; return 0 ;;
       "completed success") sem_imagem=$(( sem_imagem + 1 ))
-        [ "$sem_imagem" -le 6 ] || { echo "    imagens: build-images ok, mas o GHCR nao mostra o sha; build na VPS"; return 0; } ;;
+        [ "$sem_imagem" -le 15 ] || { echo "    imagens: build-images ok, mas o GHCR nao mostra o sha; build na VPS"; return 0; } ;;
       completed*) echo "    imagens: build-images terminou '${st#completed }'; build na VPS"; return 0 ;;
     esac
     [ "$SECONDS" -lt "$fim" ] || { echo "    imagens: teto de ${ESPERA_IMAGENS}s; build na VPS"; return 0; }
