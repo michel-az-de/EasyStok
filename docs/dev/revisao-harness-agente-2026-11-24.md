@@ -152,25 +152,25 @@ Marcação feita depois que as fatias entraram na `master`. As seções 1 a 8 fi
 
 | # | Estado | PR (issue) |
 |---|---|---|
-| R1 | Tratado: `max_tokens` é desfecho próprio; texto cortado nunca vai ao cliente; uma nova tentativa com teto maior e, estourando de novo, a conversa vai para a equipe com o motivo `teto_saida` | #3274 (#3273) |
-| R2 | Tratado: a nova tentativa só repete falha transitória (rede, prazo, 5xx, 408 e 429); 400, 401 e 402 sobem direto | #3274 (#3273) |
-| R3 | Tratado: a fila ordena por conversa, com teto de 2 turnos por loja (global 4), e o turno para em 180 s, ferramentas incluídas | #3293 (#3291) |
+| R1 | Tratado: `max_tokens` é desfecho próprio e o texto cortado nunca vai ao cliente; se o teto usado era menor que 16384, repete uma vez pedindo 16384; estourando de novo, ou se o teto já era de 16384 ou mais, a conversa vai para a equipe com o motivo `teto_saida` | #3274 (#3273) |
+| R2 | Tratado: a nova tentativa repete uma vez a falha sem resposta HTTP (rede, prazo), 5xx, 408 e 429; os outros 4xx (400, 401, 402 e afins) e o provedor indisponível (disjuntor, cota, sem chave) sobem direto | #3274 (#3273) |
+| R3 | Tratado: a fila ordena por conversa, até 2 turnos por loja e 4 no total (valores padrão); o prazo do turno, 180 s por padrão (0 desliga), conta o tempo das ferramentas, mas só corta a espera pelo modelo: ferramenta em curso e envio terminam e a volta seguinte não chama o modelo | #3293 (#3291) |
 | R4 | Tratado: a guarda monta a alternância com o nome da dona configurado | #3280 (#3278) |
-| R5 | Tratado: `chamada_ia.turno_agente_id` é preenchido nos dois caminhos | #3288 (#3287) |
+| R5 | Tratado: `chamada_ia.turno_agente_id` é preenchido nas chamadas enviadas dos dois caminhos; a linha de cota estourada, que nem chega a sair, fica sem turno | #3288 (#3287) |
 | R6 | Tratado: a cota em US$ e a soma do mês de `chamada_ia` fecham no mês de Brasília | #3296 (#3295) |
 | R7 | Tratado: turnos, limite de respostas e preços são obrigatórios no serviço do agente | #3305 (#3298) |
-| R8 | Tratado: cada modelo ganha `saida_max` (máximo, 256 a 200000) e cada provedor `prazo_segundos` (5 a 300 s), opcionais; nenhum valor foi gravado: até a tela de cadastro (S4 da #2948) o valor entra por SQL | #3312 (#3304) |
+| R8 | Tratado no caminho por loja: cada modelo ganha `saida_max` (máximo, 256 a 200000) e cada provedor `prazo_segundos` (5 a 300 s), opcionais; nulo usa o global do `.env`; com `saida_max` a repetição depois de `max_tokens` nunca passa dele (pular a repetição quando o teto não sobe é a #3313); nenhum valor foi gravado: até a tela de cadastro (S4 da #2948) o valor entra por SQL | #3312 (#3304) |
 | R9 | Tratado: a decisão de seguir pelo `.env` quando a flag não lê ficou escrita no código; rever com a S5b | #3288 (#3287) |
-| R10 | Tratado: o roteador lê o gasto do mês uma vez por escopo | #3288 (#3287) |
-| R11 | Tratado: um método devolve o primeiro portão que barra e a finalização do turno tem colaborador próprio | #3305 (#3298) |
+| R10 | Tratado: o roteador lê o gasto do mês uma vez por escopo e provedor | #3288 (#3287) |
+| R11 | Parcial: um método devolve o primeiro portão do cliente e do custo (pessoa, limite e cota); os portões da conversa e da loja seguem em chamadas à parte; a finalização do turno tem colaborador próprio (`FinalizacaoDoTurno`) | #3305 (#3298) |
 | R12 | Tratado: o log de erro do caminho do `.env` sai sem a chave | #3274 (#3273) |
-| R13 | Fora desta série: sai com a S5b do plano #2948 | #2948 |
+| R13 | Fora desta série: sai com a S5b do plano #2948 | sem PR (#2948) |
 | R14 | Aberto: decisão do Felipe sobre o prazo de retomada de 60 s | sem issue |
 | D1 | Parcial: teto e prazo por modelo e provedor passam a morar no banco (R8); o `.env` global só sai com a S5b e a ADR nova, que fixa "dois lugares, sem perfil em arquivo", espera o GO | #3312 (#3304) |
-| D2 | Tratado: o turno não grava mais `UsoIa` e a chamada de IA carrega o id do turno; `chamada_ia` segue como fonte única de custo | #3293 (#3291), #3288 (#3287) |
-| D3 | Fora desta série: a cota de tokens vira derivada da de US$, ou sai, na S5b | #2948 |
-| D4 | Tratado: `max_tokens` e falha transitória como desfechos próprios, e teto e prazo por modelo e provedor | #3274 (#3273), #3312 (#3304) |
-| D5 | Parcial: o eval mínimo entrou (casos com asserção determinística, k rodadas, veredito pelo código de saída); falta a primeira rodada real contra a bancada, que calibra o mínimo de 0,8 e os casos | #3276 (#3275) |
+| D2 | Parcial: o turno não grava mais `UsoIa` (#3293) e a chamada de IA carrega o id do turno (#3288); o `TurnoAgente` ainda guarda consumo e custo próprios e a cota de tokens lê dele, então `chamada_ia` ainda não é a fonte única | #3293 (#3291), #3288 (#3287) |
+| D3 | Fora desta série: a cota de tokens vira derivada da de US$, ou sai, na S5b | sem PR (#2948) |
+| D4 | Parcial: `max_tokens` e falha transitória são desfechos próprios (#3274) e teto e prazo existem por modelo e provedor no caminho por loja (#3312); a recusa (`refusal`) ainda não é desfecho próprio | #3274 (#3273), #3312 (#3304) |
+| D5 | Parcial: o eval mínimo entrou (casos com asserção determinística, k rodadas, veredito pelo código de saída); falta a primeira rodada real contra a bancada, que calibra o mínimo de 0,8 e os casos; nenhum workflow do GitHub roda o eval | #3276 (#3275) |
 | D6 | Sem mudança: manter só o formato Anthropic Messages | sem PR |
 | D7 | Sem mudança: não generalizar; a separação de R11 já prepara o segundo agente | #3305 (#3298) |
 | D8 | Parcial: a janela fica como está e o eval mede a entrada por turno com cache; a medida real espera a primeira rodada | #3276 (#3275) |
