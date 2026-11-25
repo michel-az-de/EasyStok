@@ -172,6 +172,12 @@ export function Popover({
         // Devolve o foco antes disso, para a nova janela guardar o acionador.
         if (evento.target.closest(SELETOR_ITENS) && origemRef.current?.isConnected) origemRef.current.focus()
       }}
+      onBlur={(evento) => {
+        // #3300: no popover de diálogo, o Tab que sai dele fecha (o menu já fechava). Clique dentro sem foco
+        // (`relatedTarget` nulo) não fecha.
+        if (papel === 'dialog' && evento.relatedTarget && !evento.currentTarget.contains(evento.relatedTarget)
+          && evento.relatedTarget !== origemRef.current) aoFechar()
+      }}
       onKeyDown={(evento) => {
         if (papel !== 'menu' || evento.altKey || evento.ctrlKey || evento.metaKey
           || !evento.target.closest(SELETOR_ITENS)) return
