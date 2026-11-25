@@ -361,7 +361,7 @@
 .acoes .gravar:hover:not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta)); }
 .acoes .gravar:active:not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 78%, var(--tinta)); }
 /* Desabilitado (canal sem áudio) mais leve que o habilitado: fundo transparente; o tracejado do Botao segue. */
-.acoes .gravar:disabled { background: transparent; }
+.acoes .enviar.gravar:disabled { background: transparent; } /* mais específico que .acoes .enviar:disabled, que vem depois */
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
 @keyframes enviarPronto { from { transform: scale(.8); } to { transform: none; } }
 @media (max-width: 759px) {

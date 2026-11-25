@@ -529,6 +529,12 @@ try {
     const fundo = async (alvo) => pixel(await alvo.evaluate((e) => getComputedStyle(e).backgroundColor))
     const token = async (nome) => pixel(await p.evaluate((nome) => { const d = document.createElement('i'); d.style.background = `var(${nome})`; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c }, nome))
     assert.equal(await fundo(gravar), await token('--preenchimento'), 'o Gravar é secundário, não laranja cheio')
+    // Desabilitado (conversa sem assumir) fica mais leve que o habilitado: sem fundo, com o tracejado do Botao. Em
+    // produção (25/11) uma regra posterior de `.acoes .enviar:disabled` pintava `--preenchimento` por cima. O defeito
+    // é de cascata: basta o estado `:disabled`.
+    await gravar.evaluate((e) => { e.disabled = true })
+    assert.equal(await fundo(gravar), await pixel('transparent'), 'o Gravar desabilitado não tem fundo')
+    await gravar.evaluate((e) => { e.disabled = false })
     await gravar.hover()
     await p.waitForTimeout(250)
     const noHover = await fundo(gravar)
