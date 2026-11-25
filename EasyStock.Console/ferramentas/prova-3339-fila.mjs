@@ -153,5 +153,18 @@ confere('7 guarda: "obrigada" sem pergunta nem impedimento não entra', () => {
   assert.equal(motivoDePrecisar(c, AGORA, false), null)
 })
 
+// Revisão da PR: a palavra de impedimento termina em limite de palavra, senão "abrem" e "verificar" entravam na fila.
+confere('7 guarda: "vocês não abrem domingo" e "não consigo verificar" não entram', () => {
+  for (const fala of ['Vocês não abrem domingo', 'Não consigo verificar agora']) {
+    assert.equal(motivoDePrecisar(conversaSemPedido(fala, ATRASO), AGORA, false), null, fala)
+  }
+})
+
+confere('7: "o link não abre" e "não consigo ver o cardápio" entram', () => {
+  for (const fala of ['O link não abre', 'Não consigo ver o cardápio']) {
+    assert.equal(motivoDePrecisar(conversaSemPedido(fala, ATRASO), AGORA, false)?.chave, 'esperando', fala)
+  }
+})
+
 console.log(`\n${passou} casos ok, ${falhas.length} falhas`)
 if (falhas.length > 0) process.exitCode = 1

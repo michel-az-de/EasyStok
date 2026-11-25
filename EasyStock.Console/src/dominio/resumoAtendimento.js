@@ -217,7 +217,9 @@ export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMe
 // #3339 (R1D-01): quem espera estorno ou tem ocorrência aberta não recebe a despedida de encerramento.
 // A caixa nasce desmarcada, e o modal diz qual estorno ainda não foi marcado.
 export function despedirAoEncerrar(conversa, { regra, podeDespedir }) {
-  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaAberta(conversa?.pedido?.ocorrencia)
+  // Na demonstração a ocorrência vem no pedido; no modo API o cadastro do cliente traz só a contagem das abertas.
+  const ocorrenciaEmAberto = ocorrenciaAberta(conversa?.pedido?.ocorrencia) || Number(conversa?.cliente?.ocorrenciasAbertas) > 0
+  return Boolean(regra) && Boolean(podeDespedir) && !ocorrenciaEmAberto
 }
 
 export function avisoDoEstornoAoEncerrar(conversa) {

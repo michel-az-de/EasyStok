@@ -75,6 +75,13 @@ caso('estorno já marcado não segura a despedida nem gera linha', () => {
   assert.equal(avisoDoEstornoAoEncerrar(estornado), null)
 })
 
+// No modo API a ocorrência não vem no pedido: o cadastro do cliente traz só a contagem das abertas (revisão da PR).
+caso('modo API: ocorrência aberta no cadastro do cliente segura a despedida', () => {
+  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: { ocorrenciasAbertas: 1 } }, { regra: REGRA, podeDespedir: true }), false)
+  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: { ocorrenciasAbertas: 0 } }, { regra: REGRA, podeDespedir: true }), true)
+  assert.equal(despedirAoEncerrar({ ...semPendencia, cliente: {} }, { regra: REGRA, podeDespedir: true }), true)
+})
+
 caso('sem regra ou sem permissão de escrita, a despedida continua desmarcada', () => {
   assert.equal(despedirAoEncerrar(semPendencia, { regra: null, podeDespedir: true }), false)
   assert.equal(despedirAoEncerrar(semPendencia, { regra: REGRA, podeDespedir: false }), false)

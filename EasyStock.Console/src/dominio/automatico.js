@@ -288,7 +288,7 @@ const foraDeAlcance = (conversa) =>
 // #3339 (R1D-04, R2F-02): reclamação e devolução já têm dona e prazo mesmo com o automático ligado;
 // palavras de impedimento ("não consigo abrir o link") são pergunta sem resposta, sem o "?".
 // Só o impedimento de usar o link ou a comanda (não "não consigo decidir"), para não encher a fila.
-const IMPEDIMENTO = /n[aã]o (consigo (abrir|acessar|pagar|entrar|ver|enviar|copiar|usar|finalizar|fechar)|abre|funciona|carrega)/
+const IMPEDIMENTO = /\bn[aã]o (consigo (abrir|acessar|pagar|entrar|ver|enviar|copiar|usar|finalizar|fechar)|abre|funciona|carrega)\b/
 
 function esperaDoCliente(conversa, agora, pausado = true, expediente = null) {
   const ultima = ultimaSemResposta(conversa)

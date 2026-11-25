@@ -353,7 +353,7 @@ export function Composer({
                 aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
-                  // #3234 (C2): "Janela fechada" fica só na faixa acima; aqui, só o caminho.
+                  // #3234 (C2): com saída por mensagem padrão o campo só aponta o caminho; sem saída (#3339, R1D-14) ele diz o motivo da faixa, e não só "indisponível".
                   ? (podeEnviarModelo ? 'Escolha uma mensagem padrão em Respostas' : motivoDoCampoFechado(motivo))
                   : anexo
                     ? 'Legenda (opcional)'

@@ -6,6 +6,7 @@
 //   node ferramentas/prova-3339-foco-apos-cardapio.mjs
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 
 registerHooks({
@@ -54,6 +55,11 @@ caso('outro campo de texto não é confundido com o da mensagem', () => {
   const { documento, campo } = montarDocumento({ rotulo: 'Nota interna' })
   assert.equal(devolverFocoAoCampoDeMensagem({ documento, ponteiroFino: true }), false)
   assert.equal(campo.focado, false)
+})
+
+caso('o Composer ainda usa o rótulo que o foco procura', () => {
+  const composer = readFileSync(new URL('../src/features/atendimento/Composer.jsx', import.meta.url), 'utf8')
+  assert.ok(composer.includes('rotulo="Mensagem para o cliente"'), 'o rótulo do campo mudou no Composer')
 })
 
 console.log(`\n${ok} ok, ${falhas.length} falha(s)`)

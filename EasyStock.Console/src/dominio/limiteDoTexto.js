@@ -14,7 +14,7 @@ export function avisoDeLimiteDoTexto(texto) {
   if (tamanho > LIMITE_TEXTO_MENSAGEM) {
     // #3339 (R1C-08): o motivo diz o número que falta cortar, e o Enviar volta quando o texto cabe.
     const passam = tamanho - LIMITE_TEXTO_MENSAGEM
-    return { acima: true, texto: `Passam ${passam} a mais do limite de ${LIMITE_TEXTO_MENSAGEM}. Encurte ou divida em duas para enviar.` }
+    return { acima: true, texto: `${passam === 1 ? 'Passa' : 'Passam'} ${passam} ${plural(passam)} do limite de ${LIMITE_TEXTO_MENSAGEM}. Encurte ou divida em duas para enviar.` }
   }
   if (tamanho < COMECA_O_AVISO) return null
   const cabem = LIMITE_TEXTO_MENSAGEM - tamanho
