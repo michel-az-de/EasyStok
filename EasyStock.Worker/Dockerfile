@@ -50,4 +50,9 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+# #3323: GIT_SHA do commit (build-arg), como no Dockerfile da API e no Dockerfile.Web. O vps-deploy.sh
+# confere esse valor na imagem puxada do GHCR antes de promove-la. Fica depois do COPY para nao
+# invalidar o cache das camadas de build.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 ENTRYPOINT ["dotnet", "EasyStock.Worker.dll"]
