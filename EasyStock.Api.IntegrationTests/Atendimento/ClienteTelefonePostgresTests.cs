@@ -97,11 +97,28 @@ public sealed class ClienteTelefonePostgresTests : IAsyncLifetime
         await db.SaveChangesAsync();
         (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
             .Should().BeTrue("duas pessoas no mesmo número, em grafias diferentes, pedem conferência");
+    }
 
-        db.Clientes.Add(Cadastro("Carla", "1133334444", agora, outroNumero: "(11) 99757-3992"));
+    // Revisão final da #3350 (A1): o ramo da lista de telefones do passo 2, sozinho, traduzido pelo Npgsql.
+    [SkippableFact]
+    public async Task DoisCadastrosSoPelaListaDeTelefonesSaoTelefoneCompartilhado()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var db = NovoContexto();
+        var agora = DateTime.UtcNow;
+        SemearEmpresa(db, agora);
+        string[] grafias = ["+5511997573992", "5511997573992", "11997573992"];
+        db.Clientes.Add(Cadastro("Carla", "1133334444", agora.AddDays(-5), outroNumero: "(11) 99757-3992"));
+        await db.SaveChangesAsync();
+        var repo = new ClienteRepository(db);
+
+        (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
+            .Should().BeFalse("um cadastro com o número só na lista resolve a conversa");
+
+        db.Clientes.Add(Cadastro("Dora", "1144445555", agora, outroNumero: "11-99757.3992"));
         await db.SaveChangesAsync();
         (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
-            .Should().BeTrue("o número na lista de telefones também conta");
+            .Should().BeTrue("dois cadastros com o número só na lista, em grafias diferentes, pedem conferência");
     }
 
     private static void SemearEmpresa(EasyStockDbContext db, DateTime agora) =>
