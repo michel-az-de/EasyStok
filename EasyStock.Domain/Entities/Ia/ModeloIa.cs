@@ -11,6 +11,8 @@ public sealed class ModeloIa
 {
     public const int IdExternoTamanhoMaximo = 100;
     public const int RotuloTamanhoMaximo = 80;
+    public const int SaidaMaxMinima = 256;
+    public const int SaidaMaxMaxima = 200_000;
     private const decimal Milhao = 1_000_000m;
 
     public Guid Id { get; private set; }
@@ -28,6 +30,18 @@ public sealed class ModeloIa
 
     /// <summary>Multiplicador do preço fora do pico, em (0, 1]. 1 = mesmo preço.</summary>
     public decimal FatorForaPico { get; private set; } = 1m;
+
+    /// <summary>#3304 (R8): teto de <c>max_tokens</c> deste modelo; nulo usa o global (<c>Anthropic:MaxTokensAgente</c>).</summary>
+    public int? SaidaMax { get; private set; }
+
+    public void DefinirSaidaMax(int? saidaMax, DateTime agora)
+    {
+        if (saidaMax is { } v && (v < SaidaMaxMinima || v > SaidaMaxMaxima))
+            throw new RegraDeDominioVioladaException(
+                $"Teto de saída do modelo precisa ficar entre {SaidaMaxMinima} e {SaidaMaxMaxima} tokens.");
+        SaidaMax = saidaMax;
+        AlteradoEm = Datas.Utc(agora);
+    }
 
     public DateTime CriadoEm { get; private set; }
     public DateTime AlteradoEm { get; private set; }

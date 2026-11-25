@@ -12,6 +12,8 @@ public sealed class ProvedorIa
 {
     public const int NomeTamanhoMaximo = 60;
     public const int BaseUrlTamanhoMaximo = 200;
+    public const int PrazoMinimoSegundos = 5;
+    public const int PrazoMaximoSegundos = 300;
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
@@ -22,6 +24,18 @@ public sealed class ProvedorIa
 
     /// <summary>Teto em US$ por mês; nulo é sem cota.</summary>
     public decimal? OrcamentoMensalUsd { get; private set; }
+
+    /// <summary>#3304 (R8): prazo por chamada em segundos; nulo usa o global (<c>Anthropic:TimeoutSegundos</c>).</summary>
+    public int? PrazoSegundos { get; private set; }
+
+    public void DefinirPrazo(int? segundos, DateTime agora)
+    {
+        if (segundos is { } v && (v < PrazoMinimoSegundos || v > PrazoMaximoSegundos))
+            throw new RegraDeDominioVioladaException(
+                $"Prazo do provedor precisa ficar entre {PrazoMinimoSegundos} e {PrazoMaximoSegundos} segundos.");
+        PrazoSegundos = segundos;
+        AlteradoEm = Datas.Utc(agora);
+    }
 
     public Guid? CredencialId { get; private set; }
     public DateTime CriadoEm { get; private set; }

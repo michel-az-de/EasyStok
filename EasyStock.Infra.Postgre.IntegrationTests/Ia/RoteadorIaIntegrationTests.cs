@@ -44,7 +44,8 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
     }
 
     /// <summary>Provedor ligado com orçamento, modelo padrão com preço DeepSeek flash e um modelo extra ligado.</summary>
-    private async Task<(Guid Provedor, Guid Padrao, Guid Extra)> SemearLojaAsync(Guid empresa, decimal? orcamento)
+    private async Task<(Guid Provedor, Guid Padrao, Guid Extra)> SemearLojaAsync(Guid empresa, decimal? orcamento,
+        int? saidaMaxDoPadrao = null, int? prazoDoProvedor = null)
     {
         var agora = Agora.UtcDateTime;
         await using var db = fixture.CreateDbContext();
@@ -52,6 +53,7 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
         db.Empresas.Add(new Empresa { Id = empresa, Nome = "Loja IA", Documento = empresa.ToString("N")[..14], CriadoEm = agora, AlteradoEm = agora });
         var provedor = ProvedorIa.Criar(empresa, "DeepSeek", "https://api.deepseek.com/anthropic", AutenticacaoProvedorIa.XApiKey,
             orcamento, agora);
+        if (prazoDoProvedor is not null) provedor.DefinirPrazo(prazoDoProvedor, agora);
         var credencial = CredencialIntegracao.Criar(empresa, CategoriaIntegracao.Ia, provedor.ProviderKey, AmbienteIntegracao.Production,
             [1, 2, 3], "kek-teste", [4], [5], Guid.NewGuid());
         db.CredenciaisIntegracao.Add(credencial);
@@ -61,6 +63,7 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
         var padrao = ModeloIa.Criar(empresa, provedor.Id, "deepseek-flash", "Flash", 0.30m, 1.20m, 0.006m, 0.5m, agora);
         padrao.Ligar(agora);
         padrao.TornarPadrao(agora);
+        if (saidaMaxDoPadrao is not null) padrao.DefinirSaidaMax(saidaMaxDoPadrao, agora);
         var extra = ModeloIa.Criar(empresa, provedor.Id, "deepseek-v4-pro", "Pro", 1.32m, 3.96m, 0.044m, 0.5m, agora);
         extra.Ligar(agora);
         db.ModelosIa.AddRange(padrao, extra);
@@ -169,6 +172,37 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
         (velho!.Modelo.Id, velho.CaiuNoPadrao).Should().Be((padrao, true));
         var semPedido = await rotas.ObterAsync(empresa, null);
         (semPedido!.Modelo.Id, semPedido.CaiuNoPadrao).Should().Be((padrao, false));
+    }
+
+    // #3304 (R8): o teto do modelo e o prazo do provedor saem do banco, passam pela rota e chegam ao destino da chamada.
+    [SkippableFact]
+    public async Task TetoDoModeloEPrazoDoProvedorChegamAoDestinoDaChamada()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        await SemearLojaAsync(empresa, 10m, saidaMaxDoPadrao: 4096, prazoDoProvedor: 45);
+        await using var sp = Provedor();
+        var http = HttpFalso();
+
+        await Roteador(sp, empresa, http).EnviarAsync(Requisicao(empresa));
+
+        await http.Received(1).EnviarAsync(Arg.Is<DestinoIa>(d => d.SaidaMax == 4096 && d.PrazoSegundos == 45 && d.Modelo == "deepseek-flash"),
+            Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [SkippableFact]
+    public async Task SemTetoNemPrazoCadastradosODestinoVaiSemOsDois()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        await SemearLojaAsync(empresa, 10m);
+        await using var sp = Provedor();
+        var http = HttpFalso();
+
+        await Roteador(sp, empresa, http).EnviarAsync(Requisicao(empresa));
+
+        await http.Received(1).EnviarAsync(Arg.Is<DestinoIa>(d => d.SaidaMax == null && d.PrazoSegundos == null),
+            Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
     }
 
     [SkippableFact]

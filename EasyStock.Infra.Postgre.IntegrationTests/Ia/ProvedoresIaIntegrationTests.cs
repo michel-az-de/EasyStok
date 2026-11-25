@@ -1,5 +1,6 @@
 using EasyStock.Domain.Entities.Ia;
 using EasyStock.Domain.Enums.Ia;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,8 @@ public class ProvedoresIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
     private const string MigracaoAnterior = "20261120145818_OrigemAnuncioNaSessaoChat";
     private const string Migracao = "20261120160109_ProvedoresIa";
+    private const string MigracaoAnteriorAoTeto = "20261123025835_AddCategoriaRespostaPronta";
+    private const string MigracaoDoTeto = "20261125034449_AddSaidaMaxEPrazoIa";
     private static readonly DateTime Agora = new(2026, 11, 20, 15, 0, 0, DateTimeKind.Utc);
 
     private static ProvedorIa Provedor(Guid empresa) =>
@@ -218,6 +221,81 @@ public class ProvedoresIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             .SingleAsync();
         comRls.Should().Be(3);
     }
+
+    // #3304 (R8): o CHECK do banco e a validação do domínio saem das mesmas constantes; o mesmo valor tem o mesmo veredito.
+    [SkippableTheory]
+    [InlineData(ProvedorIa.PrazoMinimoSegundos - 1, false)]
+    [InlineData(ProvedorIa.PrazoMinimoSegundos, true)]
+    [InlineData(ProvedorIa.PrazoMaximoSegundos, true)]
+    [InlineData(ProvedorIa.PrazoMaximoSegundos + 1, false)]
+    public async Task CheckDoPrazoDoProvedorTemOsLimitesDoDominio(int segundos, bool aceito)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var provedor = await SalvarProvedorAsync(empresa);
+
+        var dominio = () => Provedor(empresa).DefinirPrazo(segundos, Agora);
+        if (aceito) dominio.Should().NotThrow();
+        else dominio.Should().Throw<RegraDeDominioVioladaException>();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var banco = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE provedor_ia SET prazo_segundos = {segundos} WHERE id = {provedor.Id}");
+        if (aceito) (await banco()).Should().Be(1);
+        else (await banco.Should().ThrowAsync<Npgsql.PostgresException>()).Which.ConstraintName.Should().Be("ck_provedor_ia_prazo_segundos");
+    }
+
+    [SkippableTheory]
+    [InlineData(ModeloIa.SaidaMaxMinima - 1, false)]
+    [InlineData(ModeloIa.SaidaMaxMinima, true)]
+    [InlineData(ModeloIa.SaidaMaxMaxima, true)]
+    [InlineData(ModeloIa.SaidaMaxMaxima + 1, false)]
+    public async Task CheckDoTetoDeSaidaDoModeloTemOsLimitesDoDominio(int teto, bool aceito)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var provedor = await SalvarProvedorAsync(empresa);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var modelo = ModeloLigado(empresa, provedor.Id, "deepseek-chat");
+        db.ModelosIa.Add(modelo);
+        await db.SaveChangesAsync();
+
+        var dominio = () => ModeloLigado(empresa, provedor.Id, "deepseek-outro").DefinirSaidaMax(teto, Agora);
+        if (aceito) dominio.Should().NotThrow();
+        else dominio.Should().Throw<RegraDeDominioVioladaException>();
+
+        var banco = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE modelo_ia SET saida_max = {teto} WHERE id = {modelo.Id}");
+        if (aceito) (await banco()).Should().Be(1);
+        else (await banco.Should().ThrowAsync<Npgsql.PostgresException>()).Which.ConstraintName.Should().Be("ck_modelo_ia_saida_max");
+    }
+
+    [SkippableFact]
+    public async Task MigracaoDoTetoEDoPrazoDesceESobeComOsDoisChecks()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await postgres.StartAsync();
+        var options = new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(postgres.GetConnectionString()).Options;
+        await using var db = new EasyStockDbContext(options);
+        await db.Database.MigrateAsync();
+        var migrator = db.GetService<IMigrator>();
+
+        await migrator.MigrateAsync(MigracaoAnteriorAoTeto);
+        (await ExisteColunaAsync(db, "provedor_ia", "prazo_segundos")).Should().BeFalse();
+        (await ExisteColunaAsync(db, "modelo_ia", "saida_max")).Should().BeFalse();
+        (await ExisteCheckAsync(db, "ck_provedor_ia_prazo_segundos")).Should().BeFalse();
+        (await ExisteCheckAsync(db, "ck_modelo_ia_saida_max")).Should().BeFalse();
+
+        await migrator.MigrateAsync(MigracaoDoTeto);
+        (await ExisteColunaAsync(db, "provedor_ia", "prazo_segundos")).Should().BeTrue();
+        (await ExisteColunaAsync(db, "modelo_ia", "saida_max")).Should().BeTrue();
+        (await ExisteCheckAsync(db, "ck_provedor_ia_prazo_segundos")).Should().BeTrue();
+        (await ExisteCheckAsync(db, "ck_modelo_ia_saida_max")).Should().BeTrue();
+    }
+
+    private static Task<bool> ExisteCheckAsync(EasyStockDbContext db, string nome) =>
+        db.Database.SqlQueryRaw<bool>("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = {0} AND contype = 'c') AS \"Value\"", nome).SingleAsync();
 
     private static Task<bool> ExisteTabelaAsync(EasyStockDbContext db, string tabela) =>
         db.Database.SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", tabela).SingleAsync();

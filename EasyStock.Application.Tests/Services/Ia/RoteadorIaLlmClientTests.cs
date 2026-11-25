@@ -47,12 +47,13 @@ public class RoteadorIaLlmClientTests
             .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 1_000_000, 100_000, 0, "deepseek-flash"));
     }
 
-    private static RotaIa Rota(decimal? orcamento, bool comPreco = true, bool caiuNoPadrao = false)
+    private static RotaIa Rota(decimal? orcamento, bool comPreco = true, bool caiuNoPadrao = false, int? saidaMax = null, int? prazoSegundos = null)
     {
         var agora = ForaDoPico.UtcDateTime;
         var modelo = ModeloIa.Criar(Empresa, Provedor, "deepseek-flash", "Flash",
             comPreco ? 0.30m : null, comPreco ? 1.20m : null, 0.006m, 0.5m, agora);
-        return new RotaIa(Provedor, "https://api.deepseek.com/anthropic", AutenticacaoProvedorIa.XApiKey, orcamento, modelo, caiuNoPadrao);
+        modelo.DefinirSaidaMax(saidaMax, agora);
+        return new RotaIa(Provedor, "https://api.deepseek.com/anthropic", AutenticacaoProvedorIa.XApiKey, orcamento, modelo, caiuNoPadrao, prazoSegundos);
     }
 
     private RoteadorIaLlmClient Roteador() =>
@@ -88,6 +89,26 @@ public class RoteadorIaLlmClientTests
         await _provedores.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default!, default);
         _gravadas.Should().BeEmpty("sem flag quem grava é o registro da S2a, dentro do cliente do .env");
         await _flags.Received(1).ListarAtivasAsync(Empresa, Arg.Any<CancellationToken>()); // memo por escopo
+    }
+
+    [Fact]
+    public async Task DestinoLevaOTetoDeSaidaDoModeloEOPrazoDoProvedor()
+    {
+        _rotas.ObterAsync(Empresa, Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Rota(orcamento: 10m, saidaMax: 8192, prazoSegundos: 90));
+
+        await Roteador().EnviarAsync(Requisicao());
+
+        await _provedores.Received(1).EnviarAsync(
+            Arg.Is<DestinoIa>(d => d.SaidaMax == 8192 && d.PrazoSegundos == 90), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemTetoNemPrazoProprioODestinoVaiComNulosEOClienteUsaOGlobal()
+    {
+        await Roteador().EnviarAsync(Requisicao());
+
+        await _provedores.Received(1).EnviarAsync(
+            Arg.Is<DestinoIa>(d => d.SaidaMax == null && d.PrazoSegundos == null), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

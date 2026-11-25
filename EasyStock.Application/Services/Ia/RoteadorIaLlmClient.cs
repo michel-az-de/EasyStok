@@ -80,7 +80,8 @@ public sealed class RoteadorIaLlmClient(
                 requisicao.EmpresaId);
             throw new ProvedorIaIndisponivelException("Não foi possível checar o provedor de IA da loja.", ex);
         }
-        var destino = new DestinoIa(rota.ProvedorId, rota.BaseUrl, rota.Autenticacao, chave, rota.Modelo.IdExterno);
+        var destino = new DestinoIa(rota.ProvedorId, rota.BaseUrl, rota.Autenticacao, chave, rota.Modelo.IdExterno,
+            rota.Modelo.SaidaMax, rota.PrazoSegundos);
         var cronometro = Stopwatch.StartNew();
         RespostaLlm resposta;
         try

@@ -24,7 +24,7 @@ A IA tem uma chave só, global, no `.env` da VPS. Por isso:
 | D2 | A cota é em US$ por mês, por provedor. A `CotaTokensMes` atual continua como está | Felipe, 20/11 |
 | D3 | Só o formato Anthropic Messages. O gerador OpenAI (`gpt-4o-mini`) sai na S5, e isso é perda declarada | Felipe, 20/11 |
 | D4 | Toda chamada de IA entra no registro de uso | Felipe, 20/11 |
-| D5 | Cortes: sem job de saldo, sem `url_saldo`, sem prioridade nem troca automática de provedor, sem `contexto_max` e `saida_max`. Orçamento estourado passa o atendimento para a equipe; o 402 avisa a falta de saldo | Felipe, 20/11 (revisão) |
+| D5 | Cortes: sem job de saldo, sem `url_saldo`, sem prioridade nem troca automática de provedor, sem `contexto_max` e `saida_max` (emenda da #3304, R8 da revisão do harness: `saida_max` voltou, por modelo, e o provedor ganhou `prazo_segundos`, ambos opcionais; `contexto_max` segue cortado). Orçamento estourado passa o atendimento para a equipe; o 402 avisa a falta de saldo | Felipe, 20/11 (revisão) |
 | D6 | A cota é suave: a chamada só começa com gasto do mês abaixo do orçamento, sem reserva atômica. O estouro máximo é o custo das chamadas já em voo, e a tela diz isso | proposta |
 | D7 | O custo usa o preço da faixa horária: pico ou fora do pico, por horário UTC. Sem isso a cota cortaria com cerca de metade do orçamento | proposta |
 | D8 | A URL do provedor vem de uma lista fechada de hosts (Anthropic, DeepSeek, Fireworks). Host fora da lista só por SuperAdmin, com as travas de rede da seção 6 | proposta |
@@ -51,14 +51,14 @@ Todas as tabelas novas têm `empresa_id` e RLS (ADR-0010). Dinheiro é `numeric(
 credencial_integracao (existe)            provedor_ia
   categoria = Ia (nova, 7)     <──1:1──     id, empresa_id, nome
   provider_key = "ia:{provedor_id}"          base_url, autenticacao (x_api_key | bearer)
-  ambiente = Production                      ligado, orcamento_mensal_usd (nulo = sem cota)
+  ambiente = Production                      ligado, orcamento_mensal_usd (nulo = sem cota), prazo_segundos (nulo = o do .env)
   payload cifrado {apiKey}                   credencial_id (FK, único)
   mascara, ultimo_teste_*                         │1
                                                   │N   FK composta (empresa_id, provedor_id)
                                              modelo_ia
                                                id, empresa_id, provedor_id, id_externo, rotulo, ligado, padrao
                                                preco_entrada, preco_saida, preco_cache_lido (US$/1M, pico)
-                                               fator_fora_pico (padrão 1; DeepSeek 0,5)
+                                               fator_fora_pico (padrão 1; DeepSeek 0,5), saida_max (máximo do modelo; nulo = o teto do .env)
                                                   │1
                                                   │N
                                              chamada_ia (só inserção)

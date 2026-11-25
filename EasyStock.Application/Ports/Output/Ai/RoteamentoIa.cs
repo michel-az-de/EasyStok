@@ -34,14 +34,18 @@ public interface IRotasIa
     Task<decimal> GastoDoMesAsync(Guid empresaId, Guid provedorId, DateTime agoraUtc, CancellationToken ct = default);
 }
 
-/// <summary><paramref name="CaiuNoPadrao"/>: o modelo pedido não casou com nenhum modelo ligado da loja.</summary>
+/// <summary>
+/// <paramref name="CaiuNoPadrao"/>: o modelo pedido não casou com nenhum modelo ligado da loja.
+/// <paramref name="PrazoSegundos"/>: prazo da chamada ao provedor (#3304); nulo segue o global do <c>.env</c>.
+/// </summary>
 public sealed record RotaIa(
     Guid ProvedorId,
     string BaseUrl,
     AutenticacaoProvedorIa Autenticacao,
     decimal? OrcamentoMensalUsd,
     ModeloIa Modelo,
-    bool CaiuNoPadrao)
+    bool CaiuNoPadrao,
+    int? PrazoSegundos = null)
 {
     public string ProviderKey => $"ia:{ProvedorId}";
 }
@@ -52,8 +56,14 @@ public interface IClienteProvedorIa
     Task<RespostaLlm> EnviarAsync(DestinoIa destino, RequisicaoLlm requisicao, CancellationToken ct = default);
 }
 
-/// <summary>Para onde a chamada vai. O <see cref="ToString"/> nunca mostra a chave.</summary>
-public sealed record DestinoIa(Guid ProvedorId, string BaseUrl, AutenticacaoProvedorIa Autenticacao, string Chave, string Modelo)
+/// <summary>
+/// Para onde a chamada vai. O <see cref="ToString"/> nunca mostra a chave.
+/// <paramref name="SaidaMax"/>: o máximo de tokens de saída que o modelo aceita (#3304); nem a nova tentativa depois de
+/// <c>max_tokens</c> passa dele. <paramref name="PrazoSegundos"/>: prazo da chamada ao provedor; nulo em ambos segue o global do <c>.env</c>.
+/// No Assistente, com o prazo do turno ligado (180 s por padrão; <c>PrazoTurnoSegundos</c> 0 desliga), um prazo de provedor acima disso não alonga o turno.
+/// </summary>
+public sealed record DestinoIa(Guid ProvedorId, string BaseUrl, AutenticacaoProvedorIa Autenticacao, string Chave, string Modelo,
+    int? SaidaMax = null, int? PrazoSegundos = null)
 {
     public override string ToString() => $"DestinoIa {{ ProvedorId = {ProvedorId}, BaseUrl = {BaseUrl}, Modelo = {Modelo} }}";
 }
