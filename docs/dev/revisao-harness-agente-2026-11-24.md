@@ -145,3 +145,38 @@ A fatia 6 pode vir antes de todas: ela é a prova das outras.
 - A amostra do log é de 38 minutos, 48 chamadas e 2 conversas, com cara de sessão de teste. Os 6% de R1 valem para essa janela.
 - O plano `18-harness-do-agente.md` foi lido por trechos. Os planos `19` e `provedores-ia-2948` e as ADR-0065, 0066 e 0067 foram lidos inteiros.
 - Não li as 23 ferramentas uma a uma, nem `PromptAtendimento.cs`.
+
+## 9. Estado em 25/11/2026
+
+Marcação feita depois que as fatias entraram na `master`. As seções 1 a 8 ficam como foram escritas, na base `16c64c25b`: este quadro só diz o que mudou desde então e o que continua aberto. A PR é a mergeada; a issue da fatia vai entre parênteses. As provas de cada uma estão na descrição da PR.
+
+| # | Estado | PR (issue) |
+|---|---|---|
+| R1 | Tratado: `max_tokens` é desfecho próprio; texto cortado nunca vai ao cliente; uma nova tentativa com teto maior e, estourando de novo, a conversa vai para a equipe com o motivo `teto_saida` | #3274 (#3273) |
+| R2 | Tratado: a nova tentativa só repete falha transitória (rede, prazo, 5xx, 408 e 429); 400, 401 e 402 sobem direto | #3274 (#3273) |
+| R3 | Tratado: a fila ordena por conversa, com teto de 2 turnos por loja (global 4), e o turno para em 180 s, ferramentas incluídas | #3293 (#3291) |
+| R4 | Tratado: a guarda monta a alternância com o nome da dona configurado | #3280 (#3278) |
+| R5 | Tratado: `chamada_ia.turno_agente_id` é preenchido nos dois caminhos | #3288 (#3287) |
+| R6 | Tratado: a cota em US$ e a soma do mês de `chamada_ia` fecham no mês de Brasília | #3296 (#3295) |
+| R7 | Tratado: turnos, limite de respostas e preços são obrigatórios no serviço do agente | #3305 (#3298) |
+| R8 | Tratado: cada modelo ganha `saida_max` (máximo, 256 a 200000) e cada provedor `prazo_segundos` (5 a 300 s), opcionais; nenhum valor foi gravado: até a tela de cadastro (S4 da #2948) o valor entra por SQL | #3312 (#3304) |
+| R9 | Tratado: a decisão de seguir pelo `.env` quando a flag não lê ficou escrita no código; rever com a S5b | #3288 (#3287) |
+| R10 | Tratado: o roteador lê o gasto do mês uma vez por escopo | #3288 (#3287) |
+| R11 | Tratado: um método devolve o primeiro portão que barra e a finalização do turno tem colaborador próprio | #3305 (#3298) |
+| R12 | Tratado: o log de erro do caminho do `.env` sai sem a chave | #3274 (#3273) |
+| R13 | Fora desta série: sai com a S5b do plano #2948 | #2948 |
+| R14 | Aberto: decisão do Felipe sobre o prazo de retomada de 60 s | sem issue |
+| D1 | Parcial: teto e prazo por modelo e provedor passam a morar no banco (R8); o `.env` global só sai com a S5b e a ADR nova, que fixa "dois lugares, sem perfil em arquivo", espera o GO | #3312 (#3304) |
+| D2 | Tratado: o turno não grava mais `UsoIa` e a chamada de IA carrega o id do turno; `chamada_ia` segue como fonte única de custo | #3293 (#3291), #3288 (#3287) |
+| D3 | Fora desta série: a cota de tokens vira derivada da de US$, ou sai, na S5b | #2948 |
+| D4 | Tratado: `max_tokens` e falha transitória como desfechos próprios, e teto e prazo por modelo e provedor | #3274 (#3273), #3312 (#3304) |
+| D5 | Parcial: o eval mínimo entrou (casos com asserção determinística, k rodadas, veredito pelo código de saída); falta a primeira rodada real contra a bancada, que calibra o mínimo de 0,8 e os casos | #3276 (#3275) |
+| D6 | Sem mudança: manter só o formato Anthropic Messages | sem PR |
+| D7 | Sem mudança: não generalizar; a separação de R11 já prepara o segundo agente | #3305 (#3298) |
+| D8 | Parcial: a janela fica como está e o eval mede a entrada por turno com cache; a medida real espera a primeira rodada | #3276 (#3275) |
+| ADR | Aberto: a ADR nova no lugar da ADR-0065 (seção 6) espera o GO do Felipe e é issue própria, de tier ALTO | sem issue |
+
+Surgiu durante a série:
+
+- A prova `prova-2543-chip-do-motivo.mjs` lia texto de C# que o refactor da #3298 moveu e deixou o workflow `console` da `master` vermelho. Corrigida na #3311 (#3310). O filtro de caminhos do `console.yml` não inclui `EasyStock.Application`, então uma PR só de backend não roda esse workflow: mudar o filtro é de tier ALTO e fica como sugestão ao Felipe.
+- A conferência E32 da `prova-2185-efeitos-tela.mjs` falhou em duas execuções entre 00:01 e 00:05 de Brasília de 25/11 e passou às 00:15, sem mudança de código. A hipótese é a dependência do relógio, ainda não reproduzida nem provada: issue #3307.
