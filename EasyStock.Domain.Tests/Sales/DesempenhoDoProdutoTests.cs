@@ -76,10 +76,10 @@ public class DesempenhoDoProdutoTests
     }
 
     [Theory]
-    [InlineData(450.0, 10.0, 50.0, 45.0)]       // vendido
-    [InlineData(0.0, 0.0, 50.0, null)]        // sem venda
-    [InlineData(100.0, 0.0, 50.0, null)]      // sem unidade não divide
-    public void Preco_vendido_e_a_media_das_vendas(double receita, double unidades, double tabela, double? esperado) =>
+    [InlineData(450.0, 10.0, 45.0)]       // vendido
+    [InlineData(0.0, 0.0, null)]      // sem venda
+    [InlineData(100.0, 0.0, null)]      // sem unidade não divide
+    public void Preco_vendido_e_a_media_das_vendas(double receita, double unidades, double? esperado) =>
         DesempenhoDoProduto.PrecoVendido((decimal)receita, (decimal)unidades).Should().Be(esperado is { } e ? (decimal)e : null);
 
     [Theory]
