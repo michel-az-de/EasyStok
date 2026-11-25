@@ -94,7 +94,7 @@ Regras do S4a (a primeira que valer ganha; a ordem é a da entrega original):
 | Prioridade | Condição | Próxima ação |
 |---|---|---|
 | 1 | Em risco (`RegraDeRecompra`, seção 4) | Chamar no WhatsApp (já existe na aba Recompra); sem telefone, Ficha |
-| 2 | Alguma `Ocorrencia` aberta do cliente | Conversa |
+| 2 | Alguma `Ocorrencia` aberta do cliente | Conversa (desde a #3281 é o único caso em que a Conversa volta à linha, como próxima ação) |
 | 3 | Cadastro incompleto: sem telefone (o caso que hoje abre o pedido de celular) | Ficha |
 | 4 | Sem pedido parado: 0 compras e cadastro criado há mais de 30 dias (`RegraDeRecompra.DiasSemCompra`) | Novo pedido |
 
@@ -129,7 +129,7 @@ API antes do Console: `scripts/deploy/vps-deploy.sh`, depois `scripts/deploy/con
 |---|---|---|---|
 | F | Fotos pesando a lista | Carga preguiçosa, só a linha visível baixa | Reverter a PR. Sem dado a desfazer |
 | S1 | Lista lenta com base maior; vazamento entre inquilinos nas subconsultas | `IX_pedidos_ClienteId` existe; EXPLAIN no teste de integração; filtro `EmpresaId` com teste de dois inquilinos | Reverter a PR. Campos aditivos, sem migração |
-| S2 | Tela wide subaproveitada ou poluída; estágio divergente | Colunas desenhadas para 1920; prova em 1920 e 1440; o Console não recalcula | Reverter a PR. O grid volta ao de 4 colunas |
+| S2 | Tela wide subaproveitada ou poluída; estágio divergente | Colunas desenhadas para 1920; prova em 1920 e 1440; o Console não recalcula | Reverter a PR da #3281 volta às 9 colunas do S2; reverter também a do S2 volta ao grid de 4 colunas |
 | S3 | Número do indicador diferente da lista | Teste compara indicador com soma das linhas | Reverter a PR |
 | S4a | Ação errada sugerida | Regras por teste, prioridade documentada, sem IA | Reverter a PR |
 | S5 | Regressão silenciosa no Atendimento | Prova antes e depois com prints; colisão com #3234: a issue segue aberta (da crítica só entraram C2 e C3, pela PR #3236; C1, R2, G1 e G2 ainda vêm), então trazer o master e refazer a prova antes e depois na hora do merge | Reverter a PR. O Atendimento volta ao componente interno |
@@ -157,3 +157,16 @@ API antes do Console: `scripts/deploy/vps-deploy.sh`, depois `scripts/deploy/con
 - ADRs: ADR-0055 (tier baixo para spec de plano aprovado), ADR-0070 (label `aprovado` delegada), ADR-0043 (PR-first).
 - Specs: `docs/plan/novo-pedido-na-tela-2921.md` (emendada pelo S0).
 - Protótipo clicável: artifact privado, validado com o Felipe em 23/11/2026. Não tem link neste documento.
+
+## 13. Emenda da #3281 (24/11/2026)
+
+Crítica Impeccable da tela em produção, só leitura, em 24/11/2026: 19 de 36. Felipe escolheu emendar esta spec em vez de esperar o S3 e o S4a.
+
+- **Colunas (S2):** de 9 para 6. Nome, Estágio, Gasto (com o ticket embaixo), Última compra (com "desde" embaixo), Sinais (reclamação, notas e tags juntas) e Ações. Só o dado principal ausente vira traço; o secundário ausente some. Quem nunca comprou mostra "Sem compra ainda".
+- **Ações (S2 e S4a):** o nome é o botão que abre a ficha, com o mesmo nome acessível de antes ("Abrir ficha de X"). Sai da linha o botão "Abrir ficha". Na aba Todos sai também o "Conversa"; na Recompra, que existe para chamar, o "Conversa" e o "Chamar no WhatsApp" ficam, e ela ganha o mesmo grid de 6 colunas. "Novo pedido" fica como a ação da linha. A aba Sem cadastro e as outras telas de Cadastros não mudam. Onde a S2 e a S4a dizem que "Novo pedido, Conversa e Ficha seguem iguais", vale esta emenda.
+- **Troca de custo:** abrir a conversa a partir da lista passa de 1 para 3 interações (nome, aba Conversas da ficha, Abrir conversa). A ficha usa a mesma fonte, as conversas carregadas no Atendimento, então nada se perde. Com mudança por salvar no cadastro, a ficha bloqueia a conversa, como já fazia.
+- **Sem nome:** o contato sem nome de verdade mostra o telefone formatado como nome e o selo "Sem nome" (#2232), sem repetir o telefone embaixo.
+- **Legenda:** texto visível acima da lista explica os estágios (0, 1, 2 a 4, 5 ou mais compras) e a barra do gasto (% da carteira).
+- **Alvo:** as ações da linha usam `--toque` (40 px no mouse, 48 px no toque), no lugar dos 32 px.
+- **Refutado da crítica:** "sem sinal ao trocar filtro". A lista já fica apagada durante a recarga (`.lista[aria-busy='true']`).
+- **Prova:** `prova-3281-linha-enxuta.mjs` (nova) e `prova-3254-linha-relacao.mjs` (traço por célula de 5 ou mais para 4), em 1920, 1440 e 390.
