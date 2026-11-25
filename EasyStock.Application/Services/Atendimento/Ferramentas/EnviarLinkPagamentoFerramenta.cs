@@ -94,7 +94,7 @@ public sealed class EnviarLinkPagamentoFerramenta(
             ? HorarioBrasil.ConverterParaBrasilia(expira).ToString("HH:mm", CultureInfo.InvariantCulture)
             : null;
         contexto.RegistrarRespostaVerificada(
-            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {linkNoTexto}");
+            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {linkNoTexto}", duravel: true);
         return FerramentaJson.Serializar(new
         {
             linkGerado = true,

@@ -1061,7 +1061,7 @@ public partial class AgenteAtendimentoServiceTests
         const string link = "Pague por Pix ou cartão neste link: https://pagamento.test/abc";
         var pagamento = Ferramenta("enviar_link_pagamento", c =>
         {
-            c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada(link);
+            c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada(link, duravel: true);
             return """{"linkGerado":true}""";
         });
         var nota = Ferramenta("registrar_nota", _ => """{"ok":true}""");
@@ -1073,6 +1073,70 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Escalou.Should().BeFalse();
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, link, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3340 (revisão da PR): a resposta de uma consulta vale só até a próxima ferramenta. Sem isso o status de uma consulta
+    // antiga saía no lugar do texto do modelo ("confere o resumo?"), que nem passava pela guarda.
+    [Fact]
+    public async Task ConsultaSeguidaDeOutraFerramentaNaoTomaOLugarDoTextoDoModelo()
+    {
+        var consulta = Ferramenta("consulta_de_teste", c =>
+        {
+            c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada("Seu pedido 12 está em preparo.");
+            return """{"ok":true}""";
+        });
+        var nota = Ferramenta("registrar_nota", _ => """{"ok":true}""");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("consulta_de_teste"), UsoFerramenta("registrar_nota", "toolu_2"),
+            Texto("Posso ajudar em mais alguma coisa?"));
+
+        var resultado = await CriarServico(consulta, nota).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Posso ajudar em mais alguma coisa?", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("preparo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3340 (revisão da PR): o link só existe na resposta verificada (o JSON ao modelo não leva a URL); erro de uma consulta
+    // posterior não o apaga, senão o cliente recebe "mandei o link" sem link.
+    [Fact]
+    public async Task LinkDePagamentoSobreviveAErroDeFerramentaPosterior()
+    {
+        const string link = "Pague por Pix ou cartão neste link: https://pagamento.test/abc";
+        var pagamento = Ferramenta("enviar_link_pagamento", c =>
+        {
+            c.Arg<ContextoTurnoAgente>().RegistrarRespostaVerificada(link, duravel: true);
+            return """{"linkGerado":true}""";
+        });
+        var consulta = Ferramenta("consulta_de_teste", _ => """{"erro":"pedido_nao_encontrado"}""");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("enviar_link_pagamento"), UsoFerramenta("consulta_de_teste", "toolu_2"),
+            Texto("Pronto, mandei o link de pagamento pra você."));
+
+        var resultado = await CriarServico(pagamento, consulta).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeFalse();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, link, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3340 (revisão da PR): ferramenta que lançou pode ter agido no mundo (a Meta entregou a comanda e o timeout veio depois).
+    // Devolver o erro ao modelo o faria chamar de novo e o cliente receberia duas vezes: o turno acaba e escala.
+    [Fact]
+    public async Task ExcecaoDeFerramentaNaoVoltaAoModeloParaRepetirOEfeito()
+    {
+        var chamadas = 0;
+        var comanda = Ferramenta("enviar_cardapio_imagem", _ =>
+        {
+            chamadas++;
+            throw new WhatsAppCloudException(131000, "Meta fora do ar", ehPermanente: false, statusHttp: 502);
+        });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("enviar_cardapio_imagem"), UsoFerramenta("enviar_cardapio_imagem", "toolu_2"), Texto("Mandei a comanda!"));
+
+        var resultado = await CriarServico(comanda).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        chamadas.Should().Be(1);
+        resultado.Escalou.Should().BeTrue();
     }
 
     // #3340 (R2I-04): exceção do envio da comanda (Meta fora do ar) escala com o molde, uma vez, sem a frase do modelo.

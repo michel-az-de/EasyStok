@@ -241,6 +241,9 @@ public static class GeracaoAgenteAtendimento
                 resultados.Add(resultado);
                 consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido);
                 if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou", consumo);
+                // Ferramenta que lançou pode ter agido (comanda que a Meta entregou, pedido gravado): devolver ao modelo o faria
+                // repetir o efeito. O turno acaba aqui e a finalização escala como falha de ferramenta.
+                if (contexto.FerramentaLancou) return new GeracaoAgente(null, tokens, true, null, consumo);
                 if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
                 {
                     if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();
@@ -354,6 +357,7 @@ public static class GeracaoAgenteAtendimento
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
         BlocoUsoFerramentaLlm uso, ILogger logger, CancellationToken ct)
     {
+        contexto.DescartarRespostaDeConsulta();
         if (!ferramentas.TryGetValue(uso.Nome, out var ferramenta))
         {
             contexto.LimparRespostaVerificada();
@@ -371,14 +375,14 @@ public static class GeracaoAgenteAtendimento
                 contexto.RegistrarFalhaDeFerramenta();
                 return new BlocoResultadoFerramentaLlm(uso.Id, resultado, EhErro: true);
             }
-            if (ResultadoTemErro(resultado)) contexto.LimparRespostaVerificada();
+            if (ResultadoTemErro(resultado)) contexto.DescartarRespostaDeConsulta();
             contexto.ResultadosDasFerramentas.Add(resultado);
             return new BlocoResultadoFerramentaLlm(uso.Id, resultado);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             contexto.LimparRespostaVerificada();
-            contexto.RegistrarFalhaDeFerramenta();
+            contexto.RegistrarFalhaDeFerramenta(lancou: true);
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
             return new BlocoResultadoFerramentaLlm(uso.Id, "A ferramenta falhou; não invente o resultado.", EhErro: true);
