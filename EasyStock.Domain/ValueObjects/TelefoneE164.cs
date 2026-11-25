@@ -91,18 +91,23 @@ public sealed record TelefoneE164
 
     /// <summary>
     /// #3341: grafias, só dígitos, em que um celular BR pode estar gravado no cadastro: com ou sem o zero do tronco,
-    /// com ou sem o DDI 55 e com ou sem o nono dígito, sempre com o mesmo DDD e os 8 últimos dígitos. Vazio quando o
-    /// texto não traz DDD e número.
+    /// com ou sem o DDI 55 e com ou sem o nono dígito, sempre com o mesmo DDD e os 8 últimos dígitos. O nono dígito só
+    /// varia quando os 8 últimos começam por 6 a 9 (faixa dos celulares antigos): fixo (2 a 5) nunca vira celular, para
+    /// não juntar o fixo de uma pessoa com o celular de outra. Vazio quando o texto não traz DDD e número.
     /// </summary>
     public static IReadOnlyList<string> FormasDeBusca(string? telefone)
     {
         var nacional = NacionalBr(SoDigitos(telefone));
         if (nacional is null) return [];
 
+        var oito = nacional[^8..];
+        var celular = nacional.Length == 10 || nacional[2] == '9';
+        var nonos = celular && oito[0] is >= '6' and <= '9' ? new[] { "", "9" } : new[] { nacional[2..^8] };
+
         var formas = new List<string>(8);
         foreach (var prefixo in new[] { "", "0", "55", "055" })
-        foreach (var nono in new[] { "", "9" })
-            formas.Add(prefixo + nacional[..2] + nono + nacional[^8..]);
+        foreach (var nono in nonos)
+            formas.Add(prefixo + nacional[..2] + nono + oito);
         return formas;
     }
 

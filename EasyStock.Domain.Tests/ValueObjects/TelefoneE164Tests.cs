@@ -50,6 +50,12 @@ public class TelefoneE164Tests
         formas.Should().NotContain("21997573992");
     }
 
+    [Theory]
+    [InlineData("(11) 3299-7573", "11932997573")]
+    [InlineData("(11) 93299-7573", "1132997573")]
+    public void FormasDeBuscaNaoJuntamFixoComCelularDeFinalIgual(string telefone, string outro) =>
+        TelefoneE164.FormasDeBusca(telefone).Should().NotContain(outro);
+
     [Fact]
     public void FormasDeBuscaVaziaQuandoNaoHaDddENumero() =>
         TelefoneE164.FormasDeBusca("abc").Should().BeEmpty();
