@@ -52,7 +52,8 @@ public sealed class ClienteTelefonePostgresTests : IAsyncLifetime
         var antigo = Cadastro("Antigo", "(11) 99757-3992", agora.AddDays(-30));
         var identico = Cadastro("Identico", "1133334444", agora.AddDays(-1), outroNumero: "+5511997573992");
         var fixo = Cadastro("Fixo", "1133334444", agora.AddDays(-60));
-        db.Clientes.AddRange(recente, antigo, identico, fixo);
+        var limpo = Cadastro("Limpo", "11997573992", agora.AddDays(-2));
+        db.Clientes.AddRange(recente, antigo, identico, fixo, limpo);
         await db.SaveChangesAsync();
         var repo = new ClienteRepository(db);
 
@@ -64,7 +65,15 @@ public sealed class ClienteTelefonePostgresTests : IAsyncLifetime
         db.ChangeTracker.Clear();
 
         (await repo.FindByTelefoneAsync(EmpresaId, "+5511997573992"))!.Id
-            .Should().Be(antigo.Id, "entre duas grafias diferentes vence o cadastro mais antigo");
+            .Should().Be(limpo.Id, "a grafia só de dígitos vence a mascarada, mesmo mais antiga");
+
+        db.ChangeTracker.Clear();
+        db.Remove(limpo);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        (await repo.FindByTelefoneAsync(EmpresaId, "+5511997573992"))!.Id
+            .Should().Be(antigo.Id, "entre duas grafias mascaradas vence o cadastro mais antigo");
         (await repo.FindByTelefoneAsync(EmpresaId, "+551133334444"))!.Id
             .Should().Be(fixo.Id, "telefone fixo casa com fixo");
         (await repo.FindByTelefoneAsync(EmpresaId, "+5521997573992")).Should().BeNull("DDD diferente é outra pessoa");

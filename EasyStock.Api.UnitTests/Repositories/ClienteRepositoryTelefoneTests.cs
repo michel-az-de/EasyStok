@@ -122,6 +122,43 @@ public sealed class ClienteRepositoryTelefoneTests : IDisposable
         (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992"))!.Id.Should().Be(antigo.Id);
     }
 
+    // Revisão final: o número em grafia limpa (só dígitos, como o ERP e a importação gravam) vence o mascarado,
+    // mesmo que o mascarado seja mais antigo; antes da #3341 só o limpo era achado.
+    [Fact]
+    public async Task GrafiaLimpaVenceOMascaradoMaisAntigo()
+    {
+        var mascarado = Cliente.Criar(_empresaId, "Mascarado");
+        mascarado.Telefone = "(11) 99757-3992";
+        mascarado.CriadoEm = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var limpo = Cliente.Criar(_empresaId, "Limpo");
+        limpo.Telefone = "11997573992";
+        limpo.CriadoEm = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        _db.Clientes.AddRange(mascarado, limpo);
+        await _db.SaveChangesAsync();
+
+        (await _repo.FindByTelefoneAsync(_empresaId, "+5511997573992"))!.Id.Should().Be(limpo.Id);
+    }
+
+    // Aceite da #3341 (R2L-01, linha 5 da matriz): cadastro do ERP em 12 grafias x wa_id com e sem o nono dígito.
+    // Antes, 15 das 24 combinações criavam lead duplicado.
+    public static IEnumerable<object[]> MatrizDas24Combinacoes() =>
+        from gravado in new[]
+        {
+            "+5511997573992", "5511997573992", "11997573992", "(11) 99757-3992", "11 99757-3992", "+55 11 99757-3992",
+            "11 9 9757-3992", "011997573992", "11997573992 ", "+551197573992", "1197573992", "551197573992",
+        }
+        from waId in new[] { "+5511997573992", "+551197573992" }
+        select new object[] { gravado, waId };
+
+    [Theory]
+    [MemberData(nameof(MatrizDas24Combinacoes))]
+    public async Task MatrizDas24CombinacoesAchaOCadastroExistente(string gravado, string waId)
+    {
+        var cliente = await GravarAsync(_empresaId, gravado);
+
+        (await _repo.FindByTelefoneAsync(_empresaId, waId))!.Id.Should().Be(cliente.Id);
+    }
+
     [Fact]
     public async Task NaoAchaNumeroDeOutraEmpresa()
     {
