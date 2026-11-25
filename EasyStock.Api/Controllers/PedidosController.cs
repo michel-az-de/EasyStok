@@ -56,13 +56,14 @@ public class PedidosController(
         [FromQuery] string? sort = "criadoem",
         [FromQuery] string? order = "desc",
         [FromQuery] DateTime? entregaDesde = null,
-        [FromQuery] DateTime? entregaAte = null)
+        [FromQuery] DateTime? entregaAte = null,
+        [FromQuery] bool sinais = false)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         var (p, sz) = NormalisePage(page, pageSize);
         var result = await listarUseCase.ExecuteAsync(new ListarPedidosQuery(
             emp, p, sz, status, clienteId, DataUtc.InicioDoPeriodoUtc(desde), DataUtc.FimDoPeriodoUtc(ate), search, sort, NormaliseOrder(order),
-            DataUtc.InicioDoPeriodoUtc(entregaDesde), DataUtc.FimDoPeriodoUtc(entregaAte)));
+            DataUtc.InicioDoPeriodoUtc(entregaDesde), DataUtc.FimDoPeriodoUtc(entregaAte), sinais));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 

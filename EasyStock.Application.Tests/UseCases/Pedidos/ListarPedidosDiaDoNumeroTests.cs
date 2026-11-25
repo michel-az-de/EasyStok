@@ -21,7 +21,7 @@ public class ListarPedidosDiaDoNumeroTests
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>())
             .Returns((new[] { encomenda, semNumero }.AsEnumerable(), 2));
 
-        var lista = await new ListarPedidosUseCase(repo).ExecuteAsync(new ListarPedidosQuery(empresaId));
+        var lista = await new ListarPedidosUseCase(repo, Substitute.For<IPedidosResumoQuery>(), TimeProvider.System).ExecuteAsync(new ListarPedidosQuery(empresaId));
 
         lista.Items[0].NumeroDoDia.Should().Be(7);
         lista.Items[0].DataNumero.Should().Be(new DateOnly(2026, 11, 15));

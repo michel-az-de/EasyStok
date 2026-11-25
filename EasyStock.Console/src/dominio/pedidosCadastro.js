@@ -2,7 +2,7 @@
 // `GET api/pedidos/{id}`: consulta, situação no vocabulário da Cozinha, canal legível, número do dia,
 // saldo e linha do tempo. A tela só desenha; nada aqui conhece React nem a API.
 import { nomeDoMetodoCaixa, normalizarMetodoCaixa } from './caixa'
-import { dataIsoNoFuso, diaMes, horaCurta, moeda, somarDiasIso } from './formato'
+import { dataIsoNoFuso, diaMes, horaCurta, idadeDoAviso, moeda, somarDiasIso } from './formato'
 import { COLUNAS_KDS } from './kds'
 import { numeroDoDiaNaTela } from './pedido'
 
@@ -244,4 +244,74 @@ export function pagamentoNoDetalhe(pedido) {
   }
   const motivo = MOTIVOS_SEM_BAIXA_NO_DETALHE[pedido.status]
   return { texto: `Falta receber ${moeda(falta)}`, falta, botao: motivo ? { ligado: false, motivo } : { ligado: true, valor: falta } }
+}
+
+// #3294: os indicadores da tela (`GET api/pedidos/resumo`) usam os mesmos filtros da lista, menos situação, página e
+// ordem: a faixa mede o recorte inteiro, e a situação vira filtro ao clicar no número dela.
+const SO_DA_LISTA = ['page', 'pageSize', 'sort', 'order']
+export function consultaDoResumo(filtros = {}, agoraMs = Date.now()) {
+  const consulta = consultaDePedidos({ ...filtros, situacao: '', pagina: 1, ordem: 'mais-recentes' }, agoraMs)
+  return Object.fromEntries(Object.entries(consulta).filter(([chave]) => !SO_DA_LISTA.includes(chave)))
+}
+
+// O recorte que a faixa mede, dito como a dona fala.
+export function rotuloDoRecorte({ periodo = 'tudo', entrega = 'tudo', busca = '' } = {}) {
+  const quando = periodo === 'tudo' ? 'Em todo o período' : PERIODOS_PEDIDO.find((p) => p.valor === periodo)?.rotulo ?? 'Em todo o período'
+  return [quando, entrega === 'hoje' && 'entrega hoje', String(busca ?? '').trim() && `busca "${String(busca).trim()}"`].filter(Boolean).join(' · ')
+}
+
+// A janela anterior tem o mesmo tamanho e para na mesma hora: hoje compara com ontem até agora, nunca com o dia cheio.
+const COMPARADO_COM = {
+  hoje: { nome: 'ontem até esta hora', em: 'ontem até esta hora', a: 'a ontem até esta hora' },
+  '7d': { nome: 'os 7 dias anteriores', em: 'nos 7 dias anteriores', a: 'aos 7 dias anteriores' },
+  '30d': { nome: 'os 30 dias anteriores', em: 'nos 30 dias anteriores', a: 'aos 30 dias anteriores' },
+}
+export function variacaoDoVendido(resumo, periodo) {
+  const anterior = resumo?.anterior
+  const com = COMPARADO_COM[periodo]
+  if (!anterior || !com) return null
+  const agora = centavos(resumo.vendido), antes = centavos(anterior.vendido)
+  if (antes === 0) return agora === 0 ? { texto: `Sem vendas também ${com.em}`, tom: 'igual' } : { texto: `Nada vendido ${com.em}`, tom: 'sobe' }
+  const pct = Math.round(((agora - antes) / antes) * 100)
+  if (pct === 0) return { texto: `Igual ${com.a} (${moeda(anterior.vendido)})`, tom: 'igual' }
+  return { texto: `${pct > 0 ? '+' : '−'}${Math.abs(pct)}% sobre ${com.nome} (${moeda(anterior.vendido)})`, tom: pct > 0 ? 'sobe' : 'desce' }
+}
+
+// Quantos voltaram: compra de cliente que já tinha comprado antes, sobre todas as compras com cliente.
+export function clientesQueVoltaram(resumo) {
+  const primeira = resumo?.primeiraCompra ?? 0, voltaram = resumo?.recompra ?? 0
+  const comCliente = primeira + voltaram
+  if (comCliente === 0) return null
+  return { primeira, voltaram, percentual: Math.round((voltaram / comCliente) * 100) }
+}
+
+const QUANTIDADE = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 })
+const UNIDADES_CONTADAS = ['', 'un', 'und', 'unid', 'unidade', 'unidades']
+// "2× Bolo" ou, no que se pesa, "1,5 kg Brigadeiro".
+export function textoDoItem({ nome, quantidade, unidade } = {}) {
+  const qtd = QUANTIDADE.format(Number(quantidade ?? 0))
+  const un = String(unidade ?? '').trim().toLowerCase()
+  return UNIDADES_CONTADAS.includes(un) ? `${qtd}× ${nome}` : `${qtd} ${un} ${nome}`
+}
+
+// O que foi pedido, na linha: até 3 itens na ordem em que entraram e "+N" pelo resto (`itensSemFrete` é o total; API
+// antiga, `itensCount`).
+export function itensDaLinha(pedido) {
+  const resumo = Array.isArray(pedido?.itensResumo) ? pedido.itensResumo : []
+  if (resumo.length === 0) return null
+  const resto = Math.max(0, (pedido.itensSemFrete ?? pedido.itensCount ?? resumo.length) - resumo.length)
+  return { texto: resumo.map(textoDoItem).join(', '), resto: resto > 0 ? `+${resto}` : null }
+}
+
+// "1ª compra" é cliente nova; da segunda em diante é a ordem da compra dela na loja.
+export function compraDoClienteNaLinha(pedido) {
+  const n = pedido?.compraDoCliente
+  return Number.isInteger(n) && n > 0 ? { texto: `${n}ª compra`, nova: n === 1 } : null
+}
+
+// Desde quando está na situação. Pedido fechado (entregue, cancelado) não conta tempo: a pergunta já foi respondida.
+const FECHADOS = ['entregue', 'cancelado']
+export function tempoNaSituacao(pedido, agoraMs = Date.now()) {
+  if (!pedido?.situacaoDesde || FECHADOS.includes(pedido.status)) return null
+  return idadeDoAviso(pedido.situacaoDesde, agoraMs)
 }

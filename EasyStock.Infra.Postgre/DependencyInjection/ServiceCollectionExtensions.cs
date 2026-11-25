@@ -120,6 +120,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IDesacertosEstoqueQueries, EasyStock.Infra.Postgre.Queries.DesacertosEstoqueQueries>(); // S22
             services.AddScoped<IDomicilioQueries, EasyStock.Infra.Postgre.Queries.DomicilioQueries>(); // S25
             services.AddScoped<IPedidoRepository, PedidoRepository>();
+            services.AddScoped<IPedidosResumoQuery, PedidosResumoQuery>(); // #3294: indicadores da tela Pedidos
             services.AddScoped<ICaixaRepository, CaixaRepository>();
             services.AddScoped<ILoteRepository, LoteRepository>();
             services.AddScoped<IEtiquetaTemplateRepository, EtiquetaTemplateRepository>();

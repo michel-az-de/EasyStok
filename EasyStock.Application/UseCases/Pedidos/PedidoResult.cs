@@ -29,8 +29,18 @@ public sealed record PedidoResult(
     // #2813: o que falta receber pela regra do domínio (zero no quitado do histórico). A tela lê daqui e não refaz total menos pago.
     decimal? AReceber = null,
     // E4 L1 (#3076): endereço de entrega (ou nulo na retirada); o detalhe mostra no cabeçalho.
-    string? EnderecoEntrega = null
+    string? EnderecoEntrega = null,
+    // #3294: só a lista de Pedidos de Cadastros preenche (ListarPedidosUseCase): os 3 primeiros itens, a ordem da
+    // compra do cliente (1 = primeira; nulo sem cliente ou fora da regra de compra), desde quando está na situação e
+    // se passou da hora marcada (RegraDeAtraso).
+    IReadOnlyList<PedidoItemNaLista>? ItensResumo = null,
+    int? CompraDoCliente = null,
+    DateTime? SituacaoDesde = null,
+    bool? Atrasado = null,
+    int? ItensSemFrete = null
 );
+
+public sealed record PedidoItemNaLista(string Nome, decimal Quantidade, string? Unidade);
 
 public sealed record PedidoDetalheResult(
     PedidoResult Pedido,

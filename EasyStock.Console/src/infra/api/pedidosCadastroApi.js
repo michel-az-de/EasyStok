@@ -1,11 +1,12 @@
 // #2478: leitura dos pedidos para a tela Pedidos de Cadastros e para o detalhe da Busca na Casa.
 import { chamarApi } from './cliente'
-import { consultaDePedidos } from '../../dominio/pedidosCadastro'
+import { consultaDePedidos, consultaDoResumo } from '../../dominio/pedidosCadastro'
 
 const opcoes = (contexto, sinal) => ({ identidadeEsperada: contexto.identidade, sinal, prazoComCancelamento: true })
 
 export async function listarPedidos(filtros, contexto, sinal, agoraMs = Date.now()) {
-  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, ...consultaDePedidos(filtros, agoraMs) })
+  // #3294: `sinais` pede itens, ordem da compra, tempo na situação e atraso da linha (só esta tela paga essa leitura).
+  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, ...consultaDePedidos(filtros, agoraMs), sinais: 'true' })
   const r = await chamarApi(`/api/pedidos?${parametros}`, { ...opcoes(contexto, sinal), envelope: true })
   const itens = r?.data
   if (!Array.isArray(itens)) throw new Error('A lista de pedidos não foi recebida. Tente carregar novamente.')
@@ -29,4 +30,12 @@ export async function contarPedidos({ status = null, desde }, contexto, sinal) {
   const total = r?.meta?.totalCount ?? r?.meta?.total
   if (!Number.isInteger(total)) throw new Error('A contagem dos pedidos não foi recebida.')
   return total
+}
+
+// #3294: os indicadores da tela Pedidos, calculados pela API sobre os filtros da lista (sem situação nem página).
+export async function obterResumoDePedidos(filtros, contexto, sinal, agoraMs = Date.now()) {
+  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, ...consultaDoResumo(filtros, agoraMs) })
+  const r = await chamarApi(`/api/pedidos/resumo?${parametros}`, opcoes(contexto, sinal))
+  if (!Number.isInteger(r?.pedidos)) throw new Error('Os indicadores não carregaram.')
+  return r
 }

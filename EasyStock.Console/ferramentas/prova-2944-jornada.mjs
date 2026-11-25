@@ -23,7 +23,9 @@ await caso('17c. a lista segue a regra da Ficha: permissão, pedido pago só com
 })
 await caso('17b. a linha oferece "Cancelar pedido" com motivo de bloqueio, confirmação e recarga da lista e da Ficha', () => {
   assert.match(painel, /Cancelar pedido/)
-  assert.match(painel, /motivo=\{semCancelar\(item\) \?\? undefined\}/)
+  // #3294: o cancelar foi para o menu do pedido (como na Ficha); o motivo de bloqueio segue no item do menu.
+  assert.match(painel, /const motivoSemCancelar = semCancelar\(item\)/)
+  assert.match(painel, /desabilitado: Boolean\(motivoSemCancelar\), motivo: motivoSemCancelar \?\? undefined/)
   assert.match(painel, /motivoParaNaoCancelarPedido\(item, \{ permitido: disponivel\('cancelarPedido'\), capacidades \}\)/)
   assert.match(painel, /motivoDoCancelamentoValido\(motivo\)/)
   assert.match(painel, /cancelarPedido\(/)

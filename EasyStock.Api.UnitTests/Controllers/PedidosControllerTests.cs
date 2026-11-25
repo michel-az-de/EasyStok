@@ -101,7 +101,7 @@ public class PedidosControllerTests
                 Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()),
             Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository>());
 
-        var listar = new ListarPedidosUseCase(_pedidoRepo);
+        var listar = new ListarPedidosUseCase(_pedidoRepo, Substitute.For<IPedidosResumoQuery>(), TimeProvider.System);
 
         var obter = new ObterPedidoDetalhesUseCase(_pedidoRepo);
 

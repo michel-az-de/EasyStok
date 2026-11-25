@@ -1,12 +1,32 @@
 /* #2478: Pedidos em Cadastros. A base (painel, superfície, lista, rodapé) vem de cadastros.module.css. */
 .filtros { display: grid; grid-template-columns: minmax(200px, 1fr) repeat(4, minmax(140px, 180px)) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
-.tabela th:first-child { width: 26%; }
+.tabela table { table-layout: fixed; }
+/* #3294: 7 colunas (Pedido, Cliente, Itens, Situação, Entrega, Total, Ações), somando 100%: sem rolagem lateral em 1440. */
+/* Seletor com `table` para vencer o `.lista th:first-child` da base, que vale para Clientes. */
+.tabela table th:nth-child(1) { width: 13%; }
+.tabela table th:nth-child(2) { width: 18%; }
+.tabela table th:nth-child(3) { width: 20%; }
+.tabela table th:nth-child(4) { width: 15%; }
+.tabela table th:nth-child(5) { width: 10%; }
+.tabela table th:nth-child(6) { width: 11%; }
+.tabela table th:nth-child(7) { width: 13%; }
+.tabela th, .tabela td { padding-inline: var(--e-3); }
+.tabela td { padding-block: var(--e-3); overflow-wrap: normal; }
+.cliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); min-width: 0; }
+.cliente > span:first-child { overflow-wrap: anywhere; }
+/* Cliente nova: fundo tingido de sucesso, contorno uniforme. */
+.primeiraCompra { display: inline-flex; align-items: center; padding: 2px var(--e-2); border: 1px solid var(--sucesso); border-radius: 999px; background: var(--sucesso-pastel); color: var(--sucesso); font-size: var(--t-micro); font-weight: 600; white-space: nowrap; }
+.tabela .cliente .selo, .restoDosItens { white-space: nowrap; }
+.itensDaLinha { display: grid; justify-items: start; gap: var(--e-1); min-width: 0; }
+.itensDaLinha > span:first-child { display: -webkit-box; max-width: 100%; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; min-width: 0; }
+.situacao { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
+.acoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-1); }
 .tabela td > strong { display: block; font-variant-numeric: tabular-nums; }
 .tabela[aria-busy='true'] tbody { opacity: 0.6; transition: opacity var(--dur-curta) var(--ease-padrao); }
 .valor { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .falta { color: var(--alerta); font-weight: 600; }
 /* O saldo é a pergunta da dona: vence o cinza de `.lista td small` da base. */
-.tabela td small.falta { color: var(--alerta); font-weight: 600; }
+.tabela td small.falta { color: var(--alerta); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .tabela .soCelular { display: none; }
 
 .detalhe { display: grid; gap: var(--e-5); min-width: 0; color: var(--tinta); }
@@ -58,12 +78,13 @@
   /* Busca na linha toda; período, situação, ordem e Atualizar dois a dois, para a lista aparecer sem rolar. */
   .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-2); padding: var(--e-3); }
   /* Pedido (com cliente, situação e entrega embaixo), Total e Abrir: as colunas Cliente, Situação e Entrega saem. */
-  .tabela table { table-layout: fixed; }
-  .tabela th:first-child { width: auto; }
+  .tabela table th:first-child { width: auto; }
   .tabela th:nth-child(2), .tabela td:nth-child(2), .tabela th:nth-child(3), .tabela td:nth-child(3),
-  .tabela th:nth-child(4), .tabela td:nth-child(4) { display: none; }
-  .tabela th:nth-child(5) { width: 6.5rem; }
-  .tabela th:last-child { width: 5.75rem; }
+  .tabela th:nth-child(4), .tabela td:nth-child(4), .tabela th:nth-child(5), .tabela td:nth-child(5) { display: none; }
+  .tabela th, .tabela td { padding-inline: var(--e-2); }
+  .tabela table th:nth-child(6) { width: 6.5rem; }
+  .tabela table th:last-child { width: 5.75rem; }
+  .acoes { flex-direction: column; align-items: stretch; }
   .tabela .soCelular { display: grid; gap: var(--e-1); margin-top: var(--e-1); }
   .tabela .soCelular small:first-child { color: var(--tinta); }
   .totais { justify-content: stretch; }
