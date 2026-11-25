@@ -87,21 +87,6 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
-    public async Task Motivo_PortaoQueEscalaSemRepositorioDeTurnosNaoQuebra()
-    {
-        ClienteVinculado(c => c.Bloquear("golpe", Agora.AddHours(-1)));
-        var semTurnos = new AgenteAtendimentoService(
-            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
-            _cloudClient, _unitOfWork,
-            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, _log, _pedidos);
-
-        var resultado = await semTurnos.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
-
-        resultado.Escalou.Should().BeTrue();
-    }
-
-    [Fact]
     public async Task Motivo_RespostaNormalGravaNulo()
     {
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
@@ -206,7 +191,8 @@ public partial class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository, [_consultarPedido], _escalador,
         _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, _log, _pedidos, turnos: _turnos,
+        _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
         prazoTurno: Microsoft.Extensions.Options.Options.Create(new PrazoDoTurnoAgenteOptions { Segundos = 1 }));
 
     [Fact]
@@ -297,6 +283,24 @@ public partial class AgenteAtendimentoServiceTests
         await turno;
 
         TurnoGravado().Motivo.Should().Be(MotivoDoTurno.Interrompido);
+    }
+
+    // #3298 (R11): a conversa mudou de mãos e o modelo também tinha falhado: o histórico guarda o erro do modelo, não só a interrupção.
+    [Fact]
+    public async Task Motivo_TurnoInterrompidoComFalhaDoModeloGravaErroComFalhaLlm()
+    {
+        var aguardando = new TaskCompletionSource<RespostaLlm>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chamou = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ => { chamou.SetResult(); return aguardando.Task; });
+        var turno = CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        await chamou.Task;
+        _conversa.VincularCliente(Guid.NewGuid());
+        aguardando.SetException(new HttpRequestException("fora do ar"));
+        await turno;
+
+        var gravado = TurnoGravado();
+        gravado.Desfecho.Should().Be(DesfechoTurnoAgente.Erro);
+        gravado.Motivo.Should().Be(MotivoDoTurno.FalhaLlm);
     }
 
     [Fact]

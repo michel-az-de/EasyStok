@@ -25,6 +25,7 @@ public class ChecarAssistenteConversaUseCaseTests
     private readonly IClienteRepository _clientes = Substitute.For<IClienteRepository>();
     private readonly ICadernoRepository _caderno = Substitute.For<ICadernoRepository>();
     private readonly IContatoDaEquipeAvisada _equipe = Substitute.For<IContatoDaEquipeAvisada>();
+    private readonly ITurnoAgenteRepository _turnos = Substitute.For<ITurnoAgenteRepository>();
     private readonly IFerramentaAgente _consultarPedido = Substitute.For<IFerramentaAgente>();
     private readonly ConfiguracaoAtendimento _configuracao;
     private readonly Conversa _conversa;
@@ -52,7 +53,7 @@ public class ChecarAssistenteConversaUseCaseTests
         _llm, _conversas, _configuracoes, _clientes, _caderno,
         new ObterDossieClienteUseCase(_clientes, Substitute.For<IClienteCrmRepository>(),
             Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversas),
-        [_consultarPedido], _equipe);
+        [_consultarPedido], _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()), _equipe);
 
     private static EtapaAssistente Etapa(ChecagemAssistenteResult checagem, string codigo) =>
         checagem.Etapas.Single(e => e.Codigo == codigo);

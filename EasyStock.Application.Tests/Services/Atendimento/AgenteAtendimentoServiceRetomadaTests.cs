@@ -31,7 +31,8 @@ public partial class AgenteAtendimentoServiceTests
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
             [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, _log, _pedidos,
+            _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+            Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
             eventos: _eventos, retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
     }
 
@@ -233,6 +234,19 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue();
         _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Encaminhamento, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3298 (R11): o encaminhamento da escalada anterior que falhou no envio não chegou ao cliente: não vale como aviso dado.
+    [Fact]
+    public async Task Retomada_EncaminhamentoAnteriorQueFalhouNoEnvio_AvisaOClienteDeNovo()
+    {
+        EscaladaPeloRoboHa(AlemDoPrazo);
+        _historico[^1].RegistrarFalhaEnvio("fora do ar", TipoFalhaEnvio.Permanente, Agora, reenvioAutomatico: false);
+
+        var resultado = await RetomarComOModeloEscalando();
+
+        resultado.Escalou.Should().BeTrue();
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Encaminhamento, Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

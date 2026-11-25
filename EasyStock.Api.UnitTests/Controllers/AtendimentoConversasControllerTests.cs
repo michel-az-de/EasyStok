@@ -174,7 +174,10 @@ public partial class AtendimentoConversasControllerTests
             new ObterDossieClienteUseCase(
                 Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
-            Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
+            Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance,
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository>(),
+            Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+            Microsoft.Extensions.Options.Options.Create(new PrecosModelosAgenteOptions()));
 
         var turno = await agente.ProcessarTurnoAsync(_empresaId, conversa.Id, agora);
 

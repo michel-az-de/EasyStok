@@ -43,8 +43,9 @@ public sealed record PortaoDoFluxo(string Codigo, string Titulo, string Checa, b
 public sealed class PortoesDoAssistente(
     IAgenteLlmClient llm,
     IConversaRepository conversas,
-    IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null)
+    ITurnoAgenteRepository turnos,
+    IOptions<LimiteRespostasAgenteOptions> limiteRespostas,
+    IContatoDaEquipeAvisada? equipe = null)
 {
     public const string Situacao = "situacao";
     public const string Vinculo = "vinculo";
@@ -83,13 +84,11 @@ public sealed class PortoesDoAssistente(
     /// S69 (#2853): cota mensal de tokens da loja. Soma o mesmo registro dos turnos que o painel de uso mostra, no mês de
     /// Brasília. Barrando, o turno não chama o modelo e a conversa passa para a equipe.
     /// </summary>
-    public static async Task<EtapaAssistente> DaCotaAsync(
-        ITurnoAgenteRepository? turnos, Guid empresaId, ConfiguracaoAtendimento configuracao, DateTime agora, CancellationToken ct)
+    public async Task<EtapaAssistente> DaCotaAsync(
+        Guid empresaId, ConfiguracaoAtendimento configuracao, DateTime agora, CancellationToken ct)
     {
         if (configuracao.CotaTokensMes is not { } cota || cota <= 0)
             return EtapaAssistente.Fora(Cota, "Cota do mês", "Sem cota mensal de tokens.");
-        if (turnos is null)
-            return EtapaAssistente.Fora(Cota, "Cota do mês", "Consumo indisponível.");
 
         var usados = await UsadosNoMesAsync(turnos, empresaId, agora, ct);
         var detalhe = $"{usados:N0} de {cota:N0} tokens usados no mês.";
@@ -178,7 +177,7 @@ public sealed class PortoesDoAssistente(
     /// <summary>#2285: anti-loop de custo. Barrando, a conversa passa para a equipe.</summary>
     public async Task<EtapaAssistente> DoLimiteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
     {
-        var maximo = limiteRespostas?.Value.MaximoPorHora ?? LimiteRespostasAgenteOptions.PadraoPorHora;
+        var maximo = limiteRespostas.Value.MaximoPorHora;
         if (maximo <= 0)
             return EtapaAssistente.Fora(Limite, "Respostas na última hora", "Sem limite configurado.");
 
@@ -188,5 +187,31 @@ public sealed class PortoesDoAssistente(
             ? EtapaAssistente.Barrou(Limite, "Respostas na última hora", detalhe + " Parou para evitar loop.",
                 AgenteAtendimentoService.MotivoLimiteRespostas(maximo))
             : EtapaAssistente.Passou(Limite, "Respostas na última hora", detalhe);
+    }
+
+    /// <summary>
+    /// #3298 (R11): a pessoa, o limite de respostas e a cota do mês, nesta ordem, e só até onde alguém consome: quem para na
+    /// primeira que barra (<see cref="PrimeiraQueBarraDoClienteEDoCustoAsync"/>) não lê o banco das seguintes, e a checagem
+    /// do console lê todas. A ordem mora aqui, para o turno, a retomada, a resposta sem modelo e a tela não divergirem.
+    /// </summary>
+    public async IAsyncEnumerable<EtapaAssistente> EtapasDoClienteEDoCustoAsync(
+        Guid empresaId, Guid conversaId, ConfiguracaoAtendimento configuracao, Cliente? cliente, DateTime agora,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        foreach (var etapa in DaPessoa(cliente)) yield return etapa;
+        yield return await DoLimiteAsync(empresaId, conversaId, agora, ct);
+        yield return await DaCotaAsync(empresaId, configuracao, agora, ct);
+    }
+
+    /// <summary>
+    /// A primeira etapa de <see cref="EtapasDoClienteEDoCustoAsync"/> que barra, ou nulo. As três têm
+    /// <see cref="EtapaAssistente.MotivoEscalada"/> quando barram: quem recebe a etapa passa a conversa para a equipe com ele.
+    /// </summary>
+    public async Task<EtapaAssistente?> PrimeiraQueBarraDoClienteEDoCustoAsync(
+        Guid empresaId, Guid conversaId, ConfiguracaoAtendimento configuracao, Cliente? cliente, DateTime agora, CancellationToken ct)
+    {
+        await foreach (var etapa in EtapasDoClienteEDoCustoAsync(empresaId, conversaId, configuracao, cliente, agora, ct))
+            if (etapa.Barra) return etapa;
+        return null;
     }
 }

@@ -40,11 +40,13 @@ public sealed class AgenteAtendimentoService(
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
+    // #3298 (R7): o controle de custo (registro do turno, limite de respostas e preços) é regra de negócio: sem ele a cota
+    // vira "não se aplica" e o turno não é registrado, sem erro. Obrigatório, a fiação errada falha ao montar o serviço.
+    ITurnoAgenteRepository turnos,
+    IOptions<LimiteRespostasAgenteOptions> limiteRespostas,
+    IOptions<PrecosModelosAgenteOptions> precos,
     IPedidoRepository? pedidos = null,
     Notifications.IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
-    ITurnoAgenteRepository? turnos = null,
-    IOptions<PrecosModelosAgenteOptions>? precos = null,
     IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
     IOptions<RetomadaAssistenteOptions>? retomadaOpcoes = null,
     IOperacaoEventPublisher? eventos = null,
@@ -110,17 +112,9 @@ public sealed class AgenteAtendimentoService(
         // Automatica sem ninguém e fora do lembrete (#1288).
         // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô,
         // até a equipe devolver a conversa a ele (#2493). As etapas são as mesmas da checagem do console (#2496).
-        var portoes = new PortoesDoAssistente(llm, conversaRepository, equipe, limiteRespostas);
-        var portaoDaLoja = (await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct)).FirstOrDefault(e => e.Barra);
-        var motivoSemAgente = portaoDaLoja?.MotivoEscalada;
-        if (motivoSemAgente is not null)
-        {
-            LogsDoAssistente.PortaoBarrou(logger, conversaId, portaoDaLoja!.Codigo);
-            await escalador.EscalarAsync(empresaId, conversa, motivoSemAgente, agora, ct);
-            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, portaoDaLoja.Codigo);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
-        }
+        var portoes = new PortoesDoAssistente(llm, conversaRepository, turnos, limiteRespostas, equipe);
+        if ((await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct)).FirstOrDefault(e => e.Barra) is { } portaoDaLoja)
+            return await EscalarPeloPortaoAsync(portaoDaLoja);
 
         var mensagens = GeracaoAgenteAtendimento.MontarConversacao(dados.Mensagens, pendentes);
         if (mensagens.Count == 0 || mensagens[^1].Papel != MensagemLlm.Usuario)
@@ -132,35 +126,11 @@ public sealed class AgenteAtendimentoService(
 
         // S24: bloqueado no meio da conversa → a dona assume; o agente não responde.
         // #2249: pessoa encaminhada à responsável. Fica com a equipe até alguém devolver a conversa ao robô.
-        if (PortoesDoAssistente.DaPessoa(cliente).FirstOrDefault(e => e.Barra) is { MotivoEscalada: { } motivoPessoa } portaoDaPessoa)
-        {
-            LogsDoAssistente.PortaoBarrou(logger, conversaId, portaoDaPessoa.Codigo);
-            await escalador.EscalarAsync(empresaId, conversa, motivoPessoa, agora, ct);
-            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, portaoDaPessoa.Codigo);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
-        }
-
         // #2285: anti-loop de custo. Outro robô do lado do cliente (ou um loop de mensagens) faria o agente
         // responder e gastar sem fim; no limite da hora, a conversa para nele e a escalada avisa a dona.
-        if (await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct) is { Barra: true, MotivoEscalada: { } motivoLimite })
-        {
-            LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Limite);
-            await escalador.EscalarAsync(empresaId, conversa, motivoLimite, agora, ct);
-            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, PortoesDoAssistente.Limite);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
-        }
-
         // S69 (#2853): cota mensal esgotada. Não chama o modelo, passa para a equipe e deixa o turno no histórico como cota.
-        if (await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct) is { Barra: true, MotivoEscalada: { } motivoCota })
-        {
-            LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Cota);
-            await escalador.EscalarAsync(empresaId, conversa, motivoCota, agora, ct);
-            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Cota, PortoesDoAssistente.Cota);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
-        }
+        if (await portoes.PrimeiraQueBarraDoClienteEDoCustoAsync(empresaId, conversaId, configuracao, cliente, agora, ct) is { } portao)
+            return await EscalarPeloPortaoAsync(portao);
 
         // #2126: o vínculo só é limpo em parte dos caminhos de cancelamento e entrega. Pedido já finalizado
         // não é atendimento em andamento: preso, a IA respondia "quero uma lasanha" com a comanda antiga e
@@ -199,126 +169,34 @@ public sealed class AgenteAtendimentoService(
             turnoAgenteId: turnoId,
             // #3291 (R3): prazo do turno (relógio corrido, ferramentas incluídas) que só interrompe o modelo; ferramenta e envio terminam com o ct do serviço.
             prazoTotal: (prazoTurno?.Value ?? new PrazoDoTurnoAgenteOptions()).Prazo);
-        var motivoEscalada = geracao.MotivoFalha;
-        var concluiu = geracao.Concluiu;
+        // #3298 (R11): o fim do turno (resposta, guarda, escalada e registro) é do colaborador. Se a conversa mudou de mãos
+        // durante a chamada ao modelo, a proteção descarta o fim e o turno só fica no histórico.
+        var turno = new FinalizacaoDoTurno.Turno(
+            empresaId, conversaId, agora, conversa, cliente, configuracao, dados.Mensagens, entradaRetomada,
+            pendentes[^1].Id, turnoId, cronometro, geracao, contexto, gravacao, _ferramentas.Keys);
+        var finalizacao = new FinalizacaoDoTurno(conversaRepository, escalador, cloudClient, unitOfWork, turnos, precos, logger);
+        return await protecao.ExecutarAsync(token => finalizacao.FinalizarAsync(turno, token), ct, gravar: false)
+            ?? await finalizacao.InterrompidoAsync(turno, ct);
 
-        var final = await protecao.ExecutarAsync(Finalizar, ct, gravar: false);
-        if (final is not null) return final;
-        var desfechoSemResposta = geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido;
-        LogsDoAssistente.TurnoInterrompido(logger, conversaId, desfechoSemResposta.ToString());
-        await RegistrarTurnoAsync(desfechoSemResposta, geracao.Consumo?.FalhaLlm == true ? MotivoDoTurno.FalhaLlm : MotivoDoTurno.Interrompido, ct);
-        await unitOfWork.CommitAsync();
-        return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
-
-        // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids. #3291 (D2): é a única fonte do
-        // consumo do turno; o agregado mensal UsoIa saiu do caminho (o gasto mensal vem de TurnoAgente e chamada_ia).
-        // #3175: turno de portao que escala nao chama o modelo: 0 tokens e o codigo do portao como motivo.
+        // S67 (#2534): um registro por turno, só com números e ids. #3175: turno de portao que escala nao chama o modelo:
+        // 0 tokens e o codigo do portao como motivo.
         async Task RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente desfecho, string codigoDoPortao)
         {
-            if (turnos is null) return;
             await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
                 desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, MotivoDoTurno.DoPortao(codigoDoPortao)), ct);
         }
 
-        async Task RegistrarTurnoAsync(DesfechoTurnoAgente desfecho, string? motivo, CancellationToken token)
+        // O portão que barra passa a conversa para a equipe com o motivo dele e deixa o turno no histórico, sem chamar o
+        // modelo (#3298, R11). A cota tem desfecho próprio; os demais, escalou. Toda etapa que escala traz motivo; sem ele
+        // o detalhe vai no lugar, nunca um portão que barra deixa o modelo responder.
+        async Task<ResultadoTurnoAgente> EscalarPeloPortaoAsync(EtapaAssistente portao)
         {
-            if (turnos is null) return;
-            var consumo = geracao.Consumo ?? new ConsumoGeracaoAgente();
-            await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, gravacao.UltimaSaidaId,
-                consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
-                precos?.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
-                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, motivo, turnoId), token);
-        }
-
-        async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)
-        {
-        ct = token;
-
-        // #3175: o codigo do motivo, nunca o texto dele nem o que o modelo escreveu.
-        var codigoDoMotivo = geracao.MotivoFalha is null ? null
-            : MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha, geracao.Consumo?.FalhaLlm == true);
-
-        // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
-        // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
-        await gravacao.MarcarProcessadasAsync(ct);
-
-        var respondeu = contexto.HouveEnvio;
-        // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
-        var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
-        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MoldeEscalada(), primeiroNome, configuracao.NomeDona);
-        // #3068: no turno retomado o cliente já pode ter recebido o encaminhamento da escalada anterior; não se repete.
-        var jaAvisado = entradaRetomada is not null && dados.Mensagens.SkipWhile(m => m.Id != entradaRetomada.Id)
-            .Any(m => m.Autor == AutorMensagem.Agente && m.Status != StatusMensagem.Falhou);
-        if (conversa.Situacao == SituacaoConversa.Assumida && !jaAvisado)
-        {
-            var aoContato = contexto.Encaminhou
-                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome, configuracao.NomeDona)
-                : encaminhamento;
-            respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
-        }
-        else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
-            respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
-        else if (conversa.Situacao == SituacaoConversa.Automatica)
-        {
-            // #2515: sem texto do agente, o menu adiado basta como resposta. #2544: a foto do produto também.
-            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto)
-                && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
-            if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
-                respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
-            else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
-            {
-                // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
-                var barrada = !concluiu || motivoEscalada is not null ? null
-                    : contexto.FerramentaFalhou ? LogsDoAssistente.CategoriaFerramentaFalhou
-                    : GuardaRespostaAgente.Avaliar(geracao.Texto,
-                        contexto.ResultadosDasFerramentas,
-                        _ferramentas.Keys,
-                        configuracao.NomeDona);
-                if (concluiu && motivoEscalada is null && barrada is null)
-                    respondeu = await EnviarRespostaAsync(gravacao, conversa, geracao.Texto!, ct) || respondeu;
-                else
-                {
-                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
-                    if (barrada is not null)
-                    {
-                        var categoria = LogsDoAssistente.CategoriaDaGuarda(barrada);
-                        LogsDoAssistente.GuardaBarrou(logger, conversaId, categoria);
-                        codigoDoMotivo ??= MotivoDoTurno.DaGuarda(categoria);
-                    }
-                    else if (!concluiu) codigoDoMotivo ??= MotivoDoTurno.Iteracoes;
-                    motivoEscalada ??= concluiu ? $"resposta do agente barrada ({barrada}); precisa de conferência humana"
-                        : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
-                }
-            }
-        }
-
-        // #2515: o menu da ferramenta sai depois do texto; conversa escalada ou texto barrado não o recebe.
-        // Menu que não sai deixa o cliente convidado a escolher sem opções: a equipe confere, e quem não recebeu nada
-        // recebe o encaminhamento.
-        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica && contexto.TemEnvioAdiado)
-        {
-            if (await contexto.EnviarAdiadoAsync(ct))
-                respondeu = true;
-            else
-            {
-                if (!respondeu)
-                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct);
-                motivoEscalada = "o menu de janelas não saiu ao cliente; precisa de conferência humana";
-                codigoDoMotivo = MotivoDoTurno.Menu;
-            }
-        }
-
-        if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
-            await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);
-
-        var escalou = motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida;
-        // Escalou sem codigo de falha, guarda, iteracao ou menu: foi o modelo, pela ferramenta escalar_para_dona.
-        await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro
-            : escalou ? DesfechoTurnoAgente.Escalou : DesfechoTurnoAgente.Respondeu,
-            codigoDoMotivo ?? (escalou ? MotivoDoTurno.EscaladaModelo : null), ct);
-
-        await unitOfWork.CommitAsync();
-        return new ResultadoTurnoAgente(true, respondeu, escalou);
+            LogsDoAssistente.PortaoBarrou(logger, conversaId, portao.Codigo);
+            await escalador.EscalarAsync(empresaId, conversa, portao.MotivoEscalada ?? portao.Detalhe, agora, ct);
+            await RegistrarTurnoDoPortaoAsync(
+                portao.Codigo == PortoesDoAssistente.Cota ? DesfechoTurnoAgente.Cota : DesfechoTurnoAgente.Escalou, portao.Codigo);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
     }
 
@@ -365,13 +243,11 @@ public sealed class AgenteAtendimentoService(
         var cliente = conversa.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
-        var portoes = new PortoesDoAssistente(llm, conversaRepository, equipe, limiteRespostas);
-        var barra = PortoesDoAssistente.DaConversa(conversa, agora).Where(e => e.Codigo != PortoesDoAssistente.Situacao)
-            .Concat(await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
-            .Concat(PortoesDoAssistente.DaPessoa(cliente))
-            .Append(await portoes.DoLimiteAsync(empresaId, conversa.Id, agora, ct))
-            .Append(await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct))
-            .FirstOrDefault(e => e.Barra);
+        var portoes = new PortoesDoAssistente(llm, conversaRepository, turnos, limiteRespostas, equipe);
+        // Todos os portões menos "quem atende", na ordem do turno, parando no primeiro que barra.
+        var barra = PortoesDoAssistente.DaConversa(conversa, agora).FirstOrDefault(e => e.Barra && e.Codigo != PortoesDoAssistente.Situacao)
+            ?? (await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct)).FirstOrDefault(e => e.Barra)
+            ?? await portoes.PrimeiraQueBarraDoClienteEDoCustoAsync(empresaId, conversa.Id, configuracao, cliente, agora, ct);
         if (barra is not null)
         {
             LogsDoAssistente.RetomadaDispensada(logger, conversa.Id, barra.Codigo);
@@ -478,44 +354,6 @@ public sealed class AgenteAtendimentoService(
             ?? "O contexto da conversa mudou. Nenhuma ação foi executada.";
     }
 
-    private async Task<bool> EnviarRespostaAsync(GravacaoSaidaTurno gravacao, Conversa conversa, string texto, CancellationToken ct)
-    {
-        var (empresaId, agora) = (gravacao.EmpresaId, gravacao.Agora);
-        if (string.IsNullOrWhiteSpace(texto)) return false;
-        texto = TextoWhatsApp.SemTravessao(texto);
-        if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
-
-        Mensagem saida;
-        var enviou = false;
-        if (conversa.Canal == CanalConversa.ChatSite)
-        {
-            // #2876: o widget lê a saída gravada pelo id "chatsite:..."; nada sai por provedor externo.
-            saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto,
-                CanalChatSite.PrefixoIdExterno + Guid.NewGuid().ToString("N"));
-            enviou = true;
-        }
-        else
-        try
-        {
-            var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
-            saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto, envio.Wamid);
-            enviou = true;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            logger.LogWarning(ex, "Agente de atendimento: falha ao enviar a resposta da conversa {ConversaId}.", conversa.Id);
-            saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto);
-            saida.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
-        }
-
-        // encerrar_conversa pode ter fechado a conversa neste turno: a despedida ainda vai para o histórico.
-        if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
-        await conversaRepository.AddMensagemAsync(saida, ct);
-        gravacao.UltimaSaidaId = saida.Id;
-        await gravacao.GravarAsync(ct);
-        return enviou;
-    }
-
     /// <summary>
     /// Entradas do cliente que ninguém respondeu ainda (#1288). A ordem por <c>EnviadaEm</c> não basta:
     /// a entrada usa o timestamp da Meta (truncado em segundos) e a resposta do agente o início do
@@ -540,52 +378,5 @@ public sealed class AgenteAtendimentoService(
         }
 
         return pendentes;
-    }
-
-    /// <summary>
-    /// Grava cada saída do turno logo depois do envio (#1791), junto com as entradas que o turno levou ao LLM
-    /// marcadas como processadas: o status e o eco da Meta encontram a mensagem pelo wamid, e um commit final que
-    /// falhe não faz o próximo job responder de novo. Falha aqui não derruba o envio: o que ficou rastreado vai no
-    /// commit seguinte.
-    /// </summary>
-    private sealed class GravacaoSaidaTurno(
-        IConversaRepository conversaRepository, IUnitOfWork unitOfWork, ILogger logger, Guid empresaId, IReadOnlyList<Mensagem> historico, DateTime agora)
-    {
-        private bool _entradasMarcadas;
-
-        public Guid EmpresaId => empresaId;
-        public DateTime Agora => agora;
-
-        /// <summary>S67: a última resposta que o turno gravou, para o registro do turno.</summary>
-        public Guid? UltimaSaidaId { get; set; }
-
-        public async Task GravarAsync(CancellationToken ct)
-        {
-            try
-            {
-                await MarcarProcessadasAsync(ct);
-                await unitOfWork.CommitAsync();
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                logger.LogWarning(ex, "Agente: falha ao gravar a saída já enviada; segue para o commit do fim do turno.");
-            }
-        }
-
-        /// <summary>
-        /// Marca no rastreamento, uma vez por turno, as entradas que foram ao LLM. O histórico vem sem tracking:
-        /// a entidade rastreada é buscada pelo <c>wamid</c>.
-        /// </summary>
-        public async Task MarcarProcessadasAsync(CancellationToken ct)
-        {
-            if (_entradasMarcadas) return;
-            foreach (var entrada in historico.Where(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is null))
-            {
-                if (entrada.ExternoId is not { } externoId) continue;
-                var rastreada = await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, externoId, ct);
-                rastreada?.MarcarProcessada(agora);
-            }
-            _entradasMarcadas = true;
-        }
     }
 }

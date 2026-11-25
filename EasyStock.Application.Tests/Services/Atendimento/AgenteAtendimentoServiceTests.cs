@@ -82,16 +82,26 @@ public partial class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, _log, _pedidos,
-        turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos),
+        _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
         modelos: Microsoft.Extensions.Options.Options.Create(_modelos));
 
     private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
-        limiteRespostas: Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }));
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _turnos,
+        Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }),
+        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos);
+
+    /// <summary>Contato da equipe (#2211, #2493): o serviço de sempre, com o aviso da equipe injetado.</summary>
+    private AgenteAtendimentoService CriarServicoComEquipe(EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada equipe) => new(
+        _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+        [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
+        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _turnos,
+        Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
+        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos, equipe);
 
     private void RespostasDoAgenteNaUltimaHora(int total) =>
         _conversaRepository.ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), Arg.Any<CancellationToken>())
@@ -1345,11 +1355,7 @@ public partial class AgenteAtendimentoServiceTests
         // #2211: a pessoa que recebe os avisos responde pelo número da loja; o robô não conversa com ela.
         var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
         equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
-        var servico = new AgenteAtendimentoService(
-            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
-            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+        var servico = CriarServicoComEquipe(equipe);
 
         var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
@@ -1367,11 +1373,7 @@ public partial class AgenteAtendimentoServiceTests
         equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
         _conversa.Assumir(Agora.AddMinutes(-5), Guid.NewGuid());
         _conversa.LiberarAutomatico();
-        var servico = new AgenteAtendimentoService(
-            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
-            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+        var servico = CriarServicoComEquipe(equipe);
 
         var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 

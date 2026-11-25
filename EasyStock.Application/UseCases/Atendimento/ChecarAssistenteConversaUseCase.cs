@@ -40,9 +40,9 @@ public sealed class ChecarAssistenteConversaUseCase(
     ICadernoRepository caderno,
     ObterDossieClienteUseCase dossies,
     IEnumerable<IFerramentaAgente> ferramentas,
-    IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
-    ITurnoAgenteRepository? turnos = null)
+    ITurnoAgenteRepository turnos,
+    IOptions<LimiteRespostasAgenteOptions> limiteRespostas,
+    IContatoDaEquipeAvisada? equipe = null)
 {
     public async Task<ChecagemAssistenteResult> ExecuteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -51,14 +51,13 @@ public sealed class ChecarAssistenteConversaUseCase(
         var conversa = dados.Conversa;
         var configuracao = await configuracoes.GetByEmpresaIdAsync(empresaId) ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
         var cliente = conversa.ClienteId is { } clienteId ? await clientes.GetByIdAsync(empresaId, clienteId) : null;
-        var portoes = new PortoesDoAssistente(llm, conversas, equipe, limiteRespostas);
+        var portoes = new PortoesDoAssistente(llm, conversas, turnos, limiteRespostas, equipe);
 
         var etapas = PortoesDoAssistente.DaConversa(conversa, agora).Select(e => ParaProximaMensagem(e, conversa))
             .Concat(await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
-            .Concat(PortoesDoAssistente.DaPessoa(cliente))
-            .Append(await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct))
-            .Append(await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct))
             .ToList();
+        await foreach (var etapa in portoes.EtapasDoClienteEDoCustoAsync(empresaId, conversaId, configuracao, cliente, agora, ct))
+            etapas.Add(etapa);
         var bloqueio = etapas.FirstOrDefault(e => e.Barra);
         var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
         var prompt = await GeracaoAgenteAtendimento.MontarSystemAsync(
