@@ -16,12 +16,17 @@ namespace EasyStock.ArchitectureTests;
 [Trait("Category", "Architecture")]
 public class ControleDeCustoDoAssistenteTests
 {
+    // O fim do turno (registro e envio) é interno ao Application: acha-se pelo nome, e o guarda falha alto se ele mudar.
+    private static readonly Type Finalizacao = typeof(AgenteAtendimentoService).Assembly
+        .GetType("EasyStock.Application.Services.Atendimento.FinalizacaoDoTurno", throwOnError: true)!;
+
     private static readonly Type[] TiposQueAplicamOCusto =
     [
         typeof(AgenteAtendimentoService),
         typeof(PortoesDoAssistente),
         typeof(RespostaSemIa),
         typeof(ChecarAssistenteConversaUseCase),
+        Finalizacao,
     ];
 
     private static readonly Type[] RegrasDeCusto =
@@ -60,5 +65,7 @@ public class ControleDeCustoDoAssistenteTests
             porTipo[tipo].Should().Contain(typeof(IOptions<LimiteRespostasAgenteOptions>), $"{tipo.Name} aplica o limite de respostas");
         foreach (var tipo in new[] { typeof(PortoesDoAssistente), typeof(RespostaSemIa), typeof(ChecarAssistenteConversaUseCase) })
             porTipo[tipo].Should().Contain(typeof(ITurnoAgenteRepository), $"{tipo.Name} aplica a cota do mês");
+        porTipo[Finalizacao].Should().Contain(typeof(ITurnoAgenteRepository)).And.Contain(typeof(IOptions<PrecosModelosAgenteOptions>),
+            "o fim do turno registra o turno com o custo estimado");
     }
 }
