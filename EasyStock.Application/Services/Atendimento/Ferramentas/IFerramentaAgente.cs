@@ -77,7 +77,14 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
 
     public void RegistrarEncaminhamento() => Encaminhou = true;
 
-    public void RegistrarRespostaVerificada(string texto) => RespostaVerificada = texto;
+    /// <summary>
+    /// #3340 (R2I-03): cada ferramenta do turno soma o que o cliente deve receber; a seguinte não apaga o link anterior.
+    /// </summary>
+    public void RegistrarRespostaVerificada(string texto)
+    {
+        if (RespostaVerificada is null) RespostaVerificada = texto;
+        else if (!RespostaVerificada.Contains(texto, StringComparison.Ordinal)) RespostaVerificada = $"{RespostaVerificada}\n\n{texto}";
+    }
 
     public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;
 

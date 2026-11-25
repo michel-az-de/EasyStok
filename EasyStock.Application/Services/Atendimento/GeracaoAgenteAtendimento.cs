@@ -293,13 +293,30 @@ public static class GeracaoAgenteAtendimento
 
     private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
+    // #3340 (R2I-02): recusa é o JSON com "erro" ou com "linkGerado":false, o que as ferramentas devolvem quando não fazem o que foi pedido.
+    private static bool FerramentaRecusou(string resultado)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(resultado);
+            var raiz = doc.RootElement;
+            if (raiz.ValueKind != System.Text.Json.JsonValueKind.Object) return false;
+            return raiz.TryGetProperty("erro", out _)
+                || (raiz.TryGetProperty("linkGerado", out var link) && link.ValueKind == System.Text.Json.JsonValueKind.False);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
     private static async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
         BlocoUsoFerramentaLlm uso, ILogger logger, CancellationToken ct)
     {
-        contexto.LimparRespostaVerificada();
         if (!ferramentas.TryGetValue(uso.Nome, out var ferramenta))
         {
+            contexto.LimparRespostaVerificada();
             contexto.RegistrarFalhaDeFerramenta();
             return new BlocoResultadoFerramentaLlm(uso.Id, $"Ferramenta desconhecida: {uso.Nome}.", EhErro: true);
         }
@@ -307,6 +324,13 @@ public static class GeracaoAgenteAtendimento
         try
         {
             var resultado = await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct);
+            // #3340 (R2I-02): recusa devolvida pela ferramenta é falha: o "já enviei" do modelo não sai ao cliente.
+            if (FerramentaRecusou(resultado))
+            {
+                contexto.LimparRespostaVerificada();
+                contexto.RegistrarFalhaDeFerramenta();
+                return new BlocoResultadoFerramentaLlm(uso.Id, resultado, EhErro: true);
+            }
             contexto.ResultadosDasFerramentas.Add(resultado);
             return new BlocoResultadoFerramentaLlm(uso.Id, resultado);
         }
