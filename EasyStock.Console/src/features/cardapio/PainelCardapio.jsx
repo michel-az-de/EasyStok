@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
+import { AjusteLargura } from '../../componentes/AjusteLargura'
 import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
@@ -643,6 +644,9 @@ export function PainelCardapio({
     }
     : null
 
+  // #3322: a alça e o botão Largura usam os mesmos limites e a mesma função.
+  const limitesLargura = { min: LARGURA_MINIMA, max: larguraMaxima, padrao: Math.min(460, larguraMaxima) }
+
   return (
     <aside
       className={`${css.painel} ${ladoDoBalcao ? css.painelDoBalcao : ''}`}
@@ -654,7 +658,7 @@ export function PainelCardapio({
         valor={largura}
         min={LARGURA_MINIMA}
         max={larguraMaxima}
-        padrao={Math.min(460, larguraMaxima)}
+        padrao={limitesLargura.padrao}
         invertida={!ladoDoBalcao}
         aoMudar={aoRedimensionar}
       />
@@ -668,6 +672,7 @@ export function PainelCardapio({
             {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar ao pedido.</p>}
           </div>
           <div className={css.ferramentasPainel}>
+            <AjusteLargura nome="do cardápio" valor={largura} {...limitesLargura} aoMudar={aoRedimensionar} />
             {/* #1806: lado e tamanho do painel, lembrados por aparelho. Só ícone para caber nos
                 440 px do painel ao lado do título; o nome vai no aria-label e no title. */}
             {aoTrocarLado && (
