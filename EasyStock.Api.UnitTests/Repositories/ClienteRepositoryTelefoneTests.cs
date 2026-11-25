@@ -167,5 +167,53 @@ public sealed class ClienteRepositoryTelefoneTests : IDisposable
         (await _repo.FindByTelefoneAsync(_empresaId, "11997573992")).Should().BeNull();
     }
 
+    // Revisão da #3350 (A2): a trava de telefone compartilhado enxerga as mesmas grafias que a busca. Dois cadastros que só
+    // casam pelas formas novas (mascarados) são duas pessoas no mesmo número: a conversa não pode ir ao mais antigo sem aviso.
+    private static readonly string[] GrafiasDoWaId = ["+5511997573992", "5511997573992", "11997573992"];
+
+    [Fact]
+    public async Task DoisCadastrosMascaradosNoMesmoNumeroSaoTelefoneCompartilhado()
+    {
+        await GravarAsync(_empresaId, "(11) 99757-3992");
+        await GravarAsync(_empresaId, "11 99757-3992");
+
+        (await _repo.TemTelefoneCompartilhadoAsync(_empresaId, GrafiasDoWaId, [])).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CadastroExatoUnicoVenceOMascaradoEnaoEhCompartilhado()
+    {
+        await GravarAsync(_empresaId, "+5511997573992");
+        await GravarAsync(_empresaId, "(11) 99757-3992");
+
+        (await _repo.TemTelefoneCompartilhadoAsync(_empresaId, GrafiasDoWaId, [])).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UmCadastroMascaradoSoNaoEhCompartilhado()
+    {
+        await GravarAsync(_empresaId, "(11) 99757-3992");
+
+        (await _repo.TemTelefoneCompartilhadoAsync(_empresaId, GrafiasDoWaId, [])).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task MascaradoDeOutraEmpresaNaoContaNoCompartilhado()
+    {
+        await GravarAsync(_empresaId, "(11) 99757-3992");
+        await GravarAsync(Guid.NewGuid(), "11 99757-3992");
+
+        (await _repo.TemTelefoneCompartilhadoAsync(_empresaId, GrafiasDoWaId, [])).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DoisMascaradosNaListaDeTelefonesSaoCompartilhado()
+    {
+        await GravarAsync(_empresaId, "1133334444", outroNumero: "(11) 99757-3992");
+        await GravarAsync(_empresaId, "1144445555", outroNumero: "11-99757.3992");
+
+        (await _repo.TemTelefoneCompartilhadoAsync(_empresaId, GrafiasDoWaId, [])).Should().BeTrue();
+    }
+
     public void Dispose() => _db.Dispose();
 }

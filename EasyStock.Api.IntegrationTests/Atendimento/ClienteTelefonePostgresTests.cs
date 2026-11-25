@@ -44,10 +44,7 @@ public sealed class ClienteTelefonePostgresTests : IAsyncLifetime
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         await using var db = NovoContexto();
         var agora = DateTime.UtcNow;
-        db.Empresas.Add(new Empresa
-        {
-            Id = EmpresaId, Nome = "Empresa Telefone", Documento = EmpresaId.ToString("N")[..14], CriadoEm = agora, AlteradoEm = agora,
-        });
+        SemearEmpresa(db, agora);
         var recente = Cadastro("Recente", "11 99757-3992", agora);
         var antigo = Cadastro("Antigo", "(11) 99757-3992", agora.AddDays(-30));
         var identico = Cadastro("Identico", "1133334444", agora.AddDays(-1), outroNumero: "+5511997573992");
@@ -78,6 +75,40 @@ public sealed class ClienteTelefonePostgresTests : IAsyncLifetime
             .Should().Be(fixo.Id, "telefone fixo casa com fixo");
         (await repo.FindByTelefoneAsync(EmpresaId, "+5521997573992")).Should().BeNull("DDD diferente é outra pessoa");
     }
+
+    // Revisão da #3350 (A2): a trava de telefone compartilhado usa a mesma equivalência da busca, traduzida pelo Npgsql.
+    [SkippableFact]
+    public async Task DoisCadastrosEmGrafiasDiferentesSaoTelefoneCompartilhado()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var db = NovoContexto();
+        var agora = DateTime.UtcNow;
+        SemearEmpresa(db, agora);
+        string[] grafias = ["+5511997573992", "5511997573992", "11997573992"];
+        var ana = Cadastro("Ana", "(11) 99757-3992", agora.AddDays(-30));
+        db.Clientes.Add(ana);
+        await db.SaveChangesAsync();
+        var repo = new ClienteRepository(db);
+
+        (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
+            .Should().BeFalse("um cadastro mascarado só resolve a conversa");
+
+        db.Clientes.Add(Cadastro("Bruno", "11 99757-3992", agora));
+        await db.SaveChangesAsync();
+        (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
+            .Should().BeTrue("duas pessoas no mesmo número, em grafias diferentes, pedem conferência");
+
+        db.Clientes.Add(Cadastro("Carla", "1133334444", agora, outroNumero: "(11) 99757-3992"));
+        await db.SaveChangesAsync();
+        (await repo.TemTelefoneCompartilhadoAsync(EmpresaId, grafias, []))
+            .Should().BeTrue("o número na lista de telefones também conta");
+    }
+
+    private static void SemearEmpresa(EasyStockDbContext db, DateTime agora) =>
+        db.Empresas.Add(new Empresa
+        {
+            Id = EmpresaId, Nome = "Empresa Telefone", Documento = EmpresaId.ToString("N")[..14], CriadoEm = agora, AlteradoEm = agora,
+        });
 
     private EasyStockDbContext NovoContexto()
     {

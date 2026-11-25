@@ -236,12 +236,25 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         public async Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
-            IReadOnlyList<string> hashes, CancellationToken ct = default) =>
-            await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
+            IReadOnlyList<string> hashes, CancellationToken ct = default)
+        {
+            var identicos = await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
                 && ((c.TelefoneHash != null && hashes.Contains(c.TelefoneHash))
                     || (c.Telefone != null && telefones.Contains(c.Telefone))
                     || c.Telefones.Any(t => telefones.Contains(t.Numero))))
+                .Select(c => c.Id).Take(2).CountAsync(ct);
+            // Cadastro idêntico vence na busca: um só resolve, dois são compartilhado.
+            if (identicos > 0) return identicos > 1;
+
+            // #3341: sem idêntico, a busca cai nas outras grafias (mascarada). Dois cadastros assim são duas pessoas no
+            // mesmo número, e a conversa não pode ir ao mais antigo sem aviso (a mesma equivalência da busca).
+            var formas = telefones.SelectMany(TelefoneE164.FormasDeBusca).Distinct().ToArray();
+            if (formas.Length == 0) return false;
+            return await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
+                && ((c.Telefone != null && formas.Contains(c.Telefone.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))
+                    || c.Telefones.Any(t => formas.Contains(t.Numero.Replace("(", "").Replace(")", "").Replace("+", "").Replace("-", "").Replace(".", "").Replace(" ", "")))))
                 .Select(c => c.Id).Take(2).CountAsync(ct) > 1;
+        }
 
         public Task AddAsync(Cliente cliente) { db.Clientes.Add(cliente); return Task.CompletedTask; }
         public Task UpdateAsync(Cliente cliente) { db.Clientes.Update(cliente); return Task.CompletedTask; }
