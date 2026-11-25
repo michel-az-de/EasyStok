@@ -33,7 +33,8 @@
 # de proposito a uma versao anterior so com --rollback, que exige motivo e
 # confirmacao. Tambem recusa rodar a partir de uma copia deste script diferente
 # da do origin/master (worktree antigo). Cada execucao grava uma linha em
-# $BUILD_ROOT/deploy-history.log na VPS: data, modo, sha, rc, quem, motivo, imagens (pull ou build), dur (s) e digests (16 hex por imagem puxada).
+# $BUILD_ROOT/deploy-history.log na VPS: data, modo, sha, rc, quem, motivo, imagens (pull ou build), dur (s na VPS), digests (16 hex por imagem puxada) e
+# espera (s que o script esperou o build-images antes de ir a VPS; dur + espera e o relogio do deploy).
 #
 # Uso:
 #   scripts/deploy/vps-deploy.sh                 # origin/master
@@ -58,7 +59,7 @@
 # WPP_CONTAINER (easystok-wppconnect-1, a ponte que o deploy so verifica, #3117),
 # ESPELHO_URL ($VPS_HOST:git/EasyStok.git, espelho bare da #2958),
 # REGISTRO (ghcr.io/michel-az-de, dono das imagens easystok-<svc>), ESPERA_IMAGENS
-# (600 s de teto para esperar o build-images; 0 nao espera) e ESPERA_PASSO (10 s).
+# (600 s de teto para esperar o build-images; 0 nao espera) e ESPERA_PASSO (4 s).
 # =============================================================================
 set -euo pipefail
 
@@ -76,7 +77,7 @@ RETEM_PREV="${RETEM_PREV:-3}"
 CACHE_TETO="${CACHE_TETO:-10GB}"
 REGISTRO="${REGISTRO:-ghcr.io/michel-az-de}"
 ESPERA_IMAGENS="${ESPERA_IMAGENS:-600}"
-ESPERA_PASSO="${ESPERA_PASSO:-10}"
+ESPERA_PASSO="${ESPERA_PASSO:-4}"
 SERVICES="api worker web"
 
 uso() { echo "ERRO: $*" >&2; sed -n '/^# Uso:/,/^# Saidas:/p' "$0" | sed '$d; s/^# \{0,1\}//' >&2; exit 2; }
@@ -106,9 +107,9 @@ read -r -d '' REMOTE <<'REMOTE_EOF' || true
 set -euo pipefail
 registra() {
   local rc=$?
-  # #3323: tres colunas novas no fim (imagens do deploy, segundos na VPS e digests puxados); as seis antigas ficam onde estavam.
-  printf '%s\t%s\t%s\trc=%s\t%s\t%s\timagens=%s\tdur=%ss\tdigests=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODO" "$SHA" "$rc" "$QUEM" "$MOTIVO" \
-    "${IMAGENS:-build}" "$SECONDS" "${DIGESTS:--}" >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true
+  # #3323: quatro colunas novas no fim (imagens do deploy, segundos na VPS, digests puxados e espera local pelo CI); as seis antigas ficam onde estavam.
+  printf '%s\t%s\t%s\trc=%s\t%s\t%s\timagens=%s\tdur=%ss\tdigests=%s\tespera=%ss\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MODO" "$SHA" "$rc" "$QUEM" "$MOTIVO" \
+    "${IMAGENS:-build}" "$SECONDS" "${DIGESTS:--}" "${ESPERA_S:-0}" >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true
 }
 trap registra EXIT
 exec 9>/tmp/easystok-deploy.lock
@@ -218,7 +219,7 @@ healthy() {
       return 1
     fi
     [ "$ok" = 1 ] && return 0
-    sleep 5
+    sleep 2
   done
   return 1
 }
@@ -355,7 +356,7 @@ if [ "$ROLLBACK" = 1 ] && [ "$DRY_RUN" = 0 ]; then
 fi
 
 # --- imagens (#3323): puxa do GHCR o que o build-images publicou para o sha; build na VPS e o fallback.
-IMAGENS=build ESPEROU=0
+IMAGENS=build ESPEROU=0 ESPERA_S=0
 registro_tem() { # $1 = servico; 0 se o GHCR tem a imagem do sha (repo publico: pull anonimo)
   local repo="${REGISTRO#ghcr.io/}/easystok-$1" tok
   tok="$(curl -fsS --max-time 8 "https://ghcr.io/token?scope=repository:$repo:pull" 2>/dev/null | sed -n 's/.*"token" *: *"\([^"]*\)".*/\1/p')" || return 1
@@ -382,7 +383,7 @@ espera_build_ci() {
       "") echo "    imagens: sem run do build-images para $SHA; build na VPS"; return 0 ;;
       "completed cancelled") echo "    imagens: build-images cancelado (push mais novo no master?); build na VPS"; return 0 ;;
       "completed success") sem_imagem=$(( sem_imagem + 1 ))
-        [ "$sem_imagem" -le 6 ] || { echo "    imagens: build-images ok, mas o GHCR nao mostra o sha; build na VPS"; return 0; } ;;
+        [ "$sem_imagem" -le 15 ] || { echo "    imagens: build-images ok, mas o GHCR nao mostra o sha; build na VPS"; return 0; } ;;
       completed*) echo "    imagens: build-images terminou '${st#completed }'; build na VPS"; return 0 ;;
     esac
     [ "$SECONDS" -lt "$fim" ] || { echo "    imagens: teto de ${ESPERA_IMAGENS}s; build na VPS"; return 0; }
@@ -398,7 +399,9 @@ escolhe_imagens() {
     echo "    imagens: build na VPS (o GHCR nao tem $SHA e nao ha build do master para esperar)"; return 0
   fi
   if [ "$DRY_RUN" = 1 ]; then echo "    imagens: o GHCR ainda nao tem $SHA; o deploy esperaria o build-images (teto ${ESPERA_IMAGENS}s)"; return 0; fi
+  local t0=$SECONDS
   espera_build_ci
+  ESPERA_S=$(( SECONDS - t0 ))
 }
 escolhe_imagens
 # Durante a espera o master pode ter avancado (e o cancel-in-progress do build-images cancela o sha antigo):
@@ -422,7 +425,7 @@ fi
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
 ENVS="$ENVS BACKUP_HOOK=$BACKUP_HOOK WPP_CONTAINER=$WPP_CONTAINER"
-ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
+ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES' ESPERA_S=$ESPERA_S"
 ENVS="$ENVS RETEM_PREV=$RETEM_PREV CACHE_TETO=$CACHE_TETO"
 ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"
 
