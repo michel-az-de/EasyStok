@@ -621,6 +621,10 @@ await confere('A. tela: nenhuma letra se perde quando o despacho atrasado volta 
 
 await confere('A. tela: Enter envia o que está no campo sem esperar a pausa, e o campo limpa', naTela(atendimento, async (t) => {
   const id = t.estado.selecionadaId
+  // #3282: a conversa da demonstração é do Assistente e a 1a vez da sessão pergunta antes de assumir; aqui a
+  // pessoa já confirmou nesta sessão (a pergunta em si é provada em prova-2134).
+  guardado.set('easystok.sessao', JSON.stringify({ token: 'prova', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' }, usuario: { id: 'u1' } }))
+  guardado.set('easystok.confirmouEnviarAssumindo.v1:empresa:u1', '1')
   for (const texto of FRASE) t.teclar(texto)
   t.evento('onKeyDown', { key: 'Enter', shiftKey: false })
   await assentar()

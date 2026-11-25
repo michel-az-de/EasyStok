@@ -191,7 +191,8 @@ await confere('A6  balão com no máximo 75 %, cor própria de saída e ponta po
 await confere('A7  já atende: com texto ou anexo o botão é "Enviar"; vazio, é o microfone', () => {
   const composer = fonte('features/atendimento/Composer.jsx')
   assert.match(composer, /\{temTexto \|\| anexo \|\| !acoes\.audio \? \(/)
-  assert.match(composer, /aria-label="Enviar mensagem"[\s\S]*?>Enviar<\/Botao>/)
+  // #3282: com o Assistente atendendo o botão diz que assume; o nome acessível contém o texto visível (WCAG 2.5.3).
+  assert.match(composer, /aria-label=\{enviaAssumindo \? 'Enviar e assumir a conversa' : 'Enviar mensagem'\}[\s\S]*?>\{enviaAssumindo \? 'Enviar e assumir' : 'Enviar'\}<\/Botao>/)
   // #2185 (R15): o microfone tem ícone e palavra ("Gravar"), na largura do Enviar; o nome acessível segue.
   assert.match(composer, /aria-label="Gravar áudio"[\s\S]*?icone="mic"[\s\S]*?>Gravar<\/Botao>/)
 })
