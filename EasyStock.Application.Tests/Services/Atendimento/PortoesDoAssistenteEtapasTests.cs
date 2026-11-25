@@ -125,7 +125,6 @@ public class PortoesDoAssistenteEtapasTests
         var etapas = await Todas(Liberado());
 
         etapas.Select(e => e.Codigo).Should().Equal(CodigosDoCatalogo);
-        etapas[0].Codigo.Should().Be(PortoesDoAssistente.Situacao);
         etapas[0].Barra.Should().BeTrue();
         await _llm.Received(1).DisponivelAsync(_empresaId, Arg.Any<CancellationToken>());
         await _conversas.Received(1).ContarRespostasDoAgenteDesdeAsync(
@@ -136,6 +135,8 @@ public class PortoesDoAssistenteEtapasTests
     [Fact]
     public async Task ConversaQueBarra_QuemParaNaPrimeira_NaoLeALojaNemOResto()
     {
+        // O contrato da preguiça no primeiro portão. A retomada filtra "situacao" e para em "vinculo" ou "janela", que
+        // Ordem_Retomada_* cobre pelo serviço.
         _conversa.Assumir(Agora.AddMinutes(-1), Guid.NewGuid());
 
         var barrou = await AtePrimeiraQueBarra(Liberado());

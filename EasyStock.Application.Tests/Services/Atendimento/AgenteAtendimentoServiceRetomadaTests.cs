@@ -6,6 +6,7 @@ using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -21,7 +22,12 @@ public partial class AgenteAtendimentoServiceTests
 
     private const string Encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
 
-    private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais)
+    private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais) =>
+        CriarServicoComRetomada(null, segundos, adicionais);
+
+    /// <summary>Com o contato da equipe que o grupo da loja consulta; sem ele, o portão da equipe não se aplica.</summary>
+    private AgenteAtendimentoService CriarServicoComRetomada(
+        IContatoDaEquipeAvisada? equipe, int segundos = 60, params IFerramentaAgente[] adicionais)
     {
         // A retomada decide dentro de uma transação, com a conversa travada.
         _unitOfWork.ExecuteInTransactionSemRetryAsync(
@@ -32,7 +38,7 @@ public partial class AgenteAtendimentoServiceTests
             [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-            Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
+            Microsoft.Extensions.Options.Options.Create(_precos), _pedidos, equipe,
             eventos: _eventos, retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
     }
 

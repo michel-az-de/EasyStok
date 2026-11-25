@@ -1,7 +1,5 @@
-using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Notifications;
-using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -9,8 +7,9 @@ namespace EasyStock.Application.Tests.Services.Atendimento;
 
 /// <summary>
 /// #3356 (R11): a ordem dos portões medida por fora, no turno e na retomada. O turno e a retomada leem cada grupo (conversa,
-/// loja, pessoa, limite, cota) só se o anterior passou, e o primeiro portão que barra decide. Estes testes valem antes e
-/// depois de a retomada passar a pedir a ordem a <c>PortoesDoAssistente.EtapasAsync</c>.
+/// loja, pessoa, limite, cota) só se o anterior passou, e o primeiro portão que barra decide. Não dependem de
+/// <c>PortoesDoAssistente.EtapasAsync</c>: fixam o que se vê por fora (as leituras e o portão que decide) e passam com a
+/// ordem montada à mão ou pedida a ele.
 /// </summary>
 public partial class AgenteAtendimentoServiceTests
 {
@@ -21,24 +20,8 @@ public partial class AgenteAtendimentoServiceTests
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(desligada);
     }
 
-    private AgenteAtendimentoService OrdemServicoDeRetomada(IContatoDaEquipeAvisada equipe)
-    {
-        // A retomada decide dentro de uma transação, com a conversa travada.
-        _unitOfWork.ExecuteInTransactionSemRetryAsync(
-                Arg.Any<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>(), Arg.Any<CancellationToken>())
-            .Returns(c => c.Arg<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>()(c.Arg<CancellationToken>()));
-        return new(
-            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
-            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-            Microsoft.Extensions.Options.Options.Create(_precos), _pedidos, equipe,
-            eventos: _eventos,
-            retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = 60 }));
-    }
-
     private Task<ResultadoTurnoAgente> OrdemRetomar(IContatoDaEquipeAvisada equipe, DateTime? agora = null) =>
-        OrdemServicoDeRetomada(equipe).ProcessarTurnoAsync(_empresaId, _conversa.Id, agora ?? Agora, retomada: true);
+        CriarServicoComRetomada(equipe).ProcessarTurnoAsync(_empresaId, _conversa.Id, agora ?? Agora, retomada: true);
 
     /// <summary>A retomada foi dispensada pelo portão: a conversa fica com a equipe, o modelo não roda e a mensagem não volta.</summary>
     private async Task OrdemRetomadaDispensadaPor(ResultadoTurnoAgente resultado, Mensagem entrada, string portao)
@@ -57,6 +40,7 @@ public partial class AgenteAtendimentoServiceTests
     public async Task Ordem_Turno_ConversaQueBarra_NaoLeAConfiguracaoNemAEquipeNemOCliente()
     {
         _conversa.Assumir(Agora.AddMinutes(-1), Guid.NewGuid());
+        ClienteVinculado(_ => { });
 
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
@@ -168,6 +152,33 @@ public partial class AgenteAtendimentoServiceTests
         await equipe.Received(1).EhInscritoAsync(_empresaId, Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _conversaRepository.DidNotReceiveWithAnyArgs().ContarRespostasDoAgenteDesdeAsync(default, default, default, default);
         await _turnos.DidNotReceiveWithAnyArgs().SomarAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task Ordem_Retomada_ModeloIndisponivel_BarraNoModelo_SemLerOCusto()
+    {
+        var entrada = EscaladaPeloRoboHa(AlemDoPrazo);
+        _llm.DisponivelAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(false);
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
+
+        var resultado = await OrdemRetomar(Substitute.For<IContatoDaEquipeAvisada>());
+
+        await OrdemRetomadaDispensadaPor(resultado, entrada, PortoesDoAssistente.Modelo);
+        await _conversaRepository.DidNotReceiveWithAnyArgs().ContarRespostasDoAgenteDesdeAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task Ordem_Retomada_ContatoDaEquipe_BarraNaEquipe_SemLerOCusto()
+    {
+        var entrada = EscaladaPeloRoboHa(AlemDoPrazo);
+        var equipe = Substitute.For<IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(default, default, default).ReturnsForAnyArgs(true);
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
+
+        var resultado = await OrdemRetomar(equipe);
+
+        await OrdemRetomadaDispensadaPor(resultado, entrada, PortoesDoAssistente.Equipe);
+        await _conversaRepository.DidNotReceiveWithAnyArgs().ContarRespostasDoAgenteDesdeAsync(default, default, default, default);
     }
 
     [Fact]

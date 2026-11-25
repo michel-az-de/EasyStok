@@ -191,8 +191,9 @@ public sealed class PortoesDoAssistente(
 
     /// <summary>
     /// #3298 (R11): a pessoa, o limite de respostas e a cota do mês, nesta ordem, e só até onde alguém consome: quem para na
-    /// primeira que barra (<see cref="PrimeiraQueBarraDoClienteEDoCustoAsync"/>) não lê o banco das seguintes, e a checagem
-    /// do console lê todas. A ordem mora aqui, para o turno, a retomada, a resposta sem modelo e a tela não divergirem.
+    /// primeira que barra (<see cref="PrimeiraQueBarraDoClienteEDoCustoAsync"/>, do turno e da resposta sem modelo) não lê o
+    /// banco das seguintes. A retomada e a tela leem as três por <see cref="EtapasAsync"/>, depois da conversa e da loja. A
+    /// ordem destas três mora aqui; a dos cinco grupos, em <see cref="EtapasAsync"/>.
     /// </summary>
     public async IAsyncEnumerable<EtapaAssistente> EtapasDoClienteEDoCustoAsync(
         Guid empresaId, Guid conversaId, ConfiguracaoAtendimento configuracao, Cliente? cliente, DateTime agora,
@@ -219,8 +220,10 @@ public sealed class PortoesDoAssistente(
     /// #3356 (R11): todas as etapas na ordem do <see cref="Catalogo"/> (conversa, loja, pessoa, limite e cota), lidas só
     /// quando quem consome chega nelas: a tela consome até o fim, a retomada para na primeira que barra e não lê o grupo
     /// seguinte. A preguiça é entre grupos; o da loja sai inteiro (modelo, canal e contato da equipe), como no turno. O
-    /// turno segue em etapas de propósito: entre um grupo e outro ele lê a mensagem, a configuração e o cadastro e, ao
-    /// barrar, escala com o motivo do portão.
+    /// turno e a resposta sem modelo seguem em etapas de propósito: leem a configuração e o cadastro só depois de o grupo
+    /// anterior passar e, no turno, ainda conferem se há o que responder (as entradas pendentes antes da loja, a conversação
+    /// montada antes do cadastro) e ignoram sem escalar quando não há. Numa chamada só, a loja e o cadastro poderiam escalar
+    /// uma conversa que não tinha o que responder.
     /// </summary>
     public async IAsyncEnumerable<EtapaAssistente> EtapasAsync(
         Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, Cliente? cliente, DateTime agora,

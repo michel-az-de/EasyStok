@@ -189,6 +189,19 @@ public class ChecarAssistenteConversaUseCaseTests
     }
 
     [Fact]
+    public async Task OTokenDeQuemChama_ChegaAoModeloAoContatoEAoBanco()
+    {
+        // #3356 (R11): a tela pede as etapas a PortoesDoAssistente.EtapasAsync, e o token tem de chegar às leituras dele.
+        using var origem = new CancellationTokenSource();
+
+        await CriarUseCase().ExecuteAsync(_empresaId, _conversa.Id, Agora, origem.Token);
+
+        await _llm.Received().DisponivelAsync(_empresaId, origem.Token);
+        await _equipe.Received().EhInscritoAsync(_empresaId, Arg.Any<string?>(), origem.Token);
+        await _conversas.Received().ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), origem.Token);
+    }
+
+    [Fact]
     public async Task ConversaDeOutraEmpresa_NaoEncontrada()
     {
         var acao = () => CriarUseCase().ExecuteAsync(Guid.NewGuid(), _conversa.Id, Agora);
