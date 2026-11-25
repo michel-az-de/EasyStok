@@ -67,7 +67,7 @@ public class CriarPedidoFerramentaTests
             var dossie = new ObterDossieClienteUseCase(Clientes, Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), Conversas);
             return new AgenteAtendimentoService(llm, Conversas, Checkout.ConfiguracaoAtendimentoRepo, Clientes,
-                [Ferramenta], Substitute.For<IEscaladorConversa>(), cloud, Substitute.For<IUsoIaRepository>(), Uow,
+                [Ferramenta], Substitute.For<IEscaladorConversa>(), cloud, Uow,
                 dossie, Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
         }
 

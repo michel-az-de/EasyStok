@@ -32,7 +32,6 @@ public partial class AgenteAtendimentoServiceTests
     private readonly IDomicilioQueries _domicilio = Substitute.For<IDomicilioQueries>();
     private readonly IEscaladorConversa _escalador = Substitute.For<IEscaladorConversa>();
     private readonly IWhatsAppCloudClient _cloudClient = Substitute.For<IWhatsAppCloudClient>();
-    private readonly IUsoIaRepository _usoIaRepository = Substitute.For<IUsoIaRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IFerramentaAgente _consultarPedido = Substitute.For<IFerramentaAgente>();
     private readonly ICadernoRepository _caderno = Substitute.For<ICadernoRepository>();
@@ -81,7 +80,7 @@ public partial class AgenteAtendimentoServiceTests
 
     private AgenteAtendimentoService CriarServico(params IFerramentaAgente[] adicionais) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-        [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, _log, _pedidos,
         turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos),
@@ -89,7 +88,7 @@ public partial class AgenteAtendimentoServiceTests
 
     private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-        [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
         limiteRespostas: Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }));
@@ -153,7 +152,7 @@ public partial class AgenteAtendimentoServiceTests
         await _consultarPedido.DidNotReceiveWithAnyArgs().ExecutarAsync(default!, default, default);
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
         await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
-        await _usoIaRepository.Received(1).AddAsync(Arg.Any<UsoIa>());
+        TurnoGravado().Desfecho.Should().Be(DesfechoTurnoAgente.Interrompido);
     }
 
     [Fact]
@@ -261,8 +260,8 @@ public partial class AgenteAtendimentoServiceTests
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente && m.ExternoId == "wamid.out1"),
             Arg.Any<CancellationToken>());
-        await _usoIaRepository.Received(1).AddAsync(Arg.Is<UsoIa>(u =>
-            u.EmpresaId == _empresaId && u.TotalGeracoes == 1 && u.TotalTokens == 210));
+        // #3291 (D2): o consumo do turno mora no registro dele; o agregado mensal saiu do caminho.
+        TurnoGravado().TotalTokens.Should().Be(210);
         await _unitOfWork.Received().CommitAsync();
     }
 
@@ -1135,7 +1134,7 @@ public partial class AgenteAtendimentoServiceTests
         await _conversaRepository.DidNotReceive().AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente), Arg.Any<CancellationToken>());
         await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
-        await _usoIaRepository.Received(1).AddAsync(Arg.Any<UsoIa>());
+        TurnoGravado().Desfecho.Should().Be(DesfechoTurnoAgente.Interrompido);
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -1348,7 +1347,7 @@ public partial class AgenteAtendimentoServiceTests
         equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
         var servico = new AgenteAtendimentoService(
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
 
@@ -1370,7 +1369,7 @@ public partial class AgenteAtendimentoServiceTests
         _conversa.LiberarAutomatico();
         var servico = new AgenteAtendimentoService(
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            [_consultarPedido], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
 

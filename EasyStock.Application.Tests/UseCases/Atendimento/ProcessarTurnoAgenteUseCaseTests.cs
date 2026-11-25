@@ -37,7 +37,7 @@ public class ProcessarTurnoAgenteUseCaseTests
         var agente = new AgenteAtendimentoService(
             llm, _conversaRepository, Substitute.For<IConfiguracaoAtendimentoRepository>(), clientes,
             [], _escalador, Substitute.For<IWhatsAppCloudClient>(),
-            Substitute.For<IUsoIaRepository>(), _unitOfWork,
+            _unitOfWork,
             new ObterDossieClienteUseCase(clientes, Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversaRepository),
             Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
