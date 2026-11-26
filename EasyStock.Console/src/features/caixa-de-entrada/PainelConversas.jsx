@@ -123,7 +123,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     destravarRef.current = setTimeout(() => setOrdemCongelada(null), 300)
   }
 
-  const lista = useMemo(() => {
+  const listaBase = useMemo(() => {
     if (!ordemCongelada) return visiveis
     const porId = new Map(visiveis.map((c) => [c.id, c]))
     const congeladas = new Set(ordemCongelada)
@@ -131,6 +131,47 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     const novas = visiveis.filter((c) => !congeladas.has(c.id))
     return [...ordenada, ...novas]
   }, [visiveis, ordemCongelada])
+
+  // #3363 (S4): responder muda o motivo e a hora da conversa aberta e, sem isto, o cartão dela sai do lugar e os de baixo
+  // sobem de uma vez (hoje 365 px e 6 × 93,2 px). Só o cartão da conversa aberta é preso: fica logo abaixo do vizinho que
+  // tinha (ou no mesmo índice, se o vizinho saiu), atenuado se já não pertence a esta lista, até a troca de conversa. O resto
+  // da lista ordena e recebe as novas como sempre. Mudar aba, canal, busca, ordem ou responsável recomeça a conta, e a âncora
+  // é refeita se nasceu antes de a conversa estar na lista (primeira carga, aberta por fora). Estado no render, como `buscaVista`.
+  const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
+  const [ancora, setAncora] = useState(null)
+  const indiceNaBase = selecionadaId == null ? -1 : listaBase.findIndex((c) => c.id === selecionadaId)
+  const ancoraValeu = ancora?.id === selecionadaId && ancora.chave === chaveDaLista && !(ancora.indice < 0 && indiceNaBase >= 0)
+  if (!ancoraValeu && (selecionadaId != null || ancora != null)) {
+    setAncora(selecionadaId == null ? null : { id: selecionadaId, chave: chaveDaLista, indice: indiceNaBase, acima: indiceNaBase > 0 ? listaBase[indiceNaBase - 1].id : null })
+  }
+  const lista = useMemo(() => {
+    if (!ancoraValeu || ancora.indice < 0) return listaBase
+    const aberta = listaBase.find((c) => c.id === selecionadaId) ?? conversas.find((c) => c.id === selecionadaId)
+    if (!aberta) return listaBase
+    const resto = listaBase.filter((c) => c.id !== selecionadaId)
+    const abaixoDe = ancora.acima == null ? -1 : resto.findIndex((c) => c.id === ancora.acima)
+    const posicao = ancora.acima == null ? 0 : abaixoDe >= 0 ? abaixoDe + 1 : Math.min(ancora.indice, resto.length)
+    return [...resto.slice(0, posicao), aberta, ...resto.slice(posicao)]
+  }, [listaBase, ancora, ancoraValeu, selecionadaId, conversas])
+  const foraDaLista = ancoraValeu && ancora.indice >= 0 && indiceNaBase < 0 ? selecionadaId : null
+
+  // #3363 (S1): a lista é uma parada de Tab só (foco itinerante). A parada é o cartão aberto; sem aberto, o último que teve
+  // foco; sem ele, o primeiro. ↑ ↓ j k Home End andam entre os cartões. Estado, não ref: o id entra na conta do render.
+  // Com o foco dentro da lista a parada é o cartão focado (senão o Tab de um cartão qualquer cairia no aberto, dentro da lista).
+  const [focoId, setFocoId] = useState(null)
+  const [focoNaLista, setFocoNaLista] = useState(false)
+  const naLista = (id) => id != null && lista.some((c) => String(c.id) === String(id))
+  const ativoId = String(focoNaLista && naLista(focoId) ? focoId : naLista(selecionadaId) ? selecionadaId : naLista(focoId) ? focoId : lista[0]?.id)
+  function aoTeclarNaLista(e) {
+    // Só com o foco num cartão e sem modificador (WCAG 2.1.4): j e k em campo de texto continuam escrevendo.
+    if (!e.target.matches?.('button[data-conversa-id]') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+    const passo = { ArrowDown: 1, j: 1, ArrowUp: -1, k: -1 }[e.key]
+    if (passo === undefined && e.key !== 'Home' && e.key !== 'End') return
+    const cartoes = [...e.currentTarget.querySelectorAll('button[data-conversa-id]')]
+    const alvo = e.key === 'Home' ? 0 : e.key === 'End' ? cartoes.length - 1 : cartoes.indexOf(e.target) + passo
+    e.preventDefault()
+    cartoes[Math.min(Math.max(alvo, 0), cartoes.length - 1)]?.focus()
+  }
 
   const semCanal = filtros.canais.length === 0
   const semBusca = !filtros.busca.trim()
@@ -142,7 +183,6 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   const novas = vistas.current ? new Set(lista.map((c) => c.id).filter((id) => !vistas.current.has(id))) : new Set()
   useEffect(() => { if (!carga) vistas.current = new Set(lista.map((c) => c.id)) })
   const rolagem = useRef(null)
-  const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
   useLayoutEffect(() => {
     if (!carga && rolagem.current) rolagem.current.scrollTop = filtros.posicao ?? 0
   }, [carga, chaveDaLista])
@@ -190,7 +230,13 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {/* #3300 (F7): lista para o leitor de tela ("lista, 11 itens"); `display: contents` não muda o layout. */}
-        <div role="list" aria-label="Conversas" className={css.listaSemCaixa}>
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- #3363: as setas valem em qualquer cartão; a lista é o único ancestral comum. */}
+        <div
+          role="list" aria-label="Conversas" className={css.listaSemCaixa}
+          onFocus={(e) => { const id = e.target.dataset?.conversaId; if (id) { setFocoId(id); setFocoNaLista(true) } }}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocoNaLista(false) }}
+          onKeyDown={aoTeclarNaLista}
+        >
         {lista.map((conversa) => (
           <div role="listitem" key={conversa.id} className={css.listaSemCaixa}>
           <CartaoConversa
@@ -207,6 +253,8 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             aoAbrir={abrir}
             fonteApi={fonteApi}
             usuario={sessao?.usuario}
+            tabIndex={String(conversa.id) === ativoId ? 0 : -1}
+            atenuado={conversa.id === foraDaLista}
           />
           </div>
         ))}

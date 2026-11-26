@@ -8,11 +8,12 @@
 // classe que o CSS já não tinha e `neutro`, a cobrança vencida, não tinha nenhuma, e o chip dava 11
 // com 8 cartões marcados). #2420: o traço lateral saiu do CSS. #2427: `.atrasada` (tom `perigo`) pinta
 // o ícone de vermelho; `.precisa` hoje não tem estilo próprio e o ícone fica no âmbar padrão.
-export function classesDoCartao(css, { motivo = null, slaEstourado = false } = {}) {
+export function classesDoCartao(css, { motivo = null, slaEstourado = false, atenuado = false } = {}) {
   return [
     css.cartao,
     motivo && motivo.tom !== 'perigo' ? css.precisa : '',
     motivo?.tom === 'perigo' ? css.atrasada : '',
     slaEstourado ? css.slaEstourado : '',
+    atenuado ? css.atenuado : '',
   ].filter(Boolean).join(' ')
 }

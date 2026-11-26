@@ -375,7 +375,9 @@ try {
   })
 
   // --- F6: Esc no campo de mensagem ---------------------------------------------------------------------------
-  await confere('F6. Esc no campo de mensagem não fecha o Assistente nem tira o foco do campo', async () => {
+  // #3363 (S2): o Esc no campo agora leva o foco ao cartão da conversa aberta (a atendente "desiste" de digitar e volta à
+  // lista). O que o F6 protege continua: o Esc do campo não fecha o Assistente nem manda o foco para o gatilho dele.
+  await confere('F6. Esc no campo de mensagem não fecha o Assistente nem leva o foco ao gatilho dele; vai ao cartão da conversa aberta', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
     await p.getByRole('button', { name: 'Abrir assistente', exact: true }).click()
@@ -383,7 +385,8 @@ try {
     await campo(p).click()
     await campo(p).press('Escape')
     assert.equal(await p.getByRole('dialog', { name: /Assistente/ }).isVisible(), true, 'o Assistente segue aberto')
-    assert.equal(await campo(p).evaluate((el) => document.activeElement === el), true, 'o foco continua no campo')
+    assert.equal(await p.evaluate(() => Boolean(document.activeElement?.matches('[role=list] button[aria-current="true"]'))), true, 'o foco foi ao cartão da conversa aberta')
+    assert.equal(await p.evaluate(() => Boolean(document.activeElement?.closest('[role=dialog]'))), false, 'o foco foi para dentro do painel do Assistente')
     await ctx.close()
   })
   await confere('F6. Esc dentro do painel do Assistente continua fechando e devolve o foco ao gatilho', async () => {

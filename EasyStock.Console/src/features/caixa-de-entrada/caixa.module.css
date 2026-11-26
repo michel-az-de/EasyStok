@@ -35,6 +35,9 @@
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
 /* O prazo vencido mantém o ícone e o texto acessível, sem piscar. */
 .cartao.slaEstourado { box-shadow: none; }
+/* #3363 (S4): a conversa aberta que já saiu desta lista fica no lugar até a troca de conversa. O apagado é só o texto, no
+   token de apoio já usado na hora: sem opacidade nem transform, e o estado também sai no nome acessível do cartão. */
+.cartao.atenuado .topo strong, .cartao.atenuado .previa { color: var(--tinta-3); }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: none; }
 /* #3330 (F22): no Alto Contraste o navegador troca os fundos por Canvas, e a conversa aberta e o filtro ligado
    só diferiam por `background`. O contorno com cor de sistema mantém a forma; com foco, vale o anel de foco. */
@@ -73,6 +76,9 @@
   color: var(--tinta-2); font-size: var(--t-corpo);
 }
 .prefixo { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--tinta-3); vertical-align: -2px; }
+/* #3363 (S4): o prefixo desce 2 px da linha de base e, sozinho, alongava o cartão em 2 px na hora em que a atendente
+   responde (a prévia passa a começar por "Você:"). A margem negativa devolve esses 2 px: o cartão não muda de altura. */
+.cartao .prefixo { margin-bottom: -2px; }
 
 @keyframes estalarPonto { from { transform: scale(0); } to { transform: none; } }
 
