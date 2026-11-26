@@ -10,7 +10,7 @@ namespace EasyStock.ArchitectureTests;
 
 /// <summary>
 /// Guard (#3298, R7 da revisão do harness do Assistente): o controle de custo não pode falhar aberto. Cota mensal, limite
-/// de respostas por hora e registro do turno dependem do repositório de turnos e das opções de limite e de preços. Com
+/// de respostas por hora e registro do turno dependem do repositório de turnos e das opções de limite; o custo da chamada, das de preços. Com
 /// qualquer um deles opcional (padrão nulo), uma fiação esquecida deixava a cota virar "não se aplica" e o turno sem
 /// registro, sem erro algum. Obrigatória, a fiação errada falha na hora de montar o serviço.
 /// #3365 (D2): o preço mora só na chamada. Quem registra a chamada em <c>chamada_ia</c> (<see cref="RegistroChamadaIaLlmClient"/>)

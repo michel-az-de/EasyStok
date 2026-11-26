@@ -28,6 +28,7 @@ public class RegistroChamadaIaLlmClientTests
     {
         var tabela = new PrecosModelosAgenteOptions();
         tabela.Modelos["claude-sonnet-5"] = new PrecoModeloAgente(3m, 15m, 0.3m);
+        tabela.Modelos["claude-haiku-5"] = new PrecoModeloAgente(1m, 5m, 0.1m);
         return Options.Create(tabela);
     }
 
@@ -245,6 +246,41 @@ public class RegistroChamadaIaLlmClientTests
 
         venceu.Should().BeSameAs(tarefa, "o registro tem prazo próprio e não prende a resposta da IA");
         (await tarefa).Should().BeSameAs(resposta);
+    }
+
+    [Fact]
+    public async Task PrazoDoRegistroEstouradoNaoAnulaOCustoDevolvidoAoTurno()
+    {
+        // #3365 (D2): o aceite pede o custo do turno inteiro mesmo quando a linha se perde por prazo; aqui o modelo tem preço.
+        // 1.000 entrada x 3 + 100 saída x 15, por milhão = 0,0045.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 1_000, 100, 0, "claude-sonnet-5"));
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns(c => Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>()));
+
+        var tarefa = new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System,
+            NullLogger<RegistroChamadaIaLlmClient>.Instance, Precos(), TimeSpan.FromMilliseconds(200)).EnviarAsync(Requisicao());
+        var venceu = await Task.WhenAny(tarefa, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        venceu.Should().BeSameAs(tarefa);
+        (await tarefa).CustoUsd.Should().Be(0.0045m, "o prazo cancela só a gravação; o custo já estava calculado");
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(0.0045m, "a linha entregue ao registro leva o mesmo custo");
+    }
+
+    [Fact]
+    public async Task CadaChamadaUsaOPrecoDoSeuModelo()
+    {
+        // 1M entrada + 100 mil saída: sonnet 3 + 1,5 = 4,5; haiku 1 + 0,5 = 1,5. O turno soma o que cada chamada devolve.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            new RespostaLlm("end_turn", [], 1_000_000, 100_000, 0, "claude-sonnet-5"),
+            new RespostaLlm("end_turn", [], 1_000_000, 100_000, 0, "claude-haiku-5"));
+        var cliente = Cliente();
+
+        var primeira = await cliente.EnviarAsync(Requisicao());
+        var segunda = await cliente.EnviarAsync(Requisicao());
+
+        (primeira.CustoUsd, segunda.CustoUsd).Should().Be((4.5m, 1.5m));
+        _gravadas.Select(c => c.CustoUsd).Should().Equal(4.5m, 1.5m);
     }
 
     [Fact]
