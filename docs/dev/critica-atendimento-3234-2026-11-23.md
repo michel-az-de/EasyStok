@@ -169,3 +169,13 @@ Decisões da B1 (C6):
 - Revisão da PR: Enter, duplo clique na alça e "Restaurar disposição" gravavam o padrão da tela atual como escolha. Como o padrão agora muda com a tela, restaurar em 1920 levava o 450/490 para o notebook, e a conversa ficava com 326 px em 1366. Agora restaurar desfaz a escolha e a coluna volta a acompanhar a tela. Arrastar até o valor do padrão continua sendo escolha.
 - O C6 deixa 296 px a menos para o cabeçalho em 1920, e é com essa largura que o B6 (C5) vai medir.
 - Os prints de antes e depois, tirados do harness da prova-2185 com a conversa de demonstração "Cliente auto", estão em `critica-atendimento-3234/b1/`. Em 1920, a lista mais larga passa a mostrar os selos "Só modelo" e "Contato", que antes eram cortados.
+
+Decisões da B2 (R1 e R2):
+
+- O telefone e o endereço continuam como texto na identidade. Copiar telefone, Copiar endereço, Abrir no mapa e Conferir identidade foram para uma fileira só, logo abaixo do endereço. Cada ação tem ícone sobre um rótulo curto (Telefone, Endereço, Mapa, Identidade), e o nome acessível continua sendo o de antes ("Copiar telefone …", "Abrir no mapa", "Conferir identidade").
+- As colunas da fileira têm a mesma largura e contorno uniforme de 1px. Na Ficha mínima (292 px) os quatro rótulos ainda cabem numa linha.
+- Um retorno só, "Copiado", embaixo da fileira, para as duas cópias.
+- No lead, "Já é cliente? Vincular a um cadastro" continua abaixo de "Cadastrar cliente", como ação discreta (#3207). A fileira do lead tem só o telefone, quando ele existe.
+- As miniaturas de mídia (#3209) continuam onde estavam. O lugar logo abaixo da fileira fica para a distância (#3232) e a mídia (#3233).
+- R2: "Itens" é primário só com pedido em montagem. Sem pedido, ou quando o cadastro vem antes da venda, é secundário.
+- Os prints de antes e depois, tirados do harness da prova nova `prova-3265-cartao-acoes.mjs`, estão em `critica-atendimento-3234/b2/`.
