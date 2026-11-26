@@ -66,6 +66,30 @@ public class HistoricoAssistenteUseCasesTests
     }
 
     [Fact]
+    public async Task UsoComPisoDasChamadasMostraOsTokensDoPisoEMantemCustoEContagemDosTurnos()
+    {
+        // #3370: as chamadas em chamada_ia somam mais do que os turnos (um turno caiu depois de chamar o modelo). Os tokens,
+        // o percentual e o alerta saem do piso, a mesma soma que o portão da cota usa; custo, contagens e a estimativa de
+        // poupados seguem dos turnos.
+        var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.DefinirAssistente(null, null, 3_000, null, null);
+        configuracoes.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+        var dosTurnos = new SomaTurnosAgente(5, 1_000, 200, 500, 0.012m, 1, RespostasSemIa: 2, TurnosComTokens: 3);
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(dosTurnos.ComPisoDasChamadas(1_500, 300, 600));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System, configuracoes)
+            .ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        (uso.TokensEntrada, uso.TokensSaida, uso.TokensCacheLido, uso.TotalTokens).Should().Be((1_500L, 300L, 600L, 2_400L));
+        uso.Percentual.Should().Be(80);
+        uso.Alerta.Should().BeTrue();
+        (uso.Turnos, uso.CustoEstimado, uso.TurnosSemPreco, uso.RespostasSemIa).Should().Be((5, 0.012m, 1, 2));
+        uso.TokensPoupadosEstimados.Should().Be(1_133);
+    }
+
+    [Fact]
     public async Task UsoDizQuantasRespostasSairamSemIaEAEstimativaPoupada()
     {
         // S78 (#2896): 3 respostas sem IA e 2 turnos do modelo que gastaram 30 mil tokens. Média de 15 mil por turno
