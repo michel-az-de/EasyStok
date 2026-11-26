@@ -85,6 +85,9 @@ export const CartaoConversa = memo(function CartaoConversa({
   const seloAFrente = contexto.some(ehSeloDeDinheiro)
   // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
   const hora = horaDaLista(conversa.ultimaEm, agora)
+  // #3374 (C4, L1): no máximo 2 pílulas na linha (estado + 1 contexto, ou 2 de contexto); o resto segue no `title`.
+  // O selo de dinheiro vai à frente, então nunca é o que cai fora.
+  const visiveis = [...contexto].sort((a, b) => Number(ehSeloDeDinheiro(b)) - Number(ehSeloDeDinheiro(a))).slice(0, etiqueta ? 1 : 2)
 
   return (
     <button
@@ -159,7 +162,7 @@ export const CartaoConversa = memo(function CartaoConversa({
         </span>
         {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
           {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
-          {contexto.map((item) => (
+          {visiveis.map((item) => (
             <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined} className={ehSeloDeDinheiro(item) ? css.seloDinheiro : undefined}>{item.texto}</Pilula>
           ))}
         </span>}
