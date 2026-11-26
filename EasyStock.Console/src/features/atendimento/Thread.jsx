@@ -45,7 +45,7 @@ function SeparadorDeDia({ rotulo }) {
 // movimento reduzido (base.css) ficam parados e o texto continua dizendo.
 function Digitando() {
   return (
-    <div className={`${css.balao} ${css.saida} ${css.doAutomatico} ${css.digitando}`}>
+    <div className={`${css.balao} ${css.saida} ${css.digitando}`}>
       <span className={css.pontos} aria-hidden="true"><i /><i /><i /></span>
       <span className={css.meta}>
         <span className={css.selo}><Icone nome="agente" /> Assistente digitando</span>

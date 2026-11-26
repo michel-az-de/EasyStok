@@ -184,7 +184,7 @@ export const Balao = memo(function Balao({
   }
   const reagivel = Boolean(aoReagir) && podeReagir(mensagem)
   return (
-    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
+    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
       {(aoReagir || aoApagar) && (
         <MenuDaMensagem
           mensagem={mensagem} podeReagir={reagivel} alinhamento={mensagem.dir === 'out' ? 'direita' : 'esquerda'}

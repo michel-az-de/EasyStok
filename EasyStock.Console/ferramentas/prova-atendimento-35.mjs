@@ -77,6 +77,9 @@ function medir({ escala }) {
 
   const fundos = new Set(todos.map((e) => rgba(getComputedStyle(e).backgroundColor)).filter((c) => c[3] > 0).map((c) => c.map((v, i) => i < 3 ? Math.round(v) : Math.round(v * 100) / 100).join(',')))
 
+  // C6: toda bolha de saída (escrita pelo atendente ou pelo Assistente) tem o mesmo fundo; o selo diz quem mandou.
+  const fundosSaida = new Set(todos.filter((e) => /(^|\s)_?saida_/.test(String(e.className))).map((e) => rgba(getComputedStyle(e).backgroundColor).join(',')))
+
   const comTexto = todos.filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
   const fonteMin = Math.min(...comTexto.map((e) => parseFloat(getComputedStyle(e).fontSize)))
 
@@ -111,6 +114,7 @@ function medir({ escala }) {
     laranjas: { n: laranjas.length, itens: laranjas },
     espacamentos: { n: espacos.size, valores: [...espacos].sort((x, y) => x - y), foraDaEscala: [...foraDaEscala].sort((x, y) => x - y) },
     fundos: { n: fundos.size, valores: [...fundos] },
+    fundosSaida: { n: fundosSaida.size, valores: [...fundosSaida] },
     fonteMin,
     aninhados: { n: aninhados.length, itens: aninhados },
     contraste: { n: contraste.length, itens: contraste },
@@ -169,6 +173,7 @@ for (const m of medidas) {
   if (m.laranjasPorEstado) for (const [estado, v] of Object.entries(m.laranjasPorEstado)) falha(v.n <= 1, `laranjas ${v.n} > 1 em "${estado}": ${v.itens.join(' | ')}`)
   falha(m.espacamentos.foraDaEscala.length === 0, `espaçamentos fora da escala: ${m.espacamentos.foraDaEscala.join(', ')}`)
   falha(m.fundos.n <= 3 + ESTADOS_PERMITIDOS, `fundos ${m.fundos.n} > ${3 + ESTADOS_PERMITIDOS}`)
+  falha(m.fundosSaida.n <= 1, `fundos de bolha de saída ${m.fundosSaida.n} > 1`)
   falha(m.fonteMin >= 13, `fonte mínima ${m.fonteMin} < 13`)
   falha(m.aninhados.n === 0, `cartões aninhados ${m.aninhados.n}`)
   falha(m.contraste.n === 0, `contraste < 4,5 em ${m.contraste.n}`)

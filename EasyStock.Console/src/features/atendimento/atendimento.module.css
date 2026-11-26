@@ -91,7 +91,7 @@
   align-self: flex-start; background: var(--papel); border: 0;
   box-shadow: var(--sombra);
 }
-/* #2232 (A6): o enviado tem cor própria (verde-pastel); o do automático segue neutro, mais abaixo. */
+/* #2232 (A6): o enviado tem cor própria (verde-pastel). #3374 (C6): é a única cor de saída; o selo "Assistente" diz quem mandou. */
 .saida {
   align-self: flex-end; background: var(--sucesso-pastel); color: var(--tinta);
   box-shadow: none;
@@ -339,15 +339,6 @@
 .canal_camera { color: var(--c-instagram); }
 .canal_globo { color: var(--c-site); }
 
-/* O que o automático mandou fica em tom de marca claro, com texto escuro; o
-   laranja cheio é só o que ela escreveu. A conversa ganha ritmo em vez de
-   virar um bloco laranja só. */
-.saida.doAutomatico {
-  background: var(--elevado); color: var(--tinta);
-  box-shadow: none;
-}
-.saida.doAutomatico .meta, .saida.doAutomatico .meta * { color: var(--tinta-3); }
-.saida.doAutomatico .selo { color: var(--tinta-3); }
 
 /* Rodada 6c: barra do composer com ícone em cada ação, botões fantasma que
    ganham fundo no hover, e o enviar redondo com seta, como no Mensagens. */
@@ -432,13 +423,11 @@
 .canal_whatsapp { color: var(--c-whatsapp); }
 .canal_instagram { color: var(--c-instagram); }
 
-/* Rodada 6d (banca estética, item 1): dois tons só. Recebida em papel, a
-   dela e a do automático na tinta clara da marca (o selo "automática" é que
-   diz quem mandou). Aviso do sistema vira
+/* Rodada 6d (banca estética, item 1) e #3374 (C6): dois tons só. Recebida em papel, toda saída em um tom
+   (o selo "Assistente" é que diz quem mandou). Aviso do sistema vira
    texto centralizado, sem caixa. */
 .entrada { border-radius: var(--r-2); }
 .saida { border-radius: var(--r-2); }
-.saida.doAutomatico { background: var(--preenchimento-forte); }
 
 /* Banca, item 13: o cabeçalho da conversa na mesma altura das colunas. */
 .cabecalho { min-height: var(--altura-regiao); padding-top: var(--e-2); padding-bottom: var(--e-2); }
