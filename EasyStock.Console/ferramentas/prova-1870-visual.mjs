@@ -161,7 +161,8 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   // Devolver e Concluir moram no menu ⋮ do cabeçalho: nenhum segundo menu na barra.
   assert.doesNotMatch(barra, /<details|<summary|>Mais ações</)
   const css = fonte('features/atendimento/atendimento.module.css')
-  assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
+  // #3374 (C8): a faixa é uma linha; o motivo que não cabe trunca com reticências e o texto inteiro fica no title.
+  assert.match(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
   assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
   // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
   // #2762 (A1): o anel do item é o da casa (borda de foco na cor da marca), no lugar do halo de 2 px, que sumia no escuro.

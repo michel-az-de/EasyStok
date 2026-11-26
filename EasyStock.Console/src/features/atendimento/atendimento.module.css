@@ -283,12 +283,13 @@
 }
 
 /* Estado e Assumir permanecem à vista; as ações secundárias moram no ⋮ do cabeçalho (#2232, A4). */
-.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
-.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.modoLinha { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
+.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; }
 .modoEstado { flex: none; }
 .modoTexto {
-  flex: 1 1 0; min-width: 12ch; margin: 0;
+  flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* #3374 (C8): uma linha; o que não cabe vai ao title */
 }
 .modoAssumir { margin-left: auto; flex: none; }
 /* #3300 (F4): um laranja só entre a barra e o campo. Com o Enviar habilitado (texto ou anexo em espera, #3368), quem
@@ -300,15 +301,12 @@
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:active:not(:disabled) {
   background: var(--atd-preenchimento-hover);
 }
-/* #2185: em coluna estreita o motivo, espremido ao lado de Assumir, quebrava em 3 linhas. Desce inteiro para baixo do estado. */
-.modoLinha { container: barra-modo / inline-size; }
-@container barra-modo (max-width: 559px) {
-  .modoTexto { order: 1; flex: 1 1 100%; padding-bottom: var(--e-2); }
-}
+/* #3374 (C8): a faixa é uma linha só em qualquer coluna; o motivo que não cabe trunca com reticências e fica no title
+   (antes, abaixo de 560 px ele descia para uma segunda linha, #2185). */
 /* #3234 (C5): no desktop, só com a pílula (e o Assumir), o modo é selo no cabeçalho, ao lado do Assistente:
    a faixa de 40 px some e a conversa ganha a altura. Sem fundo nem traço, como os outros controles do topo. */
 .modoNoCabecalho { padding: 0; min-height: 0; background: transparent; }
-.modoNoCabecalho .modoLinha { container-type: normal; flex-wrap: nowrap; min-height: 0; }
+.modoNoCabecalho .modoLinha { min-height: 0; }
 .modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: var(--e-4); display: grid; gap: var(--e-2); color: var(--tinta-2); }
@@ -623,15 +621,15 @@
   display: flex; align-items: center; gap: var(--e-3);
   border: 0;
   background: transparent; color: var(--tinta);
-  font-size: var(--t-apoio); line-height: var(--lh-compacto); overflow-wrap: anywhere;
+  font-size: var(--t-apoio); line-height: var(--lh-compacto);
 }
 .faixaIcone { flex: none; color: var(--alerta); }
 .faixaTexto {
-  display: grid; gap: var(--e-1); min-width: 0; padding-left: var(--e-3);
-  border-left: var(--b-1) solid var(--linha-forte);
+  display: flex; align-items: baseline; gap: var(--e-2); min-width: 0; padding-left: var(--e-3);
+  border-left: var(--b-1) solid var(--linha-forte); white-space: nowrap;
 }
-.faixaTexto strong { font-weight: 600; }
-.faixaMotivo { color: var(--tinta-2); }
+.faixaTexto strong { flex: none; font-weight: 600; }
+.faixaMotivo { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--tinta-2); }
 
 /* #2232 (A5): "Novas mensagens" fica no pé da área que rola, à vista de quem está lendo mais acima. */
 .novasMensagens {

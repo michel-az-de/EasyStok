@@ -34,6 +34,9 @@ import { Thread } from './Thread'
 import { devolverFocoAoCampoDepoisDeFechar } from './focoDoComposer'
 import css from './atendimento.module.css'
 
+// #3374 (C8): selo no cabeçalho medido e recusado. Com a flag ligada, na comanda aberta (prova-1738, 1280x720) o
+// cabeçalho foi a 79 px em 1280 e 1440 (64 em 1920) e a comanda cobriu o "Total dos itens". Regra da banca: só liga se
+// couber em uma linha nas três larguras; senão a faixa (BarraModo) fica abaixo do cabeçalho, em uma linha só.
 const SELO_NO_CABECALHO = false
 
 // #3037: o anfitrião da confirmação de "conversa de outra" vale para todo o Painel, com ou sem conversa aberta.

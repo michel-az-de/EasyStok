@@ -1072,8 +1072,8 @@ try {
         await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
         const m = await medir(p)
         const cena = `${inicial} em ${largura}: ${JSON.stringify(m)}`
-        // #3374 (C0): selo desligado até a C8 (ligado, o cabeçalho ia a 77 px em 1280). Aqui o modo segue na faixa e
-        // o cabeçalho fica em 64 px; a C8 troca esta conferência pela do selo.
+        // #3374 (C0): selo desligado (C8 mediu 79 px em 1280 e 1440, ver SELO_NO_CABECALHO). O modo segue na faixa de uma
+        // linha e o cabeçalho fica em 64 px.
         assert.equal(m.noCabecalho, false, `o selo subiu antes da C8 (${cena})`)
         assert.match(m.texto, new RegExp(selo), cena)
         assert.ok(m.alturaCabecalho <= 64, `o cabeçalho cresceu (${cena})`)
