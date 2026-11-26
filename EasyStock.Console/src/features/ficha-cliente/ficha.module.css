@@ -165,9 +165,11 @@
 }
 
 /* #2420: a comanda é um cartão com contorno, e a ação de montar fica dentro dele. */
-.resumoAtual { padding: var(--e-3); margin: 0 var(--e-4); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+/* #3374 (C5): o Pedido deixou de ser cartão (borda, raio e fundo) e é a primeira linha da lista da ficha: o botão
+   "Itens" não fica mais num cartão dentro de cartão, e a divisória de 1px é a mesma das linhas de acesso. */
+.resumoAtual { padding: var(--e-3) 0; margin: 0 var(--e-4); background: transparent; border: 0; border-bottom: var(--b-1) solid var(--linha); border-radius: 0; }
 .resumoAtual .acaoMontar { margin-top: var(--e-3); padding: 0; }
-.resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
+.resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--atd-realce); }
 .resumoAtual h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin: 0 0 var(--e-2); font-size: var(--t-corpo); }
 .resumoAtual h3 small { color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
 .resumoAtual p { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: 1.5; }

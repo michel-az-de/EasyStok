@@ -302,18 +302,16 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           {(pedidoCriado || (fonteApi && selecionada.clienteId)) && <AcessoDaFicha icone="map-pin" titulo="Entrega" focoReserva={mapaMovel.chave}
             resumo={resumoDaEntrega({ faixa: pedido ? faixa : null, endereco: cliente.endereco, bairro: bairroDoEndereco(cliente.endereco) })} aoAbrir={() => cliente.endereco ? setFreteAberto(true) : abrirFichaEditando()} />}
           {editavel && pedidoCriado && <AcessoDaFicha icone="credit-card" titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
+          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={abrirFicha} />
+          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
+            resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
         <div className={css.notasDaFicha}>
           <NotasDoCliente key={selecionada.id} conversaId={selecionada.id} clienteId={selecionada.clienteId ?? selecionada.id}
             clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []} observacao={cliente.observacoes ?? null}
             aoCriarNota={editavel ? aoAbrirNota : undefined} podeCriarNota={!fonteApi || Boolean(selecionada.clienteId)} />
         </div>
-        <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">
-          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
-            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={abrirFicha} />
-          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
-            resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
-        </nav>
         {editavel && fonteApi && <details className={css.linkCompartilhado}><summary>Link do cliente<Icone nome="chevron-down" tamanho={16} /></summary>{comandaCompartilhada}</details>}
         {fonteApi && editavel && <AreaColaborativaIa conversaId={selecionada.id}
           aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota}

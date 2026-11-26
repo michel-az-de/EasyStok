@@ -137,7 +137,8 @@ for (const fonteApi of [true, false]) provar(`seleção local ${fonteApi ? 'API'
   assert.equal((html.match(/aria-label="Adicionar itens"/g) ?? []).length, 1, 'montagem tem um único atalho direto para itens')
   assert.ok(html.indexOf('aria-label="Adicionar itens"') < html.indexOf('aria-label="Detalhes do atendimento"'))
   assert.ok(html.indexOf('Revisar pedido') < html.indexOf('Notas internas do cliente'))
-  assert.ok(html.indexOf('Notas internas do cliente') < html.indexOf('Histórico do cliente'))
+  // #3374 (C5, R4): os acessos (Pedido a Pós-venda) são uma lista só; as notas vêm logo depois dela.
+  assert.ok(html.indexOf('Histórico do cliente') < html.indexOf('Notas internas do cliente'))
   assert.doesNotMatch(html, /Pedido criado|Pagamento completo|a receber|Ocorrências e devoluções/)
 })
 provar('restrições configuradas aparecem antes das preferências e não somem após a quarta tag', () => {
