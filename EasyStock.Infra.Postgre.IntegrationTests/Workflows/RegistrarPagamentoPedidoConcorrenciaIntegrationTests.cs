@@ -1,5 +1,4 @@
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Notifications;
@@ -162,10 +161,14 @@ public sealed class RegistrarPagamentoPedidoConcorrenciaIntegrationTests(Postgre
         (await conferir.Set<PedidoEvento>().CountAsync(e => e.PedidoId == pedido.Id && e.Tipo == "quitacao_confirmada"))
             .Should().Be(1);
         (await conferir.ImpressoesPendentes.CountAsync(i => i.PedidoId == pedido.Id)).Should().Be(1);
+        // #3367: o total nao sai do dia de um UtcNow lido agora. O sinal leva `agora` e o saldo leva o relogio do use
+        // case: com a meia-noite de SP entre os dois, ou entre eles e a consulta, nenhum dia teria os 200. Soma do
+        // primeiro ao ultimo PagoEm que o banco gravou.
+        var gravadoEm = salvo.Pagamentos.Select(p => p.PagoEm).ToList();
         await using var caixaScope = provider.CreateAsyncScope();
         caixaScope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
         (await caixaScope.ServiceProvider.GetRequiredService<ICaixaRepository>()
-            .GetTotalPagamentosPedidosDoDiaAsync(empresaId, HorarioBrasil.DataOperacional(DateTime.UtcNow), loja.Id))
+            .GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, gravadoEm.Min(), gravadoEm.Max().AddSeconds(1), loja.Id))
             .Should().Be(200m);
     }
 

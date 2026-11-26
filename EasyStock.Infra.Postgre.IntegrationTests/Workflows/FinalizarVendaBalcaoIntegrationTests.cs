@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.FinalizarVendaBalcao;
@@ -29,10 +30,14 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [SkippableFact]
-    public async Task VendaBalcao_paga_com_produto_novo_persiste_tudo_atomico()
+    private sealed record VendaFeita(Guid EmpresaId, Guid LojaId, FinalizarVendaBalcaoResult Resultado, DateTime Antes, DateTime Depois);
+
+    /// <summary>
+    /// Zera o banco e faz a venda balcao paga (3 x R$ 25, cliente e produto novos) pelo DI de producao. Antes e Depois
+    /// cercam o use case: o PagoEm que ele grava com UtcNow cai entre os dois.
+    /// </summary>
+    private async Task<VendaFeita> VenderAsync()
     {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -73,6 +78,7 @@ public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixt
         // ── 2. Orquestrador via DI de producao ─────────────────────────────
         await using var provider = BuildProductionProvider();
         FinalizarVendaBalcaoResult result;
+        var antes = DateTime.UtcNow;
         await using (var scope = provider.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -105,6 +111,15 @@ public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixt
                 CriadoPorUserId: null,
                 CriadoPorNome: "Operador E2E"));
         }
+        var depois = DateTime.UtcNow;
+        return new VendaFeita(empresaId, lojaId, result, antes, depois);
+    }
+
+    [SkippableFact]
+    public async Task VendaBalcao_paga_com_produto_novo_persiste_tudo_atomico()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, lojaId, result, antes, depois) = await VenderAsync();
 
         result.Pago.Should().BeTrue();
         result.Total.Should().Be(75m);
@@ -146,15 +161,46 @@ public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixt
             var pag = pedido.Pagamentos.Single();
             pag.Valor.Should().Be(75m);
             pag.Metodo.Should().Be("dinheiro");
+            // #3367: o carimbo e do relogio real do use case, entre antes e depois da venda.
+            pag.PagoEm.Should().BeOnOrAfter(antes).And.BeOnOrBefore(depois);
 
             var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
             // #822: a query usa JanelaDiaUtc (dia civil BRT). Pedir pelo dia UTC fazia o
             // teste falhar SO entre 21h-24h BRT (pagamento cai no dia BRT anterior) —
             // exatamente a janela classica do caixa (#379). DataOperacional e a regua certa.
+            // #3367: o dia sai do PagoEm que o banco gravou, nao de um UtcNow lido depois da venda: com a meia-noite
+            // de SP entre as duas leituras a consulta pedia o dia novo e o total vinha 0 (run 45745312637).
             var totalDia = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(
-                empresaId, EasyStock.Application.Common.HorarioBrasil.DataOperacional(DateTime.UtcNow), lojaId);
+                empresaId, HorarioBrasil.DataOperacional(pag.PagoEm), lojaId);
             totalDia.Should().Be(75m);
         }
+    }
+
+    // #3367: o use case carimba PagoEm com UtcNow e nao ha relogio injetavel nele, entao a virada real nao se forca
+    // pela venda. O que a prova controla e o dia que ela pede: leva o PagoEm gravado ao ultimo segundo do dia
+    // anterior (venda feita antes da meia-noite de SP) e consulta o dia que um UtcNow lido depois da virada pediria.
+    [SkippableFact]
+    public async Task Total_do_dia_acompanha_o_instante_gravado_quando_a_meia_noite_cai_entre_a_venda_e_a_consulta()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, lojaId, _, _, _) = await VenderAsync();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        var pedido = await db.Pedidos.Include(p => p.Pagamentos).SingleAsync();
+        var pagamento = pedido.Pagamentos.Single();
+        // Os dois dias saem de instantes gravados, sem ler o relogio: a prova vale tambem se a virada real cair nela.
+        var diaDaConsulta = HorarioBrasil.DataOperacional(pagamento.PagoEm);
+        pagamento.PagoEm = HorarioBrasil.JanelaDiaUtc(diaDaConsulta).IniUtc.AddSeconds(-1);
+        await db.SaveChangesAsync();
+        var diaDaVenda = HorarioBrasil.DataOperacional(pagamento.PagoEm);
+        diaDaVenda.Should().Be(diaDaConsulta.AddDays(-1), "a venda ficou no ultimo segundo do dia anterior");
+
+        var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(db);
+        // O que o CI viu: o dia lido depois da meia-noite nao tem o pagamento.
+        (await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, diaDaConsulta, lojaId)).Should().Be(0m);
+        // A prova da venda pede o dia do instante gravado, e esse tem.
+        (await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, diaDaVenda, lojaId)).Should().Be(75m);
     }
 
     private ServiceProvider BuildProductionProvider()

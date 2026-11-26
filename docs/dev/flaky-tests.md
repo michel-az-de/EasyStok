@@ -10,6 +10,47 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#3367): a prova da venda de balcão pedia o dia de um `UtcNow` lido depois da venda
+
+Falhou 1 vez no job "Integração (parte 2)" do CI do master em `c191c8b25` (PR #3366, sem relação com caixa ou venda),
+em 26/11/2026 às 03:00:00Z (00:00 em São Paulo), run 45745312637, tentativa 1:
+`FinalizarVendaBalcaoIntegrationTests.VendaBalcao_paga_com_produto_novo_persiste_tudo_atomico`, "Expected totalDia to
+be 75M, but found 0M (difference of -75)". A tentativa 2 do mesmo SHA passou sem mudança, e a mesma árvore passou na
+PR (run 45744098319, 23:44 a 23:49 em São Paulo). Os outros 138 testes do assembly passaram no mesmo job.
+
+- **Por que era flaky:** a prova faz a venda com o relógio real e, no fim, consultava o total com
+  `HorarioBrasil.DataOperacional(DateTime.UtcNow)`, que lê o relógio de novo. O log fecha a prova 0,26 s depois de
+  03:00:00Z, e ela leva cerca de 1 s: o pagamento foi carimbado antes da meia-noite de São Paulo e a consulta pediu o
+  dia novo, que não tem pagamento. É o "Limite conhecido" da #2770 (a meia-noite entre o semeio e a consulta), numa
+  prova que a #2770 não cobria.
+- **Como foi confirmado:** o use case carimba `PagoEm` com `DateTime.UtcNow` e não tem relógio injetável, então a
+  virada real não se força pela venda. Com o `PagoEm` gravado no último segundo do dia anterior, que é o que a
+  meia-noite entre a venda e a consulta produz, a derivação antiga falha com a mensagem do CI (`to be 75M, but found
+  0M`) e o dia do `PagoEm` gravado dá 75. O rerun verde do mesmo SHA, depois da meia-noite, é o outro sinal.
+- **Fix (#3367):** a prova pede o dia do `PagoEm` que o banco gravou. A venda foi para `VenderAsync`, que cerca o use
+  case com `antes` e `depois` e prova que o carimbo é do relógio real. A prova nova
+  `Total_do_dia_acompanha_o_instante_gravado_quando_a_meia_noite_cai_entre_a_venda_e_a_consulta` leva o `PagoEm` ao
+  último segundo do dia anterior e confere 0 no dia novo e 75 no dia da venda. Só teste.
+- **Se voltar a falhar:** ver se alguma prova consulta o total do dia com `HorarioBrasil.DataOperacional(DateTime.UtcNow)`
+  ou `HorarioBrasil.Hoje()` lido depois de semear. O dia sai de um instante que o banco gravou; com pagamentos em
+  instantes diferentes, o certo é o intervalo do primeiro ao último, não um dia.
+- **Limite conhecido:** a virada é simulada, não real: a prova nova move o `PagoEm` gravado e não exercita o use case
+  sobre a meia-noite de verdade. Isso só some com relógio injetável no use case, que é mudança de produção e ficou
+  fora da #3367.
+- **Provas vizinhas conferidas (#3367):**
+  - `RegistrarPagamentoPedidoConcorrenciaIntegrationTests.Saldo_de_encomenda_apos_sinal_online_quita_uma_vez_no_postgres`
+    tinha a mesma janela, com dois instantes: o sinal leva o `agora` do semeio, o saldo leva o relógio do use case, e a
+    consulta lia um terceiro `UtcNow`. Agora soma o intervalo do primeiro ao último `PagoEm` gravado
+    (`GetTotalPagamentosPedidosNoIntervaloAsync`), sem depender de dia.
+  - `PedidoDoPwaNoConsoleIntegrationTests.PedidoMistoRecebidoOntem_ConsolidadoHoje_RecebimentoFicaNoDiaOriginal` não
+    falha na virada: o dia do recebimento sai do `PagoEm` gravado, e a consulta de "hoje" espera 0. Com a virada,
+    "hoje" vira o dia seguinte, também vazio. Só muda qual dia vazio ela confere, falso verde aceito.
+  - `BaixaDeLotesUnicaIntegrationTests` (campo `Hoje`, lido na carga da classe) não falha na virada: `Hoje` fica no
+    máximo um dia atrás, e as validades usadas (-2, -1, 3, 5, 10, 20 e 30 dias) deslocam todas juntas e nenhuma fica a
+    menos de um dia do limite entre vencido e válido. Nenhum veredito nem a ordem FEFO muda.
+
+---
+
 ## ✅ CORRIGIDO (#3250): `ExecutorPorChaveTests` fixava qual de duas chaves pega a vaga primeiro
 
 Falhou 1 vez no job "Unidade, arquitetura e Inventario" da PR #3247 (run 45286414101, tentativa 1, commit
