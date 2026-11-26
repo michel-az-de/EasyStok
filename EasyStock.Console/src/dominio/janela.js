@@ -3,7 +3,7 @@
 
 import { bloqueioDe, estaBloqueada, resumoDoBloqueio } from './conversa'
 import { CANAL_DESCONHECIDO, canalPorNome } from './canal'
-import { partesNoFuso } from './formato'
+import { dataIsoNoFuso, partesNoFuso, somarDiasIso } from './formato'
 
 export const SEM_JANELA = {
   tom: 'neutro', rotulo: 'Sem janela neste canal', rotuloCurto: 'Sem janela', textoLivre: true,
@@ -19,11 +19,11 @@ const MS_POR_MINUTO = 60000
 // nunca a do aparelho: com o processo em UTC ou em Tóquio a frase é a mesma.
 function fimPorExtenso(fim, agora) {
   const f = partesNoFuso(fim)
-  const hoje = partesNoFuso(agora)
-  const amanha = partesNoFuso(agora + 24 * 60 * MS_POR_MINUTO)
+  // "amanhã" é o dia civil seguinte na loja, não agora + 24 h (vale mesmo se o horário de verão voltar).
+  const dia = dataIsoNoFuso(fim), hoje = dataIsoNoFuso(agora)
   const hora = f.minutos ? `${f.horas}h${String(f.minutos).padStart(2, '0')}` : `${f.horas}h`
-  if (f.ano === hoje.ano && f.mes === hoje.mes && f.dia === hoje.dia) return hora
-  if (f.ano === amanha.ano && f.mes === amanha.mes && f.dia === amanha.dia) return `amanhã ${hora}`
+  if (dia === hoje) return hora
+  if (dia === somarDiasIso(hoje, 1)) return `amanhã ${hora}`
   return `${String(f.dia).padStart(2, '0')}/${String(f.mes).padStart(2, '0')} ${hora}`
 }
 

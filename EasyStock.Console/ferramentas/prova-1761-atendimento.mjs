@@ -1,3 +1,5 @@
+// #3374 (C13): o processo roda num fuso diferente do da loja, para a hora do aparelho não passar por acaso.
+process.env.TZ = 'Asia/Tokyo'
 import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1761 (simulação de atendimento de 13/10/2026): o que a tela dizia errado ou em
