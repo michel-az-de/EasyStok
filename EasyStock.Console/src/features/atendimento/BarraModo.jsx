@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
@@ -25,6 +25,25 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
   const { assumindo, assumir: assumirUmaVez } = assumirSemRepetir ?? proprio
   const { resumo, faixa, linha, mostrarLinha } = apresentacaoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
 
+  // #3374 (C10): `A` assume pelo mesmo botão (o clique cobre o "Assumir?" de conversa de colega). Só com o foco fora de campo,
+  // menu e janela, sem modificador: no campo de mensagem o A continua sendo letra. A dica vai no botão.
+  const botaoAssumir = useRef(null)
+  const podeAssumir = Boolean(acoes.assumir)
+  useEffect(() => {
+    if (!podeAssumir) return undefined
+    const ouvir = (e) => {
+      if (e.key.toLowerCase() !== 'a' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || e.defaultPrevented || e.isComposing) return
+      const alvo = e.target
+      if (alvo?.closest?.('input, textarea, select, [contenteditable], [role=dialog], [role=menu], [role=listbox], [role=combobox], dialog')) return
+      const botao = botaoAssumir.current
+      if (!botao || botao.disabled || botao.offsetParent === null || document.querySelector('dialog[open]')) return
+      e.preventDefault()
+      botao.click()
+    }
+    document.addEventListener('keydown', ouvir)
+    return () => document.removeEventListener('keydown', ouvir)
+  }, [podeAssumir])
+
   function assumir() {
     setConfirmando(null)
     return assumirUmaVez(conversa.id, aoAssumir)
@@ -47,11 +66,12 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
         {!faixa && <p className={mostrarLinha ? css.modoTexto : 'sr'} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>}
         {acoes.assumir && (
           <Botao
+            ref={botaoAssumir} aria-keyshortcuts="A"
             variante="primario" className={css.modoAssumir} disabled={assumindo.has(conversa.id)}
             aria-haspopup={acoes.confirmarAoAssumir ? 'dialog' : undefined}
             onClick={acoes.confirmarAoAssumir ? () => setConfirmando({ conversaId: conversa.id }) : assumir}
           >
-            Assumir conversa
+            Assumir conversa <kbd className={css.teclaNoBotao} aria-hidden="true">A</kbd>
           </Botao>
         )}
       </div>

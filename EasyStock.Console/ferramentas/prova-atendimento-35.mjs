@@ -133,6 +133,7 @@ function medir({ escala }) {
   }
 }
 
+const fixas = []
 const condicoes = []
 for (const tema of ['light', 'dark']) for (const [w, h] of [[1440, 900], [1920, 1080]]) for (const cena of ['conversa', 'assistente']) condicoes.push({ tema, w, h, cena })
 
@@ -161,13 +162,39 @@ for (const c of condicoes) {
   if (c.cena === 'conversa') {
     const contar = async () => { await p.waitForTimeout(300); return (await p.evaluate(medir, { escala: ESCALA })).laranjas }
     const antes = await contar()
-    await p.getByRole('button', { name: /^Assumir conversa/ }).first().click()
+    // C10: a tecla A (foco fora de campo) assume pelo mesmo botão, e a dica dela está à vista no botão.
+    fixas.push([await p.locator('button[aria-keyshortcuts="A"] kbd', { hasText: /^A$/ }).first().isVisible(), `${nome}: dica "A" invisível no Assumir`])
+    await p.evaluate(() => document.activeElement?.blur())
+    await p.keyboard.press('a')
+    await p.getByRole('button', { name: /^Assumir conversa/ }).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    fixas.push([(await p.getByRole('button', { name: /^Assumir conversa/ }).count()) === 0, `${nome}: a tecla A não assumiu a conversa`])
     const assumida = await contar()
     await p.locator('main[aria-label="Atendimento"] textarea').first().fill('oi')
     const comTexto = await contar()
     porEstado = { antes, assumida, comTexto }
   }
-  medidas.push({ condicao: nome, ...c, ...m, laranjasPorEstado: porEstado, errosDePagina: erros })
+  // C9 e C10 (sempre cobradas, são baratas e estáveis): com o Assistente aberto o Assumir fica à vista e clicável (o centro dele cai nele
+// e o painel não o cobre) e o Esc fecha o painel devolvendo o foco ao botão que o abriu.
+if (c.cena === 'assistente') {
+const assumir = p.getByRole('button', { name: /^Assumir conversa/ }).first()
+const cx = await assumir.boundingBox().then((b) => b && { x: b.x + b.width / 2, y: b.y + b.height / 2 })
+const clicavel = cx ? await p.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y); return !!el?.closest('button')?.textContent.startsWith('Assumir conversa') }, cx) : false
+const painel = await p.locator('section[role=dialog]').first().boundingBox()
+const sobrepoe = !!(cx && painel && cx.x >= painel.x && cx.x <= painel.x + painel.width && cx.y >= painel.y && cx.y <= painel.y + painel.height)
+const conversa = await p.locator('section[aria-label^="Conversa com"]').boundingBox()
+const largura = await p.evaluate(() => document.documentElement.clientWidth)
+const folga = painel ? { esq: Math.round(painel.x), conversaFim: conversa ? Math.round(conversa.x + conversa.width) : null } : null
+fixas.push([clicavel && !sobrepoe, `${nome}: Assumir ${cx ? '' : 'invisível, '}${clicavel ? '' : 'coberto, '}${sobrepoe ? 'sob o painel' : ''}`])
+fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1, `${nome}: conversa termina em ${folga?.conversaFim}, painel começa em ${folga?.esq}`])
+fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), `${nome}: rolagem horizontal da página (${largura} px)`])
+fixas.push([await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible(), `${nome}: dica "Esc" invisível no painel`])
+await p.keyboard.press('Escape')
+await p.waitForTimeout(200)
+const fechou = (await p.locator('section[role=dialog]').count()) === 0
+const foco = await p.evaluate(() => document.activeElement?.getAttribute('aria-label'))
+fixas.push([fechou && foco === 'Abrir assistente', `${nome}: Esc ${fechou ? 'fechou' : 'não fechou'}, foco em "${foco}" (esperado "Abrir assistente")`])
+}
+medidas.push({ condicao: nome, ...c, ...m, laranjasPorEstado: porEstado, errosDePagina: erros })
   await p.close()
 }
 
@@ -194,6 +221,9 @@ for (const m of medidas) {
   falha(m.errosDePagina.length === 0, `erros de página: ${m.errosDePagina.join(' | ')}`)
 }
 console.log(`Medida gravada em ${resolve(pasta, 'medidas.json')}`)
+const quebradas = fixas.filter(([ok]) => !ok).map(([, t]) => t)
+if (quebradas.length) { console.log(['', `C9/C10: ${quebradas.length} falha(s)`, ...quebradas.map((l) => `  ${l}`)].join('\n')); process.exit(1) }
+console.log(`C9/C10 ok (${fixas.length} verificações: Assumir à vista com o painel, conversa fora do painel, Esc devolve o foco)`)
 if (process.env.ALVO_35 === '1') {
   if (cobranca.length) { console.log(`\nALVO_35: ${cobranca.length} alvo(s) não atingido(s)\n${cobranca.map((l) => `  ${l}`).join('\n')}`); process.exit(1) }
   console.log('ALVO_35: todos os alvos atingidos')

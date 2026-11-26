@@ -292,6 +292,8 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* #3374 (C8): uma linha; o que não cabe vai ao title */
 }
 .modoAssumir { margin-left: auto; flex: none; }
+/* #3374 (C10): a tecla que faz o mesmo que o botão, no próprio botão (contorno uniforme, sem barra lateral). */
+.teclaNoBotao { margin-left: var(--e-2); padding: 0 var(--e-1); border: var(--b-1) solid currentColor; border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); font-weight: 400; }
 /* #3300 (F4): um laranja só entre a barra e o campo. Com o Enviar habilitado (texto ou anexo em espera, #3368), quem
    age é "Enviar e assumir"; "Assumir conversa" vira secundário (mesmas cores do `secundario` do Botao). */
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:not(:disabled) {

@@ -11,7 +11,7 @@ import { useEscape } from '../../hooks/useEscape'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CHAVE_ASSISTENTE, usePreferenciaDePainel } from '../../aplicacao/preferenciaDosPaineis'
 import {
-  ASSISTENTE, MARGEM_ASSISTENTE, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
+  ASSISTENTE, CONVERSA_MINIMA, MARGEM_ASSISTENTE, TRILHO, VAO, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
 } from '../../dominio/paineis'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
@@ -193,15 +193,34 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const area = areaDoBalcao ?? { tela: window.innerWidth, colunas: false }
   const { lado } = posicaoPainel
   const solto = lado === 'flutuante' && !celular
-  const larguraMaximaPainel = larguraMaxima({
-    ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE,
-  })
+  // #3374 (C9, R5): encaixado no computador o painel EMPURRA o palco em vez de cobrir a conversa (o Assumir ficava
+  // embaixo dele). Com isso a máxima deixa as três colunas nos seus mínimos de CSS (fila 260, ficha 292, conversa 320).
+  const empurra = !celular && !solto && area.colunas
+  const larguraMaximaPainel = limitar(
+    larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
+    ASSISTENTE.min,
+    empurra ? area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO : ASSISTENTE.max,
+  )
   const larguraPainel = limitar(posicaoPainel.largura, ASSISTENTE.min, larguraMaximaPainel)
   const dentroDaTela = (x, y) => posicaoDentroDaTela({
     x, y, largura: larguraPainel, altura: alturaPainel,
     tela: window.innerWidth, alturaTela: window.innerHeight, margem: MARGEM_ASSISTENTE,
   })
   const posicao = dentroDaTela(posicaoPainel.x, posicaoPainel.y)
+
+  // A reserva vai por variável no :root e o CSS do painel a lê no palco (`#conteudo-principal`): a moldura não importa o painel.
+  const reserva = aberto && empurra ? larguraPainel + MARGEM_ASSISTENTE : 0
+  useLayoutEffect(() => {
+    if (!reserva) return undefined
+    const raiz = document.documentElement
+    raiz.style.setProperty(`--assistente-reserva-${lado === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
+    raiz.dataset.assistenteEmpurra = lado === 'esquerda' ? 'esquerda' : 'direita'
+    return () => {
+      raiz.style.removeProperty('--assistente-reserva-esquerda')
+      raiz.style.removeProperty('--assistente-reserva-direita')
+      delete raiz.dataset.assistenteEmpurra
+    }
+  }, [reserva, lado])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
@@ -338,7 +357,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
             {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
-            <BotaoIcone rotulo="Fechar" icone="x" onClick={fechar} />
+            {/* #3374 (C10): a tecla que fecha, à vista; o botão leva o mesmo atalho na dica. */}
+            <kbd className={css.tecla} aria-hidden="true">Esc</kbd>
+            <BotaoIcone rotulo="Fechar" icone="x" atalho="Esc" onClick={fechar} aria-keyshortcuts="Escape" />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>

@@ -1031,7 +1031,7 @@ try {
     const medir = (p) => p.evaluate(() => {
       const cabecalho = document.querySelector('[data-cabecalho-conversa]')
       const regiao = document.querySelector('[data-controle-conversa]')
-      const assumir = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Assumir conversa')
+      const assumir = [...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('Assumir conversa'))
       const c = cabecalho.getBoundingClientRect()
       const fio = document.querySelector('[role=log]').parentElement.getBoundingClientRect()
       return {

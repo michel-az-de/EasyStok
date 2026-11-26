@@ -57,6 +57,10 @@
 @media (max-width: 1179px) { .painelEsquerda { left: var(--e-4); } }
 /* Solto: left e top vêm do arrasto, já limitados à tela (`dominio/paineis.js`). */
 .painelSolto { animation: none; }
+/* #3374 (C9): encaixado, o painel empurra o palco (reserva medida em BalaoAssistente) e a conversa nunca fica por baixo dele.
+   Borda transparente, não padding: é reserva de tela, não espaçamento da escala `--e-`. */
+:global(html[data-assistente-empurra='direita']) :global(#conteudo-principal) { border-right: var(--assistente-reserva-direita, 0px) solid transparent; }
+:global(html[data-assistente-empurra='esquerda']) :global(#conteudo-principal) { border-left: var(--assistente-reserva-esquerda, 0px) solid transparent; }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
 .posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {
@@ -80,6 +84,7 @@
 .identidade { min-width: 0; }
 .clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; line-height: var(--lh-compacto); }
 .cabecalho > button { flex-shrink: 0; }
+.tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }
 
 .corpo { overflow-y: auto; padding: var(--e-3); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0; }
 
