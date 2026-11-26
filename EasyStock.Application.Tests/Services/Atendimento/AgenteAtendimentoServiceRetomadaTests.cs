@@ -38,7 +38,7 @@ public partial class AgenteAtendimentoServiceTests
             [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
             _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-            Microsoft.Extensions.Options.Options.Create(_precos), _pedidos, equipe,
+            _pedidos, equipe,
             eventos: _eventos, retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
     }
 

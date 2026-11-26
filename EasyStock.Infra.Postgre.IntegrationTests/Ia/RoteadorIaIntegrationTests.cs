@@ -206,6 +206,21 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
     }
 
     [SkippableFact]
+    public async Task LinhaDoEnvComCustoFicaForaDoGastoDaLoja()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        // #3365 (D2): o .env passou a gravar custo_usd (provedor nulo). Só o filtro por provedor o mantém fora da cota em US$ da loja.
+        var empresa = Guid.NewGuid();
+        var (provedor, _, _) = await SemearLojaAsync(empresa, 10m);
+        await using var sp = Provedor();
+        await Roteador(sp, empresa, HttpFalso()).EnviarAsync(Requisicao(empresa));
+        await sp.GetRequiredService<IRegistroChamadaIa>().RegistrarAsync(ChamadaIa.Registrar(empresa, null, null,
+            "claude-sonnet-5", FinalidadeIa.Atendimento, null, 100, 20, 0, 0, 5m, 10, DesfechoChamadaIa.Ok, Agora.UtcDateTime));
+
+        (await sp.GetRequiredService<IRotasIa>().GastoDoMesAsync(empresa, provedor, Agora.UtcDateTime)).Should().Be(0.75m);
+    }
+
+    [SkippableFact]
     public async Task LeituraIsoladaUmaLojaNaoVeRotaNemGastoDaOutra()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

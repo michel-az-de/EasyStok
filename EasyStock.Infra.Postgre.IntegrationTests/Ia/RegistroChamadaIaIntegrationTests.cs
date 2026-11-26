@@ -1,6 +1,7 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Ia;
 using EasyStock.Domain.Enums.Ia;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -8,6 +9,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Ia;
@@ -42,7 +44,7 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
         interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("end_turn", [], 100, 20, 0, "deepseek-flash"));
         return new RegistroChamadaIaLlmClient(interno, sp.GetRequiredService<IRegistroChamadaIa>(), new RelogioFixo(),
-            log);
+            log, sp.GetRequiredService<IOptions<PrecosModelosAgenteOptions>>());
     }
 
     private static RequisicaoLlm Requisicao(Guid empresa, FinalidadeIa finalidade) =>

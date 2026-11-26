@@ -225,7 +225,7 @@ public partial class AgenteAtendimentoServiceTests
         _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
+        _pedidos,
         prazoTurno: Microsoft.Extensions.Options.Options.Create(new PrazoDoTurnoAgenteOptions { Segundos = 1 }));
 
     [Fact]

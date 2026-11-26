@@ -34,6 +34,12 @@ public sealed class ChamadaIa
 
     private ChamadaIa() { }
 
+    /// <summary>
+    /// #3365 (D2): o custo da chamada em 6 casas, como a linha o guarda. Quem calcula o custo para devolver ao turno usa esta
+    /// regra, para o valor somado no turno ser o mesmo de <c>chamada_ia.custo_usd</c>.
+    /// </summary>
+    public static decimal ArredondarCusto(decimal custoUsd) => decimal.Round(custoUsd, LimitesIa.CasasValor);
+
     public static ChamadaIa Registrar(Guid empresaId, Guid? provedorId, Guid? modeloId, string? modeloRespondido,
         FinalidadeIa finalidade, Guid? turnoAgenteId, int tokensEntrada, int tokensSaida, int tokensCacheLido,
         int tokensCacheEscrito, decimal? custoUsd, int duracaoMs, DesfechoChamadaIa desfecho, DateTime agora)
@@ -43,7 +49,7 @@ public sealed class ChamadaIa
         if (tokensEntrada < 0 || tokensSaida < 0 || tokensCacheLido < 0 || tokensCacheEscrito < 0 || duracaoMs < 0)
             throw new RegraDeDominioVioladaException("Tokens e duração da chamada não podem ser negativos.");
         // #2967: arredonda como o numeric(12,6) arredondaria; o resto do limite vale como no modelo.
-        custoUsd = custoUsd is { } c ? decimal.Round(c, LimitesIa.CasasValor) : null;
+        custoUsd = custoUsd is { } c ? ArredondarCusto(c) : null;
         LimitesIa.ValidarValor(custoUsd, "Custo da chamada");
         if (!Enum.IsDefined(finalidade) || !Enum.IsDefined(desfecho))
             throw new RegraDeDominioVioladaException("Finalidade ou desfecho da chamada inválido.");

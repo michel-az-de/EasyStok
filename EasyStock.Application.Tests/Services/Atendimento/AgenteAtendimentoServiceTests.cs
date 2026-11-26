@@ -83,7 +83,7 @@ public partial class AgenteAtendimentoServiceTests
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, _log, _turnos, Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos,
+        _pedidos,
         modelos: Microsoft.Extensions.Options.Options.Create(_modelos));
 
     private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
@@ -92,7 +92,7 @@ public partial class AgenteAtendimentoServiceTests
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance, _turnos,
         Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }),
-        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos);
+        _pedidos);
 
     /// <summary>Contato da equipe (#2211, #2493): o serviço de sempre, com o aviso da equipe injetado.</summary>
     private AgenteAtendimentoService CriarServicoComEquipe(EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada equipe) => new(
@@ -101,7 +101,7 @@ public partial class AgenteAtendimentoServiceTests
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance, _turnos,
         Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-        Microsoft.Extensions.Options.Options.Create(_precos), _pedidos, equipe);
+        _pedidos, equipe);
 
     private void RespostasDoAgenteNaUltimaHora(int total) =>
         _conversaRepository.ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), Arg.Any<CancellationToken>())

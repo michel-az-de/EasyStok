@@ -40,11 +40,11 @@ public sealed class AgenteAtendimentoService(
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
-    // #3298 (R7): o controle de custo (registro do turno, limite de respostas e preços) é regra de negócio: sem ele a cota
+    // #3298 (R7): o controle de custo (registro do turno e limite de respostas) é regra de negócio: sem ele a cota
     // vira "não se aplica" e o turno não é registrado, sem erro. Obrigatório, a fiação errada falha ao montar o serviço.
+    // #3365 (D2): o preço saiu daqui; o custo de cada chamada vem de quem a registra (RespostaLlm.CustoUsd).
     ITurnoAgenteRepository turnos,
     IOptions<LimiteRespostasAgenteOptions> limiteRespostas,
-    IOptions<PrecosModelosAgenteOptions> precos,
     IPedidoRepository? pedidos = null,
     Notifications.IContatoDaEquipeAvisada? equipe = null,
     IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
@@ -179,7 +179,7 @@ public sealed class AgenteAtendimentoService(
         var turno = new FinalizacaoDoTurno.Turno(
             empresaId, conversaId, agora, conversa, cliente, configuracao, dados.Mensagens, entradaRetomada,
             pendentes[^1].Id, turnoId, cronometro, geracao, contexto, gravacao, _ferramentas.Keys);
-        var finalizacao = new FinalizacaoDoTurno(conversaRepository, escalador, cloudClient, unitOfWork, turnos, precos, logger);
+        var finalizacao = new FinalizacaoDoTurno(conversaRepository, escalador, cloudClient, unitOfWork, turnos, logger);
         return await protecao.ExecutarAsync(token => finalizacao.FinalizarAsync(turno, token), ct, gravar: false)
             ?? await finalizacao.InterrompidoAsync(turno, ct);
 

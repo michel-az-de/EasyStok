@@ -180,6 +180,93 @@ public class RoteadorIaLlmClientTests
     }
 
     [Theory]
+    [InlineData(false, "0.21")] // segunda, 11h UTC: fora do pico
+    [InlineData(true, "0.42")] // terça, 07h UTC: pico
+    public async Task RespostaDaLojaVoltaComOMesmoCustoQueFoiGravadoNaLinha(bool noPico, string custo)
+    {
+        // #3365 (D2): o custo nasce na chamada, uma vez; o turno soma o que a resposta traz e não recalcula.
+        if (noPico) _relogio.SetUtcNow(new DateTimeOffset(2026, 11, 24, 7, 0, 0, TimeSpan.Zero));
+        var esperado = decimal.Parse(custo, System.Globalization.CultureInfo.InvariantCulture);
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().Be(esperado);
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(resposta.CustoUsd);
+        resposta.Modelo.Should().Be("deepseek-flash", "só o custo muda na resposta");
+    }
+
+    [Fact]
+    public async Task CustoDevolvidoSaiArredondadoEmSeisCasasComoALinha()
+    {
+        // 7 tokens de saída × 1,20 / 1M × 0,5 (fora do pico) = 0,0000042: a linha guarda 0,000004 e o turno soma o mesmo valor.
+        _provedores.EnviarAsync(Arg.Any<DestinoIa>(), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 0, 7, 0, "deepseek-flash"));
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().Be(0.000004m);
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(0.000004m);
+    }
+
+    [Fact]
+    public async Task EscritaDeCacheFicaForaDoCustoDaLoja()
+    {
+        // O preço do banco não tem campo para a escrita de cache; a cota em US$ já era assim e o turno passa a seguir a mesma conta.
+        _provedores.EnviarAsync(Arg.Any<DestinoIa>(), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 1_000_000, 100_000, 0, "deepseek-flash", 500_000));
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().Be(0.21m);
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(0.21m);
+    }
+
+    [Fact]
+    public async Task FalhaAoGravarNaoAnulaOCustoDevolvidoAoTurno()
+    {
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("banco fora"));
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().Be(0.21m, "o custo é do turno mesmo quando a linha se perde");
+    }
+
+    [Fact]
+    public async Task LinhaRecusadaPeloTetoDaColunaNaoTiraOCustoDoTurno()
+    {
+        // O custo passa do teto de numeric(12,6): a linha é recusada pelo domínio e vira log, mas a conta é feita antes e fora
+        // do try, e o turno recebe o valor (4M tokens de entrada a 999.999 por milhão, ×0,5 fora do pico).
+        var caro = ModeloIa.Criar(Empresa, Provedor, "deepseek-flash", "Flash", 999_999m, 1.20m, 0.006m, 0.5m, ForaDoPico.UtcDateTime);
+        _rotas.ObterAsync(Empresa, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new RotaIa(Provedor, "https://api.deepseek.com/anthropic", AutenticacaoProvedorIa.XApiKey, 10m, caro, false, null));
+        _provedores.EnviarAsync(Arg.Any<DestinoIa>(), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 4_000_000, 0, 0, "deepseek-flash"));
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().Be(1_999_998m);
+        _gravadas.Should().BeEmpty();
+        _log.Erros.Should().Contain(e => e.Contains("RegistroChamadaIa perdido"));
+    }
+
+    [Fact]
+    public async Task RespostaComTokenNegativoNaoDerrubaOTurnoESaiSemCusto()
+    {
+        // Resposta malformada: a conta do preço recusa token negativo. Como antes, a linha se perde em log e a resposta segue;
+        // sem custo calculado, o turno fica sem preço em vez de somar lixo.
+        _provedores.EnviarAsync(Arg.Any<DestinoIa>(), Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], -1, 5, 0, "deepseek-flash"));
+
+        var resposta = await Roteador().EnviarAsync(Requisicao());
+
+        resposta.CustoUsd.Should().BeNull();
+        resposta.Conteudo.Should().ContainSingle();
+        _gravadas.Should().BeEmpty();
+        _log.Erros.Should().Contain(e => e.Contains("RegistroChamadaIa perdido"));
+    }
+
+    [Theory]
     [InlineData(HttpStatusCode.PaymentRequired, DesfechoChamadaIa.SemSaldo402)]
     [InlineData(HttpStatusCode.TooManyRequests, DesfechoChamadaIa.Limite429)]
     [InlineData(HttpStatusCode.InternalServerError, DesfechoChamadaIa.Erro)]
@@ -321,9 +408,10 @@ public class RoteadorIaLlmClientTests
     {
         _rotas.ObterAsync(Empresa, Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(Rota(orcamento: null, comPreco: false));
 
-        await Roteador().EnviarAsync(Requisicao());
+        var resposta = await Roteador().EnviarAsync(Requisicao());
 
         _gravadas.Should().ContainSingle().Which.CustoUsd.Should().BeNull();
+        resposta.CustoUsd.Should().BeNull("sem preço no banco o turno fica sem custo, nunca zero (#3365)");
         await _rotas.DidNotReceiveWithAnyArgs().GastoDoMesAsync(default, default, default, default);
     }
 

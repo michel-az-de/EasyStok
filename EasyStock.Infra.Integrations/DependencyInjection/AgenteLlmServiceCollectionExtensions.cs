@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Ia;
 using Microsoft.Extensions.Logging;
 using EasyStock.Infra.Integrations.Ia;
@@ -67,11 +68,15 @@ public static class AgenteLlmServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Sem persistência registrada (host sem banco), segue o cliente puro.</summary>
+    /// <summary>
+    /// Sem persistência registrada (host sem banco), segue o cliente puro. #3365 (D2): o custo da chamada nasce aqui, com a
+    /// tabela <c>Anthropic:Precos</c>; sem o decorador a resposta volta sem custo e o turno o grava nulo.
+    /// </summary>
     private static IAgenteLlmClient ComRegistro(IServiceProvider sp, IAgenteLlmClient interno) =>
         sp.GetService<IRegistroChamadaIa>() is { } registro
             ? new RegistroChamadaIaLlmClient(interno, registro, sp.GetService<TimeProvider>() ?? TimeProvider.System,
-                sp.GetRequiredService<ILogger<RegistroChamadaIaLlmClient>>())
+                sp.GetRequiredService<ILogger<RegistroChamadaIaLlmClient>>(),
+                sp.GetRequiredService<IOptions<PrecosModelosAgenteOptions>>())
             : interno;
 
     /// <summary>

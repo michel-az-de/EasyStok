@@ -4,7 +4,6 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
-using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -16,7 +15,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 internal sealed class FinalizacaoDoTurno(
     IConversaRepository conversaRepository, IEscaladorConversa escalador, IWhatsAppCloudClient cloudClient,
-    IUnitOfWork unitOfWork, ITurnoAgenteRepository turnos, IOptions<PrecosModelosAgenteOptions> precos, ILogger logger)
+    IUnitOfWork unitOfWork, ITurnoAgenteRepository turnos, ILogger logger)
 {
     /// <summary>O turno que acabou: o que a orquestração já decidiu e o que o modelo devolveu.</summary>
     public sealed record Turno(
@@ -146,12 +145,13 @@ internal sealed class FinalizacaoDoTurno(
 
     // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids. #3291 (D2): é a única fonte do
     // consumo do turno; o agregado mensal UsoIa saiu do caminho (o gasto mensal vem de TurnoAgente e chamada_ia).
+    // #3365 (D2): o custo não se recalcula aqui. Cada chamada o trouxe de quem a registra em chamada_ia, e o consumo o soma:
+    // o número do turno é o das linhas, e sem preço (ou sem registro) fica nulo, nunca zero.
     private async Task RegistrarAsync(Turno turno, DesfechoTurnoAgente desfecho, string? motivo, CancellationToken ct)
     {
         var consumo = turno.Geracao.Consumo ?? new ConsumoGeracaoAgente();
         await turnos.AddAsync(TurnoAgente.Registrar(turno.EmpresaId, turno.ConversaId, turno.UltimaEntradaId, turno.Gravacao.UltimaSaidaId,
-            consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
-            precos.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
+            consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido, consumo.CustoUsd,
             consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(turno.Cronometro.ElapsedMilliseconds, int.MaxValue), turno.Agora,
             motivo, turno.TurnoId), ct);
     }

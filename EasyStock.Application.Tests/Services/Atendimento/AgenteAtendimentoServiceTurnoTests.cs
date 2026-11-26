@@ -1,6 +1,5 @@
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
-using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -15,15 +14,6 @@ public partial class AgenteAtendimentoServiceTests
     private const string ModeloRespondido = "claude-sonnet-5-20261101";
 
     private readonly ITurnoAgenteRepository _turnos = Substitute.For<ITurnoAgenteRepository>();
-
-    private readonly PrecosModelosAgenteOptions _precos = TabelaDePrecos();
-
-    private static PrecosModelosAgenteOptions TabelaDePrecos()
-    {
-        var tabela = new PrecosModelosAgenteOptions();
-        tabela.Modelos["claude-sonnet-5"] = new PrecoModeloAgente(3m, 15m, 0.3m);
-        return tabela;
-    }
 
     private TurnoAgente TurnoGravado() =>
         _turnos.ReceivedCalls()
@@ -44,9 +34,11 @@ public partial class AgenteAtendimentoServiceTests
     {
         VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
         var saidas = CapturarSaidas();
+        // #3365 (D2): o custo vem de cada chamada (quem a registra em chamada_ia o calcula); o turno só soma. Os valores
+        // não saem de nenhuma tabela, para provar que o serviço não recalcula.
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
-            UsoFerramenta("consultar_pedido") with { TokensCacheLido = 500, Modelo = ModeloRespondido },
-            Texto("Seu pedido fica pronto por volta das 15h40.") with { Modelo = ModeloRespondido });
+            UsoFerramenta("consultar_pedido") with { TokensCacheLido = 500, Modelo = ModeloRespondido, CustoUsd = 0.5m },
+            Texto("Seu pedido fica pronto por volta das 15h40.") with { Modelo = ModeloRespondido, CustoUsd = 0.25m });
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
@@ -62,9 +54,23 @@ public partial class AgenteAtendimentoServiceTests
         turno.Passos.Should().Be(2);
         turno.Ferramentas.Should().Equal(new FerramentaDoTurno("consultar_pedido", true));
         turno.Desfecho.Should().Be(DesfechoTurnoAgente.Respondeu);
-        // 180 × 3 + 30 × 15 + 500 × 0,30, por milhão.
-        turno.CustoEstimado.Should().Be(0.00114m);
+        turno.CustoEstimado.Should().Be(0.75m, "é a soma do custo das duas chamadas, sem tabela de preço no turno");
         turno.DuracaoMs.Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public async Task ChamadaSemCustoDeixaOCustoDoTurnoGravadoNulo()
+    {
+        // #3365 (D2): sem custo vindo da chamada (modelo sem preço ou cliente sem registro), o turno fica sem custo e o painel
+        // o conta como "fora da conta"; o serviço não tem mais tabela de preço para recalcular.
+        VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("consultar_pedido") with { Modelo = ModeloRespondido, CustoUsd = 0.5m },
+            Texto("Seu pedido fica pronto por volta das 15h40.") with { Modelo = ModeloRespondido });
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        TurnoGravado().CustoEstimado.Should().BeNull("uma das duas chamadas veio sem custo");
     }
 
     [Fact]

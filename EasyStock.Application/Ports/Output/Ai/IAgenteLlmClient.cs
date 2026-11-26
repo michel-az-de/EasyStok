@@ -110,4 +110,10 @@ public sealed record RespostaLlm(
     /// maior não o sobe e repetir depois de <c>max_tokens</c> sairia igual. Falso quando o cliente não sabe (caminho do <c>.env</c>).
     /// </summary>
     public bool TetoNoMaximo { get; init; }
+
+    /// <summary>
+    /// #3365 (D2): custo em US$ desta chamada, calculado uma vez por quem a registra em <c>chamada_ia</c> (6 casas, como a linha).
+    /// Nulo quando o modelo não tem preço ou quando nenhum registro envolve o cliente; o turno soma e nunca recalcula.
+    /// </summary>
+    public decimal? CustoUsd { get; init; }
 }
