@@ -70,6 +70,10 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
         // turno_agente_id; se o turno caiu depois de chamar o modelo, os tokens dele só existem lá. Fora ficam a sugestão de
         // resposta para a equipe (finalidade Atendimento, sem turno) e as outras finalidades. A escrita de cache entra na
         // entrada, como o turno a soma (#2862). Falha de banco propaga, como na soma dos turnos: o controle de custo não abre.
+        // Fica neste repositório, e não em IRegistroChamadaIa, para que nenhum host monte a cota sem o piso e o construtor de
+        // PortoesDoAssistente siga como o ControleDeCustoDoAssistenteTests exige. Não é a soma de SomarMesAsync (todas as
+        // finalidades, entrada sem a escrita de cache): aqui é só o consumo do Assistente, na conta do turno. O desfecho da
+        // chamada não filtra: o que foi registrado com tokens conta, mesmo que tenha terminado em erro.
         var chamadas = await db.ChamadasIa.AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.CriadoEm >= deUtc && c.CriadoEm < ateUtc)
             .Where(c => c.Finalidade == FinalidadeIa.Atendimento && c.TurnoAgenteId != null)

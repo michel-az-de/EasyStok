@@ -12,9 +12,10 @@ public interface ITurnoAgenteRepository
     Task<PaginaTurnosAgente> ListarAsync(Guid empresaId, FiltroTurnosAgente filtro, CancellationToken ct = default);
 
     /// <summary>
-    /// Soma os turnos do Assistente em [<paramref name="deUtc"/>, <paramref name="ateUtc"/>), com o piso das chamadas ligadas
-    /// a turno em <c>chamada_ia</c> (#3370, <see cref="SomaTurnosAgente.ComPisoDasChamadas"/>). A cota e o cartão de uso leem
-    /// por aqui, então os dois mostram o mesmo consumo.
+    /// Soma os turnos do Assistente em [<paramref name="deUtc"/>, <paramref name="ateUtc"/>), com o piso das chamadas do
+    /// Assistente em <c>chamada_ia</c>: as ligadas a um turno, mesmo o que não gravou (#3370,
+    /// <see cref="SomaTurnosAgente.ComPisoDasChamadas"/>). A cota e o cartão de uso leem por aqui, então os dois mostram o
+    /// mesmo consumo.
     /// </summary>
     Task<SomaTurnosAgente> SomarAsync(Guid empresaId, DateTime deUtc, DateTime ateUtc, CancellationToken ct = default);
 }
@@ -67,12 +68,13 @@ public sealed record SomaTurnosAgente(
     public long? TokensDosTurnos { get; init; }
 
     /// <summary>
-    /// #3370 (D2 da #3271): piso do consumo. Se as chamadas de <c>chamada_ia</c> ligadas aos turnos somam mais tokens do que
-    /// os turnos, os tokens passam a ser os das chamadas (o turno caiu depois de chamar o modelo e não gravou, ou gravou sem
-    /// consumo). É o maior dos dois registros, nunca a soma: cada chamada pertence a um turno e contaria duas vezes. Empate
-    /// fica nos turnos. Só os tokens mudam; contagens e custo seguem dos turnos, então o cartão pode mostrar mais tokens do
-    /// que o custo cobre. O piso não é por turno: uma chamada perdida num turno gravado esconde, até o tamanho dela, um turno
-    /// que não gravou no mesmo período.
+    /// #3370 (D2 da #3271): piso do consumo. Se as chamadas do Assistente em <c>chamada_ia</c> (as ligadas a um turno, na
+    /// janela) somam mais tokens do que os turnos, os tokens passam a ser os das chamadas (o turno caiu depois de chamar o
+    /// modelo e não gravou). É o maior dos dois registros, nunca a soma: cada chamada pertence a um turno e contaria duas
+    /// vezes. Empate fica nos turnos. Só os tokens mudam; contagens e custo seguem dos turnos, então o cartão pode mostrar
+    /// mais tokens do que o custo cobre. O piso não é por turno: uma chamada perdida num turno gravado esconde, até o tamanho
+    /// dela, um turno que não gravou no mesmo período. Aplique uma vez por soma: numa segunda aplicação o total comparado já
+    /// é o do piso.
     /// </summary>
     /// <param name="entrada">Entrada das chamadas, já com a escrita de cache (o turno também a soma na entrada, #2862).</param>
     public SomaTurnosAgente ComPisoDasChamadas(long entrada, long saida, long cacheLido)

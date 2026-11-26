@@ -232,7 +232,8 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     [SkippableFact]
     public async Task Piso_com_turnos_e_chamadas_iguais_nao_conta_duas_vezes()
     {
-        // O caso de todo dia: cada turno e as chamadas dele batem, a escrita de cache já dentro da entrada do turno (#2862).
+        // O caso de todo dia: cada turno e as chamadas dele batem (a escrita de cache já dentro da entrada do turno, #2862) e
+        // o empate não conta duas vezes. Que a escrita de cache entra na entrada das chamadas, quem prova é o teste da janela.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
         var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
         var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -253,8 +254,9 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     [SkippableFact]
     public async Task Piso_conta_so_a_chamada_do_Assistente_ligada_a_turno_da_empresa_e_da_janela()
     {
-        // Sem nenhum turno gravado, só entra o que é consumo do Assistente neste mês e nesta loja. As "fora" têm tokens
-        // enormes: qualquer filtro que falte aparece na soma.
+        // Sem nenhum turno gravado, só entra o que é consumo do Assistente neste mês. As "fora" têm tokens enormes: qualquer
+        // filtro de janela, turno ou finalidade que falte aparece na soma. A outra empresa já some pelo filtro global do EF; o
+        // filtro de empresa da própria consulta é o do teste seguinte.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
         var empresa = Guid.NewGuid(); var outra = Guid.NewGuid(); var turno = Guid.NewGuid();
         var dentro = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
@@ -274,6 +276,43 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         // A escrita de cache entra na entrada (200 + 40), como o turno soma.
         (soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido).Should().Be((340L, 30L, 5L));
         soma.Turnos.Should().Be(0);
+    }
+
+    [SkippableFact]
+    public async Task Piso_conta_a_chamada_que_gastou_token_seja_qual_for_o_desfecho()
+    {
+        // O desfecho não filtra: o que foi registrado com token conta, mesmo que a chamada tenha terminado em erro, e a que
+        // nem saiu (cota estourada) vem com zero e não muda a soma.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var turno = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa,
+            Chamada(empresa, turno, em, 100, 10, 0),
+            Chamada(empresa, turno, em.AddSeconds(2), 50, 5, 0, desfecho: DesfechoChamadaIa.Erro),
+            Chamada(empresa, turno, em.AddSeconds(4), 0, 0, 0, desfecho: DesfechoChamadaIa.CotaEstourada));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        (soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido).Should().Be((150L, 15L, 0L));
+    }
+
+    [SkippableFact]
+    public async Task Piso_soma_em_long_e_nao_estoura_o_int()
+    {
+        // Duas chamadas de 1,5 bilhão de tokens de entrada somam mais do que int.MaxValue. Sem a conversão para long na
+        // consulta o banco devolve um bigint que não cabe no int do LINQ e a cota nem calcula.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var turno = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa,
+            Chamada(empresa, turno, em, 1_500_000_000, 0, 0),
+            Chamada(empresa, turno, em.AddSeconds(5), 1_500_000_000, 0, 0));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.TokensEntrada.Should().Be(3_000_000_000L);
     }
 
     [SkippableFact]
@@ -306,7 +345,8 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         await GravarChamadas(empresa, Chamada(empresa, Guid.NewGuid(), em, 10, 5, 0));
         await GravarChamadas(outra, Chamada(outra, Guid.NewGuid(), em, 9_000, 9_000, 0));
 
-        // Papel NOBYPASSRLS: a policy esconde a outra loja mesmo sem o filtro do EF, e o piso ainda lê a própria.
+        // Papel NOBYPASSRLS: a policy esconde a outra loja mesmo sem o filtro do EF, e o piso ainda lê a própria. Não mata
+        // mutante da consulta (ela filtra a empresa sozinha): prova que a policy de chamada_ia deixa o piso ler a própria loja.
         await using var db = fixture.CreateRlsClientDbContext();
         await db.Database.OpenConnectionAsync();
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {empresa.ToString()}, false)");
@@ -347,9 +387,9 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         TurnoAgente.Registrar(empresa, conversa, null, null, "claude-sonnet-5", entrada, saida, cache, custo, [], 1, desfecho, 800, em);
 
     private static ChamadaIa Chamada(Guid empresa, Guid? turno, DateTime em, int entrada, int saida, int cacheLido,
-        int cacheEscrito = 0, FinalidadeIa finalidade = FinalidadeIa.Atendimento) =>
+        int cacheEscrito = 0, FinalidadeIa finalidade = FinalidadeIa.Atendimento, DesfechoChamadaIa desfecho = DesfechoChamadaIa.Ok) =>
         ChamadaIa.Registrar(empresa, null, null, "claude-sonnet-5", finalidade, turno, entrada, saida, cacheLido, cacheEscrito, 0.001m,
-            800, DesfechoChamadaIa.Ok, em);
+            800, desfecho, em);
 
     private async Task GravarChamadas(Guid empresa, params ChamadaIa[] chamadas)
     {

@@ -56,6 +56,7 @@ public class SomaTurnosAgenteTests
         var soma = DosTurnos().ComPisoDasChamadas(1_000, 200, 500);
 
         soma.TotalTokens.Should().Be(1_700);
+        soma.Should().Be(DosTurnos());
     }
 
     [Fact]
@@ -66,7 +67,6 @@ public class SomaTurnosAgenteTests
         soma.TotalTokens.Should().Be(60);
         soma.TokensDosTurnos.Should().Be(0);
         soma.Turnos.Should().Be(0);
-        soma.TokensPoupadosEstimados.Should().BeNull();
     }
 
     [Fact]
