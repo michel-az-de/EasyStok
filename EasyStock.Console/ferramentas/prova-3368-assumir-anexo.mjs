@@ -44,6 +44,7 @@ for (let i = 0; i < await itens.count() && !achou; i++) {
   achou = (await p.getByRole('button', { name: 'Assumir conversa' }).count()) > 0
 }
 assert.ok(achou, 'a demonstração tem uma conversa com Assumir')
+const enviarPronto = () => p.waitForFunction(() => document.querySelector('button[aria-label="Enviar e assumir a conversa"]')?.disabled === false, null, { timeout: 5000 })
 const composer = p.locator('[class*="_composer_"]').filter({ has: p.locator('textarea') }).last()
 
 await caso('campo vazio: só o Assumir é laranja', async () => {
@@ -53,11 +54,11 @@ await caso('campo vazio: só o Assumir é laranja', async () => {
 })
 
 await caso('com texto: só o Enviar e assumir é laranja', async () => {
-  await p.locator('textarea').first().fill('oi')
-  await p.waitForTimeout(200)
+  await composer.locator('textarea').fill('oi')
+  await enviarPronto()
   const c = await cores()
   assert.deepEqual([c.assumirLaranja, c.enviarLaranja], [false, true])
-  await p.locator('textarea').first().fill('')
+  await composer.locator('textarea').fill('')
 })
 
 await caso('anexo sem texto: só o Enviar e assumir é laranja', async () => {
@@ -67,11 +68,12 @@ await caso('anexo sem texto: só o Enviar e assumir é laranja', async () => {
     await itens.nth(i).locator('button, a').first().click().catch(() => {})
     await p.waitForTimeout(300)
     if (!(await p.getByRole('button', { name: 'Assumir conversa' }).count())) continue
-    await composer.locator('input[type="file"]').setInputFiles({ name: 'prova.png', mimeType: 'image/png', buffer: PNG })
+    const enviou = await composer.locator('input[type="file"]').setInputFiles({ name: 'prova.png', mimeType: 'image/png', buffer: PNG }, { timeout: 1500 }).then(() => true, () => false)
+    if (!enviou) continue
     anexou = await p.getByRole('button', { name: 'Remover anexo prova.png', exact: true }).waitFor({ timeout: 1500 }).then(() => true, () => false)
   }
   assert.ok(anexou, 'a demonstração tem uma conversa com Assumir que aceita anexo')
-  await p.waitForTimeout(400)
+  await enviarPronto()
   const c = await cores()
   assert.equal(c.enviarHabilitado, true, 'Enviar e assumir habilitado com anexo')
   assert.deepEqual([c.assumirLaranja, c.enviarLaranja], [false, true], 'um laranja só')
