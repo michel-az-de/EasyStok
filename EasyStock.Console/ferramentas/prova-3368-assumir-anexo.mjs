@@ -35,6 +35,8 @@ const cores = () => p.evaluate(() => {
 })
 
 await p.goto(`${origem}/#/m/atendimento/balcao`, { timeout: 90000 })
+// A cor do botão tem transição: sem ela a leitura não depende do relógio do CI.
+await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' })
 const itens = p.locator('[role=list] [role=listitem], [role=list] > li')
 await itens.first().waitFor({ timeout: 90000 })
 let achou = false
