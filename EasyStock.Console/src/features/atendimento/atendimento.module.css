@@ -299,7 +299,7 @@
 }
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:hover:not(:disabled) { background: var(--preenchimento-forte); }
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:active:not(:disabled) {
-  background: var(--atd-preenchimento-hover);
+  background: var(--atd-preenchimento-ativo);
 }
 /* #3374 (C8): a faixa é uma linha só em qualquer coluna; o motivo que não cabe trunca com reticências e fica no title
    (antes, abaixo de 560 px ele descia para uma segunda linha, #2185). */

@@ -16,7 +16,7 @@ import { horaMono } from '../../dominio/formato'
 import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, ehSeloDeDinheiro } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, ehSeloDeDinheiro, pilulasVisiveis } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
@@ -86,8 +86,8 @@ export const CartaoConversa = memo(function CartaoConversa({
   // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
   const hora = horaDaLista(conversa.ultimaEm, agora)
   // #3374 (C4, L1): no máximo 2 pílulas na linha (estado + 1 contexto, ou 2 de contexto); o resto segue no `title`.
-  // O selo de dinheiro vai à frente, então nunca é o que cai fora.
-  const visiveis = [...contexto].sort((a, b) => Number(ehSeloDeDinheiro(b)) - Number(ehSeloDeDinheiro(a))).slice(0, etiqueta ? 1 : 2)
+  // Prioridade: dinheiro, depois aviso/perigo e "Só modelo", depois o resto (pilulasVisiveis).
+  const visiveis = pilulasVisiveis(contexto, etiqueta ? 1 : 2)
 
   return (
     <button

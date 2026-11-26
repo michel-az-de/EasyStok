@@ -150,6 +150,7 @@ for (const c of condicoes) {
   if (c.cena === 'assistente') {
     await p.getByRole('button', { name: /Abrir assistente/i }).first().click()
     await p.locator('section[role=dialog]').first().waitFor()
+    await p.mouse.move(0, 0) // mede em repouso: o cursor parado sobre o botão que abriu o painel contaria o hover como fundo
   }
   await p.waitForTimeout(600)
   const m = await p.evaluate(medir, { escala: ESCALA })

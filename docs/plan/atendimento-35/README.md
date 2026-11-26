@@ -77,7 +77,8 @@ em 13 px (`--t-micro`). O plano segue a escala: **13, 14, 16 e 20**. Se o Felipe
 - `EasyStock.Console/src/features/assistente/**` (C9, R5)
 - `EasyStock.Console/src/features/notificacoes/SinoDaSessao.jsx` (C14, faixa de notificação bloqueada)
 - `EasyStock.Console/src/componentes/AjusteLargura.jsx` (C9), `Botao*` (C3, C10: tecla no botão)
-- `EasyStock.Console/src/estilos/tokens.css` (só tokens NOVOS com prefixo `--atd-`; os tokens globais não mudam)
+- `EasyStock.Console/src/estilos/tokens.css` (só tokens NOVOS com prefixo `--atd-`; os tokens globais não mudam). Exceção: `--t-atd` (16 px do Atendimento), nome exigido pelo guarda `verificar-gramatica` (`--t-[a-z]+`); no `:root` ela vale `var(--t-corpo)` e só vira 1rem dentro de `.palco` e do painel do Assistente, para não vazar
+- `EasyStock.Console/src/app/moldura.module.css` (C2: variáveis do palco `--fundo`, `--papel`, `--preenchimento*`, `--t-atd`; folga da fila sob o botão Simular)
 - `EasyStock.Console/src/dominio/janela.js`, `resumoDoModo.js`, `falhaDeEnvio.js` (C12), `aviso.js` (C11)
 - `EasyStock.Console/src/app/AtualizacaoDoConsole.jsx` (G4), `PilhaDeAvisos.jsx` (C11), `Moldura.jsx` (C2, divisor)
 - `EasyStock.Console/src/aplicacao/contextos/**` (C11, só se o aviso novo exigir)

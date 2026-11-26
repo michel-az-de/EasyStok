@@ -6,9 +6,9 @@
   overflow-y: auto; flex: 1; min-height: 0;
   background: var(--papel);
   display: flex; flex-direction: column;
-  /* Integração: o botão flutuante "Simular" fica sobre o fim da coluna; a
-     folga deixa a última linha rolar para fora dele. */
-  padding-bottom: var(--e-3);
+  /* O botão flutuante "Simular" só existe no tablet e no celular (moldura define --folga-rolagem);
+     a folga deixa a última linha rolar para fora dele. Sem o botão, só --e-3. */
+  padding-bottom: var(--folga-rolagem, var(--e-3));
 }
 
 .cartao {

@@ -50,7 +50,7 @@ const AGORA = Date.parse('2026-11-05T01:00:00Z')
 confere('L5  o Balcão abre em "Precisa de você"', () => {
   assert.equal(estadoInicial({ conversas: [] }).filtros.aba, 'precisa')
 })
-confere('L5  segmento ligado em alto contraste; parado com contorno de botão', () => {
+confere('L5  segmento ligado em realce com contorno de tinta; parado com contorno de botão', () => {
   // #3282: filtro ligado em realce com contorno de tinta (#3374, C2); a cor de ação fica só para botão que age.
   assert.match(regra('.chipLigado'), /background:\s*var\(--preenchimento\)/)
   assert.match(regra('.chipLigado'), /color:\s*var\(--tinta\)/)
@@ -144,6 +144,17 @@ confere('T1  nome um degrau acima da prévia (--t-atd sobre --t-apoio)', () => {
 })
 confere('T3  contador sem a cor da marca', () => {
   assert.doesNotMatch(regra('.naoLidas'), /var\(--acao\)|var\(--marca\)/)
+})
+
+confere('C4  com 3+ pílulas, "Só modelo" e o aviso da passagem não caem fora; o dinheiro vai à frente', () => {
+  const ctx = [
+    { chave: 'origem', texto: 'Site', tom: 'aviso' }, { chave: 'pedido', texto: 'Falta R$ 40,00', tom: 'neutro' },
+    { chave: 'janela', texto: 'Só modelo', tom: 'neutro' }, { chave: 'tag', texto: 'Tag: VIP', tom: 'neutro' },
+  ]
+  assert.deepEqual(cartao.pilulasVisiveis(ctx, 2).map((i) => i.chave), ['pedido', 'origem'])
+  const semDinheiro = ctx.filter((i) => i.chave !== 'pedido')
+  assert.deepEqual(cartao.pilulasVisiveis(semDinheiro, 2).map((i) => i.chave), ['origem', 'janela'])
+  assert.deepEqual(cartao.pilulasVisiveis([ctx[3], ctx[2]], 1).map((i) => i.chave), ['janela'])
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

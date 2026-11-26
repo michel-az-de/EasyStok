@@ -41,11 +41,14 @@
   max-height: min(720px, calc(100dvh - 140px));
   /* #3374 (C2): o painel é do Atendimento e pinta com as mesmas 3 superfícies --atd-. */
   --papel: var(--atd-superficie); --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
+  --t-atd: 1rem;
   background: var(--papel); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: row; overflow: hidden;
   animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
+/* Hover e ativo: um tom abaixo do realce (estado, não superfície). Sem :focus: o campo abre focado e viraria um 9º fundo em repouso. */
+.painel :is(button, a, label, input, select, textarea, [role='button'], [role='tab'], [role='option']):is(:hover, :active) { --preenchimento-forte: var(--atd-preenchimento-hover); }
 /* #1806: a alça de largura fica na borda de dentro; o conteúdo segue em coluna ao lado dela. */
 .colunaPainel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 /* Encaixado à esquerda: depois do trilho no computador (#1920: token, não 84 px), na borda no tablet. */

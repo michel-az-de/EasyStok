@@ -51,7 +51,7 @@
   --atd-borda-erro: color-mix(in srgb, var(--erro) 30%, transparent);
   --atd-sombra-rolagem: color-mix(in srgb, var(--tinta) 16%, transparent);
   /* G1 (#3265): o Atendimento usa 4 tamanhos de fonte (nome `--t-atd`, não `--atd-t-corpo`: o guarda da gramática só aceita `--t-[a-z]+`), 13 (--t-micro), 14 (--t-apoio), 16 e 20 (--t-titulo). O 16 é novo: o 15 e o 17 globais não mudam. */
-  --t-atd: 1rem;
+  --t-atd: var(--t-corpo); /* fora do Atendimento: o corpo global; `.palco` e o painel do Assistente a fixam em 16 px */
   --vidro: light-dark(rgba(254, 254, 254, .94), rgba(36, 26, 18, .94));
   --desfoque: saturate(180%) blur(20px);
   --linha: light-dark(#E6E1D8, #594532);
