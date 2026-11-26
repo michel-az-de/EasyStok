@@ -231,7 +231,7 @@ public sealed class OrderLinker(
                         && await db.Set<PedidoEvento>().AnyAsync(e => e.PedidoId == pedidoIdResolvido.Value && e.Tipo == "importado" && e.StatusNovo == "pronto"))
                     {
                         if (!await LevarStatusAEsteiraAsync(pedidoIdResolvido.Value, mobileO)) continue;
-                        await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
+                        await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO, carimboDoAparelho);
                         await EnsureVendaAsync(mobileO);
                     }
                     continue;
@@ -255,7 +255,7 @@ public sealed class OrderLinker(
                 // Se a esteira recusou a entrega do pedido do ERP, ele não está entregue: não recebe.
                 if (erpAcompanhou && string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
                 {
-                    await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
+                    await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO, carimboDoAparelho);
                     await EnsureVendaAsync(mobileO);
                 }
                 // A Venda do pedido do ERP é deste vínculo (o envio não mexe nela): só é marcada como
@@ -589,7 +589,7 @@ public sealed class OrderLinker(
     /// forma da entrega; se o recebido já cobre o total, nada. Idempotente: no reenvio o restante é zero. NAO cria MovimentoCaixa "entrada" espelho: ele duplicava o pagamento no
     /// resumo do caixa e no dashboard (double-count #564 / QA BUG-004). O fluxo web/balcao nunca
     /// criou esse espelho — o mobile agora fica consistente.</summary>
-    private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
+    private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO, DateTime carimboDoAparelho)
     {
         var pedido = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == pedidoId);
@@ -610,7 +610,8 @@ public sealed class OrderLinker(
             PedidoId = pedido.Id,
             Metodo = metodo,
             Valor = restante,
-            PagoEm = await InstanteNoCaixa.DoRegistroAsync(db, pedido.EmpresaId, mobileO.UpdatedAt, pedido.LojaId),
+            // #3375: o vínculo regrava UpdatedAt ao criar o pedido; o recebimento é da hora em que o aparelho entregou.
+            PagoEm = await InstanteNoCaixa.DoRegistroAsync(db, pedido.EmpresaId, carimboDoAparelho, pedido.LojaId),
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = mobileO.Metodo is null
                 ? $"{MarcaDoRecebimentoAutomatico} (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."

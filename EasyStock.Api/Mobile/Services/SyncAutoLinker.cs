@@ -1,5 +1,6 @@
 ﻿using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Api.Mobile.Services;
 
@@ -16,7 +17,9 @@ public class SyncAutoLinker(
     Linkers.ClientLinker clientLinker,
     Linkers.ProductLinker productLinker,
     Linkers.BatchLinker batchLinker,
-    Linkers.OrderLinker orderLinker)
+    Linkers.OrderLinker orderLinker,
+    IServiceScopeFactory? escopos = null,
+    IMemoryCache? cache = null)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly IConfiguration _appConfig = appConfig;
@@ -26,6 +29,8 @@ public class SyncAutoLinker(
     private readonly Linkers.ProductLinker _productLinker = productLinker;
     private readonly Linkers.BatchLinker _batchLinker = batchLinker;
     private readonly Linkers.OrderLinker _orderLinker = orderLinker;
+    private readonly IServiceScopeFactory? _escopos = escopos;
+    private readonly IMemoryCache? _cache = cache;
 
     /// <summary>
     /// Runs auto-link for all entity types after a Push. Reads feature flags from
@@ -68,8 +73,76 @@ public class SyncAutoLinker(
         // #1543: lote antes de pedido. O pedido que chega no mesmo envio do lote so acha estoque para
         // baixar depois que a entrada do lote existe no ERP.
         if (autoLinkBatch  && batchIds.Count   > 0) await _batchLinker.ExecuteAsync(batchIds, empresaId);
-        if (autoLinkOrder  && orderIds.Count   > 0) await _orderLinker.ExecuteAsync(orderIds, empresaId);
+        if (autoLinkOrder  && orderIds.Count   > 0) await VincularPedidosAsync(orderIds, empresaId, esperar: true);
         if (autoLinkCash   && cashIds.Count    > 0) await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
+    }
+
+    /// <summary>#3375: chave da trava do Postgres que deixa um vínculo de pedidos por vez em cada empresa.</summary>
+    public static string ChaveDaTravaDePedidos(Guid empresaId) => $"mobile-autolink-pedidos:{empresaId:N}";
+
+    /// <summary>#3375: de quanto em quanto tempo a leitura de um aparelho tenta de novo os pedidos órfãos dele.</summary>
+    public static readonly TimeSpan IntervaloDaRepescagemNaLeitura = TimeSpan.FromMinutes(5);
+
+    private Task<List<string>> PedidosOrfaosAsync(Guid empresaId, string deviceId) =>
+        _db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+            .Where(o => o.EmpresaId == empresaId && o.LastDeviceId == deviceId && o.ErpPedidoId == null && o.ErpVendaId == null && o.Status != "cancelado")
+            .OrderByDescending(o => o.UpdatedAt).Take(OrfaosPorEnvio).Select(o => o.Id).ToListAsync();
+
+    /// <summary>
+    /// #3375: o pedido órfão esperava um envio novo do mesmo aparelho, que pode demorar dias; a leitura acontece o
+    /// tempo todo. Tenta de novo só os pedidos, uma vez por intervalo e por aparelho. Com outro vínculo de pedidos
+    /// da empresa em andamento, não espera: a próxima leitura tenta.
+    /// </summary>
+    public async Task RepescarPedidosOrfaosNaLeituraAsync(Guid empresaId, string deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId) || !_appConfig.GetValue<bool>("MobileSync:AutoLink:Order", true)) return;
+        var marca = $"mobile-repesca-leitura:{empresaId:N}:{deviceId}";
+        if (_cache?.TryGetValue(marca, out _) == true) return;
+
+        var orfaos = await PedidosOrfaosAsync(empresaId, deviceId);
+        if (orfaos.Count > 0)
+        {
+            if (!await VincularPedidosAsync(orfaos, empresaId, esperar: false)) return;
+            _log.LogInformation("AutoLink: leitura do aparelho tentou de novo órfãos empresa={EmpresaId} orders={O}", empresaId, orfaos.Count);
+        }
+        _cache?.Set(marca, true, IntervaloDaRepescagemNaLeitura);
+    }
+
+    /// <summary>
+    /// Vincula pedidos com a trava da empresa. A trava é de sessão e fica numa conexão só dela: o vínculo grava em
+    /// várias etapas, fora de uma transação única. Devolve false quando <paramref name="esperar"/> é false e a
+    /// trava está ocupada.
+    /// </summary>
+    private async Task<bool> VincularPedidosAsync(IEnumerable<string> orderIds, Guid? empresaId, bool esperar)
+    {
+        if (empresaId is not { } empresa || _escopos is null || !_db.Database.IsNpgsql())
+        {
+            await _orderLinker.ExecuteAsync(orderIds, empresaId);
+            return true;
+        }
+
+        using var escopo = _escopos.CreateScope();
+        var daTrava = escopo.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await daTrava.Database.OpenConnectionAsync();
+        try
+        {
+            var conexao = daTrava.Database.GetDbConnection();
+            if (!await TravaAsync(conexao, esperar ? "pg_advisory_lock" : "pg_try_advisory_lock", empresa)) return false;
+            try { await _orderLinker.ExecuteAsync(orderIds, empresaId); }
+            finally { await TravaAsync(conexao, "pg_advisory_unlock", empresa); }
+            return true;
+        }
+        finally { await daTrava.Database.CloseConnectionAsync(); }
+    }
+
+    /// <summary>pg_advisory_lock devolve void (a trava foi tomada); as outras duas devolvem se deu certo.</summary>
+    private static async Task<bool> TravaAsync(System.Data.Common.DbConnection conexao, string funcao, Guid empresaId)
+    {
+        await using var comando = conexao.CreateCommand();
+        comando.CommandText = $"SELECT {funcao}(hashtextextended(@chave, 0))";
+        var chave = comando.CreateParameter(); chave.ParameterName = "chave"; chave.Value = ChaveDaTravaDePedidos(empresaId);
+        comando.Parameters.Add(chave);
+        return await comando.ExecuteScalarAsync() is not false;
     }
 
     /// <summary>Quantos órfãos de cada tipo um envio tenta de novo, para um órfão que sempre falha não pesar no sync.</summary>
@@ -77,9 +150,10 @@ public class SyncAutoLinker(
 
     /// <summary>
     /// #2911: produto, cliente e pedido cujo vínculo falhou num envio ficavam só no aparelho; o app não os reenvia e
-    /// o backfill não tem quem chame. Cada envio tenta de novo os mais recentes gravados pelo mesmo aparelho: o app
-    /// envia um lote por vez, então dois envios nunca promovem o mesmo pedido juntos (Pedido.MobileOrderId não é
-    /// único). Pedido cancelado que nunca foi ao ERP fica de fora, e pedido do fluxo antigo de venda também.
+    /// o backfill não tem quem chame. Cada envio tenta de novo os mais recentes gravados pelo mesmo aparelho.
+    /// Pedido.MobileOrderId não é único e a leitura do aparelho também tenta de novo (#3375): quem impede o Pedido
+    /// em dobro é a trava de <see cref="VincularPedidosAsync"/>. Pedido cancelado que nunca foi ao ERP fica de fora,
+    /// e pedido do fluxo antigo de venda também.
     /// </summary>
     private async Task<(HashSet<string>, HashSet<string>, HashSet<string>)> ComOrfaosAsync(
         Guid empresaId, string deviceId, HashSet<string> productIds, HashSet<string> clientIds, HashSet<string> orderIds)
@@ -90,9 +164,7 @@ public class SyncAutoLinker(
         var clientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.LastDeviceId == deviceId && c.ErpClienteId == null)
             .OrderByDescending(c => c.UpdatedAt).Take(OrfaosPorEnvio).Select(c => c.Id).ToListAsync();
-        var pedidos = await _db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
-            .Where(o => o.EmpresaId == empresaId && o.LastDeviceId == deviceId && o.ErpPedidoId == null && o.ErpVendaId == null && o.Status != "cancelado")
-            .OrderByDescending(o => o.UpdatedAt).Take(OrfaosPorEnvio).Select(o => o.Id).ToListAsync();
+        var pedidos = await PedidosOrfaosAsync(empresaId, deviceId);
 
         if (produtos.Count + clientes.Count + pedidos.Count > 0)
             _log.LogInformation("AutoLink: tentando de novo órfãos empresa={EmpresaId} products={P} clients={C} orders={O}",
@@ -135,7 +207,7 @@ public class SyncAutoLinker(
         await _clientLinker.ExecuteAsync(clientIds, empresaId);
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
         await _batchLinker.ExecuteAsync(batchIds, empresaId);
-        await _orderLinker.ExecuteAsync(orderIds, empresaId);
+        await VincularPedidosAsync(orderIds, empresaId, esperar: true);
         await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
 
         return new BackfillCounts(productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);

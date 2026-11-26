@@ -449,6 +449,18 @@ public class SyncController(
         Guid? lojaId = device.LojaId;
         Guid? empresaId = device.EmpresaId;
 
+        // #3375: o pedido que ficou sem vínculo no ERP não espera um envio novo do aparelho. Falha aqui não derruba a leitura.
+        try
+        {
+            await _autoLinker.RepescarPedidosOrfaosNaLeituraAsync(device.EmpresaId, deviceId);
+        }
+        catch (Exception ex)
+        {
+            _db.ChangeTracker.Clear();
+            _log.LogError(ex, "AutoLink: repescagem de órfãos na leitura FALHOU empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                device.EmpresaId, ex.GetType().Name, ex.Message);
+        }
+
         var mutations = new List<MutationDto>();
 
         var productsQ = _db.Set<Product>().Where(p => p.EmpresaId == empresaId && p.ServerUpdatedAt > sinceDate && p.LastDeviceId != deviceId);
