@@ -3,7 +3,7 @@
 export function avisosDoDispositivo({ som, audioBloqueado, permissaoNotificacao }) {
   const avisos = []
   if (som && audioBloqueado) avisos.push({ id: 'som', texto: 'Som bloqueado pelo navegador.', detalhe: 'O som está bloqueado pelo navegador. Clique ou toque em qualquer parte da tela para ligar.' })
-  if (permissaoNotificacao === 'denied') avisos.push({ id: 'notificacao', texto: 'Notificações bloqueadas: use o cadeado.', detalhe: 'Os avisos do navegador estão bloqueados. Clique no cadeado ao lado do endereço, permita notificações e recarregue a página.' })
+  if (permissaoNotificacao === 'denied') avisos.push({ id: 'notificacao', texto: 'Avisos bloqueados: use o cadeado.', detalhe: 'Os avisos do navegador estão bloqueados. Clique no cadeado ao lado do endereço, permita notificações e recarregue a página.' })
   return avisos
 }
 

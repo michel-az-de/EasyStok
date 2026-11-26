@@ -38,7 +38,7 @@ export function AtualizacaoDoConsole() {
   }, [])
   if (!novaVersao) return null
   return <aside className={css.aviso} aria-label="Atualização do sistema">
-    <p role="status">Há uma nova versão. Conclua o que está preenchendo e atualize.</p>
+    <p role="status">Há uma nova versão. Atualize quando terminar.</p>
     <Botao onClick={() => {
       const destino = new URL(window.location.href)
       destino.searchParams.set('versao', novaVersao)
