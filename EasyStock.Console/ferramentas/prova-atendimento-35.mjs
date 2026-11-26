@@ -7,7 +7,7 @@
 //   e aninhados cartão (borda + raio + fundo) dentro de outro igual       f contraste     textos com contraste < 4,5
 //   g alvos     alvos interativos < 24 px                                 h bordaEsq      borda colorida só à esquerda
 // SEMPRE sai 0 gravando a medida (o `rodar-provas.mjs` roda todo prova-*.mjs). Só cobra o alvo com ALVO_35=1
-// (laranjas==1, espaçamentos só da escala --e-1..--e-6, fundos <= 3 superfícies + 5 estados, fonte >= 13, e/f/g/h == 0).
+// (laranjas==1 e no máximo 1 em cada estado da conversa (antes de assumir, assumida, com texto), espaçamentos só da escala --e-1..--e-6, fundos <= 3 superfícies + 5 estados, fonte >= 13, e/f/g/h == 0).
 // A C15 tira essa chave: o alvo passa a ser cobrado sempre.
 //
 //   PLAYWRIGHT_MODULE=<pasta do playwright> [ALVO_35=1] node ferramentas/prova-atendimento-35.mjs
@@ -140,7 +140,19 @@ for (const c of condicoes) {
   await p.waitForTimeout(600)
   const m = await p.evaluate(medir, { escala: ESCALA })
   await p.screenshot({ path: resolve(pasta, `${nome}.png`) })
-  medidas.push({ condicao: nome, ...c, ...m, errosDePagina: erros })
+  // C3 (um laranja por vez): o mesmo botão cheio muda de dono com o estado. Antes de assumir só `Assumir`; assumida e com
+  // campo vazio, nenhum (o microfone ocupa o lugar do Enviar); com texto, só `Enviar`. Mede depois do print, só na conversa.
+  let porEstado
+  if (c.cena === 'conversa') {
+    const contar = async () => { await p.waitForTimeout(300); return (await p.evaluate(medir, { escala: ESCALA })).laranjas }
+    const antes = await contar()
+    await p.getByRole('button', { name: /^Assumir conversa/ }).first().click()
+    const assumida = await contar()
+    await p.locator('main[aria-label="Atendimento"] textarea').first().fill('oi')
+    const comTexto = await contar()
+    porEstado = { antes, assumida, comTexto }
+  }
+  medidas.push({ condicao: nome, ...c, ...m, laranjasPorEstado: porEstado, errosDePagina: erros })
   await p.close()
 }
 
@@ -154,6 +166,7 @@ for (const m of medidas) {
   console.log(`${m.condicao.padEnd(32)} ${String(m.laranjas.n).padStart(5)} ${`${m.espacamentos.n}(${m.espacamentos.foraDaEscala.length})`.padStart(10)} ${String(m.fundos.n).padStart(8)} ${String(m.fonteMin).padStart(7)} ${String(m.aninhados.n).padStart(6)} ${String(m.contraste.n).padStart(7)} ${String(m.alvos.n).padStart(6)} ${String(m.bordaEsq.n).padStart(5)}`)
   const falha = (ok, texto) => { if (!ok) cobranca.push(`${m.condicao}: ${texto}`) }
   falha(m.laranjas.n === 1, `laranjas ${m.laranjas.n} != 1`)
+  if (m.laranjasPorEstado) for (const [estado, v] of Object.entries(m.laranjasPorEstado)) falha(v.n <= 1, `laranjas ${v.n} > 1 em "${estado}": ${v.itens.join(' | ')}`)
   falha(m.espacamentos.foraDaEscala.length === 0, `espaçamentos fora da escala: ${m.espacamentos.foraDaEscala.join(', ')}`)
   falha(m.fundos.n <= 3 + ESTADOS_PERMITIDOS, `fundos ${m.fundos.n} > ${3 + ESTADOS_PERMITIDOS}`)
   falha(m.fonteMin >= 13, `fonte mínima ${m.fonteMin} < 13`)
