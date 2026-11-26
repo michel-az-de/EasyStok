@@ -34,6 +34,7 @@
 }
 
 .painel {
+  font-size: var(--atd-t-corpo); /* #3374 (C7, G1): o texto sem tamanho próprio herda 16 px, não os 15 do corpo global */
   position: fixed; right: var(--e-4); z-index: 32;
   bottom: calc(56px + var(--e-4) + var(--e-2));
   width: min(432px, calc(100vw - 2 * var(--e-4)));
@@ -53,7 +54,7 @@
 /* Solto: left e top vêm do arrasto, já limitados à tela (`dominio/paineis.js`). */
 .painelSolto { animation: none; }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
-.posicoes { display: flex; align-items: center; gap: 2px; margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
+.posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {
   width: var(--toque); height: var(--toque); padding: 0;
   display: grid; place-items: center; background: none; border: 0;

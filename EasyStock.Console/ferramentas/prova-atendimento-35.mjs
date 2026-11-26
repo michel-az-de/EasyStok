@@ -62,7 +62,10 @@ function medir({ escala }) {
 
   const laranjas = todos.filter((e) => (e.tagName === 'BUTTON' || e.getAttribute('role') === 'button') && (() => { const c = rgba(getComputedStyle(e).backgroundColor); return c[3] > 0.9 && acao.some((a) => igual(a, c)) })()).map(descricao)
 
-  const espacos = new Set(); const foraDaEscala = new Set()
+  // Exceções explícitas (C7), as únicas: (1) `.sr`, o texto só para leitor de tela, que base.css recorta em 1 px com margem -1 px;
+  // (2) `Pilula`, componente compartilhado (`componentes/Pilula.module.css`, fora da lista 1.2 do plano) com padding 3/6 px.
+  const excecao = (e, p, v) => e.matches('.sr') || (e.className.toString().includes('_pilula_') && p.startsWith('padding') && (v === 3 || v === 6))
+  const espacos = new Set(); const foraDaEscala = new Set(); const origemFora = {}
   for (const e of todos) {
     const s = getComputedStyle(e)
     // `margin: auto` sai em px no getComputedStyle (valor usado); o Typed OM devolve o valor computado, `auto`.
@@ -71,7 +74,9 @@ function medir({ escala }) {
       if (p.startsWith('margin') && String(mapa?.get(p.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`))) === 'auto') continue
       const v = Math.round(Math.abs(parseFloat(s[p])) * 10) / 10
       if (!(v > 0)) continue
-      espacos.add(v); if (!escala.includes(v)) foraDaEscala.add(v)
+      if (excecao(e, p, v)) continue
+      espacos.add(v)
+      if (!escala.includes(v)) { foraDaEscala.add(v); (origemFora[v] ??= []).length < 4 && origemFora[v].push(`${p} ${descricao(e)}`) }
     }
   }
 
@@ -81,6 +86,9 @@ function medir({ escala }) {
   const fundosSaida = new Set(todos.filter((e) => /(^|\s)_?saida_/.test(String(e.className))).map((e) => rgba(getComputedStyle(e).backgroundColor).join(',')))
 
   const comTexto = todos.filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+  const fontesFora = {}
+  for (const e of comTexto.filter((x) => !x.matches('.sr'))) { const f = parseFloat(getComputedStyle(e).fontSize); if (![13, 14, 16, 20].includes(f)) (fontesFora[f] ??= []).length < 12 && fontesFora[f].push(descricao(e)) }
+  const fontes = [...new Set(comTexto.filter((e) => !e.matches('.sr')).map((e) => parseFloat(getComputedStyle(e).fontSize)))].sort((x, y) => x - y)
   const fonteMin = Math.min(...comTexto.map((e) => parseFloat(getComputedStyle(e).fontSize)))
 
   const cartao = (e) => { const s = getComputedStyle(e); return parseFloat(s.borderTopWidth) > 0 && parseFloat(s.borderTopLeftRadius) > 0 && rgba(s.backgroundColor)[3] > 0 }
@@ -112,10 +120,12 @@ function medir({ escala }) {
 
   return {
     laranjas: { n: laranjas.length, itens: laranjas },
-    espacamentos: { n: espacos.size, valores: [...espacos].sort((x, y) => x - y), foraDaEscala: [...foraDaEscala].sort((x, y) => x - y) },
+    espacamentos: { n: espacos.size, valores: [...espacos].sort((x, y) => x - y), foraDaEscala: [...foraDaEscala].sort((x, y) => x - y), origem: origemFora },
     fundos: { n: fundos.size, valores: [...fundos] },
     fundosSaida: { n: fundosSaida.size, valores: [...fundosSaida] },
     fonteMin,
+    fontes,
+    fontesFora,
     aninhados: { n: aninhados.length, itens: aninhados },
     contraste: { n: contraste.length, itens: contraste },
     alvos: { n: alvos.length, itens: alvos },
@@ -171,9 +181,10 @@ for (const m of medidas) {
   const falha = (ok, texto) => { if (!ok) cobranca.push(`${m.condicao}: ${texto}`) }
   falha(m.laranjas.n === 1, `laranjas ${m.laranjas.n} != 1`)
   if (m.laranjasPorEstado) for (const [estado, v] of Object.entries(m.laranjasPorEstado)) falha(v.n <= 1, `laranjas ${v.n} > 1 em "${estado}": ${v.itens.join(' | ')}`)
-  falha(m.espacamentos.foraDaEscala.length === 0, `espaçamentos fora da escala: ${m.espacamentos.foraDaEscala.join(', ')}`)
+  falha(m.espacamentos.foraDaEscala.length === 0, `espaçamentos fora da escala: ${m.espacamentos.foraDaEscala.join(', ')} | ${Object.entries(m.espacamentos.origem).map(([v, o]) => `${v}: ${o.join('; ')}`).join(' | ')}`)
   falha(m.fundos.n <= 3 + ESTADOS_PERMITIDOS, `fundos ${m.fundos.n} > ${3 + ESTADOS_PERMITIDOS}`)
   falha(m.fundosSaida.n <= 1, `fundos de bolha de saída ${m.fundosSaida.n} > 1`)
+  falha(m.fontesFora && Object.keys(m.fontesFora).length === 0, `fontes fora de 13/14/16/20: ${Object.entries(m.fontesFora).map(([f, o]) => `${f}: ${o.slice(0, 4).join('; ')}`).join(' | ')}`)
   falha(m.fonteMin >= 13, `fonte mínima ${m.fonteMin} < 13`)
   falha(m.aninhados.n === 0, `cartões aninhados ${m.aninhados.n}`)
   falha(m.contraste.n === 0, `contraste < 4,5 em ${m.contraste.n}`)

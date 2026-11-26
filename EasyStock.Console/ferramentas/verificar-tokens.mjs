@@ -4,8 +4,8 @@
 // color-mix, light-dark ou nome de cor.
 // Permitidos: 0, auto, inherit, initial, unset, transparent, currentColor, none, e `1px` em borda (largura do traço).
 //
-//   node ferramentas/verificar-tokens.mjs            aviso: imprime a contagem por arquivo e sai 0
-//   TOKENS_ESTRITO=1 node ferramentas/verificar-tokens.mjs   sai 1 se houver ocorrência (a C7 liga no `qualidade`)
+//   node ferramentas/verificar-tokens.mjs            erro: sai 1 se houver ocorrência (a C7 ligou no `qualidade`)
+//   TOKENS_ESTRITO=0 node ferramentas/verificar-tokens.mjs   aviso: só imprime a contagem e sai 0
 //   TOKENS_DETALHE=1 ...                             lista cada ocorrência com arquivo:linha
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
@@ -62,7 +62,7 @@ const total = [...porArquivo.values()].reduce((s, n) => s + n, 0)
 for (const [arquivo, n] of porArquivo) if (n > 0) console.log(`${String(n).padStart(4)}  ${relative('.', resolve(raiz, arquivo)).replaceAll('\\', '/')}`)
 if (process.env.TOKENS_DETALHE === '1') console.log(detalhes.join('\n'))
 console.log(`Tokens: ${total} valor(es) literal(is) de espaçamento ou cor em ${[...porArquivo.values()].filter((n) => n > 0).length} de ${porArquivo.size} arquivo(s).`)
-if (total > 0 && process.env.TOKENS_ESTRITO === '1') {
-  console.error('TOKENS_ESTRITO: troque o valor literal por var(--e-1..--e-6) ou por um token de cor.')
+if (total > 0 && process.env.TOKENS_ESTRITO !== '0') {
+  console.error('Tokens: troque o valor literal por var(--e-1..--e-6) ou por um token de cor.')
   process.exit(1)
 }

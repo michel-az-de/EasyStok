@@ -15,7 +15,7 @@
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
-  margin: 0; color: var(--erro); font-size: var(--t-corpo);
+  margin: 0; color: var(--erro); font-size: var(--atd-t-corpo);
 }
 .motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
 .alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
@@ -39,7 +39,7 @@
 .rotuloDado { flex: 0 0 88px; font-size: var(--t-apoio); color: var(--tinta-3); font-weight: 400; }
 .linhaDado > .campoEmLinha { flex: 1; min-width: 0; overflow-wrap: normal; }
 .linhaDado > .campoEmLinha button { word-break: break-word; overflow-wrap: normal; }
-.valorCanal { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-corpo); color: var(--tinta); }
+.valorCanal { display: flex; align-items: center; gap: var(--e-2); font-size: var(--atd-t-corpo); color: var(--tinta); }
 
 /* Canais de aviso (decisão 46, "Encerrar" v2): e-mail e SMS, cada um ligado
    ou não. Mesma linha do resto do cadastro, dois toques lado a lado. */
@@ -87,7 +87,7 @@
 .valorBotao {
   display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
   background: none; border: 0; padding: 0; text-align: left;
-  font-size: var(--t-corpo); color: var(--tinta); font-family: inherit;
+  font-size: var(--atd-t-corpo); color: var(--tinta); font-family: inherit;
 }
 .valorBotao svg { color: var(--tinta-2); flex-shrink: 0; }
 .valorBotao:hover svg { color: var(--tinta); }
@@ -102,7 +102,7 @@
 .controleEmLinha {
   flex: 1 0 100%; min-width: 0; min-height: var(--toque); padding: 0 var(--e-2);
   border: 0; border-radius: var(--r-1);
-  background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
+  background: var(--papel); color: var(--tinta); font-size: var(--atd-t-corpo); font-family: inherit;
 }
 /* #2258 (T12): o campo com erro continua visível; `border: 0` acima anulava a borda. */
 .controleComErro { background: var(--preenchimento); box-shadow: inset 0 0 0 var(--b-2) var(--erro); }
@@ -203,8 +203,8 @@
 /* Rodada 6c: dados do cliente como no Contatos do iPhone. Azulejo colorido
    com o ícone à esquerda, rótulo pequeno em cima e o valor embaixo. */
 .linhaDado {
-  display: grid; grid-template-columns: 30px 1fr; column-gap: var(--e-3); row-gap: 1px;
-  align-items: center; padding: 10px var(--e-3);
+  display: grid; grid-template-columns: 30px 1fr; column-gap: var(--e-3); row-gap: var(--e-1);
+  align-items: center; padding: var(--e-3) var(--e-3);
 }
 .linhaDado > :not(.azulejo) { grid-column: 2; }
 .azulejo {
@@ -224,7 +224,7 @@
 .az_camera { background: var(--canal-instagram-fundo); }
 .azCinza { background: var(--canal-neutro-fundo); }
 .rotuloDado { flex: none; font-size: var(--t-micro); color: var(--tinta-3); font-weight: 400; line-height: 1.2; }
-.linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--t-corpo); }
+.linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--atd-t-corpo); }
 
 .az_whatsapp { background: var(--canal-whatsapp-fundo); }
 .az_instagram { background: var(--canal-instagram-fundo); }
@@ -235,8 +235,8 @@
    `key`, então o realce toca uma vez por dado novo). Movimento reduzido
    (base.css) corta o realce; o selo continua. */
 .seloCaptado {
-  display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
-  padding: 1px 7px; border-radius: var(--r-pilula); vertical-align: middle;
+  display: inline-flex; align-items: center; gap: var(--e-1); margin-left: var(--e-1);
+  padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula); vertical-align: middle;
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
   color: var(--sucesso); background: var(--sucesso-pastel);
 }
@@ -251,7 +251,7 @@
    recompensas da modal de resgate. Discreto de propósito (pedido do Felipe:
    "sem sujar a UX atual"), mesmo tom pastel do selo captado acima. */
 .seloPontos {
-  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
+  display: inline-flex; align-items: center; gap: var(--e-1); padding: var(--e-1) var(--e-2);
   border-radius: var(--r-pilula); font-size: var(--t-micro); font-weight: 600;
   color: var(--marca); background: var(--marca-claro);
 }
@@ -282,25 +282,25 @@
   background: var(--alerta-pastel); border-radius: var(--r-2);
 }
 .seloInformado {
-  justify-self: start; padding: 1px 8px; border-radius: var(--r-pilula);
+  justify-self: start; padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula);
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
   color: var(--alerta); background: var(--elevado);
 }
 .listaInformado {
   display: grid; grid-template-columns: auto 1fr; gap: var(--e-1) var(--e-3); margin: 0;
-  font-size: var(--t-corpo); color: var(--tinta);
+  font-size: var(--atd-t-corpo); color: var(--tinta);
 }
 .listaInformado dt { font-size: var(--t-apoio); color: var(--tinta-3); }
 .listaInformado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .contatoInformado .rodapeBloco, .contatoInformado .erroEmLinha { margin: 0; }
 /* O telefone informado já é de um cadastro: a pergunta à dona, em texto de leitura (não de apoio). */
-.perguntaInformado { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.perguntaInformado { margin: 0; font-size: var(--atd-t-corpo); color: var(--tinta); }
 
 /* #1686 (item 9): marca de destino do motivo da barra sem mexer no layout. */
 .contents { display: contents; }
 
 /* #2780: mesmo tom âmbar da restrição: texto na tinta, só o ícone no alerta. */
 .avisoInativo { display: flex; align-items: flex-start; gap: var(--e-2); margin: var(--e-3) 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-apoio); }
-.avisoInativo svg { flex: none; margin-top: 2px; color: var(--alerta); }
+.avisoInativo svg { flex: none; margin-top: var(--e-1); color: var(--alerta); }
 .avisoInativo a { color: var(--marca); font-weight: 600; text-underline-offset: 2px; }
 .avisoInativo a:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }

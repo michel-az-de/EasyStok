@@ -9,7 +9,7 @@
   display: grid; place-items: center; flex-shrink: 0;
   width: 48px; height: 48px; border-radius: var(--r-1); background: var(--papel); color: var(--tinta-2);
 }
-.previaTexto { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.previaTexto { display: grid; gap: var(--e-1); min-width: 0; flex: 1 1 auto; }
 .previaTexto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .previaTexto span { font-size: var(--t-apoio); color: var(--tinta-3); }
 .previaRemover {
@@ -24,9 +24,9 @@
   min-height: var(--toque);
 }
 .gravandoIcone { color: var(--erro); flex-shrink: 0; }
-.onda { display: flex; align-items: flex-end; gap: 2px; height: 24px; flex: 1 1 80px; min-width: 60px; }
+.onda { display: flex; align-items: flex-end; gap: var(--e-1); height: 24px; flex: 1 1 80px; min-width: 60px; }
 .onda span { width: 3px; min-height: 3px; border-radius: var(--r-pilula); background: var(--erro); }
-.cronometro { font-family: var(--f-dado); font-size: var(--t-corpo); color: var(--tinta); min-width: 3.5ch; }
+.cronometro { font-family: var(--f-dado); font-size: var(--atd-t-corpo); color: var(--tinta); min-width: 3.5ch; }
 .avisoLimite { font-size: var(--t-apoio); color: var(--alerta); }
 
 .aviso, .erro {

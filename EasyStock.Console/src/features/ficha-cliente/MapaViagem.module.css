@@ -1,6 +1,6 @@
 .painel { display: grid; gap: var(--e-3); min-width: 0; }
 .cabecalho { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); }
-.cabecalho h3 { margin: 0; font-size: var(--t-forte); }
+.cabecalho h3 { margin: 0; font-size: var(--atd-t-corpo); }
 .conteudo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); align-items: start; gap: var(--e-4); }
 .semMapa { grid-template-columns: 1fr; }
 .mapa, .viagem { min-width: 0; display: grid; gap: var(--e-2); }
