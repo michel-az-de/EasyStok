@@ -422,7 +422,7 @@ export function Composer({
                 aria-haspopup={podeEscrever ? 'listbox' : 'true'}
                 aria-expanded={podeEscrever ? barra.aberto : modeloAberto}
                 aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                className={css.botaoRespostas}
+                aria-label="Respostas" className={css.botaoRespostas}
                 onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : (modeloAberto ? aoFecharModelos : aoAbrirModelos)}
               >
                 <Icone nome="respostas" />
