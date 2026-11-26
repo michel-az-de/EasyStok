@@ -32,9 +32,9 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
   useEffect(() => {
     if (!podeAssumir) return undefined
     const ouvir = (e) => {
-      if (e.key.toLowerCase() !== 'a' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || e.defaultPrevented || e.isComposing) return
+      if (e.key?.toLowerCase() !== 'a' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || e.defaultPrevented || e.isComposing) return
       const alvo = e.target
-      if (alvo?.closest?.('input, textarea, select, [contenteditable], [role=dialog], [role=menu], [role=listbox], [role=combobox], dialog')) return
+      if (alvo?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role=group][popover], [role=dialog], [role=menu], [role=listbox], [role=combobox], dialog')) return
       const botao = botaoAssumir.current
       if (!botao || botao.disabled || botao.offsetParent === null || document.querySelector('dialog[open]')) return
       e.preventDefault()

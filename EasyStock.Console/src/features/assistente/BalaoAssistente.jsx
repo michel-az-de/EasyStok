@@ -195,11 +195,13 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const solto = lado === 'flutuante' && !celular
   // #3374 (C9, R5): encaixado no computador o painel EMPURRA o palco em vez de cobrir a conversa (o Assumir ficava
   // embaixo dele). Com isso a máxima deixa as três colunas nos seus mínimos de CSS (fila 260, ficha 292, conversa 320).
-  const empurra = !celular && !solto && area.colunas
+  // Entre 1180 e 1307 px esse teto fica abaixo do mínimo do painel: aí não empurra e o painel segue sobreposto, na largura normal.
+  const tetoEmpurrando = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO
+  const empurra = !celular && !solto && area.colunas && tetoEmpurrando >= ASSISTENTE.min
   const larguraMaximaPainel = limitar(
     larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
     ASSISTENTE.min,
-    empurra ? area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO : ASSISTENTE.max,
+    empurra ? tetoEmpurrando : ASSISTENTE.max,
   )
   const larguraPainel = limitar(posicaoPainel.largura, ASSISTENTE.min, larguraMaximaPainel)
   const dentroDaTela = (x, y) => posicaoDentroDaTela({

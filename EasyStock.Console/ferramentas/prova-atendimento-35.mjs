@@ -136,6 +136,8 @@ function medir({ escala }) {
 const fixas = []
 const condicoes = []
 for (const tema of ['light', 'dark']) for (const [w, h] of [[1440, 900], [1920, 1080]]) for (const cena of ['conversa', 'assistente']) condicoes.push({ tema, w, h, cena })
+// Entre 1180 e 1307 px o painel não empurra o palco (teto < mínimo): fica sobreposto, mas nunca abaixo de 320 px.
+condicoes.push({ tema: 'light', w: 1280, h: 800, cena: 'assistente', estreita: true })
 
 const medidas = []
 for (const c of condicoes) {
@@ -175,7 +177,10 @@ for (const c of condicoes) {
   }
   // C9 e C10 (sempre cobradas, são baratas e estáveis): com o Assistente aberto o Assumir fica à vista e clicável (o centro dele cai nele
 // e o painel não o cobre) e o Esc fecha o painel devolvendo o foco ao botão que o abriu.
-if (c.cena === 'assistente') {
+if (c.cena === 'assistente' && c.estreita) {
+const painelLargura = await p.locator('section[role=dialog]').first().boundingBox().then((b) => b && Math.round(b.width))
+fixas.push([painelLargura >= 320, `${nome}: painel com ${painelLargura} px (mínimo 320)`])
+} else if (c.cena === 'assistente') {
 const assumir = p.getByRole('button', { name: /^Assumir conversa/ }).first()
 const cx = await assumir.boundingBox().then((b) => b && { x: b.x + b.width / 2, y: b.y + b.height / 2 })
 const clicavel = cx ? await p.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y); return !!el?.closest('button')?.textContent.startsWith('Assumir conversa') }, cx) : false

@@ -49,7 +49,10 @@ export function avisosDoRetrato(antes, retrato) {
     }
     if (mudanca.etapaMudou) {
       // #3374 (C11): para frente é "avançou" (quem respondeu vê o efeito); voltar ou sair da trilha segue neutro.
-      const avancou = indiceDoPasso(linha.etapa) > indiceDoPasso(antes?.get(id)?.etapa)
+      // Etapa fora da trilha (índice -1) em qualquer lado não permite dizer que avançou.
+      const de = indiceDoPasso(antes?.get(id)?.etapa)
+      const para = indiceDoPasso(linha.etapa)
+      const avancou = de >= 0 && para > de
       avisos.push(criar(TIPOS_DE_AVISO.ETAPA_DO_PEDIDO, id, avancou ? 'Pedido avançou' : 'Pedido mudou de etapa', `${nome}: ${rotuloDoEstado(linha.etapa)}`, null))
     }
   }

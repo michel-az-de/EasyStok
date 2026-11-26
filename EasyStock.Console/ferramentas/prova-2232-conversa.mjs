@@ -125,7 +125,7 @@ await confere('A2  a barra da conversa renderiza a faixa, sem a pílula "Passou 
 await confere('A3  uma ação primária: "Assumir conversa"; Devolver e o resto não ficam na faixa', () => {
   existe(modo, 'acoesDaConversa')
   const marcado = barra(conversaComVoce)
-  assert.match(marcado, />Assumir conversa</)
+  assert.match(marcado, />Assumir conversa <kbd[^>]*aria-hidden="true"[^>]*>A<\/kbd></) // C10: a dica da tecla A fica no botão
   assert.equal((marcado.match(/<button/g) ?? []).length, 1, 'um botão só na faixa')
   assert.doesNotMatch(marcado, /Devolver ao Assistente|Concluir conversa|Mais ações/)
   const acoes = acoesDe(conversaComVoce)

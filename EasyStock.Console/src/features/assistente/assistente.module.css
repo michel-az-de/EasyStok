@@ -58,9 +58,10 @@
 /* Solto: left e top vêm do arrasto, já limitados à tela (`dominio/paineis.js`). */
 .painelSolto { animation: none; }
 /* #3374 (C9): encaixado, o painel empurra o palco (reserva medida em BalaoAssistente) e a conversa nunca fica por baixo dele.
-   Borda transparente, não padding: é reserva de tela, não espaçamento da escala `--e-`. */
-:global(html[data-assistente-empurra='direita']) :global(#conteudo-principal) { border-right: var(--assistente-reserva-direita, 0px) solid transparent; }
-:global(html[data-assistente-empurra='esquerda']) :global(#conteudo-principal) { border-left: var(--assistente-reserva-esquerda, 0px) solid transparent; }
+   Margem, não padding: é reserva de tela, não espaçamento da escala `--e-`. Só no palco do Atendimento (`data-palco-atendimento`,
+   Moldura de três colunas): nas outras telas o Assistente continua sobreposto. */
+:global(html[data-assistente-empurra='direita']) :global(#conteudo-principal[data-palco-atendimento]) { margin-right: var(--assistente-reserva-direita, 0px); }
+:global(html[data-assistente-empurra='esquerda']) :global(#conteudo-principal[data-palco-atendimento]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
 .posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {

@@ -532,7 +532,7 @@ function ConteudoMoldura({
           aoAbrirAjuda={aoAbrirAjuda}
           disposicao={<DisposicaoConversas larguras={larguras} aoRedimensionar={aoRedimensionar} />}
         />
-        <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
+        <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela data-palco-atendimento="" id="conteudo-principal" aria-label="Atendimento">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Conversas" semTitulo>

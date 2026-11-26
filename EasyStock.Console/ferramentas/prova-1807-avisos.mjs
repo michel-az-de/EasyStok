@@ -139,6 +139,11 @@ await confere('B5b. etapa que anda para frente diz "avançou"; a que volta fica 
   assert.match(frente[0].corpo, /Marina: Pronto/)
   const volta = avisosDe(retrato([['c1', linha({ etapa: 'embalado' })]]), retrato([['c1', linha({ etapa: 'preparo' })]]))
   assert.equal(volta[0].titulo, 'Pedido mudou de etapa')
+  // Etapa fora da trilha, de qualquer lado: neutro (índice -1 não é "antes" de nada).
+  const entrando = avisosDe(retrato([['c1', linha({ etapa: 'cancelado' })]]), retrato([['c1', linha({ etapa: 'preparo' })]]))
+  assert.equal(entrando[0].titulo, 'Pedido mudou de etapa')
+  const saindo = avisosDe(retrato([['c1', linha({ etapa: 'preparo' })]]), retrato([['c1', linha({ etapa: 'cancelado' })]]))
+  assert.equal(saindo[0].titulo, 'Pedido mudou de etapa')
 })
 
 await confere('B6. o mesmo retrato pode trazer eventos de conversas diferentes', () => {
