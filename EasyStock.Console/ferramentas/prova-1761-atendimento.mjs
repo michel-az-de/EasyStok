@@ -318,9 +318,13 @@ const janelaCom = (minutosRestantes) => estadoDaJanela(
 // 1280 px (a linha cabe, prova-2185 E31); abaixo, só perto do fim (`prazoFolgado` + CSS). Fechada, não iniciada ou
 // sem regra, a janela é dita uma vez só.
 await confere('J  prazo no cabeçalho com a janela aberta; fechada ou sem regra, diz uma vez só (a faixa, se ela disser)', () => {
-  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'Janela aberta por 23 h 55 min')
-  assert.equal(prazoNoCabecalho(janelaCom(119)), 'Janela aberta por 1 h 59 min')
-  assert.equal(prazoNoCabecalho(janelaCom(20)), 'Janela aberta por 20 min')
+  // #3374 (C13): o prazo é a hora do fim, no fuso da loja (AGORA = 18h45 em São Paulo), não uma contagem.
+  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'Responda até amanhã 18h40')
+  assert.equal(prazoNoCabecalho(janelaCom(119)), 'Responda até 20h44')
+  assert.equal(prazoNoCabecalho(janelaCom(20)), 'Responda até 19h05')
+  assert.equal(prazoNoCabecalho(janelaCom(135)), 'Responda até 21h')
+  assert.equal(prazoNoCabecalho(janelaCom(5 * 60 + 15)), 'Responda até amanhã 0h', 'virada do dia: meia-noite é amanhã')
+  assert.equal(prazoNoCabecalho(janelaCom(30 * 60)), 'Responda até 15/10 0h45', 'além de amanhã vem a data')
   assert.equal(prazoNoCabecalho(estadoDaJanela({ mensagens: [] }, AGORA, SITE)), null)
   // Cada caso fechado: a faixa da janela diz, o cabeçalho cala. Concluída ou bloqueada, a faixa fala de
   // outra coisa e o cabeçalho segue dizendo a janela (senão ela some da tela).
