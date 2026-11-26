@@ -147,11 +147,11 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = fa
       <fieldset className={css.filtros}>
         <legend className="sr">Filtros das conversas</legend>
         <button type="button" aria-pressed={filtros.aba !== 'precisa'} className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`} onClick={() => aoMudar('aba', 'todas')}>
-          Todas {!semContagem && <Pilula contagem={quantasAbertas} tom="neutro" aria-hidden="true" />}
+          Todas {!semContagem && quantasAbertas > 0 && <Pilula contagem={quantasAbertas} tom="neutro" aria-hidden="true" />}
         </button>
         <button type="button" aria-pressed={filtros.aba === 'precisa'} className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''}`}
           onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}>
-          Precisa de você {!semContagem && <Pilula contagem={quantasPrecisam} tom="marca" aria-hidden="true" />}
+          Precisa de você {!semContagem && quantasPrecisam > 0 && <Pilula contagem={quantasPrecisam} tom="marca" aria-hidden="true" />}
         </button>
       </fieldset>
     </div>
