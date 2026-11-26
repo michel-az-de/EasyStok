@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { apresentacaoDoNome, clienteSemNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
@@ -9,39 +9,12 @@ import { useCatalogo } from '../../aplicacao/contextos'
 import { ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag } from '../../dominio/cliente'
 import { acoesDoCartao, ROTULO_CADASTRAR_CLIENTE } from '../../dominio/cadastroDoLead'
 import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
+import { AcoesDoCliente } from './AcoesDoCliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
 import { QuemEDoCliente } from './QuemEDoCliente'
-import { copiarTexto, linkDoMapa } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 import notasCss from './NotasDoCliente.module.css'
-
-// #2232 (F2): o endereço do cartão tem ação: copiar (com retorno visível) e abrir no mapa em nova aba.
-// Fora do botão que abre o cadastro, porque botão dentro de botão não é HTML válido.
-function EnderecoDoCliente({ endereco }) {
-  const [retorno, setRetorno] = useState(null) // 'copiado' | 'falhou'
-  useEffect(() => {
-    if (!retorno) return undefined
-    const id = setTimeout(() => setRetorno(null), 2400)
-    return () => clearTimeout(id)
-  }, [retorno])
-  const copiar = async () => setRetorno(await copiarTexto(endereco) ? 'copiado' : 'falhou')
-  return (
-    <div className={css.enderecoCliente}>
-      <Icone nome="map-pin" tamanho={16} />
-      <span className={css.enderecoClienteInline}>{endereco}</span>
-      <span className={css.acoesEndereco}>
-        <Botao variante="texto" icone="copy" onClick={copiar}>Copiar</Botao>
-        <a className={css.abrirNoMapa} href={linkDoMapa(endereco)} target="_blank" rel="noopener noreferrer">
-          <Icone nome="external-link" tamanho={16} />Abrir no mapa
-        </a>
-      </span>
-      <output className={css.retornoEndereco} aria-live="polite">
-        {retorno === 'copiado' ? 'Copiado' : retorno === 'falhou' ? 'Não foi possível copiar' : ''}
-      </output>
-    </div>
-  )
-}
 
 // #1839: o que se vê sempre no Resumo, sem abrir nada: quem é o cliente (resumo da IA), quanto já
 // comprou no total, o que costuma pedir, as tags e a última nota interna como post-it. O resto
@@ -81,10 +54,17 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, aoCadastrar, foto
         </p>
       )}
       <QuemEDoCliente conversa={conversa} />
-      {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
+      {/* #2232 (F2): o endereço fica como texto; copiar e abrir no mapa estão na fileira de ações (#3265, R1). */}
+      {cliente.endereco && (
+        <p className={css.enderecoCliente}>
+          <Icone nome="map-pin" tamanho={16} />
+          <span className={css.enderecoClienteInline}>{cliente.endereco}</span>
+        </p>
+      )}
+      <AcoesDoCliente conversa={conversa} conferir={acoes.vincular && !acoes.cadastrar} />
       {/* #3207: lead tem UM botão principal; vincular a um cadastro que já existe fica como ação discreta. */}
       {acoes.cadastrar && aoCadastrar && <Botao largo variante="primario" icone="user-plus" data-cadastrar-cliente onClick={aoCadastrar}>{ROTULO_CADASTRAR_CLIENTE}</Botao>}
-      {acoes.vincular && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} rotulo={acoes.rotuloDoVinculo} />}
+      {acoes.cadastrar && acoes.vincular && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} rotulo={acoes.rotuloDoVinculo} />}
       {mostrarEntrega && <div className={notasCss.acoesCliente}>
         {aoVerEntrega
           ? <Botao data-foco-reserva={focoFrete} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>

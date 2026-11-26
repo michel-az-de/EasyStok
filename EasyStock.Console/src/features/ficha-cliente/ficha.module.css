@@ -489,18 +489,24 @@
 .nomeClienteInline { font-size: var(--t-forte); font-weight: 700; overflow-wrap: anywhere; }
 .contatoClienteInline, .enderecoClienteInline { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: 1.5; overflow-wrap: anywhere; }
 .notasCliente { display: grid; gap: var(--e-2); }
-/* #2232 (F2): endereço com ícone de local e as duas ações; as ações descem para a linha de baixo quando falta largura. */
-.enderecoCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); color: var(--tinta-2); }
+/* #2232 (F2): endereço com ícone de local. #3265 (R1): copiar e abrir no mapa foram para a fileira de ações. */
+.enderecoCliente { display: flex; align-items: center; gap: var(--e-1) var(--e-2); margin: 0; color: var(--tinta-2); }
 .enderecoCliente > svg { flex: none; }
 .enderecoCliente .enderecoClienteInline { flex: 1 1 12ch; min-width: 0; font-size: var(--t-apoio); }
-.acoesEndereco { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); }
-.abrirNoMapa {
-  display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding-inline: var(--e-2);
-  color: var(--marca); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+/* #3265 (R1): as ações do cartão numa fileira de colunas iguais, ícone sobre rótulo curto, em contorno uniforme de 1px.
+   Duas classes, para vencer o padding e a borda do Botao sem depender da ordem dos módulos no CSS final. */
+.acoesDoCliente { display: grid; gap: var(--e-1); }
+.fileiraAcoesCliente { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--e-1); }
+.fileiraAcoesCliente .acaoCliente {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 0; min-height: 48px; padding: var(--e-1) 2px; border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  background: transparent; color: var(--tinta); font-size: var(--t-micro); font-weight: 600; line-height: 1.2;
+  text-align: center; text-decoration: none; white-space: nowrap;
 }
-.abrirNoMapa:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
-.retornoEndereco { flex-basis: 100%; min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
-.retornoEndereco:empty { display: none; }
+.fileiraAcoesCliente .acaoCliente > svg { flex: none; color: var(--tinta-2); }
+.fileiraAcoesCliente .acaoCliente:hover { background: var(--preenchimento); }
+.retornoCopia { min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
+.retornoCopia:empty { display: none; }
 /* #3209: "Quem é": telefone, pedidos e fotos do cartão, em contorno uniforme e sem barra de cor. */
 .quemE { display: grid; gap: var(--e-2); }
 .linhaQuemE { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); margin: 0; font-size: var(--t-corpo); min-width: 0; }

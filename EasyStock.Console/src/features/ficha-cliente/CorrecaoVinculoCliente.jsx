@@ -13,12 +13,14 @@ import css from './CorrecaoVinculoCliente.module.css'
 
 const LIMITE_MOTIVO = 500
 const nomeAcao = { retirar: 'Retirada do vínculo', restaurar: 'Restauração do vínculo', vincular: 'Vínculo conferido' }
-export function CorrecaoVinculoCliente({ conversa, rotulo = 'Conferir identidade' }) {
+// #3265 (R1): na fileira de ações do cartão, o rótulo visível é curto e o nome acessível continua o rótulo inteiro.
+export function CorrecaoVinculoCliente({ conversa, rotulo = 'Conferir identidade', rotuloCurto, className }) {
   const { acoes } = useAcessoModulos()
   const [aberto, abrir] = useState(false)
   if (!acoes.corrigirVinculoClienteConversa) return null
   return <>
-    <Botao variante="texto" icone="usuarios" onClick={() => abrir(true)}>{rotulo}</Botao>
+    <Botao variante="texto" icone="usuarios" className={className} aria-label={rotuloCurto ? rotulo : undefined} title={rotuloCurto ? rotulo : undefined}
+      onClick={() => abrir(true)}>{rotuloCurto ?? rotulo}</Botao>
     {aberto && <ConferenciaVinculo key={conversa.id} conversa={conversa} aoFechar={() => abrir(false)} />}
   </>
 }

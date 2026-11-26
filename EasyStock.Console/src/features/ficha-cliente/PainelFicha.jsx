@@ -243,9 +243,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // #1806: lead sem cadastro cadastra primeiro, com o formulário já preenchido pela conversa.
   const cadastrarPrimeiro = primeiroPassoAntesDaVenda({ conversa: selecionada, pedido, fonteApi }) === 'cadastro'
   const acaoMontar = !clienteEscolhendo && (!pedido || (!pedidoCriado && !comandaTravada(pedido, { fonteApi })))
-    ? (cadastrarPrimeiro
-      ? <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
-      : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
+    // #3265 (R2): primário só com pedido em montagem; sem pedido (ou com o cadastro antes da venda) é secundário.
+    ? <Botao largo variante={pedido && !cadastrarPrimeiro ? 'primario' : 'secundario'} icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}

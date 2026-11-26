@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
@@ -6,27 +6,16 @@ import { useChegouNaTela } from '../../hooks/useChegouNaTela'
 import { useMidiaDaMensagem } from '../../aplicacao/useMidiaDaMensagem'
 import { diaMes, moeda, plural } from '../../dominio/formato'
 import { resumoQuemE } from '../../dominio/quemE'
-import { copiarTexto } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 
 // #3209 (S84): telefone, pedidos e mídias do cartão, para bater o olho e saber quem é.
+// #3265 (R1): o telefone fica como texto; copiar está na fileira de ações do cartão (AcoesDoCliente).
 function Telefone({ telefone }) {
-  const [retorno, setRetorno] = useState(null) // 'copiado' | 'falhou'
-  useEffect(() => {
-    if (!retorno) return undefined
-    const id = setTimeout(() => setRetorno(null), 2400)
-    return () => clearTimeout(id)
-  }, [retorno])
-  const copiar = async () => setRetorno(await copiarTexto(telefone) ? 'copiado' : 'falhou')
   return (
-    <div className={css.linhaQuemE}>
+    <p className={css.linhaQuemE}>
       <Icone nome="phone" tamanho={16} />
       <strong data-quem-e-telefone>{telefone}</strong>
-      <Botao variante="texto" icone="copy" onClick={copiar} aria-label={`Copiar telefone ${telefone}`}>Copiar</Botao>
-      <output className={css.retornoEndereco} aria-live="polite">
-        {retorno === 'copiado' ? 'Copiado' : retorno === 'falhou' ? 'Não foi possível copiar' : ''}
-      </output>
-    </div>
+    </p>
   )
 }
 

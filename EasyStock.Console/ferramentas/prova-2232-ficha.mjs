@@ -2,7 +2,8 @@
 // Prova da issue #2232 (banca UX/UI do Atendimento, Tela 3: Ficha do cliente, celular 558x684).
 //
 //   F1  baixar e editar sem rótulo: um menu "Ações da ficha" com texto visível;
-//   F2  endereço com ícone de local, "Copiar" (com retorno) e "Abrir no mapa" (nova aba, sem opener);
+//   F2  endereço com ícone de local, "Copiar endereço" (com retorno) e "Abrir no mapa" (nova aba, sem opener);
+//       #3265 (R1): as duas ações moram na fileira de ações do cartão, com rótulo curto visível (Endereço, Mapa);
 //   F3  o valor aparece uma vez: o destaque fica, a linha de apoio não o repete;
 //   F4  a linha Entrega diz quando e onde, e nunca fica vazia;
 //   F5  uma rolagem só na Ficha (o cabeçalho fica fora dela), sem lista rolando dentro da coluna;
@@ -119,18 +120,22 @@ await confereAsync('F1  enquanto o PDF prepara, o gatilho "Ações" diz e anunci
 
 // --- F2 ------------------------------------------------------------------------------------------
 
-confere('F2  o endereço mostra ícone de local, "Copiar" e "Abrir no mapa" em nova aba, sem opener', () => {
+confere('F2  o endereço mostra ícone de local, "Copiar endereço" e "Abrir no mapa" em nova aba, sem opener', () => {
   const html = renderizarFicha()
-  const bloco = trecho(html, '<div class="enderecoCliente"', '(?:</div></div>|</div>)')
+  const bloco = trecho(html, '<p class="enderecoCliente"', '</p>')
   assert.match(html, /enderecoCliente/, 'bloco do endereço')
   assert.match(bloco, /Rua Fernão Dias, 220, Pinheiros/)
   assert.match(bloco, /lucide-map-pin|map-pin/i, 'ícone de local')
-  assert.match(bloco, />Copiar</)
-  const link = bloco.match(/<a [^>]*>/)?.[0] ?? ''
+  // #3265 (R1): copiar e abrir no mapa estão na fileira de ações, logo depois do endereço.
+  const fileira = trecho(html, '<div class="acoesDoCliente"', '</output>')
+  assert.ok(html.indexOf('<p class="enderecoCliente"') < html.indexOf('<div class="acoesDoCliente"'), 'a fileira vem depois do endereço')
+  assert.match(fileira, /aria-label="Copiar endereço"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Endereço</)
+  const link = fileira.match(/<a [^>]*>/)?.[0] ?? ''
   assert.match(link, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&amp;query=Rua%20Fern%C3%A3o%20Dias%2C%20220%2C%20Pinheiros%2C%2005427-010"/)
   assert.match(link, /target="_blank"/)
   assert.match(link, /rel="noopener noreferrer"/)
-  assert.match(bloco, />Abrir no mapa</)
+  assert.match(link, /aria-label="Abrir no mapa"/)
+  assert.match(fileira, /<\/svg>Mapa<\/a>/)
 })
 await confereAsync('F2  copiar devolve se copiou; sem permissão ou sem API devolve falso e o link do mapa codifica o texto', async () => {
   const guardado = []
@@ -139,7 +144,7 @@ await confereAsync('F2  copiar devolve se copiou; sem permissão ou sem API devo
   assert.equal(await ficha.copiarTexto('x', { writeText: async () => { throw new Error('negado') } }), false)
   assert.equal(await ficha.copiarTexto('x', null), false)
   assert.equal(ficha.linkDoMapa('Rua A, 1 & 2'), 'https://www.google.com/maps/search/?api=1&query=Rua%20A%2C%201%20%26%202')
-  assert.match(fonte('features/ficha-cliente/CartaoDoCliente.jsx'), /Copiado/, 'retorno visível')
+  assert.match(fonte('features/ficha-cliente/AcoesDoCliente.jsx'), /Copiado/, 'retorno visível')
 })
 
 // --- F3 ------------------------------------------------------------------------------------------
