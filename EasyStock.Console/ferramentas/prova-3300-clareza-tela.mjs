@@ -16,8 +16,8 @@ await caso('F2: a divisória fica numa linha só, com reticência', () => {
   assert.match(css, /\.divisoriaAtendimento > span \{[^}]*white-space: nowrap;[^}]*text-overflow: ellipsis;/)
 })
 
-await caso('F4: com texto no campo, "Assumir conversa" cede o laranja a "Enviar e assumir"', () => {
-  assert.match(css, /:has\(\.composer textarea:not\(:placeholder-shown\)\) \.modoAssumir/)
+await caso('F4: com texto ou anexo (#3368), "Assumir conversa" cede o laranja a "Enviar e assumir"', () => {
+  assert.match(css, /:has\(\.composer \.enviar:not\(\.gravar\):not\(:disabled\)\) \.modoAssumir/)
 })
 
 await caso('F5: a dica do Ctrl+Enter não aparece em tela de toque', () => {

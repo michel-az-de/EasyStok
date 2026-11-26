@@ -290,12 +290,15 @@
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 .modoAssumir { margin-left: auto; flex: none; }
-/* #3300 (F4): um laranja só entre a barra e o campo. Com texto no campo, quem age é "Enviar e assumir"; "Assumir
-   conversa" vira secundário (mesmas cores do `secundario` do Botao). */
-:global([data-conteudo-console]):has(.composer textarea:not(:placeholder-shown)) .modoAssumir:not(:disabled) {
+/* #3300 (F4): um laranja só entre a barra e o campo. Com o Enviar habilitado (texto ou anexo em espera, #3368), quem
+   age é "Enviar e assumir"; "Assumir conversa" vira secundário (mesmas cores do `secundario` do Botao). */
+:global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:not(:disabled) {
   background: var(--preenchimento); border-color: transparent; color: var(--tinta);
 }
-:global([data-conteudo-console]):has(.composer textarea:not(:placeholder-shown)) .modoAssumir:hover:not(:disabled) { background: var(--preenchimento-forte); }
+:global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:hover:not(:disabled) { background: var(--preenchimento-forte); }
+:global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:active:not(:disabled) {
+  background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta));
+}
 /* #2185: em coluna estreita o motivo, espremido ao lado de Assumir, quebrava em 3 linhas. Desce inteiro para baixo do estado. */
 .modoLinha { container: barra-modo / inline-size; }
 @container barra-modo (max-width: 559px) {
