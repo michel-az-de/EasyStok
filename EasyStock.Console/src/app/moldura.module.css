@@ -52,6 +52,13 @@
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
 .palco { display: flex; flex: 1; min-height: 0; position: relative; }
+/* #3374 (C2): o palco é só o Atendimento. Fila, conversa e ficha pintam fundo com 3 superfícies (tokens --atd-): os nomes globais
+   que os componentes já usam (Pilula, Avatar, cartão) apontam para elas aqui dentro, sem mudar os globais nas outras telas. */
+.palco {
+  --fundo: var(--atd-fundo); --chao-conversa: var(--atd-fundo); --creme: var(--atd-fundo);
+  --papel: var(--atd-superficie);
+  --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
+}
 .palcoTres { padding: 0; }
 .palcoTres > .coluna {
   border-radius: var(--r-2); border: 0;

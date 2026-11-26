@@ -168,10 +168,10 @@
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }
 .chipFiltro:hover:not(.chipLigado) { background: var(--preenchimento-forte); color: var(--tinta); }
-/* #3282 (crítica, P3): a cor de ação é só de botão que age (Assumir, + Itens). Filtro ligado vira tinta cheia:
+/* #3282 (crítica, P3): a cor de ação é só de botão que age (Assumir, + Itens). Filtro ligado: realce com contorno de tinta (#3374, C2):
    o estado segue em forma (fundo cheio, aria-pressed) e a cor de ação deixa de ter dois sentidos. */
 .chipLigado {
-  background: var(--tinta); color: var(--elevado); border-color: var(--tinta);
+  background: var(--preenchimento); color: var(--tinta); border-color: var(--tinta);
   box-shadow: none;
 }
 .chipCanal { position: relative; padding: 0 10px; gap: 5px; }

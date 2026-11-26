@@ -40,6 +40,10 @@
   --chao-conversa: light-dark(#F5F5F1, #1C1917);
   --preenchimento: light-dark(#F0EDE7, #33291F);
   --preenchimento-forte: light-dark(#E7E2D9, #3D332A);
+  /* #3374 (C2): as 3 superfícies do Atendimento (chão, painel, realce). Só o palco do Atendimento as usa; os globais acima não mudam. */
+  --atd-fundo: light-dark(#F5F5F1, #1C1917);
+  --atd-superficie: light-dark(#FEFEFE, #241A12);
+  --atd-realce: light-dark(#F0EDE7, #33291F);
   --vidro: light-dark(rgba(254, 254, 254, .94), rgba(36, 26, 18, .94));
   --desfoque: saturate(180%) blur(20px);
   --linha: light-dark(#E6E1D8, #594532);

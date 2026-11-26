@@ -38,6 +38,8 @@
   bottom: calc(56px + var(--e-4) + var(--e-2));
   width: min(432px, calc(100vw - 2 * var(--e-4)));
   max-height: min(720px, calc(100dvh - 140px));
+  /* #3374 (C2): o painel é do Atendimento e pinta com as mesmas 3 superfícies --atd-. */
+  --papel: var(--atd-superficie); --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
   background: var(--papel); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: row; overflow: hidden;
