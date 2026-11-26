@@ -62,9 +62,11 @@ function medir({ escala }) {
 
   const laranjas = todos.filter((e) => (e.tagName === 'BUTTON' || e.getAttribute('role') === 'button') && (() => { const c = rgba(getComputedStyle(e).backgroundColor); return c[3] > 0.9 && acao.some((a) => igual(a, c)) })()).map(descricao)
 
-  // Exceções explícitas (C7), as únicas: (1) `.sr`, o texto só para leitor de tela, que base.css recorta em 1 px com margem -1 px;
+  // Exceções explícitas (C7 e r1), as únicas: (1) `.sr`, o texto só para leitor de tela, que base.css recorta em 1 px com margem -1 px;
   // (2) `Pilula`, componente compartilhado (`componentes/Pilula.module.css`, fora da lista 1.2 do plano) com padding 3/6 px.
+  // (3) a margem lateral do palco com o Assistente encaixado: é a reserva da largura do painel (C9), não espaçamento.
   const excecao = (e, p, v) => e.matches('.sr') || (e.className.toString().includes('_pilula_') && p.startsWith('padding') && (v === 3 || v === 6))
+    || (e.matches('#conteudo-principal[data-palco-atendimento]') && (p === 'marginRight' || p === 'marginLeft') && document.documentElement.dataset.assistenteEmpurra)
   const espacos = new Set(); const foraDaEscala = new Set(); const origemFora = {}
   for (const e of todos) {
     const s = getComputedStyle(e)
@@ -134,9 +136,77 @@ function medir({ escala }) {
 }
 
 const fixas = []
+
+// Crítica r1 (sempre cobradas): (a) nenhum botão visível sobre outro, (b) rótulo curto de botão numa linha só e
+// (d) nenhum texto do painel do Assistente coberto (pelo rodapé ou por outra camada). Mede só a parte que aparece
+// (recortada pelos ancestrais que rolam ou cortam), para texto rolado para fora não contar como coberto.
+function layout() {
+  const raizes = [document.querySelector('main[aria-label="Atendimento"]'), ...document.querySelectorAll('section[role=dialog]')].filter(Boolean)
+  // checkVisibility: o conteúdo de um <details> fechado tem caixa, mas não aparece.
+  const visivel = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1 && e.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true }) }
+  const recorte = (e) => {
+    let r = e.getBoundingClientRect(); let [x1, y1, x2, y2] = [r.left, r.top, r.right, r.bottom]
+    for (let n = e.parentElement; n; n = n.parentElement) {
+      const s = getComputedStyle(n)
+      if (s.overflowX === 'visible' && s.overflowY === 'visible') continue
+      r = n.getBoundingClientRect(); x1 = Math.max(x1, r.left); y1 = Math.max(y1, r.top); x2 = Math.min(x2, r.right); y2 = Math.min(y2, r.bottom)
+    }
+    x2 = Math.min(x2, innerWidth); y2 = Math.min(y2, innerHeight)
+    return x2 - x1 > 1 && y2 - y1 > 1 ? { x1, y1, x2, y2 } : null
+  }
+  const nome = (e) => (e.getAttribute('aria-label') || e.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30)
+  const botoes = raizes.flatMap((r) => [...r.querySelectorAll('button')]).filter(visivel).map((e) => ({ e, r: recorte(e) })).filter((b) => b.r)
+  const sobrepostos = []
+  for (let i = 0; i < botoes.length; i++) for (let j = i + 1; j < botoes.length; j++) {
+    const [a, b] = [botoes[i], botoes[j]]
+    if (a.e.contains(b.e) || b.e.contains(a.e)) continue
+    const w = Math.min(a.r.x2, b.r.x2) - Math.max(a.r.x1, b.r.x1); const h = Math.min(a.r.y2, b.r.y2) - Math.max(a.r.y1, b.r.y1)
+    if (w > 1 && h > 1) sobrepostos.push(`"${nome(a.e)}" x "${nome(b.e)}" (${Math.round(w)}x${Math.round(h)})`)
+  }
+  // Rótulo que vaza da caixa do botão também cai sobre o vizinho ("Nota" sobre "Enviar e assumir" a 1440).
+  // Texto cortado com reticência (overflow no caminho até o botão) não vaza: só a parte visível conta.
+  const corta = (n, e) => { for (let x = n.parentElement; x; x = x === e ? null : x.parentElement) if (getComputedStyle(x).overflowX !== 'visible') return true; return false }
+  for (const { e } of botoes) {
+    const caixa = e.getBoundingClientRect()
+    for (const n of [...e.querySelectorAll('*'), e].flatMap((x) => [...x.childNodes]).filter((t) => t.nodeType === 3 && t.textContent.trim())) {
+      if (!visivel(n.parentElement) || getComputedStyle(n.parentElement).clip !== 'auto' || corta(n, e)) continue
+      const faixa = document.createRange(); faixa.selectNodeContents(n); const q = faixa.getBoundingClientRect()
+      if (q.left < caixa.left - 1 || q.right > caixa.right + 1) sobrepostos.push(`"${n.textContent.trim().slice(0, 20)}" vaza do botão "${nome(e)}"`)
+    }
+  }
+  const quebrados = []
+  for (const { e } of botoes) {
+    const texto = (e.textContent ?? '').trim()
+    if (!texto || texto.length > 30) continue // cartão da fila é botão com várias linhas de propósito
+    for (const n of [...e.querySelectorAll('*'), e].flatMap((x) => [...x.childNodes]).filter((t) => t.nodeType === 3 && t.textContent.trim())) {
+      const dono = n.parentElement; if (!visivel(dono) || getComputedStyle(dono).clip !== 'auto') continue
+      const faixa = document.createRange(); faixa.selectNodeContents(n)
+      const linhas = new Set([...faixa.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top / 4)))
+      if (linhas.size > 1) quebrados.push(`"${texto.slice(0, 30)}" em ${linhas.size} linhas`)
+    }
+  }
+  const cobertos = []
+  for (const painel of document.querySelectorAll('section[role=dialog]')) {
+    for (const e of painel.querySelectorAll('*')) {
+      if (!visivel(e) || e.matches('.sr') || ![...e.childNodes].some((t) => t.nodeType === 3 && t.textContent.trim())) continue
+      const r = e.getBoundingClientRect(); const c = recorte(e); if (!c) continue
+      const [x, y] = [(r.left + r.right) / 2, (r.top + r.bottom) / 2]
+      if (x < c.x1 || x > c.x2 || y < c.y1 || y > c.y2) continue // o centro foi rolado para fora: não está à vista, não está coberto
+      const no = document.elementFromPoint(x, y)
+      if (no && no !== e && !e.contains(no)) cobertos.push(`"${(e.textContent ?? '').trim().slice(0, 30)}" sob ${no.tagName.toLowerCase()}.${String(no.className).split(' ')[0].slice(0, 30)}`)
+    }
+  }
+  return { sobrepostos, quebrados, cobertos }
+}
+const cobrarLayout = async (p, nome) => {
+  const l = await p.evaluate(layout)
+  fixas.push([l.sobrepostos.length === 0, `${nome}: botões sobrepostos: ${l.sobrepostos.slice(0, 4).join(' | ')}`])
+  fixas.push([l.quebrados.length === 0, `${nome}: rótulo de botão quebrado: ${l.quebrados.slice(0, 4).join(' | ')}`])
+  fixas.push([l.cobertos.length === 0, `${nome}: texto do Assistente coberto: ${l.cobertos.slice(0, 4).join(' | ')}`])
+}
 const condicoes = []
 for (const tema of ['light', 'dark']) for (const [w, h] of [[1440, 900], [1920, 1080]]) for (const cena of ['conversa', 'assistente']) condicoes.push({ tema, w, h, cena })
-// Entre 1180 e 1307 px o painel não empurra o palco (teto < mínimo): fica sobreposto, mas nunca abaixo de 320 px.
+// Entre 1180 e 1307 px não cabem as três colunas e o painel: ele toma o lugar da ficha e o Assumir segue à vista (crítica r1).
 condicoes.push({ tema: 'light', w: 1280, h: 800, cena: 'assistente', estreita: true })
 
 const medidas = []
@@ -157,6 +227,7 @@ for (const c of condicoes) {
   }
   await p.waitForTimeout(600)
   const m = await p.evaluate(medir, { escala: ESCALA })
+  await cobrarLayout(p, nome)
   await p.screenshot({ path: resolve(pasta, `${nome}.png`) })
   // C3 (um laranja por vez): o mesmo botão cheio muda de dono com o estado. Antes de assumir só `Assumir`; assumida e com
   // campo vazio, nenhum (o microfone ocupa o lugar do Enviar); com texto, só `Enviar`. Mede depois do print, só na conversa.
@@ -173,14 +244,14 @@ for (const c of condicoes) {
     const assumida = await contar()
     await p.locator('main[aria-label="Atendimento"] textarea').first().fill('oi')
     const comTexto = await contar()
+    await cobrarLayout(p, `${nome} com texto`)
     porEstado = { antes, assumida, comTexto }
   }
   // C9 e C10 (sempre cobradas, são baratas e estáveis): com o Assistente aberto o Assumir fica à vista e clicável (o centro dele cai nele
 // e o painel não o cobre) e o Esc fecha o painel devolvendo o foco ao botão que o abriu.
-if (c.cena === 'assistente' && c.estreita) {
+if (c.cena === 'assistente') {
 const painelLargura = await p.locator('section[role=dialog]').first().boundingBox().then((b) => b && Math.round(b.width))
 fixas.push([painelLargura >= 320, `${nome}: painel com ${painelLargura} px (mínimo 320)`])
-} else if (c.cena === 'assistente') {
 const assumir = p.getByRole('button', { name: /^Assumir conversa/ }).first()
 const cx = await assumir.boundingBox().then((b) => b && { x: b.x + b.width / 2, y: b.y + b.height / 2 })
 const clicavel = cx ? await p.evaluate(({ x, y }) => { const el = document.elementFromPoint(x, y); return !!el?.closest('button')?.textContent.startsWith('Assumir conversa') }, cx) : false
@@ -228,7 +299,7 @@ for (const m of medidas) {
 console.log(`Medida gravada em ${resolve(pasta, 'medidas.json')}`)
 const quebradas = fixas.filter(([ok]) => !ok).map(([, t]) => t)
 if (quebradas.length) { console.log(['', `C9/C10: ${quebradas.length} falha(s)`, ...quebradas.map((l) => `  ${l}`)].join('\n')); process.exit(1) }
-console.log(`C9/C10 ok (${fixas.length} verificações: Assumir à vista com o painel, conversa fora do painel, Esc devolve o foco)`)
+console.log(`C9/C10 e r1 ok (${fixas.length} verificações: Assumir à vista com o painel, conversa fora do painel, Esc devolve o foco, botões sem sobreposição e em 1 linha, Assistente sem texto coberto)`)
 if (process.env.ALVO_35 === '1') {
   if (cobranca.length) { console.log(`\nALVO_35: ${cobranca.length} alvo(s) não atingido(s)\n${cobranca.map((l) => `  ${l}`).join('\n')}`); process.exit(1) }
   console.log('ALVO_35: todos os alvos atingidos')
