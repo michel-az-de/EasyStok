@@ -236,6 +236,7 @@ function PainelDaConversa({
         motivo={motivoDaBarraAtual}
         acoes={acoesTela}
         aoAssumir={aoAssumirDaBarra}
+        aoDevolver={() => abrirModal('devolver')}
         assumirSemRepetir={assumirSemRepetir}
         noCabecalho={modoNoCabecalho}
       />

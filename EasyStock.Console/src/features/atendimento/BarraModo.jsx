@@ -19,7 +19,7 @@ import css from './atendimento.module.css'
 //
 // #3234 (C5): `noCabecalho` é o selo no cabeçalho (desktop, só a pílula e o Assumir). O Assumir em andamento
 // vem do painel (`assumirSemRepetir`), porque a barra remonta ao mudar de lugar.
-export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, motivo, acoes, aoAssumir, assumirSemRepetir, noCabecalho = false }) {
+export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, motivo, acoes, aoAssumir, aoDevolver, assumirSemRepetir, noCabecalho = false }) {
   const [confirmando, setConfirmando] = useState(null)
   const proprio = useAssumirSemRepetir()
   const { assumindo, assumir: assumirUmaVez } = assumirSemRepetir ?? proprio
@@ -73,6 +73,10 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
           >
             Assumir conversa <kbd className={css.teclaNoBotao} aria-hidden="true">A</kbd>
           </Botao>
+        )}
+        {/* #3374 (r2 P1-3): assumida, a volta fica à vista onde estava o Assumir (o ⋮ segue com o mesmo item). */}
+        {!acoes.assumir && acoes.devolver && aoDevolver && (
+          <Botao className={css.modoAssumir} aria-haspopup="dialog" onClick={aoDevolver}>Devolver ao Assistente</Botao>
         )}
       </div>
 

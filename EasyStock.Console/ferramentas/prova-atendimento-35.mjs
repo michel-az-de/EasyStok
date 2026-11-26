@@ -210,6 +210,7 @@ for (const tema of ['light', 'dark']) for (const [w, h] of [[1440, 900], [1920, 
 condicoes.push({ tema: 'light', w: 1280, h: 800, cena: 'assistente', estreita: true })
 
 const medidas = []
+let devolverProvado = 0
 for (const c of condicoes) {
   const nome = `${c.tema === 'light' ? 'claro' : 'escuro'}-${c.w}-${c.cena}`
   const p = await navegador.newPage({ viewport: { width: c.w, height: c.h } })
@@ -242,6 +243,13 @@ for (const c of condicoes) {
     await p.getByRole('button', { name: /^Assumir conversa/ }).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
     fixas.push([(await p.getByRole('button', { name: /^Assumir conversa/ }).count()) === 0, `${nome}: a tecla A não assumiu a conversa`])
     const assumida = await contar()
+    // r2 P1-3: assumida, o Devolver ao Assistente que o ⋮ oferece também fica à vista na conversa (não só no menu).
+    await p.getByRole('button', { name: 'Mais opções da conversa' }).first().click()
+    const devolverNoMenu = await p.getByRole('menuitem', { name: 'Devolver ao Assistente' }).count()
+    await p.keyboard.press('Escape')
+    const devolverAVista = await p.locator('main[aria-label="Atendimento"]').getByRole('button', { name: /^Devolver ao Assistente$/ }).first().isVisible().catch(() => false)
+    fixas.push([devolverNoMenu === 0 || devolverAVista, `${nome}: Devolver ao Assistente só no ⋮ depois de assumir`])
+    if (devolverNoMenu) devolverProvado += 1
     await p.locator('main[aria-label="Atendimento"] textarea').first().fill('oi')
     const comTexto = await contar()
     await cobrarLayout(p, `${nome} com texto`)
@@ -274,6 +282,25 @@ medidas.push({ condicao: nome, ...c, ...m, laranjasPorEstado: porEstado, errosDe
   await p.close()
 }
 
+// r2 P1-3: numa conversa que o Assistente pode retomar (só o WhatsApp tem Assistente; a Renan é do Chat do site), assumida,
+// o Devolver fica à vista na conversa, além do ⋮.
+{
+  const p = await navegador.newPage({ viewport: { width: 1440, height: 900 } })
+  await p.goto(`${origem}/#/m/atendimento/balcao`, { timeout: 90000 })
+  await p.locator('main[aria-label="Atendimento"]').getByText('Bianca Toledo').first().click()
+  await p.locator('section[aria-label="Conversa com Bianca Toledo"]').waitFor({ timeout: 30000 })
+  await p.evaluate(() => document.activeElement?.blur())
+  await p.keyboard.press('a')
+  await p.getByRole('button', { name: /^Assumir conversa/ }).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  await p.getByRole('button', { name: 'Mais opções da conversa' }).first().click()
+  devolverProvado = await p.getByRole('menuitem', { name: 'Devolver ao Assistente' }).count()
+  await p.keyboard.press('Escape')
+  const aVista = await p.locator('main[aria-label="Atendimento"]').getByRole('button', { name: /^Devolver ao Assistente$/ }).first().isVisible().catch(() => false)
+  fixas.push([aVista, 'claro-1440 Bianca assumida: Devolver ao Assistente só no ⋮'])
+  await cobrarLayout(p, 'claro-1440 Bianca assumida')
+  await p.screenshot({ path: resolve(pasta, 'claro-1440-devolver.png') })
+  await p.close()
+}
 writeFileSync(resolve(pasta, 'medidas.json'), `${JSON.stringify({ geradoEm: new Date().toISOString(), alvo: { laranjas: 1, espacamentos: ESCALA, fundosMax: 3 + ESTADOS_PERMITIDOS, fonteMin: 13 }, medidas }, null, 2)}\n`)
 await navegador.close()
 await servidor.close()
@@ -297,6 +324,7 @@ for (const m of medidas) {
   falha(m.errosDePagina.length === 0, `erros de página: ${m.errosDePagina.join(' | ')}`)
 }
 console.log(`Medida gravada em ${resolve(pasta, 'medidas.json')}`)
+fixas.push([devolverProvado > 0, 'nenhuma condição ofereceu Devolver ao Assistente: a prova do P1-3 não rodou'])
 const quebradas = fixas.filter(([ok]) => !ok).map(([, t]) => t)
 if (quebradas.length) { console.log(['', `C9/C10: ${quebradas.length} falha(s)`, ...quebradas.map((l) => `  ${l}`)].join('\n')); process.exit(1) }
 console.log(`C9/C10 e r1 ok (${fixas.length} verificações: Assumir à vista com o painel, conversa fora do painel, Esc devolve o foco, botões sem sobreposição e em 1 linha, Assistente sem texto coberto)`)
