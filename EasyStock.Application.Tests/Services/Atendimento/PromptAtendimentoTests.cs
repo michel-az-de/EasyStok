@@ -205,7 +205,7 @@ public class PromptAtendimentoTests
 
         RoteiroAtendimento.Padrao.Select(e => e.Nome).Should().Equal(
             "Acolher", "Entender", "Mostrar", "Montar", "Entrega", "Confirmar", "Pagar", "Acompanhar");
-        prompt.Should().StartWith("Você é o assistente virtual da loja no WhatsApp");
+        prompt.Should().StartWith("Você é a atendente de vendas da loja no WhatsApp").And.NotContain("Você é o assistente virtual");
         prompt.IndexOf("Roteiro do atendimento", StringComparison.Ordinal).Should()
             .BePositive().And.BeLessThan(prompt.IndexOf("Regras (obrigatórias)", StringComparison.Ordinal));
         prompt.Should().Contain("RN-01: a saudação já foi enviada automaticamente no primeiro contato")

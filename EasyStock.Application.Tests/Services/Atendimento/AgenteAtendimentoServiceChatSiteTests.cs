@@ -34,7 +34,7 @@ public partial class AgenteAtendimentoServiceTests
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
         await _conversaRepository.Received(1).AddMensagemAsync(Arg.Is<Mensagem>(m =>
             m.Autor == AutorMensagem.Agente && m.ExternoId != null && m.ExternoId.StartsWith("chatsite:")
-            && m.Texto == "Vou encaminhar sua mensagem para Michele conferir e responder por aqui."), Arg.Any<CancellationToken>());
+            && m.Texto == "Só um instante, já te confirmo isso por aqui."), Arg.Any<CancellationToken>());
     }
 
     [Fact]

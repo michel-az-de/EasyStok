@@ -234,10 +234,23 @@ public class ConfiguracaoAtendimentoTests
         var config = Padrao();
         ConfiguracaoAtendimento.MensagemEscaladaPadrao.Should().NotContain("{");
         config.MensagemEscalada.Should().Be(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
-        config.MoldeEscalada().Should().Be(ConfiguracaoAtendimento.MensagemEscaladaComDona);
+        config.MoldeEscalada().Should().Be(ConfiguracaoAtendimento.MensagemEscaladaHumana);
 
         config.DefinirMoldes("Já chamo a {dona}, {nome}.", null);
 
         config.MoldeEscalada().Should().Be("Já chamo a {dona}, {nome}.");
+    }
+
+    // #3379: o encaminhamento padrão gravado dizia "atendimento automático"; sai o texto humano, sem migração.
+    [Fact]
+    public void MoldeEncaminhamento_padrao_gravado_sai_sem_se_dizer_automatico()
+    {
+        var config = Padrao();
+        config.MensagemEncaminhamento.Should().Be(ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
+        config.MoldeEncaminhamento().Should().Be(ConfiguracaoAtendimento.MensagemEncaminhamentoHumana);
+        config.MoldeEncaminhamento().Should().NotContainAny("automático", "automatico", "robô");
+
+        config.DefinirMoldes(null, "Oi, {nome}, a {dona} já vê.");
+        config.MoldeEncaminhamento().Should().Be("Oi, {nome}, a {dona} já vê.");
     }
 }

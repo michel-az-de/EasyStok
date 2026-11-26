@@ -378,7 +378,7 @@ public partial class AgenteAtendimentoServiceTests
             .Returns(consultar ? UsoFerramenta("consultar_pedido") : falso, falso);
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
         resultado.Escalou.Should().BeTrue();
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Só um instante, já te confirmo isso por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
@@ -414,7 +414,7 @@ public partial class AgenteAtendimentoServiceTests
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         resultado.Escalou.Should().BeTrue();
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Só um instante, já te confirmo isso por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, fala, Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Is<string>(m => m.Contains(noMotivo)),
@@ -469,7 +469,7 @@ public partial class AgenteAtendimentoServiceTests
         // #3340 (R2I-02, R2I-04): erro devolvido ou exceção da ferramenta é falha do turno: escala com o molde, uma vez.
         resultado.Escalou.Should().BeTrue();
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
-            Arg.Is<string>(s => s.Contains("equipe") && !s.Contains("anterior") && !s.Contains("caiu")),
+            Arg.Is<string>(s => s.Contains("já te confirmo") && !s.Contains("anterior") && !s.Contains("caiu")),
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
@@ -491,7 +491,7 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue(); resultado.Respondeu.Should().BeTrue();
         _requisicoes.Should().ContainSingle();
         await _consultarPedido.Received(1).ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>());
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Só um instante, já te confirmo isso por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
@@ -532,7 +532,7 @@ public partial class AgenteAtendimentoServiceTests
         _conversa.Situacao.Should().NotBe(SituacaoConversa.Encerrada);
         _conversa.PedidoEmAndamentoId.Should().Be(pedidoId);
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
-            "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
+            "Só um instante, já te confirmo isso por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
     }
@@ -625,7 +625,7 @@ public partial class AgenteAtendimentoServiceTests
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
         resultado.Respondeu.Should().BeTrue(); resultado.Escalou.Should().Be(falhaPosterior);
         if (falhaPosterior)
-            await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+            await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("já te confirmo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         else
             await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
@@ -798,7 +798,7 @@ public partial class AgenteAtendimentoServiceTests
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
             "encaminhado à responsável: retorno do orçamento de embalagens", Agora, Arg.Any<CancellationToken>());
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
-            "Oi, Joao! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.",
+            "Oi, Joao! Recebi sua mensagem e já passei para a equipe, que te responde por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
@@ -991,7 +991,7 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue();
         _unitOfWork.Received(1).DescartarAlteracoesPendentes();
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("cozinha")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("já te confirmo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     private static IFerramentaAgente Ferramenta(string nome, Func<NSubstitute.Core.CallInfo, string> efeito)
@@ -1018,7 +1018,7 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Escalou.Should().BeTrue();
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("Pronto")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("já te confirmo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     // #3340 (revisão dos deltas, I4): a ferramenta que devolve "enviado:false" ou "linkGerado:false" que só orienta não enviou
@@ -1206,7 +1206,7 @@ public partial class AgenteAtendimentoServiceTests
         var resultado = await CriarServico(resumo, comanda).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         resultado.Escalou.Should().BeTrue();
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("já te confirmo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     // #3340 (R2I-04): exceção do envio da comanda (Meta fora do ar) escala com o molde, uma vez, sem a frase do modelo.
@@ -1223,7 +1223,7 @@ public partial class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().BeTrue();
         _unitOfWork.Received(1).DescartarAlteracoesPendentes();
         await _cloudClient.DidNotReceive().EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("Mandei")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("equipe")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(s => s.Contains("já te confirmo")), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     // #3340 (revisão da PR): a exceção da ferramenta solta as entidades do contexto (`DescartarAlteracoesPendentes`) e a
@@ -1512,7 +1512,7 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Escalou.Should().BeTrue();
         _requisicoes.Should().HaveCount(AgenteAtendimentoService.MaximoIteracoes);
-        var espera = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        var espera = "Só um instante, já te confirmo isso por aqui.";
         await _cloudClient.Received(1).EnviarTextoAsync(WaId, espera, Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
     }

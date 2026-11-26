@@ -41,4 +41,17 @@ public class SaudacaoAtendimentoTests
 
         SaudacaoAtendimento.Montar(configuracao, null, Link).Should().NotContain(Link);
     }
+
+    // #3379: "a Casa já responde" anuncia robô; a frase de espera padrão gravada não sai mais. A da loja continua.
+    [Fact]
+    public void FraseDeEsperaPadrao_NaoSai()
+    {
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(Guid.Empty);
+        configuracao.FraseEspera = ConfiguracaoAtendimento.FraseEsperaPadrao;
+
+        SaudacaoAtendimento.Montar(configuracao, "Paula", Link).Should().Be("Oi, Paula! Que bom ter você de volta.");
+
+        configuracao.FraseEspera = "Já te atendo.";
+        SaudacaoAtendimento.Montar(configuracao, "Paula", Link).Should().EndWith("Já te atendo.");
+    }
 }

@@ -804,7 +804,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var padrao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
         enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato)
             .And.NotContain("/cardapio")
-            .And.EndWith(padrao.FraseEspera);
+            .And.NotContain(padrao.FraseEspera);
     }
 
     // ── #2004 atendimento-01: a automática de primeira entrada e a saudação direta não saem as duas ──────────
@@ -1317,7 +1317,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
 
         await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-pedido", "Oi, quero 2 bolos"));
 
-        enviado.Should().EndWith(padrao.FraseEspera);
+        enviado.Should().NotContain(padrao.FraseEspera);
         await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
         await _turnos.DidNotReceive().AddAsync(Arg.Any<TurnoAgente>(), Arg.Any<CancellationToken>());
     }

@@ -57,7 +57,9 @@ public class GuardaRespostaAgenteTests
 
     [Theory]
     [InlineData("A lasanha sai por R$ 38,00.", """{"preco":"R$ 38,00"}""", true)]
-    [InlineData("Três lasanhas ficam R$ 114,00.", """{"preco":"R$ 38,00"}""", false)]
+    // #3379: total de preço da ferramenta vezes quantidade inteira é conta, não valor inventado.
+    [InlineData("Três lasanhas ficam R$ 114,00.", """{"preco":"R$ 38,00"}""", true)]
+    [InlineData("Seis pacotes de 300 g dão R$ 168,00.", """{"preco":"R$ 28,00"}""", true)]
     [InlineData("O total é R$ 1.234,56.", "Total: R$ 1.234,56", true)]
     [InlineData("Fica R$ 38.", "preco R$ 38,00", true)]
     [InlineData("A lasanha sai por R$ 39,00.", """{"preco":"R$ 38,00"}""", false)]

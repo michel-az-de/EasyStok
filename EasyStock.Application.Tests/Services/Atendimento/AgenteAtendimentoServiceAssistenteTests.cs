@@ -46,7 +46,7 @@ public partial class AgenteAtendimentoServiceTests
         await CriarServico(new EscalarParaDonaFerramenta(_escalador)).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
-            "Vou encaminhar sua mensagem para Michele conferir e responder por aqui.",
+            "Só um instante, já te confirmo isso por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         _requisicoes[0].TextoCompleto().Should().Contain("a dona se chama Michele");
     }
