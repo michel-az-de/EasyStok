@@ -107,7 +107,7 @@ export function acoesDoPedido({ pedido, fonteApi = false, disponivel = () => tru
     podeDesfazerPagamento: podeDesfazerPagamento(pedido),
   }
 }
-export function itensDoMenuDaFicha({ acoes = {}, comPedido = false } = {}) {
+export function itensDoMenuDaFicha({ acoes = {}, comPedido = false, podeConcluir = true } = {}) {
   return [
     { chave: 'editar', rotulo: 'Editar cadastro', icone: 'lapis' },
     { chave: 'baixar', rotulo: 'Baixar ficha em PDF', icone: 'download' },
@@ -117,7 +117,7 @@ export function itensDoMenuDaFicha({ acoes = {}, comPedido = false } = {}) {
       acoes.podeEstornar && { chave: 'estornar', rotulo: 'Marcar estorno', icone: 'undo-2' },
       acoes.podeVoltarEtapa && { chave: 'voltar', rotulo: 'Voltar etapa', icone: 'arrow-left' },
       // #2185: o mesmo nome e ícone do ⋮ da conversa. O item só aparece com a conversa aberta (`editavel`).
-      { chave: 'encerrar', rotulo: 'Concluir conversa', icone: 'circle-check' },
+      podeConcluir && { chave: 'encerrar', rotulo: 'Concluir conversa', icone: 'circle-check' },
     ].filter(Boolean) : []),
   ]
 }

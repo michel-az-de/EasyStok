@@ -205,9 +205,11 @@ export function BarraProximoPasso({
           <Icone nome="circle-x" tamanho={32} />
           <span className={css.rotuloEstado}>{estornado ? 'Cancelado com estorno' : 'Cancelado'}</span>
         </div>
-        <Botao largo variante="primario" icone="circle-check" onClick={aoEncerrarAtendimento}>
-          Concluir conversa
-        </Botao>
+        {aoEncerrarAtendimento && (
+          <Botao largo variante="primario" icone="circle-check" onClick={aoEncerrarAtendimento}>
+            Concluir conversa
+          </Botao>
+        )}
       </div>
     )
   }
@@ -383,9 +385,11 @@ export function BarraProximoPasso({
               </Botao>
             </>
           )}
-          <Botao largo variante={aReceberDoEntregue > 0 ? 'secundario' : 'primario'} icone="circle-check" onClick={aoEncerrarAtendimento}>
-            Concluir conversa
-          </Botao>
+          {aoEncerrarAtendimento && (
+            <Botao largo variante={aReceberDoEntregue > 0 ? 'secundario' : 'primario'} icone="circle-check" onClick={aoEncerrarAtendimento}>
+              Concluir conversa
+            </Botao>
+          )}
           {botaoComplemento}
         </div>
       )

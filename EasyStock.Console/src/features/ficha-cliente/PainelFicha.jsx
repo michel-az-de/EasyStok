@@ -12,6 +12,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useADevolver } from '../../aplicacao/useADevolver'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
+import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
@@ -211,7 +212,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const escolherNoMenu = (chave) => {
     if (chave === 'editar') abrirFichaEditando()
     else if (chave === 'baixar') pdfDaFicha.baixar()
-    else if (chave === 'encerrar') aoEncerrarAtendimento()
+    else if (chave === 'encerrar') aoEncerrarAtendimento?.()
     else setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 }))
   }
 
@@ -225,7 +226,12 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // Ponta (c) da integração: a barra do pedido (Entregue, Cancelado) e o
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
-  const aoEncerrarAtendimento = () => { setSecao(null); abrirEncerramento(selecionada.id) }
+  // #3374 (C12): Concluir só depois de assumir (mesma conta do ⋮ da conversa); sem a ação, os botões não aparecem.
+  const concluivel = acoesDaConversa({
+    conversa: selecionada, pausado: automaticoPausado?.[selecionada.id] ?? false, canal: canalDaConversa(canais, selecionada),
+    bloqueada: estaBloqueada(selecionada),
+  }).concluir
+  const aoEncerrarAtendimento = concluivel ? () => { setSecao(null); abrirEncerramento(selecionada.id) } : undefined
   const abrirCardapio = () => { setSecao(null); aoAbrirCardapio() }
   // #1686 (item 9): o link do motivo abre onde ele se resolve e põe o foco no campo.
   const irParaMotivo = (alvo) => {
@@ -256,7 +262,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
       <header className={css.cabecalhoFicha} data-cabecalho-ficha>
         <h2>Cliente</h2>
         <span className={css.ferramentasFicha}>
-          <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel) })} pdf={pdfDaFicha}
+          <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel), podeConcluir: Boolean(aoEncerrarAtendimento) })} pdf={pdfDaFicha}
             aoEscolher={escolherNoMenu} />
           {acoesCabecalho}
         </span>
