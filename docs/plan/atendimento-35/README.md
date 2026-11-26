@@ -80,6 +80,7 @@ em 13 px (`--t-micro`). O plano segue a escala: **13, 14, 16 e 20**. Se o Felipe
 - `EasyStock.Console/src/estilos/tokens.css` (só tokens NOVOS com prefixo `--atd-`; os tokens globais não mudam). Exceção: `--t-atd` (16 px do Atendimento), nome exigido pelo guarda `verificar-gramatica` (`--t-[a-z]+`); no `:root` ela vale `var(--t-corpo)` e só vira 1rem dentro de `.palco` e do painel do Assistente, para não vazar
 - `EasyStock.Console/src/app/moldura.module.css` (C2: variáveis do palco `--fundo`, `--papel`, `--preenchimento*`, `--t-atd`; folga da fila sob o botão Simular)
 - `EasyStock.Console/src/dominio/janela.js`, `resumoDoModo.js`, `falhaDeEnvio.js` (C12), `acoesDaConversa.js` (C12: `concluir` só depois de assumir), `aviso.js` (C11), `avisoDoDispositivo.js` (C14: "Avisos bloqueados", mesmo termo do `SinoDaSessao`)
+- `EasyStock.Console/src/dominio/automatico.js` (r2 P1-1: `sinalUrgente` lê a restrição em todas as falas; sem isto o alerta sumia depois da resposta)
 - `EasyStock.Console/src/app/atualizacao.module.css` (C14, G4: aviso de nova versão em uma linha)
 - `EasyStock.Console/src/app/AtualizacaoDoConsole.jsx` (G4), `PilhaDeAvisos.jsx` (C11), `Moldura.jsx` (C2, divisor)
 - `EasyStock.Console/src/aplicacao/contextos/**` (C11, só se o aviso novo exigir)

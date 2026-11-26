@@ -60,6 +60,18 @@ confere('restrição alimentar sem "?" sobe na hora', () => {
   assert.equal(m?.chave, 'restricao')
 })
 
+// #3374 (r2, P1-1): a restrição continua valendo para o pedido depois da resposta. Sumia do cartão e do
+// cabeçalho porque só as falas sem resposta eram lidas; fica enquanto a conversa estiver aberta.
+confere('restrição já respondida continua no motivo enquanto a conversa está aberta', () => {
+  const falas = [
+    cliente('É pra minha esposa, ela não pode lactose de jeito nenhum.', 9),
+    casa('Vou conferir a ficha do prato e já te falo.', 8),
+  ]
+  assert.equal(motivoDePrecisar(conversa(falas), AGORA, true)?.chave, 'restricao')
+  assert.equal(motivo(conversa([...falas, cliente('Obrigada!', 1)]))?.chave, 'restricao')
+  assert.equal(precisaDeVoce(conversa(falas, { estado: 'Encerrado' }), AGORA, true), false)
+})
+
 confere('"sem querer ser chato" não vira restrição: pedido de desligar avisos sobe como Precisa de você', () => {
   const m = motivo(conversa([
     cliente('Thatiane, sem querer ser chato, dá pra desligar essas mensagens automáticas?', 2),
