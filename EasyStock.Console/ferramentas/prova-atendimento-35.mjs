@@ -269,6 +269,9 @@ const conversa = await p.locator('section[aria-label^="Conversa com"]').bounding
 const largura = await p.evaluate(() => document.documentElement.clientWidth)
 const folga = painel ? { esq: Math.round(painel.x), conversaFim: conversa ? Math.round(conversa.x + conversa.width) : null } : null
 fixas.push([clicavel && !sobrepoe, `${nome}: Assumir ${cx ? '' : 'invisível, '}${clicavel ? '' : 'coberto, '}${sobrepoe ? 'sob o painel' : ''}`])
+// r2 P1-5: com o Assistente aberto a conversa continua legível (>= 560 px), em toda condição.
+const conversaLargura = conversa ? Math.round(conversa.width) : null
+fixas.push([conversaLargura !== null && conversaLargura >= 560, `${nome}: conversa com ${conversaLargura} px (mínimo 560)`])
 fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1, `${nome}: conversa termina em ${folga?.conversaFim}, painel começa em ${folga?.esq}`])
 fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), `${nome}: rolagem horizontal da página (${largura} px)`])
 fixas.push([await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible(), `${nome}: dica "Esc" invisível no painel`])

@@ -63,6 +63,8 @@
 :global(html[data-assistente-empurra='direita']) :global(#conteudo-principal[data-palco-atendimento]) { margin-right: var(--assistente-reserva-direita, 0px); }
 :global(html[data-assistente-empurra='esquerda']) :global(#conteudo-principal[data-palco-atendimento]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
 /* Critica r1 (P1): sem espaço para as três colunas e o painel, ele substitui a coluna Cliente (e a alça dela) até fechar. */
+/* Critica r2 (P1-5): com o painel empurrando, a conversa fica com no mínimo --assistente-conversa-minima; fila e ficha cedem. */
+:global(html[data-assistente-empurra]) :global(#conteudo-principal[data-palco-atendimento] > section[aria-label='Conversa']) { min-width: var(--assistente-conversa-minima, 0px); }
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > section[aria-label='Ficha']),
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > :has(+ section[aria-label='Ficha'])) { display: none; }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }

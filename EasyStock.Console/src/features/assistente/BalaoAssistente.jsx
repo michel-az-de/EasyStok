@@ -58,6 +58,10 @@ const POSICOES = [
 const PASSO_MOVER = 16
 const PASSO_MOVER_GRANDE = 64
 
+// Critica r2 (P1-5): com a ficha à vista a conversa não fica abaixo de 560 px (320 só cabia o Assumir, não ler). Se com a ficha ela
+// ficaria menor, o Assistente toma o lugar da coluna Cliente (semFicha).
+const CONVERSA_LEGIVEL = 560
+
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const { selecionada, agora, historico, rascunho, fonteApi, automaticoPausado } = useAtendimento()
   const { canais } = useCatalogo()
@@ -199,10 +203,13 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   // Entre 1180 e 1307 px esse teto fica abaixo do mínimo do painel: aí não empurra e o painel segue sobreposto, na largura normal.
   // Critica r1 (P1): abaixo disso (1180 a 1307 px) o painel cobria o Assumir. Agora ele toma o lugar da coluna Cliente
   // (a ficha some enquanto ele está aberto e volta ao fechar) e segue empurrando: a conversa nunca fica por baixo.
-  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO
+  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_LEGIVEL) - 2 * VAO
   const encaixado = !celular && !solto && area.colunas
   const semFicha = encaixado && tetoComFicha < ASSISTENTE.min
-  const tetoEmpurrando = semFicha ? area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + CONVERSA_MINIMA) - VAO : tetoComFicha
+  // Sem a ficha, a conversa também fica em 560 se o painel ainda couber no mínimo; senão (telas de ~1180 a 1243 px) cai ao 320 de antes.
+  const tetoSemFicha = (conversa) => area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + conversa) - VAO
+  const conversaMinima = semFicha && tetoSemFicha(CONVERSA_LEGIVEL) < ASSISTENTE.min ? CONVERSA_MINIMA : CONVERSA_LEGIVEL
+  const tetoEmpurrando = semFicha ? tetoSemFicha(conversaMinima) : tetoComFicha
   const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
   const larguraMaximaPainel = limitar(
     larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
@@ -222,15 +229,17 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     if (!reserva) return undefined
     const raiz = document.documentElement
     raiz.style.setProperty(`--assistente-reserva-${lado === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
+    raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
     raiz.dataset.assistenteEmpurra = lado === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
     return () => {
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
+      raiz.style.removeProperty('--assistente-conversa-minima')
       delete raiz.dataset.assistenteEmpurra
       delete raiz.dataset.assistenteSemFicha
     }
-  }, [reserva, lado, semFicha])
+  }, [reserva, lado, semFicha, conversaMinima])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
