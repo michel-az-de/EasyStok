@@ -301,7 +301,7 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     public async Task Piso_soma_em_long_e_nao_estoura_o_int()
     {
         // Duas chamadas de 1,5 bilhão de tokens de entrada somam mais do que int.MaxValue. Sem a conversão para long na
-        // consulta o banco devolve um bigint que não cabe no int do LINQ e a cota nem calcula.
+        // consulta a soma estoura o int e a cota nem calcula.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
         var empresa = Guid.NewGuid(); var turno = Guid.NewGuid();
         var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);

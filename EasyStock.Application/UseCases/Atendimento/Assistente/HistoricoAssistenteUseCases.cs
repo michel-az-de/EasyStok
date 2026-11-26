@@ -45,8 +45,8 @@ public sealed record UsoAssistenteResult(
 /// <summary>
 /// S67 (#2534): consumo do mês só do Assistente, pelo registro dos turnos (não por <c>UsoIa</c>, que mistura o
 /// gerador de anúncios). Mês civil de Brasília; sem ano e mês, o mês corrente. #3370: os tokens têm o piso das chamadas
-/// ligadas aos turnos em <c>chamada_ia</c> (<see cref="ITurnoAgenteRepository.SomarAsync"/>), e o custo e as contagens
-/// seguem dos turnos: com o piso ativo o cartão mostra mais tokens do que o custo cobre.
+/// do Assistente em <c>chamada_ia</c> (as ligadas a um turno, mesmo o que não gravou, <see cref="ITurnoAgenteRepository.SomarAsync"/>),
+/// e o custo e as contagens seguem dos turnos: com o piso ativo o cartão mostra mais tokens do que o custo cobre.
 /// </summary>
 public sealed class ObterUsoAssistenteUseCase(ITurnoAgenteRepository turnos, TimeProvider relogio,
     IConfiguracaoAtendimentoRepository? configuracoes = null)
