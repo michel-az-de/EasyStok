@@ -15,7 +15,7 @@
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
-  margin: 0; color: var(--erro); font-size: var(--atd-t-corpo);
+  margin: 0; color: var(--erro); font-size: var(--t-atd);
 }
 .motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
 .alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
@@ -39,7 +39,7 @@
 .rotuloDado { flex: 0 0 88px; font-size: var(--t-apoio); color: var(--tinta-3); font-weight: 400; }
 .linhaDado > .campoEmLinha { flex: 1; min-width: 0; overflow-wrap: normal; }
 .linhaDado > .campoEmLinha button { word-break: break-word; overflow-wrap: normal; }
-.valorCanal { display: flex; align-items: center; gap: var(--e-2); font-size: var(--atd-t-corpo); color: var(--tinta); }
+.valorCanal { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-atd); color: var(--tinta); }
 
 /* Canais de aviso (decisão 46, "Encerrar" v2): e-mail e SMS, cada um ligado
    ou não. Mesma linha do resto do cadastro, dois toques lado a lado. */
@@ -87,7 +87,7 @@
 .valorBotao {
   display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
   background: none; border: 0; padding: 0; text-align: left;
-  font-size: var(--atd-t-corpo); color: var(--tinta); font-family: inherit;
+  font-size: var(--t-atd); color: var(--tinta); font-family: inherit;
 }
 .valorBotao svg { color: var(--tinta-2); flex-shrink: 0; }
 .valorBotao:hover svg { color: var(--tinta); }
@@ -102,7 +102,7 @@
 .controleEmLinha {
   flex: 1 0 100%; min-width: 0; min-height: var(--toque); padding: 0 var(--e-2);
   border: 0; border-radius: var(--r-1);
-  background: var(--papel); color: var(--tinta); font-size: var(--atd-t-corpo); font-family: inherit;
+  background: var(--papel); color: var(--tinta); font-size: var(--t-atd); font-family: inherit;
 }
 /* #2258 (T12): o campo com erro continua visível; `border: 0` acima anulava a borda. */
 .controleComErro { background: var(--preenchimento); box-shadow: inset 0 0 0 var(--b-2) var(--erro); }
@@ -224,7 +224,7 @@
 .az_camera { background: var(--canal-instagram-fundo); }
 .azCinza { background: var(--canal-neutro-fundo); }
 .rotuloDado { flex: none; font-size: var(--t-micro); color: var(--tinta-3); font-weight: 400; line-height: 1.2; }
-.linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--atd-t-corpo); }
+.linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--t-atd); }
 
 .az_whatsapp { background: var(--canal-whatsapp-fundo); }
 .az_instagram { background: var(--canal-instagram-fundo); }
@@ -288,13 +288,13 @@
 }
 .listaInformado {
   display: grid; grid-template-columns: auto 1fr; gap: var(--e-1) var(--e-3); margin: 0;
-  font-size: var(--atd-t-corpo); color: var(--tinta);
+  font-size: var(--t-atd); color: var(--tinta);
 }
 .listaInformado dt { font-size: var(--t-apoio); color: var(--tinta-3); }
 .listaInformado dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .contatoInformado .rodapeBloco, .contatoInformado .erroEmLinha { margin: 0; }
 /* O telefone informado já é de um cadastro: a pergunta à dona, em texto de leitura (não de apoio). */
-.perguntaInformado { margin: 0; font-size: var(--atd-t-corpo); color: var(--tinta); }
+.perguntaInformado { margin: 0; font-size: var(--t-atd); color: var(--tinta); }
 
 /* #1686 (item 9): marca de destino do motivo da barra sem mexer no layout. */
 .contents { display: contents; }

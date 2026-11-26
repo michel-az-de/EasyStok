@@ -3,7 +3,7 @@
    resto da tela, nunca só texto solto. */
 .pedido, .resposta {
   display: flex; align-items: center; gap: var(--e-2);
-  margin: 0; font-size: var(--atd-t-corpo);
+  margin: 0; font-size: var(--t-atd);
 }
 .icone {
   display: grid; place-items: center; flex: none;

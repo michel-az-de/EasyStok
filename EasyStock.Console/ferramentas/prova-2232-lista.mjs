@@ -137,9 +137,9 @@ confere('X1  nome acessível composto do item da lista', () => {
 
 // #2185: a fonte sai só da escala por token (verificar-gramatica, fonteForaDaEscala). O nome fica no degrau
 // logo acima da prévia, que era a intenção dos 16 px literais. #3374 (C7, G1): a escala do Atendimento é 13/14/16/20,
-// então o nome fica em 16 px (--atd-t-corpo) e a prévia em 14 px (--t-apoio).
-confere('T1  nome um degrau acima da prévia (--atd-t-corpo sobre --t-apoio)', () => {
-  assert.match(regra('.topo strong'), /font-size:\s*var\(--atd-t-corpo\)/)
+// então o nome fica em 16 px (--t-atd) e a prévia em 14 px (--t-apoio).
+confere('T1  nome um degrau acima da prévia (--t-atd sobre --t-apoio)', () => {
+  assert.match(regra('.topo strong'), /font-size:\s*var\(--t-atd\)/)
   assert.match(regra('.previa'), /font-size:\s*var\(--t-apoio\)/)
 })
 confere('T3  contador sem a cor da marca', () => {

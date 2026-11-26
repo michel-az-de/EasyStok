@@ -34,7 +34,7 @@
 }
 
 .painel {
-  font-size: var(--atd-t-corpo); /* #3374 (C7, G1): o texto sem tamanho próprio herda 16 px, não os 15 do corpo global */
+  font-size: var(--t-atd); /* #3374 (C7, G1): o texto sem tamanho próprio herda 16 px, não os 15 do corpo global */
   position: fixed; right: var(--e-4); z-index: 32;
   bottom: calc(56px + var(--e-4) + var(--e-2));
   width: min(432px, calc(100vw - 2 * var(--e-4)));

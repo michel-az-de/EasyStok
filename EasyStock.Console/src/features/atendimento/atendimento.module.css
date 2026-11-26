@@ -5,7 +5,7 @@
   border: 0; flex-shrink: 0;
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
-.identidade span[aria-hidden="true"] { font-size: var(--atd-t-corpo); } /* #3374 (C7, G1): a inicial do Avatar "grande" é 17 px; aqui, 16 */
+.identidade span[aria-hidden="true"] { font-size: var(--t-atd); } /* #3374 (C7, G1): a inicial do Avatar "grande" é 17 px; aqui, 16 */
 .cabecalho h2 {
   margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
@@ -65,7 +65,7 @@
 /* Troca de remetente respira mais. */
 .trocaDeVoz { margin-top: var(--e-5); }
 /* #2420: entrelinha do corpo para a leitura longa. */
-.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--atd-t-corpo); line-height: var(--lh-corpo); }
+.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-atd); line-height: var(--lh-corpo); }
 .meta {
   display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
   margin-top: var(--e-2); font-size: var(--t-micro); color: var(--tinta-3);
@@ -666,7 +666,7 @@
 .checagemTexto > span { color: var(--tinta-2); }
 .checagemVeredito {
   display: flex; align-items: flex-start; gap: var(--e-3); margin: 0;
-  padding: var(--e-3) var(--e-4); border-radius: var(--r-2); font-size: var(--atd-t-corpo);
+  padding: var(--e-3) var(--e-4); border-radius: var(--r-2); font-size: var(--t-atd);
 }
 .checagemVeredito svg { flex-shrink: 0; margin-top: var(--e-1); }
 .checagemVeredito_ok { background: var(--sucesso-pastel); color: var(--sucesso); }
@@ -680,7 +680,7 @@
 .checagemChave input { width: 22px; height: 22px; margin-top: var(--e-1); flex-shrink: 0; accent-color: var(--marca); }
 .checagemRotulo { font-weight: 600; cursor: pointer; }
 .checagemChave:has(input:disabled) .checagemRotulo { cursor: default; }
-.checagemTitulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-2) var(--e-3); margin: 0; font-size: var(--atd-t-corpo); }
+.checagemTitulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-2) var(--e-3); margin: 0; font-size: var(--t-atd); }
 .checagemTitulo small { color: var(--tinta-2); font-weight: 400; }
 .checagemEtapas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
 .checagemEtapas li {
@@ -722,7 +722,7 @@
 .comReacao { margin-bottom: var(--e-4); }
 .reacaoDaBolha {
   position: absolute; bottom: calc(-1 * var(--e-4)); right: var(--e-3); padding: var(--e-1) var(--e-2);
-  border-radius: var(--r-pilula); background: var(--papel); box-shadow: 0 0 0 var(--b-1) var(--linha); font-size: var(--atd-t-corpo); line-height: 1.2;
+  border-radius: var(--r-pilula); background: var(--papel); box-shadow: 0 0 0 var(--b-1) var(--linha); font-size: var(--t-atd); line-height: 1.2;
 }
 .entrada .reacaoDaBolha { right: auto; left: var(--e-3); }
 .apagada p { display: flex; align-items: center; gap: var(--e-1); font-style: italic; color: var(--tinta-2); }
