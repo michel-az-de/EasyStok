@@ -270,7 +270,7 @@ public class RegistroChamadaIaLlmClientTests
     [Fact]
     public async Task CadaChamadaUsaOPrecoDoSeuModelo()
     {
-        // 1M entrada + 100 mil saída: sonnet 3 + 1,5 = 4,5; haiku 1 + 0,5 = 1,5. O turno soma o que cada chamada devolve.
+        // 1M entrada + 100 mil saída: sonnet 3 + 1,5 = 4,5; haiku 1 + 0,5 = 1,5. Cada resposta sai com o custo do seu modelo; a soma no turno é de GeracaoAgenteCustoTests.
         _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
             new RespostaLlm("end_turn", [], 1_000_000, 100_000, 0, "claude-sonnet-5"),
             new RespostaLlm("end_turn", [], 1_000_000, 100_000, 0, "claude-haiku-5"));

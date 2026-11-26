@@ -214,7 +214,7 @@ public class RoteadorIaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICl
         var (provedor, _, _) = await SemearLojaAsync(empresa, 10m);
         await using var sp = Provedor();
         await Roteador(sp, empresa, HttpFalso()).EnviarAsync(Requisicao(empresa));
-        await sp.GetRequiredService<IRegistroChamadaIa>().RegistrarAsync(EasyStock.Domain.Entities.Ia.ChamadaIa.Registrar(empresa, null, null,
+        await sp.GetRequiredService<IRegistroChamadaIa>().RegistrarAsync(ChamadaIa.Registrar(empresa, null, null,
             "claude-sonnet-5", FinalidadeIa.Atendimento, null, 100, 20, 0, 0, 5m, 10, DesfechoChamadaIa.Ok, Agora.UtcDateTime));
 
         (await sp.GetRequiredService<IRotasIa>().GastoDoMesAsync(empresa, provedor, Agora.UtcDateTime)).Should().Be(0.75m);
