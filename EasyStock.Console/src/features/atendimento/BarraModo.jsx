@@ -1,12 +1,10 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
-import { MODOS } from '../../dominio/automatico'
-import { faixaDaTransferencia } from '../../dominio/faixaDeTransferencia'
-import { resumoDoModo } from '../../dominio/resumoDoModo'
-import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
+import { apresentacaoDoModo } from '../../dominio/resumoDoModo'
+import { useAssumirSemRepetir } from './useAssumirSemRepetir'
 import css from './atendimento.module.css'
 
 // Quem responde esta conversa: o estado e, quando cabe, o Assumir. Uma linha, um lugar só, no topo
@@ -18,33 +16,22 @@ import css from './atendimento.module.css'
 // O motivo da passagem fica à vista: "Passou para você" sem dizer "alergia a camarão" obrigava a
 // procurar o porquê. A frase dos outros estados repetia a pílula e fica para o leitor de tela e o
 // `title` (#1442, #1870). Cadastro bloqueado é explicado junto do campo de mensagem.
-export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, motivo, acoes, aoAssumir }) {
+//
+// #3234 (C5): `noCabecalho` é o selo no cabeçalho (desktop, só a pílula e o Assumir). O Assumir em andamento
+// vem do painel (`assumirSemRepetir`), porque a barra remonta ao mudar de lugar.
+export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, agora = null, motivo, acoes, aoAssumir, assumirSemRepetir, noCabecalho = false }) {
   const [confirmando, setConfirmando] = useState(null)
-  // A barra não remonta ao trocar de conversa: o Assumir em andamento é de uma conversa só (#2185 F22).
-  const [assumindo, setAssumindo] = useState(() => new Set())
-  const emVoo = useRef(new Set())
-  const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
-  const faixa = resumo.chave === MODOS.COM_VOCE ? faixaDaTransferencia(conversa.passagem) : null
-  // Com o Assistente desligado na loja, "pausado" e "volta" prometem o que não acontece.
-  const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
-  // #3318: o motivo de precisar de você vence o aviso do Assistente desligado e fica à vista.
-  const linha = semAssistente && !resumo.precisa ? 'O Assistente está desligado.' : resumo.linha
-  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE || resumo.precisa
+  const proprio = useAssumirSemRepetir()
+  const { assumindo, assumir: assumirUmaVez } = assumirSemRepetir ?? proprio
+  const { resumo, faixa, linha, mostrarLinha } = apresentacaoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
 
-  async function assumir() {
+  function assumir() {
     setConfirmando(null)
-    const id = conversa.id
-    if (emVoo.current.has(id)) return
-    emVoo.current.add(id)
-    setAssumindo(new Set(emVoo.current))
-    try { await aoAssumir() } finally {
-      emVoo.current.delete(id)
-      setAssumindo(new Set(emVoo.current))
-    }
+    return assumirUmaVez(conversa.id, aoAssumir)
   }
 
   return (
-    <section className={css.modo} data-controle-conversa aria-label="Quem responde esta conversa">
+    <section className={`${css.modo} ${noCabecalho ? css.modoNoCabecalho : ''}`} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
         {/* #2420: título em negrito e motivo embaixo; o " · " fica para o leitor de tela ler a frase inteira. */}
         {faixa ? (

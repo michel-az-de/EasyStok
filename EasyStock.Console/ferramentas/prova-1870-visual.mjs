@@ -154,7 +154,9 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   const barra = fonte('features/atendimento/BarraModo.jsx')
   // #2185: o motivo da passagem fica à vista; a frase que só repete a pílula é para o leitor de tela.
   assert.match(barra, /<p className=\{mostrarLinha \? css\.modoTexto : 'sr'\} title=/)
-  assert.match(barra, /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  // #3234 (C5): a regra da frase mora em apresentacaoDoModo, que também decide o selo no cabeçalho.
+  assert.match(fonte('dominio/resumoDoModo.js'), /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  assert.match(barra, /apresentacaoDoModo\(conversa, pausado, bloqueada/)
   assert.match(barra, /\{acoes\.assumir && \([\s\S]*?Assumir/)
   // Devolver e Concluir moram no menu ⋮ do cabeçalho: nenhum segundo menu na barra.
   assert.doesNotMatch(barra, /<details|<summary|>Mais ações</)

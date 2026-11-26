@@ -167,7 +167,8 @@ try {
 
   await confere('1. bloqueado aparece uma vez entre o cabeçalho e a barra', async () => {
     const { ctx, p } = await abrir('bloqueada')
-    const textos = await p.locator('[data-cabecalho-conversa], [data-controle-conversa] > div > span').allInnerTexts()
+    // #3234 (C5): no desktop a barra é selo dentro do cabeçalho; ali ela já conta no texto do cabeçalho.
+    const textos = await p.locator('[data-cabecalho-conversa], [data-controle-conversa]:not([data-cabecalho-conversa] *) > div > span').allInnerTexts()
     assert.equal(textos.join(' ').match(/Bloqueado/g)?.length, 1, textos.join(' | '))
     await ctx.close()
   })
