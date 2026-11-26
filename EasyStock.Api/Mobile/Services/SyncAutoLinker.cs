@@ -83,10 +83,16 @@ public class SyncAutoLinker(
     /// <summary>#3375: de quanto em quanto tempo a leitura de um aparelho tenta de novo os pedidos órfãos dele.</summary>
     public static readonly TimeSpan IntervaloDaRepescagemNaLeitura = TimeSpan.FromMinutes(5);
 
-    private Task<List<string>> PedidosOrfaosAsync(Guid empresaId, string deviceId) =>
+    /// <summary>Quantos pedidos órfãos uma leitura tenta de novo: ela é um GET do aparelho e não pode demorar.</summary>
+    private const int OrfaosPorLeitura = 10;
+
+    /// <summary>Quanto o envio e o backfill esperam a trava dos pedidos antes de deixá-los para a próxima tentativa.</summary>
+    public static readonly TimeSpan EsperaDaTravaDePedidos = TimeSpan.FromSeconds(10);
+
+    private Task<List<string>> PedidosOrfaosAsync(Guid empresaId, string deviceId, int quantos = OrfaosPorEnvio) =>
         _db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
             .Where(o => o.EmpresaId == empresaId && o.LastDeviceId == deviceId && o.ErpPedidoId == null && o.ErpVendaId == null && o.Status != "cancelado")
-            .OrderByDescending(o => o.UpdatedAt).Take(OrfaosPorEnvio).Select(o => o.Id).ToListAsync();
+            .OrderByDescending(o => o.UpdatedAt).Take(quantos).Select(o => o.Id).ToListAsync();
 
     /// <summary>
     /// #3375: o pedido órfão esperava um envio novo do mesmo aparelho, que pode demorar dias; a leitura acontece o
@@ -99,19 +105,24 @@ public class SyncAutoLinker(
         var marca = $"mobile-repesca-leitura:{empresaId:N}:{deviceId}";
         if (_cache?.TryGetValue(marca, out _) == true) return;
 
-        var orfaos = await PedidosOrfaosAsync(empresaId, deviceId);
-        if (orfaos.Count > 0)
-        {
-            if (!await VincularPedidosAsync(orfaos, empresaId, esperar: false)) return;
-            _log.LogInformation("AutoLink: leitura do aparelho tentou de novo órfãos empresa={EmpresaId} orders={O}", empresaId, orfaos.Count);
-        }
+        // A marca entra antes da tentativa: uma falha (banco fora, por exemplo) não vira nova tentativa a cada leitura.
         _cache?.Set(marca, true, IntervaloDaRepescagemNaLeitura);
+        var orfaos = await PedidosOrfaosAsync(empresaId, deviceId, OrfaosPorLeitura);
+        if (orfaos.Count == 0) return;
+        if (!await VincularPedidosAsync(orfaos, empresaId, esperar: false))
+        {
+            _cache?.Remove(marca); // trava ocupada não gasta o intervalo
+            return;
+        }
+        _log.LogInformation("AutoLink: leitura do aparelho tentou de novo órfãos empresa={EmpresaId} orders={O}", empresaId, orfaos.Count);
     }
 
     /// <summary>
     /// Vincula pedidos com a trava da empresa. A trava é de sessão e fica numa conexão só dela: o vínculo grava em
-    /// várias etapas, fora de uma transação única. Devolve false quando <paramref name="esperar"/> é false e a
-    /// trava está ocupada.
+    /// várias etapas, fora de uma transação única. Devolve false, sem vincular, quando a trava está ocupada: na hora,
+    /// se <paramref name="esperar"/> é false, ou depois de <see cref="EsperaDaTravaDePedidos"/>. O pedido que ficou
+    /// para trás é órfão e a próxima leitura ou o próximo envio do aparelho o tenta de novo; o que vem depois dos
+    /// pedidos no envio (caixa) segue.
     /// </summary>
     private async Task<bool> VincularPedidosAsync(IEnumerable<string> orderIds, Guid? empresaId, bool esperar)
     {
@@ -127,7 +138,17 @@ public class SyncAutoLinker(
         try
         {
             var conexao = daTrava.Database.GetDbConnection();
-            if (!await TravaAsync(conexao, esperar ? "pg_advisory_lock" : "pg_try_advisory_lock", empresa)) return false;
+            var limite = DateTime.UtcNow + (esperar ? EsperaDaTravaDePedidos : TimeSpan.Zero);
+            while (!await TravaAsync(conexao, "pg_try_advisory_lock", empresa))
+            {
+                if (DateTime.UtcNow >= limite)
+                {
+                    if (esperar) _log.LogWarning("AutoLink Pedido: trava ocupada por {Espera}s, pedidos ficam para a próxima tentativa empresa={EmpresaId}",
+                        EsperaDaTravaDePedidos.TotalSeconds, empresa);
+                    return false;
+                }
+                await Task.Delay(100);
+            }
             try { await _orderLinker.ExecuteAsync(orderIds, empresaId); }
             finally { await TravaAsync(conexao, "pg_advisory_unlock", empresa); }
             return true;
@@ -135,14 +156,13 @@ public class SyncAutoLinker(
         finally { await daTrava.Database.CloseConnectionAsync(); }
     }
 
-    /// <summary>pg_advisory_lock devolve void (a trava foi tomada); as outras duas devolvem se deu certo.</summary>
     private static async Task<bool> TravaAsync(System.Data.Common.DbConnection conexao, string funcao, Guid empresaId)
     {
         await using var comando = conexao.CreateCommand();
         comando.CommandText = $"SELECT {funcao}(hashtextextended(@chave, 0))";
         var chave = comando.CreateParameter(); chave.ParameterName = "chave"; chave.Value = ChaveDaTravaDePedidos(empresaId);
         comando.Parameters.Add(chave);
-        return await comando.ExecuteScalarAsync() is not false;
+        return await comando.ExecuteScalarAsync() is true;
     }
 
     /// <summary>Quantos órfãos de cada tipo um envio tenta de novo, para um órfão que sempre falha não pesar no sync.</summary>

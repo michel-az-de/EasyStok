@@ -63,7 +63,6 @@ public class SyncPullRepescaOrfaoE2ETests(MobileE2EFixture fixture)
 
         // A tentativa pulada não gasta o intervalo: a leitura seguinte já promove.
         await PullAsync(aparelho);
-        await PullAsync(aparelho);
 
         (await ErpDoPedidoAsync(orfao)).Should().NotBeNull();
         (await PedidosNoErpAsync(orfao)).Should().Be(1);
