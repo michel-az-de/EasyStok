@@ -14,6 +14,8 @@ namespace EasyStock.Application.Services.Atendimento;
 public static partial class GuardaRespostaAgente
 {
     private const int MaximoQuantidade = 50;
+    // Revisão da #3379: taxa ou troco pequeno (R$ 1, R$ 0,50) não vira base de qualquer valor redondo.
+    private const decimal PrecoMinimoMultiplo = 5m;
 
     /// <param name="nomeDaDona">#3278 (R4): <c>ConfiguracaoAtendimento.NomeDona</c>. Promessa feita em nome dela ("a Fulana vai
     /// combinar com você") conta como promessa da equipe. Sem nome, valem só os papéis (dona, equipe, responsável, atendente, ela).</param>
@@ -60,7 +62,7 @@ public static partial class GuardaRespostaAgente
         {
             var valor = Reais(m);
             // #3379: preço da ferramenta vezes quantidade inteira (2 a 50) é o total da conta, não valor inventado.
-            if (!valores.Contains(valor) && !valores.Any(v => v > 0 && valor % v == 0 && valor / v is >= 2 and <= MaximoQuantidade))
+            if (!valores.Contains(valor) && !valores.Any(v => v >= PrecoMinimoMultiplo && valor % v == 0 && valor / v is >= 2 and <= MaximoQuantidade))
                 return $"valor {m.Value.Replace("r$", "R$", StringComparison.Ordinal)} sem origem em ferramenta";
         }
 

@@ -119,7 +119,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
             texto.Should().StartWith("Combinado. Até a próxima!", "#2071: despedida curta do encerramento");
         }
-        else texto.Should().Contain("equipe").And.NotContain("Pedido registrado");
+        else texto.Should().Contain("já te confirmo").And.NotContain("Pedido registrado");
         if (caso is "escalar" or "encerrar_sem_pedido")
         {
             (await db.Pedidos.CountAsync()).Should().Be(caso == "escalar" ? 1 : 0, "nenhuma ferramenta do lote pode executar após transferência ou encerramento");
@@ -310,7 +310,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         else
         {
             resultado.Escalou.Should().BeTrue();
-            mensagens.Should().ContainSingle().Which.Should().Contain("equipe");
+            mensagens.Should().ContainSingle().Which.Should().Contain("já te confirmo");
         }
         (await scope.ServiceProvider.GetRequiredService<AgenteAtendimentoService>()
             .ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow)).ChamouLlm.Should().BeFalse();
