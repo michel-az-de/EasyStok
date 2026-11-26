@@ -42,8 +42,7 @@ public class ProcessarTurnoAgenteUseCaseTests
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversaRepository),
             Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance,
             Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository>(),
-            Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-            Microsoft.Extensions.Options.Options.Create(new PrecosModelosAgenteOptions()));
+            Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()));
         return new ProcessarTurnoAgenteUseCase(agente, _tenant, _conversaRepository, _escalador, _unitOfWork, _logger);
     }
 

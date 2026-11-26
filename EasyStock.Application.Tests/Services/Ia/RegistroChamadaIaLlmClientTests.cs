@@ -1,9 +1,11 @@
 using System.Net;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Ia;
 using EasyStock.Domain.Entities.Ia;
 using EasyStock.Domain.Enums.Ia;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 
 namespace EasyStock.Application.Tests.Services.Ia;
@@ -21,9 +23,17 @@ public class RegistroChamadaIaLlmClientTests
         _registro.RegistrarAsync(Arg.Do<ChamadaIa>(_gravadas.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
     }
 
+    // #3365 (D2): a tabela Anthropic:Precos agora vale na chamada. O modelo "deepseek-flash" dos testes antigos fica sem preço.
+    private static IOptions<PrecosModelosAgenteOptions> Precos()
+    {
+        var tabela = new PrecosModelosAgenteOptions();
+        tabela.Modelos["claude-sonnet-5"] = new PrecoModeloAgente(3m, 15m, 0.3m);
+        return Options.Create(tabela);
+    }
+
     private RegistroChamadaIaLlmClient Cliente() =>
         new(_interno, _registro, new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 17, 0, 0, TimeSpan.Zero)),
-            NullLogger<RegistroChamadaIaLlmClient>.Instance);
+            NullLogger<RegistroChamadaIaLlmClient>.Instance, Precos());
 
     private static RequisicaoLlm Requisicao(FinalidadeIa finalidade = FinalidadeIa.ResumoCliente, Guid? empresa = null) =>
         new("s", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], [])
@@ -40,7 +50,7 @@ public class RegistroChamadaIaLlmClientTests
 
         var devolvida = await Cliente().EnviarAsync(Requisicao());
 
-        devolvida.Should().BeSameAs(resposta);
+        devolvida.Should().BeSameAs(resposta, "sem preço para o modelo a resposta passa intacta, sem custo");
         var c = _gravadas.Should().ContainSingle().Subject;
         c.EmpresaId.Should().Be(Empresa);
         c.Finalidade.Should().Be(FinalidadeIa.ResumoCliente);
@@ -50,6 +60,90 @@ public class RegistroChamadaIaLlmClientTests
         c.ProvedorId.Should().BeNull();
         c.ModeloId.Should().BeNull();
         c.CustoUsd.Should().BeNull();
+    }
+
+    private const string ModeloComPreco = "claude-sonnet-5-20261101";
+
+    [Fact]
+    public async Task ComPrecoGravaOCustoNaLinhaEDevolveOMesmoCustoAoTurno()
+    {
+        // #3365 (D2): o custo nasce aqui, uma vez. Entrada + escrita de cache, como o turno fazia:
+        // (180 + 1200) × 3 + 30 × 15 + 500 × 0,30, por milhão = 0,00474.
+        var resposta = new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 180, 30, 500, ModeloComPreco, 1200);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(FinalidadeIa.Atendimento));
+
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(0.00474m);
+        devolvida.CustoUsd.Should().Be(0.00474m);
+        devolvida.Should().Be(resposta with { CustoUsd = 0.00474m }, "só o custo muda na resposta");
+    }
+
+    [Fact]
+    public async Task CustoSaiArredondadoEmSeisCasasComoALinha()
+    {
+        // 7 tokens de cache lido × 0,30 / 1M = 0,0000021: a linha guarda 0,000002 e é esse o valor que o turno soma.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 0, 0, 7, ModeloComPreco));
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(FinalidadeIa.Atendimento));
+
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().Be(0.000002m);
+        devolvida.CustoUsd.Should().Be(0.000002m);
+    }
+
+    [Fact]
+    public async Task ModeloSemPrecoDevolveCustoNuloENuncaZero()
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 100, 20, 0, "modelo-que-ninguem-precificou"));
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(FinalidadeIa.Atendimento));
+
+        devolvida.CustoUsd.Should().BeNull("sem preço o painel não pode mostrar grátis");
+        _gravadas.Should().ContainSingle().Which.CustoUsd.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FalhaAoGravarNaoAnulaOCustoDevolvidoAoTurno()
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 1_000_000, 0, 0, ModeloComPreco));
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("banco fora"));
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(FinalidadeIa.Atendimento));
+
+        devolvida.CustoUsd.Should().Be(3m, "o custo é do turno mesmo quando a linha se perde");
+    }
+
+    [Fact]
+    public async Task CustoQueALinhaRecusaPorTamanhoNaoDerrubaNemAnulaOCustoDoTurno()
+    {
+        // A linha recusa custo a partir de US$ 1.000.000 (numeric(12,6)); ela se perde em log, e o turno segue com o valor.
+        var tabela = new PrecosModelosAgenteOptions();
+        tabela.Modelos["modelo-caro"] = new PrecoModeloAgente(2_000_000_000m, 0m, 0m);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 1_000_000, 0, 0, "modelo-caro"));
+        var cliente = new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System,
+            NullLogger<RegistroChamadaIaLlmClient>.Instance, Options.Create(tabela));
+
+        var devolvida = await cliente.EnviarAsync(Requisicao(FinalidadeIa.Atendimento));
+
+        _gravadas.Should().BeEmpty();
+        devolvida.CustoUsd.Should().Be(2_000_000_000m);
+    }
+
+    [Fact]
+    public async Task SemEmpresaNaoGravaMasDevolveOCusto()
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(new RespostaLlm("end_turn", [], 1_000_000, 0, 0, ModeloComPreco));
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(empresa: Guid.Empty));
+
+        _gravadas.Should().BeEmpty();
+        devolvida.CustoUsd.Should().Be(3m);
     }
 
     [Theory]
@@ -146,7 +240,7 @@ public class RegistroChamadaIaLlmClientTests
             .Returns(c => Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>()));
 
         var tarefa = new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System,
-            NullLogger<RegistroChamadaIaLlmClient>.Instance, TimeSpan.FromSeconds(1)).EnviarAsync(Requisicao());
+            NullLogger<RegistroChamadaIaLlmClient>.Instance, Precos(), TimeSpan.FromSeconds(1)).EnviarAsync(Requisicao());
         var venceu = await Task.WhenAny(tarefa, Task.Delay(TimeSpan.FromSeconds(10)));
 
         venceu.Should().BeSameAs(tarefa, "o registro tem prazo próprio e não prende a resposta da IA");
@@ -177,7 +271,7 @@ public class RegistroChamadaIaLlmClientTests
             .Returns<Task>(_ => throw new InvalidOperationException("banco fora"));
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<RegistroChamadaIaLlmClient>>();
 
-        await new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System, logger).EnviarAsync(Requisicao());
+        await new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System, logger, Precos()).EnviarAsync(Requisicao());
 
         logger.ReceivedCalls().Select(c => c.GetArguments()).Where(a => a.Length == 5)
             .Should().ContainSingle(a => (Microsoft.Extensions.Logging.LogLevel)a[0]! == Microsoft.Extensions.Logging.LogLevel.Error

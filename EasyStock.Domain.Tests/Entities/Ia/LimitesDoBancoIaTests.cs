@@ -75,6 +75,20 @@ public class LimitesDoBancoIaTests
         c.CustoUsd.Should().Be(0.000003m);
     }
 
+    [Theory]
+    [InlineData("0.0000028", "0.000003")]
+    [InlineData("0.0000025", "0.000002")] // meio a meio vai para o par, como o decimal.Round da linha
+    [InlineData("0.0000035", "0.000004")]
+    [InlineData("0.00114", "0.00114")]
+    public void ArredondarCustoEhARegraDaLinha(string custo, string esperado)
+    {
+        var arredondado = ChamadaIa.ArredondarCusto(decimal.Parse(custo, System.Globalization.CultureInfo.InvariantCulture));
+        arredondado.Should().Be(decimal.Parse(esperado, System.Globalization.CultureInfo.InvariantCulture));
+        ChamadaIa.Registrar(Guid.NewGuid(), null, null, "deepseek-chat", FinalidadeIa.Atendimento,
+            null, 10, 0, 0, 0, decimal.Parse(custo, System.Globalization.CultureInfo.InvariantCulture), 1, DesfechoChamadaIa.Ok, Agora)
+            .CustoUsd.Should().Be(arredondado, "o turno soma o mesmo valor que a linha guarda");
+    }
+
     [Fact]
     public void CustoDaChamadaForaDeNumeric12x6EhRecusado()
     {

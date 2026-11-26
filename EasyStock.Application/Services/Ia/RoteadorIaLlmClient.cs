@@ -97,8 +97,9 @@ public sealed class RoteadorIaLlmClient(
             await GravarAsync(requisicao, rota, null, GravacaoChamadaIa.Desfecho(ex), cronometro.ElapsedMilliseconds);
             throw;
         }
-        await GravarAsync(requisicao, rota, resposta, DesfechoChamadaIa.Ok, cronometro.ElapsedMilliseconds);
-        return resposta;
+        // #3365 (D2): o custo nasce na gravação, uma vez, e a resposta o leva ao turno, que só soma.
+        var custo = await GravarAsync(requisicao, rota, resposta, DesfechoChamadaIa.Ok, cronometro.ElapsedMilliseconds);
+        return custo is null ? resposta : resposta with { CustoUsd = custo };
     }
 
     private async Task<bool> PorLojaAsync(Guid empresaId, CancellationToken ct)
@@ -158,7 +159,7 @@ public sealed class RoteadorIaLlmClient(
                 // Uma linha por escopo e provedor: o portão e o envio da mesma requisição não duplicam.
                 if (_cotaGravada.Add((empresaId, rota.ProvedorId)))
                     await GravacaoChamadaIa.GravarAsync(registro, Chamada(empresaId, finalidade, rota, null,
-                        DesfechoChamadaIa.CotaEstourada, 0), null, logger);
+                        DesfechoChamadaIa.CotaEstourada, 0, Agora()), null, logger);
                 throw new ProvedorIaIndisponivelException("O orçamento de IA do mês acabou.");
             }
             if (gasto >= orcamento * FracaoAviso)
@@ -197,31 +198,43 @@ public sealed class RoteadorIaLlmClient(
 
     private DateTime Agora() => relogio.GetUtcNow().UtcDateTime;
 
-    private ChamadaIa Chamada(Guid empresaId, FinalidadeIa finalidade, RotaIa rota, RespostaLlm? resposta,
-        DesfechoChamadaIa desfecho, long duracaoMs, Guid? turnoAgenteId = null)
-    {
-        var agora = Agora();
-        var custo = resposta is null
-            ? null
-            : rota.Modelo.Custo(resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheLido, FaixaHorariaIa.ForaDoPico(agora));
-        return ChamadaIa.Registrar(empresaId, rota.ProvedorId, rota.Modelo.Id, resposta?.Modelo ?? rota.Modelo.IdExterno,
+    /// <summary>
+    /// #3365 (D2): custo da chamada pelo preço do banco e pela faixa horária do instante; nulo sem preço, nunca zero. Em 6
+    /// casas, a regra da linha, para o turno somar o mesmo valor que <c>chamada_ia.custo_usd</c> guarda.
+    /// </summary>
+    private static decimal? CustoDaResposta(RotaIa rota, RespostaLlm resposta, DateTime agora) =>
+        rota.Modelo.Custo(resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheLido, FaixaHorariaIa.ForaDoPico(agora))
+            is { } custo ? ChamadaIa.ArredondarCusto(custo) : null;
+
+    private static ChamadaIa Chamada(Guid empresaId, FinalidadeIa finalidade, RotaIa rota, RespostaLlm? resposta,
+        DesfechoChamadaIa desfecho, long duracaoMs, DateTime agora, decimal? custo = null, Guid? turnoAgenteId = null) =>
+        ChamadaIa.Registrar(empresaId, rota.ProvedorId, rota.Modelo.Id, resposta?.Modelo ?? rota.Modelo.IdExterno,
             finalidade, turnoAgenteId, resposta?.TokensEntrada ?? 0, resposta?.TokensSaida ?? 0, resposta?.TokensCacheLido ?? 0,
             resposta?.TokensCacheEscrito ?? 0, custo, (int)Math.Min(duracaoMs, int.MaxValue), desfecho, agora);
-    }
 
-    private async Task GravarAsync(RequisicaoLlm requisicao, RotaIa rota, RespostaLlm? resposta, DesfechoChamadaIa desfecho, long duracaoMs)
+    /// <summary>
+    /// Grava a linha e devolve o custo da chamada. O custo é calculado antes de a linha ser montada e gravada, e fica fora
+    /// dessa falha: linha perdida (validação, banco, prazo) vira log e não tira o custo do turno. Resposta malformada (token
+    /// negativo) falha na própria conta: sem linha e sem custo, como antes.
+    /// </summary>
+    private async Task<decimal?> GravarAsync(RequisicaoLlm requisicao, RotaIa rota, RespostaLlm? resposta, DesfechoChamadaIa desfecho, long duracaoMs)
     {
         ChamadaIa chamada;
+        decimal? custo = null;
         try
         {
-            chamada = Chamada(requisicao.EmpresaId, requisicao.Finalidade, rota, resposta, desfecho, duracaoMs, requisicao.TurnoAgenteId);
+            var agora = Agora();
+            if (resposta is not null) custo = CustoDaResposta(rota, resposta, agora);
+            chamada = Chamada(requisicao.EmpresaId, requisicao.Finalidade, rota, resposta, desfecho, duracaoMs, agora, custo,
+                requisicao.TurnoAgenteId);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "RegistroChamadaIa perdido: falha ao registrar chamada de IA da empresa {EmpresaId} ({Finalidade}).",
                 requisicao.EmpresaId, requisicao.Finalidade);
-            return;
+            return custo;
         }
         await GravacaoChamadaIa.GravarAsync(registro, chamada, null, logger);
+        return custo;
     }
 }

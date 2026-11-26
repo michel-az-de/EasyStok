@@ -70,8 +70,7 @@ public class CriarPedidoFerramentaTests
                 [Ferramenta], Substitute.For<IEscaladorConversa>(), cloud, Uow,
                 dossie, Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance,
                 Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository>(),
-                Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()),
-                Microsoft.Extensions.Options.Options.Create(new PrecosModelosAgenteOptions()));
+                Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions()));
         }
 
         public ContextoTurnoAgente? Contexto { get; private set; }

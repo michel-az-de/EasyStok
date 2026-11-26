@@ -30,6 +30,16 @@ public sealed class ConsumoGeracaoAgente
     public string? Modelo { get; private set; }
     public int Passos { get; private set; }
 
+    private decimal _custoSomado;
+    private bool _respostaSemCusto;
+
+    /// <summary>
+    /// #3365 (D2): soma do custo que cada resposta trouxe de quem a registra em <c>chamada_ia</c>; o turno não tem tabela de
+    /// preço. Nulo sem nenhuma resposta somada ou com alguma sem custo (modelo sem preço, cliente sem registro): soma parcial
+    /// pareceria o custo do turno inteiro, e zero por falta de preço pareceria "grátis".
+    /// </summary>
+    public decimal? CustoUsd => Passos > 0 && !_respostaSemCusto ? _custoSomado : null;
+
     /// <summary>A chamada ao modelo falhou (depois da nova tentativa).</summary>
     public bool FalhaLlm { get; private set; }
 
@@ -45,12 +55,14 @@ public sealed class ConsumoGeracaoAgente
     internal void Somar(RespostaLlm resposta)
     {
         // #2862: a escrita de cache entra na entrada, sem migração. A cota do mês soma entrada, saída e cache lido e
-        // a escrita não pode sumir dela. O custo estimado fica um pouco abaixo: a escrita custa mais que a entrada comum.
+        // a escrita não pode sumir dela.
         TokensEntrada += resposta.TokensEntrada + resposta.TokensCacheEscrito;
         TokensSaida += resposta.TokensSaida;
         TokensCacheLido += resposta.TokensCacheLido;
         Modelo = resposta.Modelo ?? Modelo;
         Passos++;
+        if (resposta.CustoUsd is { } custo) _custoSomado += custo;
+        else _respostaSemCusto = true;
     }
 
     internal void RegistrarFerramenta(string nome, bool ok) => _ferramentas.Add(new FerramentaDoTurno(nome, ok));
