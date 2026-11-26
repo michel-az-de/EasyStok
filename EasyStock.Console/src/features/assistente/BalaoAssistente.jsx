@@ -31,10 +31,11 @@ import { AcoesPropostas } from './AcoesPropostas'
 import { useConversaAssistente } from './useConversaAssistente'
 import css from './assistente.module.css'
 
-// #3300 (F5): Ctrl+Enter é a convenção do Assistente, das confirmações e da nota. Em tela de toque não há Ctrl,
-// então a dica some ali (Enter segue criando linha e o botão Perguntar envia).
+// #3374 (r2 P1-4): a regra do campo da conversa, uma só nos dois campos: Enter pergunta, Shift+Enter quebra a linha e
+// Ctrl+Enter segue valendo (era a convenção do Assistente, #3300 F5). Em tela de toque não há Shift à mão,
+// então a dica some ali (o botão Perguntar envia).
 const TELA_DE_TOQUE = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches)
-const DICA_DO_ATALHO = TELA_DE_TOQUE ? undefined : 'Ctrl+Enter para perguntar. Enter cria uma nova linha.'
+const DICA_DO_ATALHO = TELA_DE_TOQUE ? undefined : 'Enter para perguntar. Shift+Enter cria uma nova linha.'
 
 // #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o Perguntar trava.
 const LIMITE_PERGUNTA = 2000
@@ -455,7 +456,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 limite={LIMITE_PERGUNTA}
                 dica={DICA_DO_ATALHO}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
+                  if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
+                  enviarPergunta(e)
                 }}
               />
               <BotaoIcone
