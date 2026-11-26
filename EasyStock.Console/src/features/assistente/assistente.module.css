@@ -92,12 +92,11 @@
 .cabecalho > button { flex-shrink: 0; }
 .tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }
 
-/* Crítica r1 (P1): o rodapé (pergunta) tem altura própria fora da rolagem; só o corpo rola. O texto cortado na borda
-   ("Bancada de teste", "Pergunte ao assistente") parecia escondido atrás da caixa: a borda de baixo agora esmaece,
-   e a folga de baixo deixa o último item inteiro fora do esmaecido quando a rolagem chega ao fim. */
+/* Crítica r1 (P1) e r2 (P2): o rodapé (pergunta) tem altura própria fora da rolagem; só o corpo rola e ele termina onde o rodapé
+   começa. O esmaecido de baixo deixava "Bancada de teste" meio apagado, como coberto: saiu. Quem corta o texto agora é a
+   linha fina entre o corpo e o rodapé, e a folga de baixo deixa o último item inteiro à vista quando a rolagem chega ao fim. */
 .corpo {
   overflow-y: auto; padding: var(--e-3) var(--e-3) var(--e-5); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0;
-  mask-image: linear-gradient(to bottom, var(--papel) calc(100% - var(--e-5)), transparent);
 }
 
 .cartoes { display: flex; flex-direction: column; }
@@ -158,7 +157,7 @@
 .acaoBotao { flex-shrink: 0; }
 .acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--sucesso); }
 
-.formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-3); flex-shrink: 0; }
+.formPergunta { border-top: var(--b-1) solid var(--linha); display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-3); flex-shrink: 0; }
 .formPergunta > div { flex: 1; min-width: 0; }
 .campoPergunta { min-height: 64px; max-height: 160px; resize: vertical; }
 .botaoEnviar { flex-shrink: 0; }
