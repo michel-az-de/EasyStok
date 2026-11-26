@@ -289,7 +289,9 @@
 .modoTexto {
   flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* #3374 (C8): uma linha; o que não cabe vai ao title */
+  /* #3374 (r2 P1-2): até 2 linhas, sem dividir a linha com o Assumir; o resto vai ao title. Com reticências numa linha,
+     "Restrição alimentar, confira a fi…" escondia o que fazer. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
 }
 .modoAssumir { margin-left: auto; flex: none; }
 /* #3374 (C10): a tecla que faz o mesmo que o botão, no próprio botão (contorno uniforme, sem barra lateral). */
@@ -303,7 +305,7 @@
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:active:not(:disabled) {
   background: var(--atd-preenchimento-ativo);
 }
-/* #3374 (C8): a faixa é uma linha só em qualquer coluna; o motivo que não cabe trunca com reticências e fica no title
+/* #3374 (C8, r2): a faixa não quebra a linha do Assumir; o motivo cabe em até 2 linhas e o texto inteiro fica no title
    (antes, abaixo de 560 px ele descia para uma segunda linha, #2185). */
 /* #3234 (C5): no desktop, só com a pílula (e o Assumir), o modo é selo no cabeçalho, ao lado do Assistente:
    a faixa de 40 px some e a conversa ganha a altura. Sem fundo nem traço, como os outros controles do topo. */
