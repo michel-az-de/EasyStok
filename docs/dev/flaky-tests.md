@@ -25,12 +25,13 @@ PR (run 45744098319, 23:44 a 23:49 em São Paulo). Os outros 138 testes do assem
   prova que a #2770 não cobria.
 - **Como foi confirmado:** o use case carimba `PagoEm` com `DateTime.UtcNow` e não tem relógio injetável, então a
   virada real não se força pela venda. Com o `PagoEm` gravado no último segundo do dia anterior, que é o que a
-  meia-noite entre a venda e a consulta produz, a derivação antiga falha com a mensagem do CI (`to be 75M, but found
-  0M`) e o dia do `PagoEm` gravado dá 75. O rerun verde do mesmo SHA, depois da meia-noite, é o outro sinal.
-- **Fix (#3367):** a prova pede o dia do `PagoEm` que o banco gravou. A venda foi para `VenderAsync`, que cerca o use
-  case com `antes` e `depois` e prova que o carimbo é do relógio real. A prova nova
+  meia-noite entre a venda e a consulta produz, a prova nova falhou com a derivação antiga (o helper pedindo
+  `DataOperacional(DateTime.UtcNow)`) e a mensagem do CI (`to be 75M, but found 0M`), e passa pedindo o dia do
+  `PagoEm` gravado. O rerun verde do mesmo SHA, depois da meia-noite, é o outro sinal.
+- **Fix (#3367):** a prova pede o dia do `PagoEm` que o banco gravou, por `TotalDoDiaDoPagamentoAsync`. A venda foi
+  para `VenderAsync`, que cerca o use case com `antes` e `depois` e prova que o carimbo é do relógio real. A prova nova
   `Total_do_dia_acompanha_o_instante_gravado_quando_a_meia_noite_cai_entre_a_venda_e_a_consulta` leva o `PagoEm` ao
-  último segundo do dia anterior e confere 0 no dia novo e 75 no dia da venda. Só teste.
+  último segundo do dia anterior, confere 0 no dia novo e 75 pelo mesmo `TotalDoDiaDoPagamentoAsync`. Só teste.
 - **Se voltar a falhar:** ver se alguma prova consulta o total do dia com `HorarioBrasil.DataOperacional(DateTime.UtcNow)`
   ou `HorarioBrasil.Hoje()` lido depois de semear. O dia sai de um instante que o banco gravou; com pagamentos em
   instantes diferentes, o certo é o intervalo do primeiro ao último, não um dia.
