@@ -1,9 +1,18 @@
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Ia;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Infra.Postgre.Repositories.Atendimento;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Domain.Enums;
+using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Atendimento;
 
@@ -171,9 +180,183 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         await FluentActions.Invoking(() => db.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
     }
 
+    // #3370 (D2 da #3271): o consumo é o maior entre os turnos e as chamadas ligadas a eles em chamada_ia. O papel (superuser)
+    // dos testes de soma não aplica RLS: o que filtra a empresa aqui é a consulta; o teste de RLS abaixo usa o papel sujeito a ela.
+
+    [SkippableFact]
+    public async Task Piso_poe_na_soma_os_tokens_do_turno_que_nao_foi_gravado()
+    {
+        // O turno caiu depois de chamar o modelo e a linha dele não nasceu: as duas chamadas dele ficaram em chamada_ia.
+        // Os turnos gravados (um do modelo, um sem IA) têm cada um as chamadas iguais ao que gravaram.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid(); var caiu = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var respondeu = Turno(empresa, conversa, em, 100, 20, 50, 0.001m, DesfechoTurnoAgente.Respondeu);
+        await Gravar(empresa, respondeu, Turno(empresa, conversa, em, 0, 0, 0, null, DesfechoTurnoAgente.SemIa));
+        await GravarChamadas(empresa,
+            Chamada(empresa, respondeu.Id, em, 100, 20, 50),
+            Chamada(empresa, caiu, em.AddSeconds(5), 500, 100, 200),
+            Chamada(empresa, caiu, em.AddSeconds(9), 300, 50, 0));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        // Tokens das chamadas (170 do turno gravado + 1.150 do que caiu); o resto continua sendo o dos turnos.
+        soma.Should().Be(new SomaTurnosAgente(2, 900, 170, 250, 0.001m, 1, RespostasSemIa: 1, TurnosComTokens: 1)
+        {
+            TokensDosTurnos = 170,
+        });
+        soma.TotalTokens.Should().Be(1_320);
+        soma.TokensPoupadosEstimados.Should().Be(170, "a média usa os tokens dos turnos, não o piso");
+    }
+
+    [SkippableFact]
+    public async Task Piso_nao_baixa_a_soma_quando_a_chamada_foi_perdida()
+    {
+        // chamada_ia perdeu a linha de um turno (o registro engole a falha com log): os turnos têm mais do que as chamadas.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var primeiro = Turno(empresa, conversa, em, 1_000, 200, 0, 0.01m, DesfechoTurnoAgente.Respondeu);
+        var perdido = Turno(empresa, conversa, em, 400, 100, 0, 0.004m, DesfechoTurnoAgente.Respondeu);
+        await Gravar(empresa, primeiro, perdido);
+        await GravarChamadas(empresa, Chamada(empresa, primeiro.Id, em, 1_000, 200, 0));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.Should().Be(new SomaTurnosAgente(2, 1_400, 300, 0, 0.014m, 0, TurnosComTokens: 2));
+        soma.TokensDosTurnos.Should().BeNull();
+    }
+
+    [SkippableFact]
+    public async Task Piso_com_turnos_e_chamadas_iguais_nao_conta_duas_vezes()
+    {
+        // O caso de todo dia: cada turno e as chamadas dele batem, a escrita de cache já dentro da entrada do turno (#2862).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var primeiro = Turno(empresa, conversa, em, 140, 20, 50, 0.001m, DesfechoTurnoAgente.Respondeu);
+        var segundo = Turno(empresa, conversa, em, 200, 30, 0, 0.002m, DesfechoTurnoAgente.Escalou);
+        await Gravar(empresa, primeiro, segundo);
+        await GravarChamadas(empresa,
+            Chamada(empresa, primeiro.Id, em, 100, 20, 50, cacheEscrito: 40),
+            Chamada(empresa, segundo.Id, em, 120, 10, 0),
+            Chamada(empresa, segundo.Id, em.AddSeconds(3), 80, 20, 0));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.Should().Be(new SomaTurnosAgente(2, 340, 50, 50, 0.003m, 0, TurnosComTokens: 2));
+    }
+
+    [SkippableFact]
+    public async Task Piso_conta_so_a_chamada_do_Assistente_ligada_a_turno_da_empresa_e_da_janela()
+    {
+        // Sem nenhum turno gravado, só entra o que é consumo do Assistente neste mês e nesta loja. As "fora" têm tokens
+        // enormes: qualquer filtro que falte aparece na soma.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var outra = Guid.NewGuid(); var turno = Guid.NewGuid();
+        var dentro = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa,
+            Chamada(empresa, turno, InicioOutubroUtc, 100, 10, 0),
+            Chamada(empresa, turno, dentro, 200, 20, 5, cacheEscrito: 40),
+            // Fora: um instante antes da janela, exatamente no fim dela, sugestão para a equipe (sem turno) e outra finalidade.
+            Chamada(empresa, turno, InicioOutubroUtc.AddMilliseconds(-1), 9_000, 9_000, 9_000),
+            Chamada(empresa, turno, FimOutubroUtc, 9_000, 9_000, 9_000),
+            Chamada(empresa, null, dentro, 9_000, 9_000, 9_000),
+            Chamada(empresa, turno, dentro, 9_000, 9_000, 9_000, finalidade: FinalidadeIa.ResumoCliente));
+        await GravarChamadas(outra, Chamada(outra, turno, dentro, 9_000, 9_000, 9_000));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        // A escrita de cache entra na entrada (200 + 40), como o turno soma.
+        (soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido).Should().Be((340L, 30L, 5L));
+        soma.Turnos.Should().Be(0);
+    }
+
+    [SkippableFact]
+    public async Task Piso_filtra_a_empresa_na_propria_consulta_sem_o_filtro_global_do_EF()
+    {
+        // O SuperAdmin desliga o filtro global de tenant e o papel dos testes não aplica RLS: sobra a empresa que a consulta
+        // do piso passa. Sem ela a soma de uma loja levaria as chamadas de todas as outras.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var outra = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa, Chamada(empresa, Guid.NewGuid(), em, 10, 5, 0));
+        await GravarChamadas(outra, Chamada(outra, Guid.NewGuid(), em, 9_000, 9_000, 0));
+        var admin = Substitute.For<ICurrentUserAccessor>();
+        admin.IsAuthenticated.Returns(true);
+        admin.Nivel.Returns(NivelAcesso.SuperAdmin);
+
+        await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(fixture.ConnectionString).Options, admin);
+        (await db.ChamadasIa.Where(c => c.EmpresaId == outra).CountAsync()).Should().Be(1, "o filtro global está desligado");
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.TotalTokens.Should().Be(15);
+    }
+
+    [SkippableFact]
+    public async Task Rls_esconde_chamada_de_outra_empresa_e_o_piso_le_a_propria()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var outra = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa, Chamada(empresa, Guid.NewGuid(), em, 10, 5, 0));
+        await GravarChamadas(outra, Chamada(outra, Guid.NewGuid(), em, 9_000, 9_000, 0));
+
+        // Papel NOBYPASSRLS: a policy esconde a outra loja mesmo sem o filtro do EF, e o piso ainda lê a própria.
+        await using var db = fixture.CreateRlsClientDbContext();
+        await db.Database.OpenConnectionAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {empresa.ToString()}, false)");
+        (await db.ChamadasIa.IgnoreQueryFilters().Select(c => c.EmpresaId).Distinct().ToListAsync()).Should().Equal(empresa);
+        db.SetMobileTenantContext(empresa);
+
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.TotalTokens.Should().Be(15);
+    }
+
+    [SkippableFact]
+    public async Task Cota_barra_o_turno_seguinte_com_os_tokens_de_um_turno_que_nao_foi_gravado()
+    {
+        // A regressão que a fatia existe para fechar: o turno caiu depois de chamar o modelo, não deixou linha, e a cota
+        // do mês via só os turnos gravados. Agora as chamadas dele entram e a etapa da cota barra o turno seguinte.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 10, 15, 0, 0, DateTimeKind.Utc);
+        await GravarChamadas(empresa, Chamada(empresa, Guid.NewGuid(), agora.AddMinutes(-5), 700, 200, 150));
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(empresa);
+        configuracao.DefinirAssistente(null, null, 1_000, null, null);
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var turnos = new TurnoAgenteRepository(db);
+        var portoes = new PortoesDoAssistente(Substitute.For<IAgenteLlmClient>(), Substitute.For<IConversaRepository>(), turnos,
+            Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = 10 }));
+
+        (await PortoesDoAssistente.UsadosNoMesAsync(turnos, empresa, agora, default)).Should().Be(1_050);
+        var etapa = await portoes.DaCotaAsync(empresa, configuracao, agora, default);
+
+        etapa.Barra.Should().BeTrue();
+        etapa.MotivoEscalada.Should().Be(PortoesDoAssistente.MotivoCotaEsgotada);
+    }
+
     private static TurnoAgente Turno(Guid empresa, Guid conversa, DateTime em, int entrada, int saida, int cache, decimal? custo,
         DesfechoTurnoAgente desfecho) =>
         TurnoAgente.Registrar(empresa, conversa, null, null, "claude-sonnet-5", entrada, saida, cache, custo, [], 1, desfecho, 800, em);
+
+    private static ChamadaIa Chamada(Guid empresa, Guid? turno, DateTime em, int entrada, int saida, int cacheLido,
+        int cacheEscrito = 0, FinalidadeIa finalidade = FinalidadeIa.Atendimento) =>
+        ChamadaIa.Registrar(empresa, null, null, "claude-sonnet-5", finalidade, turno, entrada, saida, cacheLido, cacheEscrito, 0.001m,
+            800, DesfechoChamadaIa.Ok, em);
+
+    private async Task GravarChamadas(Guid empresa, params ChamadaIa[] chamadas)
+    {
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        db.ChamadasIa.AddRange(chamadas);
+        await db.SaveChangesAsync();
+    }
 
     private async Task Gravar(Guid empresa, params TurnoAgente[] turnos)
     {

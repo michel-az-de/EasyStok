@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
@@ -60,9 +61,27 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
             })
             .FirstOrDefaultAsync(ct);
 
-        return soma is null
+        var turnos = soma is null
             ? SomaTurnosAgente.Vazia
             : new SomaTurnosAgente(soma.Turnos, soma.Entrada, soma.Saida, soma.CacheLido, soma.Custo, soma.SemPreco, soma.SemIa,
                 soma.ComTokens);
+
+        // #3370 (D2 da #3271): piso. Cada chamada ao modelo do Assistente fica em chamada_ia, ligada ao turno por
+        // turno_agente_id; se o turno caiu depois de chamar o modelo, os tokens dele só existem lá. Fora ficam a sugestão de
+        // resposta para a equipe (finalidade Atendimento, sem turno) e as outras finalidades. A escrita de cache entra na
+        // entrada, como o turno a soma (#2862). Falha de banco propaga, como na soma dos turnos: o controle de custo não abre.
+        var chamadas = await db.ChamadasIa.AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && c.CriadoEm >= deUtc && c.CriadoEm < ateUtc)
+            .Where(c => c.Finalidade == FinalidadeIa.Atendimento && c.TurnoAgenteId != null)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Entrada = g.Sum(c => (long)c.TokensEntrada + c.TokensCacheEscrito),
+                Saida = g.Sum(c => (long)c.TokensSaida),
+                CacheLido = g.Sum(c => (long)c.TokensCacheLido),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return chamadas is null ? turnos : turnos.ComPisoDasChamadas(chamadas.Entrada, chamadas.Saida, chamadas.CacheLido);
     }
 }

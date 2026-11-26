@@ -119,8 +119,10 @@ os registros.
 
 **Estado (18/11/2026, #2853).** Entregue no código. O turno barra na etapa `cota` antes de chamar o modelo e escala pelo motivo da cota. O registro sai com `Desfecho = Cota`. O `GET uso` traz `cotaTokensMes`, `percentual` e `alerta`. A checagem da conversa mostra a cota como a 11ª etapa.
 
+**Estado (26/11/2026, #3370).** O uso do mês que a cota e o cartão leem ganhou um piso: se `chamada_ia`, nas chamadas ligadas a turno do Assistente, registrou mais tokens do que os turnos, vale o das chamadas. É o caso do turno que caiu depois de chamar o modelo e não gravou: a cota o via como zero. É o maior dos dois registros, nunca a soma. O custo e as contagens do cartão seguem só dos turnos, então com o piso ativo o cartão mostra mais tokens do que o custo cobre. O piso não é por turno: uma chamada perdida num turno gravado esconde, até o tamanho dela, um turno não gravado no mesmo mês.
+
 **Escopo.**
-- Antes de chamar o modelo, o turno lê o uso do mês (S67).
+- Antes de chamar o modelo, o turno lê o uso do mês (S67, com o piso das chamadas da #3370).
 - Com o uso em 100% ou mais da `CotaTokensMes`:
   - o turno não chama o modelo;
   - a conversa passa para a dona pelo caminho da escalada que já existe (`MensagemEscalada` ao cliente);

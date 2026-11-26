@@ -81,8 +81,9 @@ public sealed class PortoesDoAssistente(
     ];
 
     /// <summary>
-    /// S69 (#2853): cota mensal de tokens da loja. Soma o mesmo registro dos turnos que o painel de uso mostra, no mês de
-    /// Brasília. Barrando, o turno não chama o modelo e a conversa passa para a equipe.
+    /// S69 (#2853): cota mensal de tokens da loja. Soma o mesmo consumo que o painel de uso mostra (turnos com o piso das
+    /// chamadas em <c>chamada_ia</c>, #3370), no mês de Brasília. Barrando, o turno não chama o modelo e a conversa passa
+    /// para a equipe.
     /// </summary>
     public async Task<EtapaAssistente> DaCotaAsync(
         Guid empresaId, ConfiguracaoAtendimento configuracao, DateTime agora, CancellationToken ct)
