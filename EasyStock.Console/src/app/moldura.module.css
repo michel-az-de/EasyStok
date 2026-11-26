@@ -58,6 +58,7 @@
   --fundo: var(--atd-fundo); --chao-conversa: var(--atd-fundo); --creme: var(--atd-fundo);
   --papel: var(--atd-superficie);
   --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
+  --t-atdforte: 1rem;
   --t-atd: 1rem; /* #3374 (G1): 16 px só aqui dentro; fora do palco o --t-atd global cai para o corpo */
 }
 /* Em repouso o palco tem 1 realce só; no hover, ativo e foco o controle troca para um tom abaixo dele (estado, não superfície). */

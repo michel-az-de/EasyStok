@@ -42,6 +42,7 @@
   /* #3374 (C2): o painel é do Atendimento e pinta com as mesmas 3 superfícies --atd-. */
   --papel: var(--atd-superficie); --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
   --t-atd: 1rem;
+  --t-atdforte: 1rem;
   background: var(--papel); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: row; overflow: hidden;
