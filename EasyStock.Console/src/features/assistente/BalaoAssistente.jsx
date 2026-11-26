@@ -196,8 +196,13 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   // #3374 (C9, R5): encaixado no computador o painel EMPURRA o palco em vez de cobrir a conversa (o Assumir ficava
   // embaixo dele). Com isso a máxima deixa as três colunas nos seus mínimos de CSS (fila 260, ficha 292, conversa 320).
   // Entre 1180 e 1307 px esse teto fica abaixo do mínimo do painel: aí não empurra e o painel segue sobreposto, na largura normal.
-  const tetoEmpurrando = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO
-  const empurra = !celular && !solto && area.colunas && tetoEmpurrando >= ASSISTENTE.min
+  // Critica r1 (P1): abaixo disso (1180 a 1307 px) o painel cobria o Assumir. Agora ele toma o lugar da coluna Cliente
+  // (a ficha some enquanto ele está aberto e volta ao fechar) e segue empurrando: a conversa nunca fica por baixo.
+  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_MINIMA) - 2 * VAO
+  const encaixado = !celular && !solto && area.colunas
+  const semFicha = encaixado && tetoComFicha < ASSISTENTE.min
+  const tetoEmpurrando = semFicha ? area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + CONVERSA_MINIMA) - VAO : tetoComFicha
+  const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
   const larguraMaximaPainel = limitar(
     larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
     ASSISTENTE.min,
@@ -217,12 +222,14 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     const raiz = document.documentElement
     raiz.style.setProperty(`--assistente-reserva-${lado === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
     raiz.dataset.assistenteEmpurra = lado === 'esquerda' ? 'esquerda' : 'direita'
+    if (semFicha) raiz.dataset.assistenteSemFicha = ''
     return () => {
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
       delete raiz.dataset.assistenteEmpurra
+      delete raiz.dataset.assistenteSemFicha
     }
-  }, [reserva, lado])
+  }, [reserva, lado, semFicha])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
