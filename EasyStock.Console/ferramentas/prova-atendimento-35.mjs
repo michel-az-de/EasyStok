@@ -64,9 +64,11 @@ function medir({ escala }) {
 
   const espacos = new Set(); const foraDaEscala = new Set()
   for (const e of todos) {
-    if (!e.firstElementChild) continue
     const s = getComputedStyle(e)
+    // `margin: auto` sai em px no getComputedStyle (valor usado); o Typed OM devolve o valor computado, `auto`.
+    const mapa = e.computedStyleMap?.()
     for (const p of ['gap', 'rowGap', 'columnGap', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft']) {
+      if (p.startsWith('margin') && String(mapa?.get(p.replace(/[A-Z]/g, (l) => `-${l.toLowerCase()}`))) === 'auto') continue
       const v = Math.round(Math.abs(parseFloat(s[p])) * 10) / 10
       if (!(v > 0)) continue
       espacos.add(v); if (!escala.includes(v)) foraDaEscala.add(v)
@@ -91,7 +93,8 @@ function medir({ escala }) {
   }
 
   const interativo = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=menuitem], [role=checkbox], [role=switch], [role=slider]'
-  const alvos = todos.filter((e) => e.matches(interativo) && getComputedStyle(e).display !== 'inline').filter((e) => { const r = e.getBoundingClientRect(); return (r.width > 1 || r.height > 1) && (r.width < 24 || r.height < 24) }) // 1x1 é campo só para leitor de tela (.sr).map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)} ${descricao(e)}`)
+  const alvos = todos.filter((e) => e.matches(interativo) && getComputedStyle(e).display !== 'inline').filter((e) => { const r = e.getBoundingClientRect(); return (r.width > 1 || r.height > 1) && (r.width < 24 || r.height < 24) }) // 1x1 é campo só para leitor de tela (.sr)
+    .map((e) => `${Math.round(e.getBoundingClientRect().width)}x${Math.round(e.getBoundingClientRect().height)} ${descricao(e)}`)
 
   const bordaEsq = todos.filter((e) => {
     const s = getComputedStyle(e)
@@ -158,6 +161,7 @@ for (const m of medidas) {
   falha(m.contraste.n === 0, `contraste < 4,5 em ${m.contraste.n}`)
   falha(m.alvos.n === 0, `alvos < 24 px: ${m.alvos.n}`)
   falha(m.bordaEsq.n === 0, `borda só à esquerda: ${m.bordaEsq.n}`)
+  falha(m.errosDePagina.length === 0, `erros de página: ${m.errosDePagina.join(' | ')}`)
 }
 console.log(`Medida gravada em ${resolve(pasta, 'medidas.json')}`)
 if (process.env.ALVO_35 === '1') {
