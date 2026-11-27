@@ -7,8 +7,7 @@ import { balcaoComCardapio, fichaComCardapio, MAXIMO } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { BotaoIcone } from '../componentes/BotaoIcone'
-import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
-import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
+import { observarAreaDosPaineis } from '../hooks/areaDosPaineis'
 import { Pilula } from '../componentes/Pilula'
 import { Icone } from '../componentes/Icone'
 import { Modal } from '../componentes/Modal'
@@ -310,8 +309,15 @@ function Trilho({
 
 function Gaveta({ titulo, aoFechar, children }) {
   const painel = useRef(null)
-  const medir = () => limitarPainelMovel({ x: window.innerWidth - 488, y: 72 },
-    { largura: 480, altura: window.innerHeight }, janelaDosPaineis())
+  // Crítica r5 (P1): a ficha é a gaveta inteira do palco, não um painel entre o cabeçalho da conversa e o campo
+  // (lá ela ficava com 291 px a 768 e 72 px de rolagem). Altura do palco, encostada à direita.
+  const medir = () => {
+    const palco = document.getElementById('conteudo-principal')?.getBoundingClientRect()
+    const largura = Math.min(480, window.innerWidth - 16)
+    const y = Math.max(8, (palco?.top ?? 72) + 8)
+    const fundo = Math.min(window.innerHeight, palco?.bottom ?? window.innerHeight) - 8
+    return { x: window.innerWidth - largura - 8, y, largura, altura: Math.max(240, fundo - y) }
+  }
   const [posicao, setPosicao] = useState(medir)
   useLayoutEffect(() => {
     const ajustar = () => setPosicao(antes => {

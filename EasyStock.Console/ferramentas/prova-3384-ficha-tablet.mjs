@@ -42,6 +42,15 @@ try {
     await botao.click()
     const abriu = await p.getByRole('button', { name: 'Fechar Ficha' }).waitFor({ timeout: 5000 }).then(() => true, () => false)
     cobrar(abriu, `${w}x${h}: o botão abre a gaveta da ficha`)
+    // Crítica r5 (P1): a gaveta herdava a área entre o cabeçalho da conversa e o campo (291 px a 768), e a ficha
+    // ficava com 72 px de rolagem. Ela ocupa a altura do palco: o valor a receber e a nota cabem sem caça.
+    await p.waitForTimeout(400)
+    const gaveta = await p.evaluate(() => {
+      const g = document.querySelector('dialog[aria-label="Ficha"]')
+      const r = g.getBoundingClientRect()
+      return { altura: Math.round(r.height), topo: Math.round(r.top), fundo: Math.round(r.bottom), vh: window.innerHeight }
+    })
+    cobrar(gaveta.altura >= gaveta.vh * 0.6 && gaveta.fundo <= gaveta.vh, `${w}x${h}: a gaveta da ficha usa a altura da tela (${gaveta.altura} de ${gaveta.vh} px)`)
     await p.close()
   }
 } finally {
