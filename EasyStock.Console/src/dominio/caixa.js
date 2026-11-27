@@ -469,6 +469,9 @@ export function linhaDoFluxo(dia) {
   return { data: dia?.data ?? null, entrou: entrou / 100, saiu: saiu / 100, saldo: (entrou - saiu) / 100, situacao, depoisDoFechamento: depois / 100 }
 }
 
+// #3389 (6): dia aberto com entrou e saiu em zero não teve movimento; a `situacao` segue alimentando a pílula.
+export const diasComMovimento = (linhas) => linhas.filter((linha) => linha.entrou !== 0 || linha.saiu !== 0).length
+
 // As linhas da tabela: hoje primeiro, depois os dias anteriores. Caixa esquecido aberto (#596): a
 // linha de hoje soma a sessão desde a abertura, então os dias que já estão dentro dela saem da
 // tabela (somariam duas vezes) e a linha diz desde quando (`desde`).

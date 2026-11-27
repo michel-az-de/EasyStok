@@ -25,7 +25,7 @@ export function PromptEstorno({ rotulo, aoCancelar, aoConfirmar, enviando = fals
       <p className={css.confirmarAcoes}>
         <Botao variante="texto" disabled={enviando} onClick={aoCancelar}>Manter lançamento</Botao>
         <Botao
-          variante="primario"
+          variante="perigo"
           icone="undo-2"
           disabled={enviando || motivo.trim().length < 3}
           onClick={() => aoConfirmar(motivo.trim())}
