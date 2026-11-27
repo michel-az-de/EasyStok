@@ -190,7 +190,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   // mexe (scrollIntoView também deslocaria as molduras); sem movimento se a pessoa pediu menos movimento.
   useEffect(() => {
     const caixa = rolagem.current
-    const cartao = !carga && selecionadaId != null ? caixa?.querySelector(`button[data-conversa-id="${CSS.escape(String(selecionadaId))}"]`) : null
+    const cartao = !carga && selecionadaId != null && typeof caixa?.querySelectorAll === 'function' ? [...caixa.querySelectorAll('button[data-conversa-id]')].find((el) => el.dataset.conversaId === String(selecionadaId)) : null
     if (!caixa || !cartao) return
     const c = caixa.getBoundingClientRect(); const k = cartao.getBoundingClientRect()
     const passo = k.top < c.top ? k.top - c.top : k.bottom > c.bottom ? k.bottom - c.bottom : 0
