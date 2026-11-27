@@ -23,7 +23,7 @@ registerHooks({
 })
 
 const { agruparFalhasSeguidas, avisoDasTentativas, marcarNaConversa, marcasDaConversa } = await import('../src/dominio/falhasSeguidas.js')
-const { TIPOS_DE_FALHA, falhaDeEnvio } = await import('../src/dominio/falhaDeEnvio.js')
+const { TIPOS_DE_FALHA, falhaDeEnvio, semOReenvio } = await import('../src/dominio/falhaDeEnvio.js')
 const { mensagemDaApi } = await import('../src/infra/api/traducaoConversas.js')
 
 let passou = 0
@@ -142,6 +142,15 @@ confere('j  o mesmo modelo com o mesmo texto agrupa; nome diferente, texto livre
   }
   // O texto livre continua agrupando pelo mesmo caminho da API.
   assert.deepEqual(ids(agruparFalhasSeguidas([daApi('a1', { modelo: null, tipoConteudo: 'Texto' }), daApi('a2', { modelo: null, tipoConteudo: 'Texto' })])), ['a2+a1'])
+})
+
+// #3374 (C12): modelo não tem Reenviar, então o aviso não manda "reenviar".
+confere('k  a frase de modelo não fala em reenviar; a de texto continua igual', () => {
+  const grupo = avisoDasTentativas(falhaDeEnvio('timeout'), 4)
+  assert.match(grupo, /antes de reenviar/)
+  assert.equal(semOReenvio(grupo), '4 tentativas sem resposta do WhatsApp. Pode ter chegado: confira com o cliente.')
+  assert.doesNotMatch(semOReenvio(falhaDeEnvio('timeout').texto), /reenviar/)
+  assert.equal(semOReenvio('Não foi enviada. Tente de novo.'), 'Não foi enviada. Tente de novo.')
 })
 
 confere('c  o aviso do grupo sai do tipo: tempo esgotado pode ter chegado; os outros não saíram', () => {

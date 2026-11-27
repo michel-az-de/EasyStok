@@ -51,6 +51,9 @@ export function falhaDeEnvio(erro) {
   return desconhecida
 }
 
+// #3374 (C12): modelo não tem Reenviar, então a frase dele não manda "reenviar" (só "confira").
+export const semOReenvio = (frase) => String(frase).replace(' antes de reenviar.', '.')
+
 export const textoDaFalhaDeEnvio = (erro) => falhaDeEnvio(erro).texto
 
 // Depois de tentar de novo: tempo esgotado não é recusa, a mensagem pode ter chegado.

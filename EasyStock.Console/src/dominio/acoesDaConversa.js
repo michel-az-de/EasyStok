@@ -40,7 +40,9 @@ export function acoesDaConversa({ conversa, pausado = false, bloqueada = false, 
     // conversa só volta ao Assistente depois de assumida: não se devolve o que é de um colega.
     devolver: parouNoAssistente && Boolean(canal?.temAssistente) && !automaticoDesligadoNaConversa(conversa),
     // Cadastro bloqueado também se conclui: o que trava é o envio, não o fim do atendimento.
-    concluir: aberta,
+    // #3374 (C12): só depois de assumir. Onde ainda há Assumir (Assistente respondendo, fila, colega), concluir
+    // fecha a conversa de quem não a pegou; o bloqueado não tem Assumir e segue concluível.
+    concluir: aberta && !(chave === MODOS.LIGADO || chave === MODOS.COM_VOCE || deOutro || semResponsavel),
     enviarCardapio: livre,
     passar: livre && permitePassar,
   }

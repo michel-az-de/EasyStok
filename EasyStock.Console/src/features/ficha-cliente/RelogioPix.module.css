@@ -12,7 +12,7 @@
   font-variant-numeric: tabular-nums; color: var(--tinta); line-height: var(--lh-compacto);
 }
 .legenda { font-size: var(--t-apoio); color: var(--tinta-2); }
-.numeroDivergente { font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 600; }
+.numeroDivergente { font-family: var(--f-dado); font-size: var(--t-atd); font-weight: 600; }
 
 /* Ao zerar: trilho inteiro vira --erro (prop `trilhoParado` do Anel
    genérico, componentes/Anel.jsx), número e legenda piscam juntos (10
@@ -31,7 +31,7 @@
 }
 /* Pagamento confirmado: o selo estala para dentro, o único momento de
    celebração da esteira. */
-.pago .rotuloPago { font-size: var(--t-forte); font-weight: 700; }
+.pago .rotuloPago { font-size: var(--t-atd); font-weight: 700; }
 .pago .horaPago { font-size: var(--t-apoio); color: var(--tinta-2); }
 .recolhido {
   display: flex; align-items: center; gap: var(--e-2);

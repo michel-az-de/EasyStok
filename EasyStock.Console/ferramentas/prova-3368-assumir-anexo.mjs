@@ -29,7 +29,7 @@ const cores = () => p.evaluate(() => {
   const fundo = (el) => el ? pixel(getComputedStyle(el).backgroundColor) : null
   const sonda = document.createElement('i'); sonda.style.background = 'var(--acao)'; document.querySelector('[data-conteudo-console]').append(sonda)
   const acao = fundo(sonda); sonda.remove()
-  const assumir = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Assumir conversa')
+  const assumir = [...document.querySelectorAll('button')].find((b) => /^Assumir conversa\s*A?$/.test(b.textContent.trim()))
   const enviar = document.querySelector('button[aria-label="Enviar e assumir a conversa"]')
   return { assumirLaranja: fundo(assumir) === acao, enviarLaranja: fundo(enviar) === acao, enviarHabilitado: enviar ? !enviar.disabled : null }
 })

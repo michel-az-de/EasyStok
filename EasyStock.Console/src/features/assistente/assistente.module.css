@@ -34,15 +34,22 @@
 }
 
 .painel {
+  font-size: var(--t-atd); /* #3374 (C7, G1): o texto sem tamanho próprio herda 16 px, não os 15 do corpo global */
   position: fixed; right: var(--e-4); z-index: 32;
   bottom: calc(56px + var(--e-4) + var(--e-2));
   width: min(432px, calc(100vw - 2 * var(--e-4)));
   max-height: min(720px, calc(100dvh - 140px));
+  /* #3374 (C2): o painel é do Atendimento e pinta com as mesmas 3 superfícies --atd-. */
+  --papel: var(--atd-superficie); --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
+  --t-atd: 1rem;
+  --t-atdforte: 1rem;
   background: var(--papel); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: row; overflow: hidden;
   animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
+/* Hover e ativo: um tom abaixo do realce (estado, não superfície). Sem :focus: o campo abre focado e viraria um 9º fundo em repouso. */
+.painel :is(button, a, label, input, select, textarea, [role='button'], [role='tab'], [role='option']):is(:hover, :active) { --preenchimento-forte: var(--atd-preenchimento-hover); }
 /* #1806: a alça de largura fica na borda de dentro; o conteúdo segue em coluna ao lado dela. */
 .colunaPainel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 /* Encaixado à esquerda: depois do trilho no computador (#1920: token, não 84 px), na borda no tablet. */
@@ -50,8 +57,18 @@
 @media (max-width: 1179px) { .painelEsquerda { left: var(--e-4); } }
 /* Solto: left e top vêm do arrasto, já limitados à tela (`dominio/paineis.js`). */
 .painelSolto { animation: none; }
+/* #3374 (C9): encaixado, o painel empurra o palco (reserva medida em BalaoAssistente) e a conversa nunca fica por baixo dele.
+   Margem, não padding: é reserva de tela, não espaçamento da escala `--e-`. Só no palco do Atendimento (`data-palco-atendimento`,
+   Moldura de três colunas): nas outras telas o Assistente continua sobreposto. */
+:global(html[data-assistente-empurra='direita']) :global(#conteudo-principal[data-palco-atendimento]) { margin-right: var(--assistente-reserva-direita, 0px); }
+:global(html[data-assistente-empurra='esquerda']) :global(#conteudo-principal[data-palco-atendimento]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
+/* Critica r1 (P1): sem espaço para as três colunas e o painel, ele substitui a coluna Cliente (e a alça dela) até fechar. */
+/* Critica r2 (P1-5): com o painel empurrando, a conversa fica com no mínimo --assistente-conversa-minima; fila e ficha cedem. */
+:global(html[data-assistente-empurra]) :global(#conteudo-principal[data-palco-atendimento] > section[aria-label='Conversa']) { min-width: var(--assistente-conversa-minima, 0px); }
+:global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > section[aria-label='Ficha']),
+:global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > :has(+ section[aria-label='Ficha'])) { display: none; }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
-.posicoes { display: flex; align-items: center; gap: 2px; margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
+.posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {
   width: var(--toque); height: var(--toque); padding: 0;
   display: grid; place-items: center; background: none; border: 0;
@@ -73,8 +90,15 @@
 .identidade { min-width: 0; }
 .clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; line-height: var(--lh-compacto); }
 .cabecalho > button { flex-shrink: 0; }
+.tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }
 
-.corpo { overflow-y: auto; padding: var(--e-3); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0; }
+/* Crítica r1 (P1): o rodapé (pergunta) tem altura própria fora da rolagem; só o corpo rola. O texto cortado na borda
+   ("Bancada de teste", "Pergunte ao assistente") parecia escondido atrás da caixa: a borda de baixo agora esmaece,
+   e a folga de baixo deixa o último item inteiro fora do esmaecido quando a rolagem chega ao fim. */
+.corpo {
+  overflow-y: auto; padding: var(--e-3) var(--e-3) var(--e-5); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0;
+  mask-image: linear-gradient(to bottom, var(--papel) calc(100% - var(--e-5)), transparent);
+}
 
 .cartoes { display: flex; flex-direction: column; }
 

@@ -20,9 +20,10 @@ await caso('F4: com texto ou anexo (#3368), "Assumir conversa" cede o laranja a 
   assert.match(css, /:has\(\.composer \.enviar:not\(\.gravar\):not\(:disabled\)\) \.modoAssumir/)
 })
 
-await caso('F5: a dica do Ctrl+Enter não aparece em tela de toque', () => {
+// #3374 (r2 P1-4): a dica passou a ser a do campo da conversa (Enter pergunta, Shift+Enter quebra a linha).
+await caso('F5: a dica do atalho não aparece em tela de toque', () => {
   assert.match(balao, /pointer: coarse/)
-  assert.doesNotMatch(balao, /dica="Ctrl\+Enter para perguntar\. Enter cria uma nova linha\."/)
+  assert.doesNotMatch(balao, /dica="Enter para perguntar\. Shift\+Enter cria uma nova linha\."/)
 })
 
 await caso('F6: o rótulo visível da nota tem classe que cede no celular e o aria-label segue completo', () => {

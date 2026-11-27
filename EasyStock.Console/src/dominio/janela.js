@@ -3,6 +3,7 @@
 
 import { bloqueioDe, estaBloqueada, resumoDoBloqueio } from './conversa'
 import { CANAL_DESCONHECIDO, canalPorNome } from './canal'
+import { dataIsoNoFuso, partesNoFuso, somarDiasIso } from './formato'
 
 export const SEM_JANELA = {
   tom: 'neutro', rotulo: 'Sem janela neste canal', rotuloCurto: 'Sem janela', textoLivre: true,
@@ -13,6 +14,18 @@ const CANAL_SEM_REGRA = {
 }
 
 const MS_POR_MINUTO = 60000
+
+// #3374 (C13): o fim da janela como a atendente fala, a hora de parede da LOJA ("18h", "amanhã 9h40"),
+// nunca a do aparelho: com o processo em UTC ou em Tóquio a frase é a mesma.
+function fimPorExtenso(fim, agora) {
+  const f = partesNoFuso(fim)
+  // "amanhã" é o dia civil seguinte na loja, não agora + 24 h (vale mesmo se o horário de verão voltar).
+  const dia = dataIsoNoFuso(fim), hoje = dataIsoNoFuso(agora)
+  const hora = f.minutos ? `${f.horas}h${String(f.minutos).padStart(2, '0')}` : `${f.horas}h`
+  if (dia === hoje) return hora
+  if (dia === somarDiasIso(hoje, 1)) return `amanhã ${hora}`
+  return `${String(f.dia).padStart(2, '0')}/${String(f.mes).padStart(2, '0')} ${hora}`
+}
 
 // A janela nasce da última mensagem do cliente. Quando a conversa traz
 // `janelaExpiraEm`, esse valor manda, porque veio da mensageria; senão a conta
@@ -50,6 +63,7 @@ export function estadoDaJanela(conversa, agora, canal) {
     tom: restam <= 30 ? 'aviso' : 'ok',
     rotulo: `${curto} na janela`,
     rotuloCurto: curto,
+    ate: fimPorExtenso(fim, agora),
     textoLivre: true,
     // Minutos até fechar. Exposto para quem só quer mostrar aviso perto do
     // fim (corte #32 do cartão do Balcão), sem mexer no tom nem no texto que
@@ -66,7 +80,7 @@ export function estadoDaJanela(conversa, agora, canal) {
 const FAIXA_DE_OUTRO_ASSUNTO = new Set(['bloqueio', 'reabrir'])
 export function prazoNoCabecalho(janela, motivo = null) {
   if (!janela) return null
-  if (janela.textoLivre) return janela.restam == null || motivo?.acao === 'bloqueio' ? null : `Janela aberta por ${janela.rotuloCurto}`
+  if (janela.textoLivre) return janela.restam == null || motivo?.acao === 'bloqueio' ? null : `Responda até ${janela.ate}`
   return motivo && !FAIXA_DE_OUTRO_ASSUNTO.has(motivo.acao) ? null : janela.rotulo
 }
 // Abaixo de 1280 px a linha do cabeçalho volta a quebrar: lá o prazo só aparece perto do fim (#1761 L4).

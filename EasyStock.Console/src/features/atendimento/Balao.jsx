@@ -5,7 +5,7 @@ import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { comLinksDePagamento, resumoDoPedidoNoTexto, rotuloDaComanda } from '../../dominio/conteudoDaMensagem'
-import { falhaDeEnvio, fraseDoReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
+import { falhaDeEnvio, fraseDoReenvio, semOReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
 import { avisoDasTentativas } from '../../dominio/falhasSeguidas'
 import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
@@ -184,7 +184,7 @@ export const Balao = memo(function Balao({
   }
   const reagivel = Boolean(aoReagir) && podeReagir(mensagem)
   return (
-    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
+    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${trocaDeVoz ? css.trocaDeVoz : ''} ${novo ? css.novo : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
       {(aoReagir || aoApagar) && (
         <MenuDaMensagem
           mensagem={mensagem} podeReagir={reagivel} alinhamento={mensagem.dir === 'out' ? 'direita' : 'esquerda'}
@@ -222,7 +222,8 @@ export const Balao = memo(function Balao({
         {mensagem.status === 'falhou' && (rotuloDaTentativa ? (
           <span className={css.falhou}><Icone nome="alerta" tamanho={16} /> {rotuloDaTentativa}</span>
         ) : (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {avisoDasTentativas(falha, tentativas)}</span>
+          // #3374 (C12): a chave é o número de tentativas: uma falha igual que entra no grupo reanuncia o aviso para o leitor de tela.
+          <span key={tentativas} className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {mensagem.modelo ? semOReenvio(avisoDasTentativas(falha, tentativas)) : avisoDasTentativas(falha, tentativas)}</span>
         ))}
         {tentativas > 1 && aoAlternarTentativas && (
           <Botao variante="texto" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-expanded={tentativasAbertas} onClick={() => aoAlternarTentativas(chaveDoGrupo ?? mensagem.id)}>

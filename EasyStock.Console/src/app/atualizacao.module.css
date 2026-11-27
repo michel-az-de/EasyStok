@@ -1,4 +1,4 @@
-.aviso { position: fixed; bottom: calc(var(--e-4) + env(safe-area-inset-bottom, 0px)); right: var(--e-4); z-index: 80; max-width: min(28rem, calc(100vw - 2 * var(--e-4))); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); animation: global(esmaecer) var(--dur-media) var(--ease-saida) both; }
-.aviso p { margin: 0 0 var(--e-3); }
+.aviso { position: fixed; bottom: calc(var(--e-4) + env(safe-area-inset-bottom, 0px)); right: var(--e-4); z-index: 80; display: flex; align-items: center; gap: var(--e-3); max-width: min(24rem, calc(100vw - 2 * var(--e-4))); padding: var(--e-3) var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); animation: global(esmaecer) var(--dur-media) var(--ease-saida) both; }
+.aviso p { margin: 0; font-size: var(--t-apoio); }
 /* #2762: no celular o aviso ocupa a largura útil e sobe acima da barra de abas, em vez de cobrir abas e Enviar. */
 @media (max-width: 759px) { .aviso { left: var(--e-4); max-width: none; bottom: calc(var(--e-4) + var(--toque) + var(--e-4) + env(safe-area-inset-bottom, 0px)); } }

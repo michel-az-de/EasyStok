@@ -417,7 +417,13 @@ const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
 
 export function sinalUrgente(conversa, agora) {
   const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
-  if (pendentes.length === 0) return null
+  // #3374 (r2): a restrição vale para o pedido depois da resposta; fica com a conversa aberta, lida desde a última reabertura (#1600).
+  const todas = conversa.mensagens ?? []
+  const desde = todas.findLastIndex((m) => m.reabertura) + 1
+  const comTexto = todas.slice(desde).filter((m) => m.texto)
+  const restricaoDita = comTexto.length > 0 && sinalDoCliente({ ...conversa, mensagens: comTexto }).paraDona === 'restricao'
+  const restricao = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: MOTIVO_POR_INTENCAO.restricao }
+  if (pendentes.length === 0) return restricaoDita ? restricao : null
   const pedido = conversa.pedido
   const { paraDona, textoParaDona, alegaPagamento } = sinalDoCliente({ ...conversa, mensagens: pendentes })
   const semPagamento = Boolean(pedido?.cobranca)
@@ -430,9 +436,7 @@ export function sinalUrgente(conversa, agora) {
       texto: 'Cliente reclamou do pedido ou pediu o dinheiro de volta',
     }
   }
-  if (paraDona === 'restricao') {
-    return { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: MOTIVO_POR_INTENCAO.restricao }
-  }
+  if (paraDona === 'restricao' || restricaoDita) return restricao
   if (alegaPagamento && semPagamento) {
     return {
       chave: 'diz-que-pagou',

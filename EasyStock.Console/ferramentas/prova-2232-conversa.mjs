@@ -125,7 +125,7 @@ await confere('A2  a barra da conversa renderiza a faixa, sem a pílula "Passou 
 await confere('A3  uma ação primária: "Assumir conversa"; Devolver e o resto não ficam na faixa', () => {
   existe(modo, 'acoesDaConversa')
   const marcado = barra(conversaComVoce)
-  assert.match(marcado, />Assumir conversa</)
+  assert.match(marcado, />Assumir conversa <kbd[^>]*aria-hidden="true"[^>]*>A<\/kbd></) // C10: a dica da tecla A fica no botão
   assert.equal((marcado.match(/<button/g) ?? []).length, 1, 'um botão só na faixa')
   assert.doesNotMatch(marcado, /Devolver ao Assistente|Concluir conversa|Mais ações/)
   const acoes = acoesDe(conversaComVoce)
@@ -176,7 +176,7 @@ await confere('A5  a visibilidade desce do painel até o hook e o botão "Novas 
 await confere('A6  balão com no máximo 75 %, cor própria de saída e ponta por geometria (sem raio)', () => {
   assert.match(regra('.balao'), /max-width:\s*min\(75%,/)
   assert.match(regra('.saida'), /background:\s*var\(--sucesso-pastel\)/, 'o enviado tem cor própria')
-  assert.match(regra('.saida.doAutomatico'), /background:\s*var\(--preenchimento-forte\)/, 'o automático segue neutro')
+  assert.doesNotMatch(css, /\.doAutomatico/, '#3374 (C6): a saída tem uma cor só; o selo Assistente distingue o automático')
   for (const lado of ['saida', 'entrada']) {
     const ponta = regra(`.${lado}::after`)
     assert.match(ponta, /clip-path:\s*polygon\(/, `ponta do .${lado} por clip-path`)

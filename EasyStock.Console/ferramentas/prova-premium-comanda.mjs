@@ -91,7 +91,9 @@ const botao = (tela, rotulo) => nos(tela.arvore).find(n => (n.type === 'button' 
 const atualizou = tela => nos(tela.arvore).some(n => n.type === 'output' && texto(n).includes('Etapa atualizada'))
 const props = (pedido = {}, extras = {}) => ({
   pedido: { estado: 'pago', pedidoId: 'pedido-a', numero: 17, itens: [{ sku: 'massa', qtd: 1 }], cobranca: null, totalApi: 100, totalPagoApi: 100, ...pedido },
-  conversaId: 'conversa-a', nomeCliente: 'Cliente A', agora: 10_000, ...extras,
+  conversaId: 'conversa-a', nomeCliente: 'Cliente A', agora: 10_000,
+  aoEncerrarAtendimento: () => {}, // C12: sem o handler (conversa ainda não assumida) o Concluir some
+  ...extras,
 })
 const pendente = () => { let resolver, rejeitar; const promise = new Promise((ok, erro) => { resolver = ok; rejeitar = erro }); return { promise, resolver, rejeitar } }
 const resultados = []
@@ -102,6 +104,10 @@ await provar('abrir uma comanda em andamento não celebra uma ação que não oc
   assert.ok(!atualizou(tela)); assert.equal(tela.arvore.props['data-etapa-confirmada'], undefined)
   const concluir = botao(tela, 'Concluir conversa')
   assert.ok(concluir); assert.equal(concluir.props.icone, 'circle-check'); tela.encerrar()
+})
+await provar('conversa não assumida: a ficha não oferece Concluir conversa (C12)', () => {
+  const tela = new Tela(props({ estado: 'entregue' }, { aoEncerrarAtendimento: undefined }))
+  assert.equal(botao(tela, 'Concluir conversa'), undefined); tela.encerrar()
 })
 await provar('posição da jornada vem de cada estado real, sem pontos ou porcentagem inventados', () => {
   for (const [i, passo] of PASSOS.entries()) {

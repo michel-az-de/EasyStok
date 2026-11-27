@@ -126,10 +126,24 @@ await confere('B5. pedido mudou de etapa, com o rótulo da etapa nova e sem som'
   const depois = retrato([['c1', linha({ etapa: 'entrega' })]])
   const lista = avisosDe(antes, depois)
   assert.deepEqual(tipos(lista), [T.ETAPA_DO_PEDIDO])
-  assert.equal(lista[0].titulo, 'Pedido mudou de etapa')
+  assert.equal(lista[0].titulo, 'Pedido avançou')
   assert.match(lista[0].corpo, /Marina/)
   assert.match(lista[0].corpo, /entrega/i)
   assert.equal(lista[0].som, null)
+})
+
+// #3374 (C11): quem responde e vê o pedido andar lê "avançou"; voltar uma etapa continua "mudou de etapa".
+await confere('B5b. etapa que anda para frente diz "avançou"; a que volta fica neutra', () => {
+  const frente = avisosDe(retrato([['c1', linha({ etapa: 'preparo' })]]), retrato([['c1', linha({ etapa: 'embalado' })]]))
+  assert.equal(frente[0].titulo, 'Pedido avançou')
+  assert.match(frente[0].corpo, /Marina: Pronto/)
+  const volta = avisosDe(retrato([['c1', linha({ etapa: 'embalado' })]]), retrato([['c1', linha({ etapa: 'preparo' })]]))
+  assert.equal(volta[0].titulo, 'Pedido mudou de etapa')
+  // Etapa fora da trilha, de qualquer lado: neutro (índice -1 não é "antes" de nada).
+  const entrando = avisosDe(retrato([['c1', linha({ etapa: 'cancelado' })]]), retrato([['c1', linha({ etapa: 'preparo' })]]))
+  assert.equal(entrando[0].titulo, 'Pedido mudou de etapa')
+  const saindo = avisosDe(retrato([['c1', linha({ etapa: 'preparo' })]]), retrato([['c1', linha({ etapa: 'cancelado' })]]))
+  assert.equal(saindo[0].titulo, 'Pedido mudou de etapa')
 })
 
 await confere('B6. o mesmo retrato pode trazer eventos de conversas diferentes', () => {

@@ -119,6 +119,17 @@ const CONVERSAS = [
   conversa('longa', { mensagens: MUITAS }),
   ...LISTA,
 ]
+// #3234 (E33): passagem=1 dá a 'meu' uma transferência com motivo, que continua na faixa abaixo do cabeçalho.
+// #3374 (E33): respondida=1 põe a última fala na loja em 'robo' (Assistente) e 'meu' (atendente). Sem cliente esperando
+// não há motivo à vista (#3318), e o modo sobe para o selo do cabeçalho.
+if (q.get('respondida') === '1') {
+  for (const [id, extra] of [['robo', { automatica: true, origemAutomatica: 'agente' }], ['meu', {}]]) {
+    const c = CONVERSAS.find((x) => x.id === id)
+    c.mensagens = [...c.mensagens, { id: 'resp-' + id, dir: 'out', texto: 'Temos sim, sai em 20 min.', em: h(5), ...extra }]
+    c.ultimaEm = h(5)
+  }
+}
+if (q.get('passagem') === '1') CONVERSAS.find((c) => c.id === 'meu').passagem = { motivo: 'Restrição alimentar: alergia a camarão', em: null, assumida: false }
 const PAUSADAS = { meu: PAUSA_POR_ASSUMIR, janela: PAUSA_POR_ASSUMIR, lead: PAUSA_POR_ASSUMIR, leadjanela: PAUSA_POR_ASSUMIR, insta: PAUSA_POR_ASSUMIR, auto: PAUSA_POR_ASSUMIR, longa: PAUSA_POR_ASSUMIR }
 const memoriaDeNotas = criarRascunhosDeNotas('e1:u1', null)
 window.memoriaDeNotas = memoriaDeNotas
@@ -250,6 +261,8 @@ function Cena() {
               <PainelAtendimento aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} visivel={!ocultoNoCelular} />
             </section>
           </div>
+          {/* #3234 (E33): ficha=1 ocupa a coluna do cliente (360 px), e a conversa fica com a largura real do Balcão. */}
+          {q.get('ficha') === '1' && <aside aria-hidden="true" style={{ width: 360, flexShrink: 0 }} />}
           <BalaoAssistente sugestaoAgente={null} aoAbrirTela={(tela) => chamadas.push(['abrirTela', tela])} areaDoBalcao={{ tela: 1280, balcao: 340, ficha: 360, colunas: true }} />
           <PilhaDeAvisos />
         </div>
@@ -670,7 +683,7 @@ try {
       const { ctx, p } = await abrir('inicial=meu&cabecalhoCheio=1', { width, height: 900 })
       await campo(p).waitFor()
       const linha = p.locator('[data-cabecalho-conversa] h2 small')
-      assert.match(await linha.innerText(), /4821 ·\s+WhatsApp · Janela aberta por \d+ h \d+ min/)
+      assert.match(await linha.innerText(), /4821 ·\s+WhatsApp · Responda até (amanhã )?\d+h(\d{2})?/)
       const { altura, alturaLinha } = await linha.evaluate((el) => ({ altura: el.getBoundingClientRect().height, alturaLinha: parseFloat(getComputedStyle(el).lineHeight) }))
       assert.ok(altura <= alturaLinha * 1.5, `a linha do cabeçalho quebrou: ${altura} px para ${alturaLinha} px`)
       await ctx.close()
@@ -1012,6 +1025,69 @@ try {
       return evento.defaultPrevented
     })
     assert.equal(impediu, false)
+    await ctx.close()
+  })
+  await confere('E33. (#3234 C5) no desktop o modo é selo no cabeçalho, sem a faixa de 40 px; a transferência segue na faixa', async () => {
+    const medir = (p) => p.evaluate(() => {
+      const cabecalho = document.querySelector('[data-cabecalho-conversa]')
+      const regiao = document.querySelector('[data-controle-conversa]')
+      const assumir = [...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('Assumir conversa'))
+      const c = cabecalho.getBoundingClientRect()
+      const fio = document.querySelector('[role=log]').parentElement.getBoundingClientRect()
+      return {
+        noCabecalho: cabecalho.contains(regiao), texto: regiao.innerText.replace(/\s+/g, ' ').trim(),
+        alturaCabecalho: Math.round(c.height), vao: Math.round(fio.top - c.bottom),
+        assumirNoCabecalho: assumir ? cabecalho.contains(assumir) : null,
+        assumirCabe: assumir ? assumir.getBoundingClientRect().right <= c.right + 0.5 : null,
+        nomeNumaLinha: (() => { const n = cabecalho.querySelector('h2 > span'); return n.getBoundingClientRect().height <= parseFloat(getComputedStyle(n).lineHeight) * 1.5 })(),
+      }
+    })
+    for (const [largura, altura] of [[1280, 800], [1440, 900], [1920, 1080]]) {
+      // #3374: depois da #3318, a 'robo' mostra o motivo ("Cliente falou por último…"), e o motivo à vista fica na
+      // faixa (conferido logo abaixo). O selo no cabeçalho vale para o modo sem motivo nem transferência.
+      {
+        const { ctx, p } = await abrir('inicial=robo', { width: largura, height: altura })
+        await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+        const m = await medir(p)
+        const cena = `robo em ${largura}: ${JSON.stringify(m)}`
+        assert.equal(m.noCabecalho, false, `o motivo de precisar de você subiu para o selo e sumiu da vista (${cena})`)
+        assert.match(m.texto, /Precisa de você/, cena)
+        assert.match(m.texto, /Cliente falou por último/, cena)
+        assert.ok(m.alturaCabecalho <= 72, `o cabeçalho cresceu (${cena})`)
+        await ctx.close()
+      }
+      // #3374: com o Assumir na tela o modo fica na faixa, como o código do selo decide (`!acoesTela.assumir`): selo e
+      // Assumir juntos quebram a linha em 1280 e 1440 (crítica de 23/11). O cabeçalho com o Assumir é a C8 do plano.
+      {
+        const { ctx, p } = await abrir('inicial=robo&respondida=1', { width: largura, height: altura })
+        await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+        const m = await medir(p)
+        const cena = `robo respondida em ${largura}: ${JSON.stringify(m)}`
+        assert.equal(m.noCabecalho, false, `selo e Assumir subiram juntos para o cabeçalho (${cena})`)
+        assert.equal(m.assumirCabe, true, cena)
+        await ctx.close()
+      }
+      for (const [inicial, selo, comAssumir] of [['meu', 'Você respondendo', false]]) {
+        const { ctx, p } = await abrir(`inicial=${inicial}&respondida=1`, { width: largura, height: altura })
+        await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+        const m = await medir(p)
+        const cena = `${inicial} em ${largura}: ${JSON.stringify(m)}`
+        // #3374 (C0): selo desligado (C8 mediu 79 px em 1280 e 1440, ver SELO_NO_CABECALHO). O modo segue na faixa de uma
+        // linha e o cabeçalho fica em 64 px.
+        assert.equal(m.noCabecalho, false, `o selo subiu antes da C8 (${cena})`)
+        assert.match(m.texto, new RegExp(selo), cena)
+        assert.ok(m.alturaCabecalho <= 64, `o cabeçalho cresceu (${cena})`)
+        assert.equal(m.nomeNumaLinha, true, `o nome quebrou (${cena})`)
+        if (comAssumir) assert.deepEqual([m.assumirNoCabecalho, m.assumirCabe], [true, true], `Assumir fora do cabeçalho (${cena})`)
+        await ctx.close()
+      }
+    }
+    // A transferência diz quem passou e por quê: é frase, não cabe num selo, e segue na faixa com o Assumir.
+    const { ctx, p } = await abrir('inicial=meu&passagem=1', { width: 1440, height: 900 })
+    await p.getByRole('region', { name: 'Quem responde esta conversa' }).waitFor()
+    const passou = await medir(p)
+    assert.equal(passou.noCabecalho, false, `a transferência subiu para o cabeçalho: ${JSON.stringify(passou)}`)
+    assert.match(passou.texto, /alergia a camarão/)
     await ctx.close()
   })
 } finally {

@@ -60,8 +60,10 @@ await caso('sem `agora` o resumo segue como antes (chamador antigo)', () => {
   assert.equal(resumoDoModo(restricao, false, false).rotulo, 'Assistente respondendo')
 })
 
+// #3374: com o selo (#3234 C5) a BarraModo lê o resumo por `apresentacaoDoModo`, que repassa `agora` e `motivo`.
 await caso('a BarraModo passa `agora` ao resumo', () => {
-  assert.match(fonte('features/atendimento/BarraModo.jsx'), /resumoDoModo\([^)]*agora/)
+  assert.match(fonte('features/atendimento/BarraModo.jsx'), /apresentacaoDoModo\([^)]*agora/)
+  assert.match(fonte('dominio/resumoDoModo.js'), /export function apresentacaoDoModo[\s\S]*?resumoDoModo\([^)]*agora[^)]*motivo/)
 })
 
 await caso('o detalhe (title e leitor de tela) não diz "Assistente respondendo" com o sinal', () => {

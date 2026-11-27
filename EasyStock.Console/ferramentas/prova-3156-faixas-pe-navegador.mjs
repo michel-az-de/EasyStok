@@ -1,5 +1,5 @@
 // #3156: Chromium e componentes reais (FaixaApi + AvisosDoDispositivo). A 390 só uma faixa por vez (a da loja
-// desligada na frente; "Notificações bloqueadas" cede), "Fechar aviso" tem alvo de clique de 44x44 sem engordar a faixa (1440 <= 72 px; 390 <= 84 px), e fechado ele não volta ao
+// desligada na frente; "Avisos bloqueados" cede), "Fechar aviso" tem alvo de clique de 44x44 sem engordar a faixa (1440 <= 72 px; 390 <= 84 px), e fechado ele não volta ao
 // recarregar enquanto o estado da loja não muda. Alturas das faixas medidas a 1440 e a 390.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
@@ -42,7 +42,7 @@ try {
     pagina.setDefaultTimeout(10000)
     pagina.on('pageerror', e => erros.push(e.message))
     const faixaDaLoja = pagina.locator('output', { hasText: 'loja online' })
-    const aparelho = pagina.locator('[role="status"]', { hasText: 'Notificações bloqueadas' })
+    const aparelho = pagina.locator('[role="status"]', { hasText: 'Avisos bloqueados' })
     const altura = async (alvo) => (await alvo.count() && await alvo.first().isVisible()) ? Math.round((await alvo.first().boundingBox()).height) : 0
     await pagina.goto(base)
     await faixaDaLoja.waitFor()

@@ -47,18 +47,19 @@ const conversa = (extra = {}) => ({ id: 'c1', nome: 'Maria Souza', estado: 'Aber
 const FILA = { motivo: 'Restrição alimentar', em: null, assumida: false }
 const MOTIVO_DESLIGADO = (await import('../src/dominio/motivoDeEscalada.js')).AUTOMATICO_DESLIGADO
 
+// #3374 (C12): Concluir só depois de assumir: onde ainda há Assumir, o Concluir some (H5, prevenção).
 // Chave: [assumir, confirmar ao assumir, devolver, concluir, enviar cardápio, passar]
 const MATRIZ = [
-  ['Assistente respondendo', { conversa: conversa(), canal: WHATSAPP }, [1, 0, 0, 1, 1, 1]],
+  ['Assistente respondendo', { conversa: conversa(), canal: WHATSAPP }, [1, 0, 0, 0, 1, 1]],
   ['você assumiu', { conversa: conversa(), canal: WHATSAPP, pausado: PAUSA_POR_ASSUMIR }, [0, 0, 1, 1, 1, 1]],
   ['você escreveu', { conversa: conversa(), canal: WHATSAPP, pausado: true }, [0, 0, 1, 1, 1, 1]],
-  ['outro atendente', { conversa: conversa({ responsavel: 'Ana' }), canal: WHATSAPP, pausado: PAUSA_POR_OUTRO }, [1, 1, 0, 1, 1, 1]],
-  ['passou para você', { conversa: conversa({ passagem: FILA }), canal: WHATSAPP, pausado: true }, [1, 0, 1, 1, 1, 1]],
-  ['chat do site na fila', { conversa: conversa({ passagem: { ...FILA, origem: 'chat-site' } }), canal: SITE, pausado: true }, [1, 0, 0, 1, 1, 1]],
+  ['outro atendente', { conversa: conversa({ responsavel: 'Ana' }), canal: WHATSAPP, pausado: PAUSA_POR_OUTRO }, [1, 1, 0, 0, 1, 1]],
+  ['passou para você', { conversa: conversa({ passagem: FILA }), canal: WHATSAPP, pausado: true }, [1, 0, 1, 0, 1, 1]],
+  ['chat do site na fila', { conversa: conversa({ passagem: { ...FILA, origem: 'chat-site' } }), canal: SITE, pausado: true }, [1, 0, 0, 0, 1, 1]],
   ['chat do site assumido', { conversa: conversa(), canal: SITE, pausado: PAUSA_POR_ASSUMIR }, [0, 0, 0, 1, 1, 1]],
-  ['e-mail na fila', { conversa: conversa({ passagem: FILA }), canal: EMAIL, pausado: true }, [1, 0, 0, 1, 1, 1]],
+  ['e-mail na fila', { conversa: conversa({ passagem: FILA }), canal: EMAIL, pausado: true }, [1, 0, 0, 0, 1, 1]],
   ['Instagram assumido', { conversa: conversa(), canal: INSTAGRAM, pausado: PAUSA_POR_ASSUMIR }, [0, 0, 0, 1, 1, 1]],
-  ['Assistente desligado na loja', { conversa: conversa({ passagem: { ...FILA, motivo: MOTIVO_DESLIGADO } }), canal: WHATSAPP, pausado: true }, [1, 0, 0, 1, 1, 1]],
+  ['Assistente desligado na loja', { conversa: conversa({ passagem: { ...FILA, motivo: MOTIVO_DESLIGADO } }), canal: WHATSAPP, pausado: true }, [1, 0, 0, 0, 1, 1]],
   ['concluída', { conversa: conversa({ estado: 'Encerrado' }), canal: WHATSAPP }, [0, 0, 0, 0, 0, 0]],
   ['bloqueada', { conversa: conversa(), canal: WHATSAPP, pausado: true, bloqueada: true }, [0, 0, 0, 1, 0, 0]],
   ['concluída com cadastro bloqueado', { conversa: conversa({ estado: 'Encerrado' }), canal: WHATSAPP, pausado: true, bloqueada: true }, [0, 0, 0, 0, 0, 0]],

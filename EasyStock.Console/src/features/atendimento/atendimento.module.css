@@ -5,6 +5,7 @@
   border: 0; flex-shrink: 0;
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
+.identidade span[aria-hidden="true"] { font-size: var(--t-atd); } /* #3374 (C7, G1): a inicial do Avatar "grande" é 17 px; aqui, 16 */
 .cabecalho h2 {
   margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
@@ -13,9 +14,9 @@
 /* A linha de apoio corre como texto: o ícone do canal é bloco (Icone.jsx) e
    quebrava a linha sozinho. Ícone em linha, alinhado à base do texto. */
 .cabecalho h2 { min-width: 0; }
-.cabecalho h2 small svg { display: inline-block; vertical-align: -3px; margin-right: 5px; }
+.cabecalho h2 small svg { display: inline-block; vertical-align: -3px; margin-right: var(--e-1); }
 .cabecalho h2 small {
-  display: block; margin-top: 2px; margin-left: 0;
+  display: block; margin-top: var(--e-1); margin-left: 0;
   font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 400;
   color: var(--tinta-3); line-height: var(--lh-compacto);
 }
@@ -53,7 +54,7 @@
   /* #2232 (A6): 75% da coluna no máximo; o enviado deixa de ocupar a largura cheia. */
   max-width: min(75%, 62ch); padding: var(--e-3) var(--e-4);
   border-radius: var(--r-2); box-shadow: none; position: relative;
-  margin-top: 4px;
+  margin-top: var(--e-1);
 }
 /* #3300 (F8): só o balão que chega com a conversa aberta entra animado; abrir a conversa não anima o fio inteiro. */
 .balao.novo { animation: entradaBalao var(--dur-media) var(--ease-saida); }
@@ -64,10 +65,10 @@
 /* Troca de remetente respira mais. */
 .trocaDeVoz { margin-top: var(--e-5); }
 /* #2420: entrelinha do corpo para a leitura longa. */
-.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); line-height: var(--lh-corpo); }
+.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-atd); line-height: var(--lh-corpo); }
 .meta {
   display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
-  margin-top: 6px; font-size: var(--t-micro); color: var(--tinta-3);
+  margin-top: var(--e-2); font-size: var(--t-micro); color: var(--tinta-3);
 }
 .meta time { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
 .falhou { color: var(--erro); font-weight: 600; white-space: normal; text-align: right; }
@@ -75,11 +76,11 @@
 .meta:has(.falhou) { flex-wrap: wrap; }
 /* (L14) o ícone de alerta fica ao lado do texto, não solto na linha de cima; as ações da bolha
    que falhou têm 32 px de altura para o toque. */
-.meta .falhou { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: flex-start; gap: 4px; }
-.meta .falhou svg { flex-shrink: 0; margin-top: 2px; }
+.meta .falhou { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: flex-start; gap: var(--e-1); }
+.meta .falhou svg { flex-shrink: 0; margin-top: var(--e-1); }
 .acaoDaBolha { min-height: var(--toque); display: inline-flex; align-items: center; }
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
-.enviando { display: inline-flex; align-items: center; gap: 4px; }
+.enviando { display: inline-flex; align-items: center; gap: var(--e-1); }
 .enviando::before {
   content: ""; width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula);
   border: 1.5px solid var(--linha-media); border-top-color: currentColor;
@@ -91,7 +92,7 @@
   align-self: flex-start; background: var(--papel); border: 0;
   box-shadow: var(--sombra);
 }
-/* #2232 (A6): o enviado tem cor própria (verde-pastel); o do automático segue neutro, mais abaixo. */
+/* #2232 (A6): o enviado tem cor própria (verde-pastel). #3374 (C6): é a única cor de saída; o selo "Assistente" diz quem mandou. */
 .saida {
   align-self: flex-end; background: var(--sucesso-pastel); color: var(--tinta);
   box-shadow: none;
@@ -110,13 +111,13 @@
 /* #1761: lida se distingue de entregue pela palavra e pela cor. */
 .saida .meta .tiqueLida, .saida .meta .tiqueLida * { color: var(--info); font-weight: 600; }
 /* #2232 (C3): o tique é ícone mais palavra ("✓ entregue"), nunca só cor. */
-.tique, .tiqueLida { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.tique, .tiqueLida { display: inline-flex; align-items: center; gap: var(--e-1); white-space: nowrap; }
 .seloBotao:disabled { cursor: progress; text-decoration: none; }
 /* #2232 (B1): aviso do sistema é uma pílula central neutra, com contorno, e não parece um balão. */
 .sistema {
   align-self: center; max-width: 80%; background: var(--preenchimento); color: var(--tinta-2);
   border: var(--b-1) solid var(--linha);
-  font-size: var(--t-micro); box-shadow: none; text-align: center; padding: 2px var(--e-3);
+  font-size: var(--t-micro); box-shadow: none; text-align: center; padding: var(--e-1) var(--e-3);
   border-radius: var(--r-pilula); white-space: pre-wrap;
 }
 .resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
@@ -246,7 +247,7 @@
   background: var(--alerta-pastel); color: var(--alerta);
   border: 0; border-radius: var(--r-2); font-size: var(--t-apoio);
 }
-.bloqueioIcone { flex: none; align-self: flex-start; margin-top: 1px; }
+.bloqueioIcone { flex: none; align-self: flex-start; margin-top: var(--e-1); }
 .bloqueioTexto {
   flex: 1 1 auto; min-width: 0; margin: 0;
   color: var(--tinta-2); line-height: var(--lh-compacto); overflow-wrap: anywhere;
@@ -258,7 +259,7 @@
   .acoes .enviar { margin-left: 0; width: 100%; }
 }
 
-.selo { display: inline-flex; align-items: center; gap: 3px; }
+.selo { display: inline-flex; align-items: center; gap: var(--e-1); }
 /* A etiqueta abre a definição e compartilha o alvo mínimo dos outros controles. */
 .seloBotao {
   border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit;
@@ -282,14 +283,19 @@
 }
 
 /* Estado e Assumir permanecem à vista; as ações secundárias moram no ⋮ do cabeçalho (#2232, A4). */
-.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
-.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.modoLinha { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
+.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; }
 .modoEstado { flex: none; }
 .modoTexto {
-  flex: 1 1 0; min-width: 12ch; margin: 0;
+  flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
+  /* #3374 (r2 P1-2): até 2 linhas, sem dividir a linha com o Assumir; o resto vai ao title. Com reticências numa linha,
+     "Restrição alimentar, confira a fi…" escondia o que fazer. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
 }
 .modoAssumir { margin-left: auto; flex: none; }
+/* #3374 (C10): a tecla que faz o mesmo que o botão, no próprio botão (contorno uniforme, sem barra lateral). */
+.teclaNoBotao { margin-left: var(--e-2); padding: 0 var(--e-1); border: var(--b-1) solid currentColor; border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); font-weight: 400; }
 /* #3300 (F4): um laranja só entre a barra e o campo. Com o Enviar habilitado (texto ou anexo em espera, #3368), quem
    age é "Enviar e assumir"; "Assumir conversa" vira secundário (mesmas cores do `secundario` do Botao). */
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:not(:disabled) {
@@ -297,16 +303,17 @@
 }
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:hover:not(:disabled) { background: var(--preenchimento-forte); }
 :global([data-conteudo-console]):has(.composer .enviar:not(.gravar):not(:disabled)) .modoAssumir:active:not(:disabled) {
-  background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta));
+  background: var(--atd-preenchimento-ativo);
 }
-/* #2185: em coluna estreita o motivo, espremido ao lado de Assumir, quebrava em 3 linhas. Desce inteiro para baixo do estado. */
-.modoLinha { container: barra-modo / inline-size; }
-@container barra-modo (max-width: 559px) {
-  .modoTexto { order: 1; flex: 1 1 100%; padding-bottom: var(--e-2); }
-}
+/* #3374 (C8, r2): a faixa não quebra a linha do Assumir; o motivo cabe em até 2 linhas e o texto inteiro fica no title
+   (antes, abaixo de 560 px ele descia para uma segunda linha, #2185). */
+/* #3234 (C5): no desktop, só com a pílula (e o Assumir), o modo é selo no cabeçalho, ao lado do Assistente:
+   a faixa de 40 px some e a conversa ganha a altura. Sem fundo nem traço, como os outros controles do topo. */
+.modoNoCabecalho { padding: 0; min-height: 0; background: transparent; }
+.modoNoCabecalho .modoLinha { min-height: 0; }
 .modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
-.listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
+.listaEfeito { margin: 0; padding-left: var(--e-4); display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
 
 /* Trava por bloqueio de cadastro. Vermelho aqui é o único caso no composer:
@@ -335,21 +342,11 @@
 .canal_camera { color: var(--c-instagram); }
 .canal_globo { color: var(--c-site); }
 
-/* O que o automático mandou fica em tom de marca claro, com texto escuro; o
-   laranja cheio é só o que ela escreveu. A conversa ganha ritmo em vez de
-   virar um bloco laranja só. */
-.saida.doAutomatico {
-  background: var(--elevado); color: var(--tinta);
-  box-shadow: none;
-}
-.saida.doAutomatico .meta, .saida.doAutomatico .meta * { color: var(--tinta-3); }
-.saida.doAutomatico .selo { color: var(--tinta-3); }
-
 /* Rodada 6c: barra do composer com ícone em cada ação, botões fantasma que
    ganham fundo no hover, e o enviar redondo com seta, como no Mensagens. */
 .acoes > button:not(.enviar) {
   background: transparent; border-color: transparent; box-shadow: none;
-  color: var(--tinta-2); padding: 0 var(--e-3); min-height: var(--toque); gap: 6px;
+  color: var(--tinta-2); padding: 0 var(--e-3); min-height: var(--toque); gap: var(--e-2);
 }
 .acoes > button:not(.enviar):hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); border-color: transparent; }
 /* #1868: desabilitado sem opacidade, como no Botao.module.css (opacidade derrubava o contraste). */
@@ -361,8 +358,8 @@
 }
 .acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
 /* #3355: o Gravar é secundário; o hover dele não pode ter a cor do Enviar desabilitado (--preenchimento-forte). */
-.acoes .gravar:hover:not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta)); }
-.acoes .gravar:active:not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 78%, var(--tinta)); }
+.acoes .gravar:hover:not(:disabled) { background: var(--atd-preenchimento-hover); }
+.acoes .gravar:active:not(:disabled) { background: var(--atd-preenchimento-ativo); }
 /* Desabilitado (canal sem áudio) mais leve que o habilitado: fundo transparente; o tracejado do Botao segue. */
 .acoes .enviar.gravar:disabled { background: transparent; } /* mais específico que .acoes .enviar:disabled, que vem depois */
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
@@ -414,7 +411,7 @@
    nos vizinhos ícone-só). Mesma pílula arredondada dos outros controles do
    app (Automáticas do trilho, ControleLoja), não uma forma nova. */
 .acoes > button.botaoRespostas {
-  width: auto; min-width: auto; padding: 0 var(--e-3) 0 10px; gap: 5px;
+  width: auto; min-width: auto; padding: 0 var(--e-3) 0 var(--e-3); gap: var(--e-1);
   /* #1868: mesma altura e raio dos vizinhos com rótulo (Anexar, Fotos, Programar, Nota). */
   min-height: var(--toque); border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600;
@@ -428,13 +425,11 @@
 .canal_whatsapp { color: var(--c-whatsapp); }
 .canal_instagram { color: var(--c-instagram); }
 
-/* Rodada 6d (banca estética, item 1): dois tons só. Recebida em papel, a
-   dela e a do automático na tinta clara da marca (o selo "automática" é que
-   diz quem mandou). Aviso do sistema vira
+/* Rodada 6d (banca estética, item 1) e #3374 (C6): dois tons só. Recebida em papel, toda saída em um tom
+   (o selo "Assistente" é que diz quem mandou). Aviso do sistema vira
    texto centralizado, sem caixa. */
 .entrada { border-radius: var(--r-2); }
 .saida { border-radius: var(--r-2); }
-.saida.doAutomatico { background: var(--preenchimento-forte); }
 
 /* Banca, item 13: o cabeçalho da conversa na mesma altura das colunas. */
 .cabecalho { min-height: var(--altura-regiao); padding-top: var(--e-2); padding-bottom: var(--e-2); }
@@ -449,7 +444,7 @@
 /* Rodada 12 (issue #16): o teto subiu de 480 para 760 px porque os botões
    ganharam nome visível; numa linha só, os nomes espremiam o campo. */
 @container composer (max-width: 760px) {
-  .caixa { flex-wrap: wrap; row-gap: 2px; }
+  .caixa { flex-wrap: wrap; row-gap: var(--e-1); }
   .caixa > :not(.acoes) { order: 0; flex-basis: 100%; }
   .acoes > .enviar { margin-left: auto; }
 }
@@ -472,7 +467,7 @@
    sequência. O global de prefers-reduced-motion (base.css) para os pontos e
    o texto "automática digitando" segue dizendo o que acontece. */
 .digitando { min-width: 132px; }
-.pontos { display: inline-flex; gap: 5px; align-items: center; height: 18px; padding: 0 2px; }
+.pontos { display: inline-flex; gap: var(--e-1); align-items: center; height: 18px; padding: 0 var(--e-1); }
 .pontos i {
   width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--tinta-3);
   animation: pontoDigitando 1.1s ease-in-out infinite;
@@ -506,7 +501,7 @@
 @media (max-width: 520px) { .programarQuando { grid-template-columns: minmax(0, 1fr); } }
 .programar p { margin: 0; }
 .programarOpcao { display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
-.programarOpcao input { margin-top: 3px; }
+.programarOpcao input { margin-top: var(--e-1); }
 .programarErro {
   padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--erro);
   border-left: 0; background: var(--elevado);
@@ -619,7 +614,7 @@
 .modo:has(.faixaTransferencia) { padding-block: var(--e-2); }
 .modoLinha:has(.faixaTransferencia) {
   gap: 0 var(--e-3); overflow: hidden;
-  border: var(--b-1) solid color-mix(in srgb, var(--alerta) 28%, transparent); border-radius: var(--r-2);
+  border: var(--b-1) solid var(--atd-borda-alerta); border-radius: var(--r-2);
   background: var(--alerta-pastel);
 }
 .modoLinha:has(.faixaTransferencia) > .modoAssumir { margin: var(--e-2) var(--e-3) var(--e-2) auto; }
@@ -630,15 +625,15 @@
   display: flex; align-items: center; gap: var(--e-3);
   border: 0;
   background: transparent; color: var(--tinta);
-  font-size: var(--t-apoio); line-height: var(--lh-compacto); overflow-wrap: anywhere;
+  font-size: var(--t-apoio); line-height: var(--lh-compacto);
 }
 .faixaIcone { flex: none; color: var(--alerta); }
 .faixaTexto {
-  display: grid; gap: 2px; min-width: 0; padding-left: var(--e-3);
-  border-left: var(--b-1) solid var(--linha-forte);
+  display: flex; align-items: baseline; gap: var(--e-2); min-width: 0; padding-left: var(--e-3);
+  border-left: var(--b-1) solid var(--linha-forte); white-space: nowrap;
 }
-.faixaTexto strong { font-weight: 600; }
-.faixaMotivo { color: var(--tinta-2); }
+.faixaTexto strong { flex: none; font-weight: 600; }
+.faixaMotivo { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--tinta-2); }
 
 /* #2232 (A5): "Novas mensagens" fica no pé da área que rola, à vista de quem está lendo mais acima. */
 .novasMensagens {
@@ -673,9 +668,9 @@
 .checagemTexto > span { color: var(--tinta-2); }
 .checagemVeredito {
   display: flex; align-items: flex-start; gap: var(--e-3); margin: 0;
-  padding: var(--e-3) var(--e-4); border-radius: var(--r-2); font-size: var(--t-forte);
+  padding: var(--e-3) var(--e-4); border-radius: var(--r-2); font-size: var(--t-atd);
 }
-.checagemVeredito svg { flex-shrink: 0; margin-top: 2px; }
+.checagemVeredito svg { flex-shrink: 0; margin-top: var(--e-1); }
 .checagemVeredito_ok { background: var(--sucesso-pastel); color: var(--sucesso); }
 .checagemVeredito_perigo { background: var(--erro-pastel); color: var(--erro); }
 .checagemVeredito_ok .checagemTexto > span,
@@ -684,10 +679,10 @@
   display: flex; align-items: flex-start; gap: var(--e-3);
   padding: var(--e-3) var(--e-4); border: 1px solid var(--linha-media); border-radius: var(--r-2);
 }
-.checagemChave input { width: 22px; height: 22px; margin-top: 2px; flex-shrink: 0; accent-color: var(--marca); }
+.checagemChave input { width: 22px; height: 22px; margin-top: var(--e-1); flex-shrink: 0; accent-color: var(--marca); }
 .checagemRotulo { font-weight: 600; cursor: pointer; }
 .checagemChave:has(input:disabled) .checagemRotulo { cursor: default; }
-.checagemTitulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-2) var(--e-3); margin: 0; font-size: var(--t-corpo); }
+.checagemTitulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-2) var(--e-3); margin: 0; font-size: var(--t-atd); }
 .checagemTitulo small { color: var(--tinta-2); font-weight: 400; }
 .checagemEtapas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
 .checagemEtapas li {
@@ -704,7 +699,7 @@
   margin: var(--e-3) 0 0; max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font-size: var(--t-apoio); line-height: 1.45; background: var(--papel-ficha); padding: var(--e-3); border-radius: var(--r-1);
 }
-.checagemFerramentas { margin: var(--e-3) 0 0; padding-left: 1.2em; display: grid; gap: var(--e-1); color: var(--tinta-2); }
+.checagemFerramentas { margin: var(--e-3) 0 0; padding-left: var(--e-4); display: grid; gap: var(--e-1); color: var(--tinta-2); }
 .checagemFerramentas code { color: var(--tinta); font-weight: 600; }
 .checagemNota { margin: 0; color: var(--tinta-2); }
 .checagemErro { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--erro-pastel); color: var(--erro); }
@@ -728,8 +723,8 @@
 /* Reação da loja: um selo no pé da bolha, como no WhatsApp. */
 .comReacao { margin-bottom: var(--e-4); }
 .reacaoDaBolha {
-  position: absolute; bottom: calc(-1 * var(--e-4)); right: var(--e-3); padding: 2px 6px;
-  border-radius: var(--r-pilula); background: var(--papel); box-shadow: 0 0 0 var(--b-1) var(--linha); font-size: var(--t-forte); line-height: 1.2;
+  position: absolute; bottom: calc(-1 * var(--e-4)); right: var(--e-3); padding: var(--e-1) var(--e-2);
+  border-radius: var(--r-pilula); background: var(--papel); box-shadow: 0 0 0 var(--b-1) var(--linha); font-size: var(--t-atd); line-height: 1.2;
 }
 .entrada .reacaoDaBolha { right: auto; left: var(--e-3); }
 .apagada p { display: flex; align-items: center; gap: var(--e-1); font-style: italic; color: var(--tinta-2); }
@@ -742,3 +737,22 @@
   .acoes > .enviar.enviarAssume { min-width: 84px; padding-inline: var(--e-2); font-size: var(--t-micro); line-height: 1.15; text-wrap: balance; }
   .acoes > .enviar.enviarAssume svg { display: none; }
 }
+
+/* Crítica r1 (P0): com o Assistente aberto a coluna da conversa fica estreita e "Nota" vazava sobre o envio, que
+   quebrava em 3 linhas. O envio nunca quebra; abaixo de 520 px de coluna Respostas e Nota ficam só no ícone (o nome
+   segue no aria-label e na dica) e a fileira desce de linha antes de sobrepor. */
+.acoes > .enviar { white-space: nowrap; flex-shrink: 0; }
+@container composer (max-width: 520px) {
+  .acoes { flex-wrap: wrap; row-gap: var(--e-1); }
+  .acoes > button.botaoRespostas, .acoes > button.botaoNota { width: var(--toque); min-width: var(--toque); padding: 0; }
+  .acoes > button.botaoRespostas > span, .acoes > button.botaoNota > .rotuloNota {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
+/* Crítica r1 (P1): com o campo vazio "Enviar e assumir" é secundário de contorno contínuo (o laranja fica com Assumir
+   conversa); o tracejado do Botao lia como "indisponível", e a ação existe, só espera o texto. Com texto ou anexo ele
+   vira o laranja e o Assumir cede (#3368). */
+.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) solid var(--linha-forte); color: var(--tinta-2); }
+/* Crítica r2 (P2): o Enviar desabilitado também tem contorno contínuo de 1px (o tracejado do Botao lia como quebrado); segue sem
+   preenchimento e em tinta-3, o que ainda o separa do ativo. */
+.acoes > .enviar:disabled { border-style: solid; }

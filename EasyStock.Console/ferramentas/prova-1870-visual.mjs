@@ -154,12 +154,16 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   const barra = fonte('features/atendimento/BarraModo.jsx')
   // #2185: o motivo da passagem fica à vista; a frase que só repete a pílula é para o leitor de tela.
   assert.match(barra, /<p className=\{mostrarLinha \? css\.modoTexto : 'sr'\} title=/)
-  assert.match(barra, /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  // #3234 (C5): a regra da frase mora em apresentacaoDoModo, que também decide o selo no cabeçalho.
+  assert.match(fonte('dominio/resumoDoModo.js'), /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  assert.match(barra, /apresentacaoDoModo\(conversa, pausado, bloqueada/)
   assert.match(barra, /\{acoes\.assumir && \([\s\S]*?Assumir/)
   // Devolver e Concluir moram no menu ⋮ do cabeçalho: nenhum segundo menu na barra.
   assert.doesNotMatch(barra, /<details|<summary|>Mais ações</)
   const css = fonte('features/atendimento/atendimento.module.css')
-  assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
+  // #3374 (r2 P1-2): o motivo quebra em até 2 linhas (reticências numa linha cortavam o que fazer, crítica r2) e o
+  // texto inteiro fica no title.
+  assert.match(css, /\.modoTexto\s*\{[^}]*-webkit-line-clamp:\s*2/)
   assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
   // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
   // #2762 (A1): o anel do item é o da casa (borda de foco na cor da marca), no lugar do halo de 2 px, que sumia no escuro.

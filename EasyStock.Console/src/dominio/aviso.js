@@ -7,6 +7,7 @@
 import { EVENTOS_DE_SOM } from './automatico.js'
 import { mudancasDoRetrato } from './avisoSonoro.js'
 import { rotuloDoEstado } from './pedido.js'
+import { indiceDoPasso } from './esteira.js'
 
 // O valor vira parte da `tag` da notificação do navegador; `precisa` é a tag de antes (rodada 10).
 export const TIPOS_DE_AVISO = {
@@ -47,7 +48,12 @@ export function avisosDoRetrato(antes, retrato) {
       avisos.push(criar(TIPOS_DE_AVISO.PAGAMENTO_CONFIRMADO, id, 'Pagamento confirmado', `${nome} pagou o pedido`, EVENTOS_DE_SOM.PAGAMENTO_CONFIRMADO, true))
     }
     if (mudanca.etapaMudou) {
-      avisos.push(criar(TIPOS_DE_AVISO.ETAPA_DO_PEDIDO, id, 'Pedido mudou de etapa', `${nome}: ${rotuloDoEstado(linha.etapa)}`, null))
+      // #3374 (C11): para frente é "avançou" (quem respondeu vê o efeito); voltar ou sair da trilha segue neutro.
+      // Etapa fora da trilha (índice -1) em qualquer lado não permite dizer que avançou.
+      const de = indiceDoPasso(antes?.get(id)?.etapa)
+      const para = indiceDoPasso(linha.etapa)
+      const avancou = de >= 0 && para > de
+      avisos.push(criar(TIPOS_DE_AVISO.ETAPA_DO_PEDIDO, id, avancou ? 'Pedido avançou' : 'Pedido mudou de etapa', `${nome}: ${rotuloDoEstado(linha.etapa)}`, null))
     }
   }
   return avisos

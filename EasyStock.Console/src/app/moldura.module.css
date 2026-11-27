@@ -52,6 +52,17 @@
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
 .palco { display: flex; flex: 1; min-height: 0; position: relative; }
+/* #3374 (C2): o palco é só o Atendimento. Fila, conversa e ficha pintam fundo com 3 superfícies (tokens --atd-): os nomes globais
+   que os componentes já usam (Pilula, Avatar, cartão) apontam para elas aqui dentro, sem mudar os globais nas outras telas. */
+.palco {
+  --fundo: var(--atd-fundo); --chao-conversa: var(--atd-fundo); --creme: var(--atd-fundo);
+  --papel: var(--atd-superficie);
+  --preenchimento: var(--atd-realce); --preenchimento-forte: var(--atd-realce);
+  --t-atdforte: 1rem;
+  --t-atd: 1rem; /* #3374 (G1): 16 px só aqui dentro; fora do palco o --t-atd global cai para o corpo */
+}
+/* Em repouso o palco tem 1 realce só; no hover, ativo e foco o controle troca para um tom abaixo dele (estado, não superfície). */
+.palco :is(button, a, label, input, select, textarea, [role='button'], [role='tab'], [role='option']):is(:hover, :active, :focus-visible) { --preenchimento-forte: var(--atd-preenchimento-hover); }
 .palcoTres { padding: 0; }
 .palcoTres > .coluna {
   border-radius: var(--r-2); border: 0;
@@ -135,6 +146,8 @@
    sobe para cima dele em vez de cobrir o botão. */
 .app:has(> footer) .botaoSimular,
 .app:has(> nav) .botaoSimular { bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px)); left: var(--e-4); }
+/* Com a pílula fixa na tela (tablet e celular), a fila ganha folga no fim para a última linha rolar para fora dela. */
+.app:has(.botaoSimular) { --folga-rolagem: calc(var(--e-3) + var(--e-5) + var(--toque)); }
 /* Celular: a pílula só aparece na aba Balcão; na conversa e na ficha ela
    caía em cima do Enviar. F2 continua abrindo de qualquer aba. */
 .app:has(> nav):not(:has(#painel-da-aba[aria-labelledby='aba-balcao'])) .botaoSimular { display: none; }

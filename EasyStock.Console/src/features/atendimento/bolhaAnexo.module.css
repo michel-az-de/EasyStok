@@ -11,17 +11,17 @@
   width: 40px; height: 40px; border-radius: var(--r-1);
   background: var(--elevado); color: var(--tinta-2);
 }
-.arquivoTexto { display: grid; gap: 2px; min-width: 0; }
+.arquivoTexto { display: grid; gap: var(--e-1); min-width: 0; }
 .arquivoTexto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arquivoTexto span { font-size: var(--t-apoio); color: var(--tinta-3); }
 
 .peca { margin: 0; display: grid; gap: var(--e-1); max-width: 280px; }
 .peca img { width: 100%; max-width: 280px; aspect-ratio: 16 / 10; object-fit: cover; border-radius: var(--r-1); display: block; }
-.peca figcaption { display: grid; gap: 2px; }
+.peca figcaption { display: grid; gap: var(--e-1); }
 .peca figcaption span { font-size: var(--t-apoio); color: var(--tinta-3); }
 
 .audio { display: flex; align-items: center; gap: var(--e-2); min-width: 220px; }
-.audioOnda { display: flex; align-items: center; gap: 2px; height: 22px; flex: 1 1 auto; }
+.audioOnda { display: flex; align-items: center; gap: var(--e-1); height: 22px; flex: 1 1 auto; }
 .audioOnda span {
   width: 3px; border-radius: var(--r-ponta); background: var(--linha-forte);
   transition: background-color var(--dur-curta) var(--ease-padrao);

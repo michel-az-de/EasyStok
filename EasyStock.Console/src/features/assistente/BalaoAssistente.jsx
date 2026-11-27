@@ -11,7 +11,7 @@ import { useEscape } from '../../hooks/useEscape'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CHAVE_ASSISTENTE, usePreferenciaDePainel } from '../../aplicacao/preferenciaDosPaineis'
 import {
-  ASSISTENTE, MARGEM_ASSISTENTE, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
+  ASSISTENTE, CONVERSA_MINIMA, MARGEM_ASSISTENTE, TRILHO, VAO, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
 } from '../../dominio/paineis'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
@@ -31,10 +31,11 @@ import { AcoesPropostas } from './AcoesPropostas'
 import { useConversaAssistente } from './useConversaAssistente'
 import css from './assistente.module.css'
 
-// #3300 (F5): Ctrl+Enter é a convenção do Assistente, das confirmações e da nota. Em tela de toque não há Ctrl,
-// então a dica some ali (Enter segue criando linha e o botão Perguntar envia).
+// #3374 (r2 P1-4): a regra do campo da conversa, uma só nos dois campos: Enter pergunta, Shift+Enter quebra a linha e
+// Ctrl+Enter segue valendo (era a convenção do Assistente, #3300 F5). Em tela de toque não há Shift à mão,
+// então a dica some ali (o botão Perguntar envia).
 const TELA_DE_TOQUE = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches)
-const DICA_DO_ATALHO = TELA_DE_TOQUE ? undefined : 'Ctrl+Enter para perguntar. Enter cria uma nova linha.'
+const DICA_DO_ATALHO = TELA_DE_TOQUE ? undefined : 'Enter para perguntar. Shift+Enter cria uma nova linha.'
 
 // #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o Perguntar trava.
 const LIMITE_PERGUNTA = 2000
@@ -56,6 +57,10 @@ const POSICOES = [
 ]
 const PASSO_MOVER = 16
 const PASSO_MOVER_GRANDE = 64
+
+// Critica r2 (P1-5): com a ficha à vista a conversa não fica abaixo de 560 px (320 só cabia o Assumir, não ler). Se com a ficha ela
+// ficaria menor, o Assistente toma o lugar da coluna Cliente (semFicha).
+const CONVERSA_LEGIVEL = 560
 
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const { selecionada, agora, historico, rascunho, fonteApi, automaticoPausado } = useAtendimento()
@@ -193,15 +198,48 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const area = areaDoBalcao ?? { tela: window.innerWidth, colunas: false }
   const { lado } = posicaoPainel
   const solto = lado === 'flutuante' && !celular
-  const larguraMaximaPainel = larguraMaxima({
-    ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE,
-  })
+  // #3374 (C9, R5): encaixado no computador o painel EMPURRA o palco em vez de cobrir a conversa (o Assumir ficava
+  // embaixo dele). Com isso a máxima deixa as três colunas nos seus mínimos de CSS (fila 260, ficha 292, conversa 320).
+  // Entre 1180 e 1307 px esse teto fica abaixo do mínimo do painel: aí não empurra e o painel segue sobreposto, na largura normal.
+  // Critica r1 (P1): abaixo disso (1180 a 1307 px) o painel cobria o Assumir. Agora ele toma o lugar da coluna Cliente
+  // (a ficha some enquanto ele está aberto e volta ao fechar) e segue empurrando: a conversa nunca fica por baixo.
+  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_LEGIVEL) - 2 * VAO
+  const encaixado = !celular && !solto && area.colunas
+  const semFicha = encaixado && tetoComFicha < ASSISTENTE.min
+  // Sem a ficha, a conversa também fica em 560 se o painel ainda couber no mínimo; senão (telas de ~1180 a 1243 px) cai ao 320 de antes.
+  const tetoSemFicha = (conversa) => area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + conversa) - VAO
+  const conversaMinima = semFicha && tetoSemFicha(CONVERSA_LEGIVEL) < ASSISTENTE.min ? CONVERSA_MINIMA : CONVERSA_LEGIVEL
+  const tetoEmpurrando = semFicha ? tetoSemFicha(conversaMinima) : tetoComFicha
+  const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
+  const larguraMaximaPainel = limitar(
+    larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
+    ASSISTENTE.min,
+    empurra ? tetoEmpurrando : ASSISTENTE.max,
+  )
   const larguraPainel = limitar(posicaoPainel.largura, ASSISTENTE.min, larguraMaximaPainel)
   const dentroDaTela = (x, y) => posicaoDentroDaTela({
     x, y, largura: larguraPainel, altura: alturaPainel,
     tela: window.innerWidth, alturaTela: window.innerHeight, margem: MARGEM_ASSISTENTE,
   })
   const posicao = dentroDaTela(posicaoPainel.x, posicaoPainel.y)
+
+  // A reserva vai por variável no :root e o CSS do painel a lê no palco (`#conteudo-principal`): a moldura não importa o painel.
+  const reserva = aberto && empurra ? larguraPainel + MARGEM_ASSISTENTE : 0
+  useLayoutEffect(() => {
+    if (!reserva) return undefined
+    const raiz = document.documentElement
+    raiz.style.setProperty(`--assistente-reserva-${lado === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
+    raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
+    raiz.dataset.assistenteEmpurra = lado === 'esquerda' ? 'esquerda' : 'direita'
+    if (semFicha) raiz.dataset.assistenteSemFicha = ''
+    return () => {
+      raiz.style.removeProperty('--assistente-reserva-esquerda')
+      raiz.style.removeProperty('--assistente-reserva-direita')
+      raiz.style.removeProperty('--assistente-conversa-minima')
+      delete raiz.dataset.assistenteEmpurra
+      delete raiz.dataset.assistenteSemFicha
+    }
+  }, [reserva, lado, semFicha, conversaMinima])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
@@ -338,7 +376,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
             {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
-            <BotaoIcone rotulo="Fechar" icone="x" onClick={fechar} />
+            {/* #3374 (C10): a tecla que fecha, à vista; o botão leva o mesmo atalho na dica. */}
+            <kbd className={css.tecla} aria-hidden="true">Esc</kbd>
+            <BotaoIcone rotulo="Fechar" icone="x" atalho="Esc" onClick={fechar} aria-keyshortcuts="Escape" />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>
@@ -425,7 +465,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 limite={LIMITE_PERGUNTA}
                 dica={DICA_DO_ATALHO}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
+                  if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
+                  enviarPergunta(e)
                 }}
               />
               <BotaoIcone

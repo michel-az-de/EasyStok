@@ -16,14 +16,14 @@
 }
 
 .clienteCompartilhado { padding: 0 var(--e-4); min-width: 0; }
-.clienteCompartilhado h3 { margin: 0; font-size: var(--t-forte); }
+.clienteCompartilhado h3 { margin: 0; font-size: var(--t-atdforte); }
 .clienteCompartilhado h3 small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 400; }
 .clienteCompartilhado p { margin: var(--e-2) 0; }
 .clienteCompartilhado ul { list-style: none; padding: 0; }
 .clienteCompartilhado li { padding: var(--e-2) 0; border-bottom: 0; }
 .clienteCompartilhado small { width: 100%; }
 .linhaCompartilhada { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e-2); }
-.linhaCompartilhada strong { font-family: var(--f-manuscrita); font-size: var(--t-corpo); font-weight: 600; overflow-wrap: anywhere; }
+.linhaCompartilhada strong { font-family: var(--f-manuscrita); font-size: var(--t-atd); font-weight: 600; overflow-wrap: anywhere; }
 .linhaCompartilhada small { display: block; margin-top: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
 .anotacaoCompartilhada summary, .enderecoCompartilhado summary, .historicoCompartilhado > summary { cursor: pointer; min-height: var(--toque); align-content: center; font-size: var(--t-apoio); color: var(--tinta-2); }
 .anotacaoCompartilhada summary small { display: block; padding-left: var(--e-3); color: var(--tinta); overflow-wrap: anywhere; }
@@ -62,7 +62,7 @@
 .numero { font-family: var(--f-corpo); font-size: var(--t-titulo); }
 /* #1474 (R3): a janela ainda falta; em tom de aviso, com a palavra (a cor nunca informa sozinha). */
 .semJanela { color: var(--alerta); font-weight: 600; }
-.subCabecalho { margin: var(--e-1) 0 0; font-family: var(--f-manuscrita); font-size: var(--t-forte); color: var(--tinta); padding-top: var(--e-2); overflow-wrap: anywhere; }
+.subCabecalho { margin: var(--e-1) 0 0; font-family: var(--f-manuscrita); font-size: var(--t-atdforte); color: var(--tinta); padding-top: var(--e-2); overflow-wrap: anywhere; }
 
 /* O espaço separa os grupos sem simular perfuração de papel. */
 .separador {
@@ -72,7 +72,7 @@
 .grupo + .grupo { margin-top: var(--e-3); }
 .rotuloGrupo {
   display: block; margin: 0 0 var(--e-2);
-  font-size: var(--t-corpo); font-weight: 700; color: var(--tinta-2);
+  font-size: var(--t-atd); font-weight: 700; color: var(--tinta-2);
 }
 
 .itens { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
@@ -86,7 +86,7 @@
    dígito com dígito (RN de leitura de relance da cozinha). */
 .qtd { flex-shrink: 0; width: 3ch; font-family: var(--f-manuscrita); font-weight: 700; }
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.nomeItem { font-family: var(--f-manuscrita); font-size: var(--t-forte); font-weight: 600; display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); overflow-wrap: anywhere; }
+.nomeItem { font-family: var(--f-manuscrita); font-size: var(--t-atdforte); font-weight: 600; display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); overflow-wrap: anywhere; }
 .porcao { font-size: var(--t-apoio); color: var(--tinta-2); }
 .preco { flex-shrink: 0; font-family: var(--f-dado); }
 
@@ -103,7 +103,7 @@
 .obs {
   display: block; margin-top: var(--e-1);
   border-left: 0; padding-left: var(--e-2);
-  font-family: var(--f-manuscrita); font-size: var(--t-corpo); color: var(--tinta);
+  font-family: var(--f-manuscrita); font-size: var(--t-atd); color: var(--tinta);
 }
 .obsCampo { min-height: var(--toque); margin-top: var(--e-1); resize: none; }
 
@@ -111,7 +111,7 @@
 .controlesItem { display: flex; align-items: center; gap: var(--e-2); }
 .contador {
   display: inline-flex; align-items: center; gap: var(--e-1);
-  border: 0; border-radius: var(--r-pilula); padding: 2px;
+  border: 0; border-radius: var(--r-pilula); padding: var(--e-1);
   background: var(--papel);
 }
 .contador button {
@@ -121,11 +121,11 @@
 .contador button:hover { background: var(--elevado); color: var(--tinta); }
 .contador b { font-family: var(--f-dado); min-width: 16px; text-align: center; }
 
-.vazio { margin: 0; font-size: var(--t-corpo); color: var(--tinta-2); }
+.vazio { margin: 0; font-size: var(--t-atd); color: var(--tinta-2); }
 
 .total {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e-2);
-  margin: 0; font-size: var(--t-corpo); font-weight: 700;
+  margin: 0; font-size: var(--t-atd); font-weight: 700;
   padding-top: var(--e-3); border-top: 0;
 }
 .total b { font-family: var(--f-corpo); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
@@ -134,8 +134,8 @@
 .resumoTotal .total { padding-top: 0; border-top: 0; }
 .total b { white-space: nowrap; }
 .notaTotal { margin: var(--e-2) 0 0; font-family: var(--f-corpo); font-size: var(--t-apoio); color: var(--tinta-2); }
-.notaTotal.apontamento { font-family: var(--f-manuscrita); font-size: var(--t-corpo); color: var(--tinta); }
-.papelSelecao .apontamento { font-family: var(--f-manuscrita); font-size: var(--t-corpo); color: var(--tinta); }
+.notaTotal.apontamento { font-family: var(--f-manuscrita); font-size: var(--t-atd); color: var(--tinta); }
+.papelSelecao .apontamento { font-family: var(--f-manuscrita); font-size: var(--t-atd); color: var(--tinta); }
 
 /* Defeito b: pedido pago que ganhou item novo não pode ficar calado sobre o
    quanto falta cobrar. Mesmo desenho de alerta do composer bloqueado. */

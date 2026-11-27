@@ -9,6 +9,7 @@ import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponde
 import { AGUARDANDO_EQUIPE, origemDaPassagem } from './passagem'
 import { naFilaSemResponsavel } from './acoesDaConversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
+import { faixaDaTransferencia } from './faixaDeTransferencia'
 import { ROTULOS } from './rotulos'
 
 const ROTULO = {
@@ -94,6 +95,23 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
     detalhe: detalheFinal,
     proximo,
     sugereEncerrar: proximo?.chave === 'encerrar-ou-aguardar',
+  }
+}
+
+// O que a barra "Quem responde esta conversa" mostra: a faixa da transferência (quem passou e por quê), a frase
+// (à vista ou só para o leitor de tela) e a pílula. Com o Assistente desligado na loja, "pausado" e "volta"
+// prometem o que não acontece. #3234 (C5): sem faixa nem frase à vista sobra só a pílula (e o Assumir), que no
+// desktop cabe no cabeçalho como selo, em vez de ocupar uma faixa de 40 px.
+export function apresentacaoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true, agora = null, motivo } = {}) {
+  const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
+  const faixa = resumo.chave === MODOS.COM_VOCE ? faixaDaTransferencia(conversa.passagem) : null
+  const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
+  // #3318: o motivo de precisar de você vence o aviso do Assistente desligado e fica à vista.
+  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE || Boolean(resumo.precisa)
+  return {
+    resumo, faixa, mostrarLinha,
+    linha: semAssistente && !resumo.precisa ? 'O Assistente está desligado.' : resumo.linha,
+    noCabecalho: !faixa && !mostrarLinha,
   }
 }
 

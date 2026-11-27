@@ -137,13 +137,15 @@ const itensDoMenu = async (p) => {
 const chamadas = (p) => p.evaluate(() => window.chamadas.slice())
 
 // #2496: "Checar o Assistente" em toda conversa aberta (modo API), antes de Concluir; concluída segue sem menu.
-const TODOS = ['Enviar cardápio', 'Passar conversa', 'Checar o Assistente', 'Concluir conversa']
-const COM_DEVOLVER = ['Enviar cardápio', 'Passar conversa', 'Devolver ao Assistente', 'Checar o Assistente', 'Concluir conversa']
+// #3374 (C12): Concluir só depois de assumir: com Assumir à vista, o menu não traz "Concluir conversa".
+const TODOS = ['Enviar cardápio', 'Passar conversa', 'Checar o Assistente']
+const COM_DEVOLVER_SEM_CONCLUIR = ['Enviar cardápio', 'Passar conversa', 'Devolver ao Assistente', 'Checar o Assistente']
+const COM_DEVOLVER = [...COM_DEVOLVER_SEM_CONCLUIR, 'Concluir conversa']
 const MATRIZ = [
   ['robo', TODOS, true],
   ['meu', COM_DEVOLVER, false],
   ['outro', TODOS, true],
-  ['fila', COM_DEVOLVER, true],
+  ['fila', COM_DEVOLVER_SEM_CONCLUIR, true],
   ['site', TODOS, true],
   ['concluida', [], false],
   ['bloqueada', ['Checar o Assistente', 'Concluir conversa'], false],
@@ -167,7 +169,8 @@ try {
 
   await confere('1. bloqueado aparece uma vez entre o cabeçalho e a barra', async () => {
     const { ctx, p } = await abrir('bloqueada')
-    const textos = await p.locator('[data-cabecalho-conversa], [data-controle-conversa] > div > span').allInnerTexts()
+    // #3234 (C5): no desktop a barra é selo dentro do cabeçalho; ali ela já conta no texto do cabeçalho.
+    const textos = await p.locator('[data-cabecalho-conversa], [data-controle-conversa]:not([data-cabecalho-conversa] *) > div > span').allInnerTexts()
     assert.equal(textos.join(' ').match(/Bloqueado/g)?.length, 1, textos.join(' | '))
     await ctx.close()
   })

@@ -110,6 +110,11 @@ const ICONE_DO_PASSO = {
 // #3009: selo de dinheiro ("Falta R$ 68,00") do contexto da linha: ele passa à frente na fileira visível.
 export const ehSeloDeDinheiro = (item) => /R\$/.test(item?.texto ?? '')
 
+// #3374 (C4): quais pílulas de contexto cabem na linha. Dinheiro primeiro; depois o que avisa (tom aviso/perigo) e
+// "Só modelo" (janela fechada); o resto por último. A ordem original se mantém dentro de cada grupo.
+const pesoDaPilula = (item) => ehSeloDeDinheiro(item) ? 0 : (item?.tom === 'aviso' || item?.tom === 'perigo' || item?.chave === 'janela') ? 1 : 2
+export const pilulasVisiveis = (contexto, limite) => [...contexto].sort((a, b) => pesoDaPilula(a) - pesoDaPilula(b)).slice(0, limite)
+
 export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
 
 // Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,

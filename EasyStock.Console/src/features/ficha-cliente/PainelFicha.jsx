@@ -12,6 +12,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useADevolver } from '../../aplicacao/useADevolver'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
+import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
@@ -211,7 +212,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const escolherNoMenu = (chave) => {
     if (chave === 'editar') abrirFichaEditando()
     else if (chave === 'baixar') pdfDaFicha.baixar()
-    else if (chave === 'encerrar') aoEncerrarAtendimento()
+    else if (chave === 'encerrar') aoEncerrarAtendimento?.()
     else setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 }))
   }
 
@@ -225,7 +226,12 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // Ponta (c) da integração: a barra do pedido (Entregue, Cancelado) e o
   // anel zerado abrem a MESMA modal do cabeçalho e do menu ⋯, com o resumo.
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
-  const aoEncerrarAtendimento = () => { setSecao(null); abrirEncerramento(selecionada.id) }
+  // #3374 (C12): Concluir só depois de assumir (mesma conta do ⋮ da conversa); sem a ação, os botões não aparecem.
+  const concluivel = acoesDaConversa({
+    conversa: selecionada, pausado: automaticoPausado?.[selecionada.id] ?? false, canal: canalDaConversa(canais, selecionada),
+    bloqueada: estaBloqueada(selecionada),
+  }).concluir
+  const aoEncerrarAtendimento = concluivel ? () => { setSecao(null); abrirEncerramento(selecionada.id) } : undefined
   const abrirCardapio = () => { setSecao(null); aoAbrirCardapio() }
   // #1686 (item 9): o link do motivo abre onde ele se resolve e põe o foco no campo.
   const irParaMotivo = (alvo) => {
@@ -243,9 +249,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // #1806: lead sem cadastro cadastra primeiro, com o formulário já preenchido pela conversa.
   const cadastrarPrimeiro = primeiroPassoAntesDaVenda({ conversa: selecionada, pedido, fonteApi }) === 'cadastro'
   const acaoMontar = !clienteEscolhendo && (!pedido || (!pedidoCriado && !comandaTravada(pedido, { fonteApi })))
-    ? (cadastrarPrimeiro
-      ? <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
-      : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
+    // #3265 (R2): primário só com pedido em montagem; sem pedido (ou com o cadastro antes da venda) é secundário.
+    ? <Botao largo variante={pedido && !cadastrarPrimeiro ? 'primario' : 'secundario'} icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}
@@ -257,7 +262,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
       <header className={css.cabecalhoFicha} data-cabecalho-ficha>
         <h2>Cliente</h2>
         <span className={css.ferramentasFicha}>
-          <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel) })} pdf={pdfDaFicha}
+          <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel), podeConcluir: Boolean(aoEncerrarAtendimento) })} pdf={pdfDaFicha}
             aoEscolher={escolherNoMenu} />
           {acoesCabecalho}
         </span>
@@ -303,18 +308,16 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           {(pedidoCriado || (fonteApi && selecionada.clienteId)) && <AcessoDaFicha icone="map-pin" titulo="Entrega" focoReserva={mapaMovel.chave}
             resumo={resumoDaEntrega({ faixa: pedido ? faixa : null, endereco: cliente.endereco, bairro: bairroDoEndereco(cliente.endereco) })} aoAbrir={() => cliente.endereco ? setFreteAberto(true) : abrirFichaEditando()} />}
           {editavel && pedidoCriado && <AcessoDaFicha icone="credit-card" titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
+          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={abrirFicha} />
+          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
+            resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
         <div className={css.notasDaFicha}>
           <NotasDoCliente key={selecionada.id} conversaId={selecionada.id} clienteId={selecionada.clienteId ?? selecionada.id}
             clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []} observacao={cliente.observacoes ?? null}
             aoCriarNota={editavel ? aoAbrirNota : undefined} podeCriarNota={!fonteApi || Boolean(selecionada.clienteId)} />
         </div>
-        <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">
-          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
-            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={abrirFicha} />
-          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
-            resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
-        </nav>
         {editavel && fonteApi && <details className={css.linkCompartilhado}><summary>Link do cliente<Icone nome="chevron-down" tamanho={16} /></summary>{comandaCompartilhada}</details>}
         {fonteApi && editavel && <AreaColaborativaIa conversaId={selecionada.id}
           aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota}
