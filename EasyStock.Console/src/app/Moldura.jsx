@@ -591,8 +591,9 @@ function ConteudoMoldura({
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
             Ficha de {selecionada ? apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
           </Botao>
+          {/* #3384 (r4 P1-1): no tablet a pílula mora no rodapé, ao lado da Ficha: fixa no canto, cobria um ou o outro. */}
+          <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
         </footer>
-        <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
         {confirmacaoDeFechar}
       </div>
     )

@@ -20,6 +20,15 @@ try {
     const p = await navegador.newPage({ viewport: { width: w, height: h } })
     await p.goto(`${origem}/#/m/atendimento/balcao`, { timeout: 90000 })
     await p.getByRole('button', { name: /^Abrir .+/ }).first().waitFor({ timeout: 30000 })
+    // Revisão da #3384: sem conversa aberta, o gatilho flutuante do Assistente e a pílula Simular não se cobrem.
+    const choque = await p.evaluate(() => {
+      const ret = (el) => el && el.getBoundingClientRect().width > 0 ? el.getBoundingClientRect() : null
+      const sim = ret([...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Simular'))
+      const assist = ret(document.querySelector('button[aria-label="Abrir assistente"]'))
+      if (!sim || !assist) return false
+      return !(sim.right <= assist.left || sim.left >= assist.right || sim.bottom <= assist.top || sim.top >= assist.bottom)
+    })
+    cobrar(!choque, `${w}x${h}: Simular não cobre o gatilho do Assistente`)
     await p.getByRole('button', { name: /^Abrir .+/ }).first().click()
     const botao = p.getByRole('button', { name: /^Ficha de / })
     await botao.waitFor({ timeout: 10000 })

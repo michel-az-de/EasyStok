@@ -217,7 +217,8 @@ function PainelDaConversa({
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   // #3206: lead sem cadastro também envia; o servidor decide.
   const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
-  const prazo = prazoNoCabecalho(janela, motivo, esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera)
+  const espera = esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera
+  const prazo = prazoNoCabecalho(janela, motivo, espera)
   // #2134: quem responde e o Assumir ficam fora da área que rola. No modo nota a barra sai de cena.
   // Com o Assumir a faixa fica: na coluna de 750 px (1440 com o cliente aberto) selo e botão empurravam a linha
   // da janela para baixo. Sem ação nem frase, a faixa era só a pílula: essa sobe.
@@ -264,7 +265,8 @@ function PainelDaConversa({
             <small>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
-              {prazo && <span className={prazoFolgado(janela) ? css.prazoFolgado : undefined}>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></span>}
+              {/* #3384 (revisão): o atraso fica à vista em qualquer largura; só a janela folgada some abaixo de 1280. */}
+              {prazo && <span className={prazoFolgado(janela) && !espera ? css.prazoFolgado : undefined}>{' · '}<span title={espera ? 'Tempo desde a mensagem do cliente ainda sem resposta' : canal.explicacao[0]}>{prazo}</span></span>}
               {/* O foco vai a este título ao trocar de conversa: o leitor de tela ouve a janela que só a faixa mostra. */}
               {!prazo && janela && !janela.textoLivre && <span className="sr"> · {janela.rotulo}</span>}
             </small>

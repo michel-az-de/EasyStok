@@ -217,7 +217,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
   // #3384 (r4 P1-5): no tablet não há três colunas; encaixado, o painel cobria a conversa e o Assumir. Agora ele toma o
   // lugar da lista de conversas (à esquerda, sem trilho) até fechar, e a conversa fica com 560 px (320 se a tela não der).
-  const encaixadoTablet = !celular && !solto && !area.colunas
+  // Só no palco do Atendimento (`data-palco-tablet`): nas outras telas não há lista a substituir nem reserva.
+  const palcoTablet = typeof document !== 'undefined' && document.querySelector('[data-palco-tablet]') != null
+  const encaixadoTablet = !celular && !solto && !area.colunas && palcoTablet
   const conversaTablet = area.tela - MARGEM_ASSISTENTE - CONVERSA_LEGIVEL >= ASSISTENTE.min ? CONVERSA_LEGIVEL : CONVERSA_MINIMA
   const tetoTablet = Math.max(ASSISTENTE.min, area.tela - MARGEM_ASSISTENTE - conversaTablet)
   const ladoEfetivo = encaixadoTablet ? 'esquerda' : lado
@@ -377,7 +379,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                     <span className="sr" id={`${painelId}-mover`}>Use as setas para mover. Shift move mais.</span>
                   </button>
                 )}
-                {POSICOES.filter((p) => area.colunas || celular || p.lado !== 'direita').map((p) => (
+                {POSICOES.filter((p) => !encaixadoTablet || p.lado !== 'direita').map((p) => (
                   <BotaoIcone
                     key={p.lado} rotulo={p.rotulo} icone={p.icone} pressionado={ladoEfetivo === p.lado}
                     onClick={() => definirPosicaoPainel({ lado: p.lado })}

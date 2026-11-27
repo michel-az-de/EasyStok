@@ -147,8 +147,8 @@
 .app:has(> footer) .botaoSimular,
 .app:has(> nav) .botaoSimular { bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px)); left: var(--e-4); }
 /* #3384 (r4 P1-1): no tablet o botão "Ficha de X" fica no canto esquerdo do rodapé e a pílula caía em cima dele
-   (a crítica r4 achou que não havia ficha a 1024). A pílula vai para o canto direito do rodapé, que é vazio. */
-.app:has(> footer) .botaoSimular { left: auto; right: var(--e-4); bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px)); }
+   (a crítica r4 achou que não havia ficha a 1024); no canto direito ela caía no gatilho do Assistente. Fica no rodapé, ao lado. */
+.rodape > .botaoSimular { position: static; }
 /* Com a pílula fixa na tela (tablet e celular), a fila ganha folga no fim para a última linha rolar para fora dela. */
 .app:has(.botaoSimular) { --folga-rolagem: calc(var(--e-3) + var(--e-5) + var(--toque)); }
 /* Celular: a pílula só aparece na aba Balcão; na conversa e na ficha ela
