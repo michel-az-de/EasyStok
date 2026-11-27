@@ -67,6 +67,10 @@
 :global(html[data-assistente-empurra]) :global(#conteudo-principal[data-palco-atendimento] > section[aria-label='Conversa']) { min-width: var(--assistente-conversa-minima, 0px); }
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > section[aria-label='Ficha']),
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > :has(+ section[aria-label='Ficha'])) { display: none; }
+/* #3384 (r4 P1-5): no tablet o painel encaixado toma o lugar da lista de conversas até fechar; a conversa não fica por baixo dele. */
+:global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
+:global(html[data-assistente-tablet] #conteudo-principal[data-palco-tablet] > section[aria-label='Conversas']) { display: none; }
+:global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet] ~ footer) { padding-left: calc(var(--assistente-reserva-esquerda, 0px) + var(--e-4)); }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
 .posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {

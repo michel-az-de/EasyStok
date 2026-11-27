@@ -153,7 +153,8 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
 confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no contexto', () => {
   const barra = fonte('features/atendimento/BarraModo.jsx')
   // #2185: o motivo da passagem fica à vista; a frase que só repete a pílula é para o leitor de tela.
-  assert.match(barra, /<p className=\{mostrarLinha \? css\.modoTexto : 'sr'\} title=/)
+  // #3384 (r4 P1-3): a frase da restrição ganha o tom de aviso; fora da vista continua só para o leitor de tela.
+  assert.match(barra, /className=\{!mostrarLinha \? 'sr' : resumo\.motivo === 'restricao' \? `\$\{css\.modoTexto\} \$\{css\.modoTextoAviso\}` : css\.modoTexto\}/)
   // #3234 (C5): a regra da frase mora em apresentacaoDoModo, que também decide o selo no cabeçalho.
   assert.match(fonte('dominio/resumoDoModo.js'), /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
   assert.match(barra, /apresentacaoDoModo\(conversa, pausado, bloqueada/)

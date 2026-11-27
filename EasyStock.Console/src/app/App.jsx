@@ -30,6 +30,7 @@ import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { ContextoFichaUnicaDoCliente } from '../aplicacao/fichaUnicaDoCliente'
 import { ContextoPainelDoAssistente } from '../aplicacao/painelDoAssistente'
+import { fraseSemResposta } from '../dominio/mensagem'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
@@ -269,10 +270,13 @@ function Composicao({ rota }) {
   useLayoutEffect(() => { contextoAssistenciaRef.current = chaveAssistencia }, [chaveAssistencia])
   useEffect(() => () => interromperConsultaAgente?.(), [chaveAssistencia, interromperConsultaAgente])
   const agenteAtual = agente.conversaId === selecionada?.id && (!FONTE_API || agente.contextoAssistencia === chaveAssistencia)
+  const passouParaVoceAgora = selecionada ? precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja) : false
   const sugestaoAgente = selecionada ? (
     <PainelAgente
       key={chaveAssistencia}
-      passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
+      // #3384 (revisão): a frase só quando a conversa é da atendente; com o Assistente respondendo, ele responde sozinho.
+      semResposta={passouParaVoceAgora ? fraseSemResposta(selecionada) : null}
+      passouParaVoce={passouParaVoceAgora}
       // #2185 (E11): "Usar no rascunho" também não vale com o campo fechado (janela de 24 h, concluída, bloqueio).
       bloqueada={!permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).pode}
       modo={FONTE_API ? 'api' : modoAgente}

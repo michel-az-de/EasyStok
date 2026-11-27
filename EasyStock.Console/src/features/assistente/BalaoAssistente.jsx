@@ -215,10 +215,18 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const conversaMinima = semFicha && tetoSemFicha(CONVERSA_LEGIVEL) < ASSISTENTE.min ? CONVERSA_MINIMA : CONVERSA_LEGIVEL
   const tetoEmpurrando = semFicha ? tetoSemFicha(conversaMinima) : tetoComFicha
   const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
+  // #3384 (r4 P1-5): no tablet não há três colunas; encaixado, o painel cobria a conversa e o Assumir. Agora ele toma o
+  // lugar da lista de conversas (à esquerda, sem trilho) até fechar, e a conversa fica com 560 px (320 se a tela não der).
+  // Só no palco do Atendimento (`data-palco-tablet`): nas outras telas não há lista a substituir nem reserva.
+  const palcoTablet = typeof document !== 'undefined' && document.querySelector('[data-palco-tablet]') != null
+  const encaixadoTablet = !celular && !solto && !area.colunas && palcoTablet
+  const conversaTablet = area.tela - MARGEM_ASSISTENTE - CONVERSA_LEGIVEL >= ASSISTENTE.min ? CONVERSA_LEGIVEL : CONVERSA_MINIMA
+  const tetoTablet = Math.max(ASSISTENTE.min, area.tela - MARGEM_ASSISTENTE - conversaTablet)
+  const ladoEfetivo = encaixadoTablet ? 'esquerda' : lado
   const larguraMaximaPainel = limitar(
     larguraMaxima({ ...area, lado: lado === 'esquerda' ? 'esquerda' : 'direita', margem: MARGEM_ASSISTENTE, faixa: ASSISTENTE }),
     ASSISTENTE.min,
-    empurra ? tetoEmpurrando : ASSISTENTE.max,
+    empurra ? tetoEmpurrando : encaixadoTablet ? tetoTablet : ASSISTENTE.max,
   )
   const larguraPainel = limitar(posicaoPainel.largura, ASSISTENTE.min, larguraMaximaPainel)
   const dentroDaTela = (x, y) => posicaoDentroDaTela({
@@ -228,22 +236,24 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const posicao = dentroDaTela(posicaoPainel.x, posicaoPainel.y)
 
   // A reserva vai por variável no :root e o CSS do painel a lê no palco (`#conteudo-principal`): a moldura não importa o painel.
-  const reserva = aberto && empurra ? larguraPainel + MARGEM_ASSISTENTE : 0
+  const reserva = aberto && (empurra || encaixadoTablet) ? larguraPainel + MARGEM_ASSISTENTE : 0
   useLayoutEffect(() => {
     if (!reserva) return undefined
     const raiz = document.documentElement
-    raiz.style.setProperty(`--assistente-reserva-${lado === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
+    raiz.style.setProperty(`--assistente-reserva-${ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'}`, `${reserva}px`)
     raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
-    raiz.dataset.assistenteEmpurra = lado === 'esquerda' ? 'esquerda' : 'direita'
+    raiz.dataset.assistenteEmpurra = ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
+    if (encaixadoTablet) raiz.dataset.assistenteTablet = ''
     return () => {
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
       raiz.style.removeProperty('--assistente-conversa-minima')
       delete raiz.dataset.assistenteEmpurra
       delete raiz.dataset.assistenteSemFicha
+      delete raiz.dataset.assistenteTablet
     }
-  }, [reserva, lado, semFicha, conversaMinima])
+  }, [reserva, ladoEfetivo, semFicha, conversaMinima, encaixadoTablet])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
@@ -302,7 +312,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     width: `${larguraPainel}px`,
     ...(solto ? { left: `${posicao.x}px`, top: `${posicao.y}px`, right: 'auto', bottom: 'auto' } : {}),
   }
-  const classePainel = [css.painel, !celular && lado === 'esquerda' ? css.painelEsquerda : '', solto ? css.painelSolto : '']
+  const classePainel = [css.painel, !celular && ladoEfetivo === 'esquerda' ? css.painelEsquerda : '', solto ? css.painelSolto : '']
     .filter(Boolean).join(' ')
   // #3322: alça e botão Largura mudam a largura pela mesma função.
   const mudarLargura = (valor) => definirPosicaoPainel({ largura: valor })
@@ -312,7 +322,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       rotulo="Redimensionar assistente"
       valor={larguraPainel}
       {...limitesLargura}
-      invertida={lado === 'direita'}
+      invertida={ladoEfetivo === 'direita'}
       aoMudar={mudarLargura}
     />
   )
@@ -345,7 +355,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
 
       {aberto && (
         <section className={classePainel} style={estiloPainel} id={painelId} role="dialog" aria-modal="false" aria-labelledby={tituloId} tabIndex={-1} ref={painelRef}>
-          {lado === 'direita' && alca}
+          {ladoEfetivo === 'direita' && alca}
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
@@ -369,9 +379,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                     <span className="sr" id={`${painelId}-mover`}>Use as setas para mover. Shift move mais.</span>
                   </button>
                 )}
-                {POSICOES.map((p) => (
+                {POSICOES.filter((p) => !encaixadoTablet || p.lado !== 'direita').map((p) => (
                   <BotaoIcone
-                    key={p.lado} rotulo={p.rotulo} icone={p.icone} pressionado={lado === p.lado}
+                    key={p.lado} rotulo={p.rotulo} icone={p.icone} pressionado={ladoEfetivo === p.lado}
                     onClick={() => definirPosicaoPainel({ lado: p.lado })}
                   />
                 ))}
@@ -482,7 +492,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
             </form>
           )}
           </div>
-          {lado !== 'direita' && alca}
+          {ladoEfetivo !== 'direita' && alca}
         </section>
       )}
     </>

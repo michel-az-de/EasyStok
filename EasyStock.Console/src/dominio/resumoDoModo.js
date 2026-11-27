@@ -87,6 +87,8 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
 
   return {
     chave: modo.chave,
+    // #3384 (r4 P1-3): qual motivo a linha diz, para a barra dar à frase da restrição o tom de aviso.
+    motivo: daFila?.chave ?? null,
     tom: daFila ? tomDoMotivo(daFila) : modo.tom,
     rotulo: urgente ? 'Precisa de você' : rotuloDoModo(modo, conversa, outro),
     urgente: Boolean(urgente),

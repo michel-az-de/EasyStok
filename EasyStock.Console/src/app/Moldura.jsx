@@ -7,8 +7,7 @@ import { balcaoComCardapio, fichaComCardapio, MAXIMO } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { BotaoIcone } from '../componentes/BotaoIcone'
-import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
-import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
+import { observarAreaDosPaineis } from '../hooks/areaDosPaineis'
 import { Pilula } from '../componentes/Pilula'
 import { Icone } from '../componentes/Icone'
 import { Modal } from '../componentes/Modal'
@@ -310,8 +309,15 @@ function Trilho({
 
 function Gaveta({ titulo, aoFechar, children }) {
   const painel = useRef(null)
-  const medir = () => limitarPainelMovel({ x: window.innerWidth - 488, y: 72 },
-    { largura: 480, altura: window.innerHeight }, janelaDosPaineis())
+  // Crítica r5 (P1): a ficha é a gaveta inteira do palco, não um painel entre o cabeçalho da conversa e o campo
+  // (lá ela ficava com 291 px a 768 e 72 px de rolagem). Altura do palco, encostada à direita.
+  const medir = () => {
+    const palco = document.getElementById('conteudo-principal')?.getBoundingClientRect()
+    const largura = Math.min(480, window.innerWidth - 16)
+    const y = Math.max(8, (palco?.top ?? 72) + 8)
+    const fundo = Math.min(window.innerHeight, palco?.bottom ?? window.innerHeight) - 8
+    return { x: window.innerWidth - largura - 8, y, largura, altura: Math.max(240, fundo - y) }
+  }
   const [posicao, setPosicao] = useState(medir)
   useLayoutEffect(() => {
     const ajustar = () => setPosicao(antes => {
@@ -574,7 +580,7 @@ function ConteudoMoldura({
     return (
       <div className={css.app}>
         {cabecalho}
-        <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
+        <main className={css.palco} tabIndex={-1} data-inicio-tela data-palco-tablet="" id="conteudo-principal" aria-label="Atendimento">
           <Coluna variante="entrada" titulo="Conversas" semTitulo>
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
@@ -591,8 +597,9 @@ function ConteudoMoldura({
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
             Ficha de {selecionada ? apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
           </Botao>
+          {/* #3384 (r4 P1-1): no tablet a pílula mora no rodapé, ao lado da Ficha: fixa no canto, cobria um ou o outro. */}
+          <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
         </footer>
-        <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
         {confirmacaoDeFechar}
       </div>
     )

@@ -682,7 +682,7 @@ try {
       const { ctx, p } = await abrir('inicial=meu&cabecalhoCheio=1', { width, height: 900 })
       await campo(p).waitFor()
       const linha = p.locator('[data-cabecalho-conversa] h2 small')
-      assert.match(await linha.innerText(), /4821 ·\s+WhatsApp · Responda até (amanhã )?\d+h(\d{2})?/)
+      assert.match(await linha.innerText(), /4821 ·\s+WhatsApp · (WhatsApp aberto até (amanhã )?\d+h(\d{2})?|Cliente espera há [\d hmind]+)/)
       const { altura, alturaLinha } = await linha.evaluate((el) => ({ altura: el.getBoundingClientRect().height, alturaLinha: parseFloat(getComputedStyle(el).lineHeight) }))
       assert.ok(altura <= alturaLinha * 1.5, `a linha do cabeçalho quebrou: ${altura} px para ${alturaLinha} px`)
       await ctx.close()
