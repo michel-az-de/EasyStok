@@ -262,7 +262,7 @@ function PainelDaConversa({
             </span>
             {/* Comanda, canal e, com a janela aberta, o prazo (e a espera atrasada, se a barra não a diz), em uma linha. #1761 (L4): a quantidade de
                 pedidos saiu (está em Histórico). #3234 (C2): fechada, quem diz é a faixa junto do campo. */}
-            <small>
+            <small title={[selecionada.numeroComanda && rotuloDoPedido(selecionada.numeroComanda), canal.nome, prazo, esperaDoCabecalho].filter((x) => typeof x === 'string' && x).join(' · ')}>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {/* #3384 (revisão): o atraso fica à vista em qualquer largura; só a janela folgada some abaixo de 1280. */}

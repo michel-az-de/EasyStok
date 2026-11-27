@@ -297,9 +297,9 @@
 .modoTexto {
   flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
-  /* #3374 (r2 P1-2): até 2 linhas, sem dividir a linha com o Assumir; o resto vai ao title. Com reticências numa linha,
-     "Restrição alimentar, confira a fi…" escondia o que fazer. */
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+  /* #3386 (r6 H8): uma linha só, com reticências; a frase inteira está no title. Em duas linhas ela dobrava a altura da barra
+     com o Assistente aberto (1280). A restrição segue na pílula e na tag do perfil. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* #3384 (r4 P1-3): a restrição alimentar na frase, não só na pílula: cor e peso de aviso, nunca o laranja de ação. */
 .modoTextoAviso { color: var(--alerta); font-weight: 600; }
@@ -339,6 +339,9 @@
 .restricao {
   margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
 }
+/* #3386 (r6 H8): com o Assistente no lugar da lista (tablet) a conversa é a coluna estreita e baixa; o campo perde a folga, não o texto. */
+:global(html[data-assistente-tablet]) .composer { padding-block: var(--e-2); }
+:global(html[data-assistente-tablet]) .restricao { margin-top: 0; }
 
 /* #2134: o que acabou de acontecer com o "responder é assumir", junto do campo. */
 .avisoAssumiu, .erroAssumir {
@@ -382,7 +385,7 @@
 /* Subtítulo da conversa numa linha só, com reticência, em vez de quebrar em
    pedaços ao lado do Encerrar. O texto inteiro fica no title do navegador. */
 .cabecalho h2 small {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* #3386 (r6): uma linha, o kebab novo não a quebra */
 }
 /* #3234 (C2): o prazo longe do fim cabe só no desktop largo; abaixo disso a linha quebrava (#1761 L4). */
 @media (max-width: 1279px) {

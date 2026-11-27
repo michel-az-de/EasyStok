@@ -92,9 +92,10 @@
   display: flex; align-items: center; gap: var(--e-1);
   font-size: var(--t-titulo); font-weight: 700; margin: 0; color: var(--tinta);
 }
-.contexto { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.cabecalho h2 > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contexto { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .identidade { min-width: 0; }
-.clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; line-height: var(--lh-compacto); }
+.clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cabecalho > button { flex-shrink: 0; }
 .tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }
 
@@ -102,14 +103,14 @@
    ("Bancada de teste", "Pergunte ao assistente") parecia escondido atrás da caixa: a borda de baixo agora esmaece,
    e a folga de baixo deixa o último item inteiro fora do esmaecido quando a rolagem chega ao fim. */
 .corpo {
-  overflow-y: auto; padding: var(--e-3) var(--e-3) var(--e-5); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0;
+  overflow-y: auto; padding: var(--e-3) var(--e-3) var(--e-5); display: flex; flex-direction: column; gap: var(--e-2); flex: 1; min-height: 0;
   mask-image: linear-gradient(to bottom, var(--papel) calc(100% - var(--e-5)), transparent);
 }
 
 .cartoes { display: flex; flex-direction: column; }
 
 .cartao {
-  padding: var(--e-2) 0;
+  padding: var(--e-1) 0;
 }
 .cartao.perigo .cartaoTopo h3 { color: var(--erro); }
 .cartao.ok .cartaoTopo h3 { color: var(--sucesso); }
@@ -119,6 +120,8 @@
   display: flex; align-items: center; gap: var(--e-1); flex-wrap: wrap;
   font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
 }
+.cartaoAlternar { display: flex; align-items: center; gap: var(--e-1); background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.cartaoCorpo[hidden] { display: none; }
 .cartaoCorpo { font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-1); line-height: var(--lh-corpo); }
 .cartaoCorpo p { margin: 0 0 var(--e-1); }
 .cartaoCorpo ul { margin: var(--e-1) 0; padding-left: var(--e-3); }
@@ -167,7 +170,7 @@
 .rodapePergunta { flex-shrink: 0; padding: var(--e-2) var(--e-3) 0; }
 .formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-2) 0 var(--e-3); }
 .formPergunta > div { flex: 1; min-width: 0; }
-.campoPergunta { min-height: 64px; max-height: 160px; resize: vertical; }
+.campoPergunta { min-height: 48px; max-height: 160px; resize: vertical; }
 .botaoEnviar { flex-shrink: 0; }
 
 /* Integração do visual: no celular o gatilho de canto sobe para cima da barra

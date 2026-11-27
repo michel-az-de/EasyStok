@@ -379,8 +379,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
-              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> Assistente</h2>
-              {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
+              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> <span>Assistente</span></h2>
+              {selecionada && <p className={css.clienteDoPainel} title={selecionada.nome}>{selecionada.nome}</p>}
             </div>
             {!celular && (
               <fieldset className={css.posicoes}>
@@ -428,7 +428,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
 
             {selecionada && (
               <>
-                <p className={css.contexto}>Revise as sugestões. Cada ação só acontece quando você confirma.</p>
+                <p className={css.contexto} title="Revise as sugestões. Cada ação só acontece quando você confirma.">Revise as sugestões. Você confirma cada ação.</p>
 
                 {/* #3386 (r5 P2-10): o aviso de "sem resposta" vem antes dos cartões, à vista ao abrir o painel. */}
                 {sugestaoAgente}

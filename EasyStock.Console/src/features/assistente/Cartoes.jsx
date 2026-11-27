@@ -1,3 +1,4 @@
+import { useId, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Chip } from '../../componentes/Chip'
@@ -10,27 +11,40 @@ import css from './assistente.module.css'
 // Casca comum aos seis cartões: ícone, título, "ok, entendi" (seção D da
 // pesquisa: "cada cartão é dispensável"), corpo livre. Nenhum cartão bloqueia
 // nada: dispensar só tira ele da vista desta conversa, nunca muda o pedido.
-function Cartao({ icone, titulo, tom, aoDispensar, children }) {
+// #3386 (r6 H8): em tela baixa os cartões abrem recolhidos (título, com o resumo à vista); quem precisa do detalhe o abre.
+// Senão dois cartões empurravam o campo de pergunta e cortavam o perfil sob ele (1024x768 e 1280x800).
+const TELA_BAIXA = '(max-height: 899px)'
+const abrirRecolhido = () => typeof window !== 'undefined' && window.matchMedia?.(TELA_BAIXA).matches
+function Cartao({ icone, titulo, tom, aoDispensar, resumo, children }) {
+  const [aberto, setAberto] = useState(() => !abrirRecolhido())
+  const idCorpo = useId()
   return (
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
       <div className={css.cartaoTopo}>
-        <h3><Icone nome={icone} tamanho={20} /> {titulo}</h3>
+        <h3>
+          <button type="button" className={css.cartaoAlternar} aria-expanded={aberto} aria-controls={idCorpo} onClick={() => setAberto((v) => !v)}>
+            <Icone nome={icone} tamanho={20} /> {titulo} <Icone nome={aberto ? 'chevron-up' : 'chevron-down'} tamanho={16} />
+          </button>
+        </h3>
         <BotaoIcone rotulo={`Dispensar ${titulo.toLowerCase()}`} icone="x" onClick={aoDispensar} />
       </div>
-      <div className={css.cartaoCorpo}>{children}</div>
+      {!aberto && resumo}
+      <div className={css.cartaoCorpo} id={idCorpo} hidden={!aberto}>{children}</div>
     </article>
   )
 }
 
 // "HD aqui da cabeça" (entrevista, 2.2): quem é o cliente, num relance.
 export function CartaoCliente({ dado, aoDispensar }) {
+  // A restrição alimentar não pode escapar: as tags ficam à vista também com o cartão recolhido.
+  const tags = dado.tags.length > 0 && (
+    <div className={css.tagsCliente}>
+      {dado.tags.map((tag) => <Chip key={tag} papel="tag">{rotuloDaTag(tag)}</Chip>)}
+    </div>
+  )
   return (
-    <Cartao icone="ficha" titulo="Perfil do cliente" aoDispensar={aoDispensar}>
-      {dado.tags.length > 0 && (
-        <div className={css.tagsCliente}>
-          {dado.tags.map((tag) => <Chip key={tag} papel="tag">{rotuloDaTag(tag)}</Chip>)}
-        </div>
-      )}
+    <Cartao icone="ficha" titulo="Perfil do cliente" aoDispensar={aoDispensar} resumo={tags}>
+      {tags}
       <p>{dado.chegou ?? 'Sem data de chegada registrada'}</p>
       <div className={css.numeros}>
         <span><b>{dado.pedidos}</b> {dado.pedidos === 1 ? 'pedido' : 'pedidos'}</span>
