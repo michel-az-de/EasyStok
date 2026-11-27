@@ -61,7 +61,7 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
             </span>
           </p>
         ) : (
-          <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+          <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina ponto>{resumo.rotulo}</Pilula></span>
         )}
         {/* #3384 (r4 P1-3): a restrição alimentar é o que não pode escapar; a frase ganha o tom de aviso, não só a pílula. */}
         {!faixa && (

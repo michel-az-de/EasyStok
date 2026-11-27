@@ -115,12 +115,12 @@ export const CartaoConversa = memo(function CartaoConversa({
         <span className={css.topo}>
           <strong className={pendentes > 0 ? css.semResposta : ''}>
             <NomeDoContato
-              completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
+              completo={nome.principal} curto={nome.curto} forma="curta" capsula={nome.capsula} titulo={nome.titulo}
               complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.numeroPedido ? `#${nome.numeroPedido}` : nome.complemento}</small>}
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}
-          {slaEstourado && motivo?.chave !== 'esperando' && (
+          {slaEstourado && (
             <span className={css.sinalPrazo} title="Prazo de resposta estourado" role="img" aria-label="Prazo de resposta estourado">
               <Icone nome="relogio" tamanho={16} />
             </span>
@@ -162,7 +162,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           )}
         </span>
         {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
-          {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
+          {etiqueta && <Pilula tamanho="inline" className={css.etiquetaEstado} tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
           {visiveis.map((item) => (
             <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined} className={ehSeloDeDinheiro(item) ? css.seloDinheiro : undefined}>{item.texto}</Pilula>
           ))}

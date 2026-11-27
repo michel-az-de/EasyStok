@@ -52,7 +52,7 @@
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--e-1); }
 
 /* Linha 1: nome à esquerda, hora à direita. */
-.topo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; width: 100%; }
+.topo { display: flex; align-items: center; gap: var(--e-1); min-width: 0; width: 100%; }
 .topo strong {
   font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-atd);
   line-height: var(--lh-compacto); min-width: 0; color: var(--tinta);
@@ -89,9 +89,13 @@
 /* #1761 (L16): etiqueta de contexto que não cabe inteira some, em vez de cortar em "Automático
    não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
 .contextoLinha {
-  display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
+  display: flex; flex-wrap: nowrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
   font-size: var(--t-micro); line-height: 1.35; height: 1.75em; color: var(--tinta-3); white-space: nowrap; /* #3282: a pílula ganhou 3 px de respiro vertical; a fileira cresce junto */
 }
+
+/* #3386 (r6, H4): a fileira não quebra: o estado encolhe (reticência, o texto inteiro no title) para o "Pago" e o selo de
+   dinheiro aparecerem em toda largura, em vez de caírem para uma segunda fileira cortada. */
+.etiquetaEstado { flex-shrink: 1; min-width: 0; }
 
 /* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
 .seloDinheiro { order: -1; }

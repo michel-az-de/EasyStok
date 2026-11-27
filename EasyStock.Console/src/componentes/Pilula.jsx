@@ -18,7 +18,7 @@ const TONS_DA_CONTAGEM = Object.freeze({ neutro: 'neutro', marca: 'marca', perig
 // #2185 (R05): `tamanho="inline"` é o estado em linha miúda (cartão da lista, ficha): 13 px, ícone de 16,
 // fundo do tom, e o texto longo corta com reticência. `fina` é o rótulo de apoio, sem peso: vale quando o
 // estado não pede ação. O estado de um item é sempre este componente, nunca uma classe de tela.
-export function Pilula({ tom = 'neutro', fina = false, tamanho, icone, titulo, contagem, className, children, ...resto }) {
+export function Pilula({ tom = 'neutro', fina = false, ponto = false, tamanho, icone, titulo, contagem, className, children, ...resto }) {
   if (contagem !== undefined && contagem !== null) {
     const tomDaContagem = TONS_DA_CONTAGEM[tom] ?? 'neutro'
     return (
@@ -29,7 +29,7 @@ export function Pilula({ tom = 'neutro', fina = false, tamanho, icone, titulo, c
   }
   const emLinha = tamanho === 'inline'
   const classes = [
-    css.pilula, css[tom], fina ? css.fina : '', icone && !emLinha ? css.comIcone : '', emLinha ? css.inline : '', className,
+    css.pilula, css[tom], fina ? css.fina : '', ponto ? css.ponto : '', icone && !emLinha ? css.comIcone : '', emLinha ? css.inline : '', className,
   ].filter(Boolean).join(' ')
   return (
     <span className={classes} title={titulo} {...resto}>
