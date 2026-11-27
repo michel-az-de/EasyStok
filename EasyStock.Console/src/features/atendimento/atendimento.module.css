@@ -26,6 +26,11 @@
 }
 .identidade { flex-basis: auto; }
 .ancoraAssistente { display: inline-flex; flex: none; }
+/* #3381 (A4): o rótulo cede (fica o ícone, com nome acessível pelo texto sr) quando o cabeçalho aperta. */
+.cardapioNoCabecalho { flex: none; }
+@container topo-conversa (max-width: 519px) {
+  .rotuloCardapio { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 .ancoraAssistente:empty { display: none; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
