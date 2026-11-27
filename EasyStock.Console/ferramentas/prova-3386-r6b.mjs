@@ -70,7 +70,7 @@ try {
           const rol = document.querySelector('section[aria-label^="Conversa com"]')
           return {
             linhasTitulo: titulo && linhasDe(titulo), linhasNome: nome && linhasDe(nome),
-            linhasRestricao: restricao && linhasDe(restricao),
+            linhasRestricao: restricao && (() => { const caixa = restricao.getBoundingClientRect(); return new Set([...restricao.querySelectorAll('span')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.top < caixa.bottom - 1).map((r) => Math.round(r.top))).size || linhasDe(restricao) })(), // #3386 (r8): a segunda linha do alerta fica escondida; conta só a visível
             perfilFundo: cartao && Math.round(cartao.getBoundingClientRect().bottom), corpoFundo: corpo && Math.round(corpo.getBoundingClientRect().bottom), rolavel: corpo && corpo.scrollHeight - corpo.clientHeight, campoTopo: campo && Math.round(campo.getBoundingClientRect().top),
             recolhido: cartao?.querySelector('button[aria-expanded="false"]') != null, numerosFundo: numeros?.offsetParent && Math.round(numeros.getBoundingClientRect().bottom),
             mensagens: rol && Math.round(rol.getBoundingClientRect().height),

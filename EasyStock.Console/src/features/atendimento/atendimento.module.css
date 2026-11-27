@@ -303,7 +303,11 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* #3384 (r4 P1-3): a restrição alimentar na frase, não só na pílula: cor e peso de aviso, nunca o laranja de ação. */
-.modoTextoAviso { color: var(--alerta); font-weight: 600; }
+/* #3386 (r8 P2-3): sem reticências no meio da frase. A parte essencial ("Sem lactose") com o ícone vem inteira; "confira os ingredientes"
+   só aparece se couber na mesma linha: senão quebra para uma segunda linha que a altura fixa esconde (o title diz o resto). */
+.modoTextoAviso { color: var(--alerta); font-weight: 600; display: flex; flex-wrap: wrap; align-content: flex-start; overflow: clip; height: calc(var(--lh-compacto) * 1em); }
+.modoEssencial { flex: none; white-space: nowrap; }
+.modoResto { flex: none; white-space: pre; }
 .modoTextoIcone { display: inline-block; vertical-align: -2px; margin-right: var(--e-1); }
 .modoAssumir { margin-left: auto; flex: none; }
 /* #3374 (C10): a tecla que faz o mesmo que o botão, no próprio botão (contorno uniforme, sem barra lateral). */

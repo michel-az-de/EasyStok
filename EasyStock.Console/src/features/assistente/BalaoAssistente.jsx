@@ -414,7 +414,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
             {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
             {/* #3374 (C10): a tecla que fecha, à vista; o botão leva o mesmo atalho na dica. */}
             <kbd className={css.tecla} aria-hidden="true">Esc</kbd>
-            <BotaoIcone rotulo="Fechar" icone="x" atalho="Esc" onClick={fechar} aria-keyshortcuts="Escape" />
+            <BotaoIcone rotulo="Fechar (Esc)" icone="x" onClick={fechar} aria-keyshortcuts="Escape" />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>

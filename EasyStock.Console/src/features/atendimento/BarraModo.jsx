@@ -69,7 +69,9 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
             className={!mostrarLinha ? 'sr' : resumo.motivo === 'restricao' ? `${css.modoTexto} ${css.modoTextoAviso}` : css.modoTexto}
             title={linha === resumo.linha ? resumo.detalhe : linha}
           >
-            {mostrarLinha && resumo.motivo === 'restricao' && <Icone nome="alerta" className={css.modoTextoIcone} />}{linha}
+            {mostrarLinha && resumo.motivo === 'restricao'
+              ? <><span className={css.modoEssencial}><Icone nome="alerta" className={css.modoTextoIcone} />{linha.split(': ')[0]}</span>{linha.includes(': ') && <span className={css.modoResto}>{`: ${linha.split(': ').slice(1).join(': ')}`}</span>}</>
+              : linha}
           </p>
         )}
         {acoes.assumir && (

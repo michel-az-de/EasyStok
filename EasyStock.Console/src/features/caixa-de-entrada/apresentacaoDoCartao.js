@@ -110,10 +110,20 @@ const ICONE_DO_PASSO = {
 // #3009: selo de dinheiro ("Falta R$ 68,00") do contexto da linha: ele passa à frente na fileira visível.
 export const ehSeloDeDinheiro = (item) => /R\$/.test(item?.texto ?? '')
 
-// #3374 (C4): quais pílulas de contexto cabem na linha. Dinheiro primeiro; depois o que avisa (tom aviso/perigo) e
-// "Só modelo" (janela fechada); o resto por último. A ordem original se mantém dentro de cada grupo.
-const pesoDaPilula = (item) => ehSeloDeDinheiro(item) ? 0 : (item?.tom === 'aviso' || item?.tom === 'perigo' || item?.chave === 'janela') ? 1 : 2
-export const pilulasVisiveis = (contexto, limite) => [...contexto].sort((a, b) => pesoDaPilula(a) - pesoDaPilula(b)).slice(0, limite)
+// #3386 (r8 P1): a linha de contexto mostra até duas fileiras de chips inteiros (o CSS esconde o que não cabe; o texto todo
+// segue no `title` e no aria-label). A ordem é a da prioridade de ação: o estado que pede ação (Diz que pagou, Pix vencido,
+// Aguardando Pix...), depois o dinheiro (Falta R$, Pago), depois o que avisa e "Só modelo", depois o resto. Dentro de cada
+// grupo vale a ordem original. Chip com o mesmo texto de outro aparece uma vez só.
+const pesoDaPilula = (item) => item?.chave === 'estado' ? 0 : ehSeloDeDinheiro(item) || item?.chave === 'pedido' && /^Pago$|^Sinal pago$/.test(item.texto) ? 1 : (item?.tom === 'aviso' || item?.tom === 'perigo' || item?.chave === 'janela') ? 2 : 3
+export function pilulasDaLinha(estado, etiqueta, contexto) {
+  const todos = etiqueta && estado ? [{ ...estado, chave: 'estado' }, ...contexto] : [...contexto]
+  const vistos = new Set()
+  return todos
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => pesoDaPilula(a.item) - pesoDaPilula(b.item) || a.i - b.i)
+    .map(({ item }) => item)
+    .filter((item) => { const t = item.texto?.trim().toLowerCase(); if (vistos.has(t)) return false; vistos.add(t); return true })
+}
 
 export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
 
