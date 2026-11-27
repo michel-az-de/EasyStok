@@ -186,6 +186,16 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   useLayoutEffect(() => {
     if (!carga && rolagem.current) rolagem.current.scrollTop = filtros.posicao ?? 0
   }, [carga, chaveDaLista])
+  // #3381 (B2): o cartão que acabou de abrir fica inteiro à vista, mesmo no pé da fila. Só a caixa de rolagem da lista
+  // mexe (scrollIntoView também deslocaria as molduras); sem movimento se a pessoa pediu menos movimento.
+  useEffect(() => {
+    const caixa = rolagem.current
+    const cartao = !carga && selecionadaId != null && typeof caixa?.querySelectorAll === 'function' ? [...caixa.querySelectorAll('button[data-conversa-id]')].find((el) => el.dataset.conversaId === String(selecionadaId)) : null
+    if (!caixa || !cartao) return
+    const c = caixa.getBoundingClientRect(); const k = cartao.getBoundingClientRect()
+    const passo = k.top < c.top ? k.top - c.top : k.bottom > c.bottom ? k.bottom - c.bottom : 0
+    if (passo) caixa.scrollBy({ top: passo, behavior: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [selecionadaId, carga])
 
   return (
     <>

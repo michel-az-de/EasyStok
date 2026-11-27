@@ -135,6 +135,35 @@ const mensagemComPista = (conversa, teste, quantas = 3) => [...conversa.mensagen
 const falaRecenteDoCliente = (conversa, quantas = 3) => conversa.mensagens
   .filter((m) => m.dir === 'in').slice(-quantas).map((m) => normalizar(m.texto)).join(' ')
 
+// #3381: o que evitar, dito pela cliente, para o aviso dizer "Sem lactose" em vez de só "Restrição alimentar". Vale o item
+// dito por último nas falas recentes: "massa sem leite?" e depois "ela não pode lactose" fica com lactose. Sem item, null.
+const ROTULO_DO_ITEM = {
+  gluten: 'glúten', celiac: 'glúten', laticinio: 'laticínio', crustace: 'crustáceo', camaro: 'camarão', camara: 'camarão',
+  castanha: 'castanha', noz: 'nozes', noze: 'nozes', frutos: 'frutos do mar', ovo: 'ovo', peixe: 'peixe',
+}
+// Revisão da #3381: só itens de uma lista fechada (palavra livre depois de "não posso" virava "Sem abrir"). A alergia,
+// a intolerância e o "não pode" valem mais que um "sem X" de pergunta: "alérgica a camarão" e depois "suco sem leite?"
+// fica com camarão. Entre os do mesmo peso, vale o dito por último.
+const ITEM = '(lactose|laticinio\\w*|leite|gluten|ovos?|amendoim|castanhas?|nozes|noz|frutos\\s+do\\s+mar|crustace\\w*|camar(?:ao|oes)|peixes?|soja|trigo|carne)\\b'
+const PADRAO_FORTE = new RegExp('\\b(?:alergi\\w*|alergic\\w*|intoleran\\w*)\\s+(?:a|ao|aos|as|de)?\\s*(?:o\\s+|a\\s+)?' + ITEM
+  + '|\\bnao\\s+(?:pode|posso|podem|consigo|consegue)\\s+(?:comer\\s+|beber\\s+|tomar\\s+|ingerir\\s+)?(?:o\\s+|a\\s+)?' + ITEM
+  + '|\\bnao\\s+(?:come|como|comem|tolera|tolero)\\s+(?:o\\s+|a\\s+)?' + ITEM, 'g')
+const PADRAO_FRACO = new RegExp('\\b(?:sem|zero)\\s+(?:o\\s+|a\\s+)?' + ITEM, 'g')
+const ultimoItem = (texto, padrao) => {
+  let achado = null
+  for (const m of texto.matchAll(padrao)) achado = m.slice(1).find(Boolean) ?? achado
+  return achado
+}
+export function itemDaRestricao(conversa) {
+  // Todas as falas do cliente recebidas (o chamador já corta na reabertura): "alérgica a camarão" lá atrás ainda vale.
+  const texto = (conversa.mensagens ?? []).filter((m) => m.dir === 'in').map((m) => normalizar(m.texto)).join(' ')
+  const celiaca = /celiac\w*/.test(texto) ? 'celiac' : null
+  const achado = ultimoItem(texto, PADRAO_FORTE) ?? celiaca ?? ultimoItem(texto, PADRAO_FRACO)
+  if (!achado) return null
+  const chave = Object.keys(ROTULO_DO_ITEM).find((k) => achado.startsWith(k))
+  return chave ? ROTULO_DO_ITEM[chave] : achado.replace(/s$/, '')
+}
+
 // Itens do cardápio citados nas últimas falas do cliente e que estão sem
 // saldo. Exigir todas as palavras do nome juntas deixa passar apelido ou nome
 // parcial ("a de carne", "aquela lasanha"). Uma palavra-chave de 5+ letras já

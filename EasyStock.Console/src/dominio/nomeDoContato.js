@@ -61,7 +61,6 @@ export function primeiroNomeDaConversa(conversa) {
 const VISITANTE = 'Visitante'
 const FORMAS_LEGAIS = new Set(['ltda', 'me', 'epp', 'eireli', 'mei', 'sa', 's/a', 'cia'])
 const PARTICULAS = new Set(['da', 'de', 'do', 'das', 'dos', 'e'])
-const LIMITE_DA_PALAVRA_DE_EMPRESA = 7
 const SEM_NOME = { texto: 'Sem nome', tom: 'neutro' }
 const COMPLETAR_NOME = { texto: 'Completar nome', tom: 'ambar', acao: 'completar-nome' }
 
@@ -77,16 +76,15 @@ function numeroDaComanda(nome, comanda) {
 const ehVisitante = (nome) => nome === '' || /^visitante(\s+do\s+site)?$/i.test(nome) || /^comanda\s+\d+$/i.test(nome)
 
 function formaCurta(palavras, ehEmpresa) {
+  // Revisão da #3381: empresa fica com o nome inteiro sem a forma legal ("Supermercado Alimentos" era nome inventado).
+  if (ehEmpresa) return palavras.join(' ')
   const [primeira, ...resto] = palavras.filter((p, i) => i === 0 || !PARTICULAS.has(p.toLowerCase()))
   const ultima = resto.at(-1)
   if (!ultima) return primeira
-  const abrevia = ehEmpresa
-    ? ultima.length > LIMITE_DA_PALAVRA_DE_EMPRESA
-    : ultima.length > 1
-  if (!abrevia) return `${primeira} ${ultima}`
-  const emPessoa = ultima.length >= 8 || ehEmpresa
-  // Empresa e palavra longa mantêm o começo ("Eletr."); sobrenome vira inicial ("R.").
-  return emPessoa ? `${primeira} ${ultima.slice(0, 5)}.` : `${primeira} ${ultima[0].toUpperCase()}.`
+  // Revisão da #3381: empresa não vira inicial ("Padaria Q." perdia o nome); fica inteira e o CSS corta com reticências.
+  if (ultima.length <= 1) return `${primeira} ${ultima}`
+  // #3381: uma regra só, primeiro nome inteiro e inicial do último; o que ainda não couber, o CSS corta com reticências.
+  return `${primeira} ${ultima[0].toUpperCase()}.`
 }
 
 export function apresentacaoDoNome(nome, { comanda = null } = {}) {

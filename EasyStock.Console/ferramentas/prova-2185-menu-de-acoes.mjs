@@ -138,8 +138,9 @@ const chamadas = (p) => p.evaluate(() => window.chamadas.slice())
 
 // #2496: "Checar o Assistente" em toda conversa aberta (modo API), antes de Concluir; concluída segue sem menu.
 // #3374 (C12): Concluir só depois de assumir: com Assumir à vista, o menu não traz "Concluir conversa".
-const TODOS = ['Enviar cardápio', 'Passar conversa', 'Checar o Assistente']
-const COM_DEVOLVER_SEM_CONCLUIR = ['Enviar cardápio', 'Passar conversa', 'Devolver ao Assistente', 'Checar o Assistente']
+// #3381 (A4): no desktop o "Enviar cardápio" sai do ⋮ e vira botão secundário no cabeçalho (assert 1b abaixo).
+const TODOS = ['Passar conversa', 'Checar o Assistente']
+const COM_DEVOLVER_SEM_CONCLUIR = ['Passar conversa', 'Devolver ao Assistente', 'Checar o Assistente']
 const COM_DEVOLVER = [...COM_DEVOLVER_SEM_CONCLUIR, 'Concluir conversa']
 const MATRIZ = [
   ['robo', TODOS, true],
@@ -160,6 +161,22 @@ try {
       await ctx.close()
     })
   }
+
+  await confere('1b. #3381 A4: "Enviar cardápio" é botão secundário (contorno) no cabeçalho em 1280 e não repete no ⋮; em 600 volta ao ⋮', async () => {
+    const { ctx, p } = await abrir('meu')
+    const botao = p.locator('[data-cabecalho-conversa]').getByRole('button', { name: 'Enviar cardápio', exact: true })
+    assert.equal(await botao.count(), 1)
+    assert.equal(await botao.isVisible(), true)
+    const fundo = await botao.evaluate((el) => getComputedStyle(el).backgroundColor)
+    assert.equal(await botao.getAttribute('aria-haspopup'), 'dialog')
+    assert.ok(/rgba\(0, 0, 0, 0\)|transparent/.test(fundo) || fundo !== await p.evaluate(() => { const s = document.createElement('i'); s.style.background = 'var(--acao)'; document.body.append(s); const c = getComputedStyle(s).backgroundColor; s.remove(); return c }), 'não pode ser laranja: ' + fundo)
+    // Revisão da #3381: em 600 o botão sai do cabeçalho e o cardápio volta ao ⋮ (segue acessível no celular).
+    await p.setViewportSize({ width: 600, height: 900 })
+    await p.waitForTimeout(300)
+    assert.equal(await botao.count(), 0)
+    assert.ok((await itensDoMenu(p)).includes('Enviar cardápio'), 'em 600 o cardápio volta ao ⋮')
+    await ctx.close()
+  })
 
   await confere('1. o motivo da passagem fica à vista, e não só no title', async () => {
     const { ctx, p } = await abrir('fila')
@@ -211,13 +228,13 @@ try {
     const { ctx, p } = await abrir('meu')
     await gatilho(p).press('Enter')
     const foco = () => p.evaluate(() => document.activeElement.innerText.trim())
-    assert.equal(await foco(), 'Enviar cardápio')
-    await p.keyboard.press('ArrowDown')
     assert.equal(await foco(), 'Passar conversa')
+    await p.keyboard.press('ArrowDown')
+    assert.equal(await foco(), 'Devolver ao Assistente')
     await p.keyboard.press('End')
     assert.equal(await foco(), 'Concluir conversa')
     await p.keyboard.press('ArrowDown')
-    assert.equal(await foco(), 'Enviar cardápio')
+    assert.equal(await foco(), 'Passar conversa')
     await ctx.close()
   })
 

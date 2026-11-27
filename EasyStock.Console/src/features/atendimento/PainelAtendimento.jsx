@@ -224,6 +224,7 @@ function PainelDaConversa({
   const motivoDaBarraAtual = motivoDaBarra(motivoDaFila, motivo, pausado)
   // #3374 (C0): o selo no cabeçalho fica desligado até a C8. Ligado, o cabeçalho passou de 64 para 77 px em 1280
   // e a comanda cobriu o "Total dos itens" (prova-1738), a quebra medida na crítica de 23/11.
+  const cardapioNoCabecalho = desktop && Boolean(acoesTela.enviarCardapio)
   const modoNoCabecalho = SELO_NO_CABECALHO && desktop && !acoesTela.assumir && apresentacaoDoModo(selecionada, pausado, bloqueada, { podeReabrir, agora, motivo: motivoDaBarraAtual }).noCabecalho
   const barraModo = (
     <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
@@ -274,11 +275,15 @@ function PainelDaConversa({
           {/* O balão planta o gatilho do Assistente aqui. Com lugar próprio, ele não troca de lado com
               o menu conforme a conversa (#2185: a ordem dependia de quem montou por último). */}
           {modoNoCabecalho && barraModo}
+          {/* #3381 (A4): no desktop o cardápio sai do ⋮ e fica à vista, em contorno (o laranja é da ação da tela). */}
+          {cardapioNoCabecalho && <Botao variante="secundario" className={css.cardapioNoCabecalho} aria-haspopup="dialog" onClick={() => abrirModal('cardapio')}>
+            <Icone nome="cardapio" tamanho={20} /><span className={css.rotuloCardapio}>Enviar cardápio</span>
+          </Botao>}
           <span className={css.ancoraAssistente} data-ancora-assistente />
           <MenuDeAcoes
             rotulo="Mais opções da conversa"
             itens={[
-              acoesTela.enviarCardapio && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
+              acoesTela.enviarCardapio && !cardapioNoCabecalho && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
               acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
               acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'agente', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
               // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída

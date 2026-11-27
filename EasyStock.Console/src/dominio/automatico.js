@@ -19,7 +19,7 @@ import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } 
 import { pedidoEncerrado } from './pedido.js'
 import { MOTIVO_PERGUNTA_FORA_DO_ROTEIRO, ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
-import { INTENCOES, classificarIntencao, sinalDoCliente } from './agente.js'
+import { INTENCOES, classificarIntencao, itemDaRestricao, sinalDoCliente } from './agente.js'
 
 export const MODOS = {
   LIGADO: 'ligado',
@@ -415,6 +415,14 @@ function valorDiferente(conversa, agora) {
 // mensagens ainda sem resposta. Sem texto carregado (resumo da API), não opina.
 const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
 
+// #3381: o aviso diz o que evitar ("Sem lactose: confira a ficha do prato"), curto para caber sem corte no cabeçalho;
+// o motivo inteiro fica em `detalhe` (title e leitor de tela). Sem item reconhecido, o texto genérico de sempre.
+export function avisoDeRestricao(item) {
+  const base = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso' }
+  if (!item) return { ...base, texto: MOTIVO_POR_INTENCAO.restricao }
+  return { ...base, texto: `Sem ${item}: confira a ficha do prato`, detalhe: MOTIVO_POR_INTENCAO.restricao }
+}
+
 export function sinalUrgente(conversa, agora) {
   const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
   // #3374 (r2): a restrição vale para o pedido depois da resposta; fica com a conversa aberta, lida desde a última reabertura (#1600).
@@ -422,7 +430,7 @@ export function sinalUrgente(conversa, agora) {
   const desde = todas.findLastIndex((m) => m.reabertura) + 1
   const comTexto = todas.slice(desde).filter((m) => m.texto)
   const restricaoDita = comTexto.length > 0 && sinalDoCliente({ ...conversa, mensagens: comTexto }).paraDona === 'restricao'
-  const restricao = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: MOTIVO_POR_INTENCAO.restricao }
+  const restricao = avisoDeRestricao(restricaoDita ? itemDaRestricao({ mensagens: comTexto }) : null)
   if (pendentes.length === 0) return restricaoDita ? restricao : null
   const pedido = conversa.pedido
   const { paraDona, textoParaDona, alegaPagamento } = sinalDoCliente({ ...conversa, mensagens: pendentes })

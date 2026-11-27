@@ -83,7 +83,7 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
   const urgente = ligado ? daFila : null
   if (daFila) linha = daFila.texto
   // O `title` da pílula e da linha e o leitor de tela leem o `detalhe`: ele começa pelo motivo.
-  const detalheFinal = urgente ? `Precisa de você. ${urgente.texto}.` : daFila ? `${daFila.texto}. ${detalhe}` : detalhe
+  const detalheFinal = urgente ? `Precisa de você. ${urgente.detalhe ?? urgente.texto}.` : daFila ? `${daFila.detalhe ?? daFila.texto}. ${detalhe}` : detalhe
 
   return {
     chave: modo.chave,

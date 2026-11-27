@@ -342,8 +342,7 @@ try {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
     await campo(p).fill('Bom dia, Maria, já confirmo')
-    await p.getByRole('button', { name: 'Mais opções da conversa', exact: true }).click()
-    await p.getByRole('menuitem', { name: 'Enviar cardápio' }).click()
+    await p.getByRole('button', { name: 'Enviar cardápio', exact: true }).click() // #3381 (A4): botão do cabeçalho, não mais o ⋮
     await p.getByRole('button', { name: 'Gerar e enviar' }).click()
     await p.getByRole('dialog').waitFor({ state: 'detached', timeout: 4000 })
     const envios = (await chamadasDe(p)).filter((c) => c[0] === 'enviar')
@@ -558,7 +557,7 @@ try {
     assert.notEqual(noHover, await token('--preenchimento'), 'o hover muda o fundo')
     await p.mouse.move(0, 0)
     await campo(p).fill('oi')
-    assert.equal(await fundo(p.getByRole('button', { name: /^Enviar/ }).first()), await token('--acao'), 'com texto, o Enviar segue laranja')
+    assert.equal(await fundo(p.getByRole('button', { name: /^Enviar(?! cardápio)/ }).first()), await token('--acao'), 'com texto, o Enviar segue laranja')
     await ctx.close()
   })
 

@@ -45,7 +45,7 @@ export function acaoDoPix(situacaoCob, {
       return {
         rotuloEstado: 'Cobrança venceu',
         ...(bloqueado ? { motivo: MOTIVO_BLOQUEADO_AO_ENVIAR } : null),
-        botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix, desabilitado: bloqueado }],
+        botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix, desabilitado: bloqueado, secundario: true }],
       }
     case 'em-conferencia':
       return {

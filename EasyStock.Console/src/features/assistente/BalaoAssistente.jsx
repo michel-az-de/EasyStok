@@ -170,6 +170,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
 
   const sentimentoNotavel = sentimento && sentimento.classificacao !== 'neutro'
   const pedeAtencao = Boolean(cdc || foto || (sentimento && sentimento.classificacao === 'negativo'))
+  // #3381 (A2): o ponto vermelho é um alerta real; quem não o enxerga ouve o motivo (title e descrição do botão).
+  const motivosDoPonto = [cdc && 'direito do consumidor', foto && 'foto suspeita', sentimento?.classificacao === 'negativo' && 'cliente insatisfeito'].filter(Boolean)
+  const textoDoPonto = `Há um alerta nesta conversa: ${motivosDoPonto.join(', ')}. Abra o Assistente para ver.`
+  const idDoPonto = `${painelId}-ponto`
 
   function enviarPergunta(evento) {
     evento.preventDefault()
@@ -316,10 +320,12 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const gatilho = (
     <Botao
       ref={botaoRef}
-      // #1761 (L5): no cabeçalho da conversa é apoio, não o próximo passo: secundário.
-      variante={cabecalhoDoAtendimento ? 'secundario' : 'primario'}
+      // #1761 (L5), #3381: o Assistente nunca é o próximo passo; o laranja fica com a ação da tela (Abrir, Assumir, Enviar).
+      variante="secundario"
       className={cabecalhoDoAtendimento ? css.gatilhoNoCabecalho : css.gatilho}
       aria-label={aberto ? 'Fechar assistente' : 'Abrir assistente'}
+      title={!aberto && pedeAtencao ? textoDoPonto : undefined}
+      aria-describedby={!aberto && pedeAtencao ? idDoPonto : undefined}
       aria-expanded={aberto}
       aria-haspopup="dialog"
       aria-controls={aberto ? painelId : undefined}
@@ -329,7 +335,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           palavra diz o que o botão é. Nome acessível segue em `aria-label`. */}
       <Icone nome="agente" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
       <span className={css.rotuloGatilho}>Assistente</span>
-      {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
+      {!aberto && pedeAtencao && <><span className={css.pontoAtencao} aria-hidden="true" /><span id={idDoPonto} className="sr">{textoDoPonto}</span></>}
     </Botao>
   )
 
