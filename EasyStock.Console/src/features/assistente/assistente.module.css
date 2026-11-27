@@ -84,7 +84,7 @@
 .pega { cursor: move; touch-action: none; }
 
 .cabecalho {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap;
   padding: var(--e-3);
   flex-shrink: 0;
 }
@@ -94,7 +94,7 @@
 }
 .cabecalho h2 > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .contexto { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.identidade { min-width: 0; }
+.identidade { flex: 1 0 auto; max-width: 100%; min-width: 0; } /* #3386 (r7): o título é o último a encolher; se não cabe ao lado dos controles, eles descem para a linha de baixo. */
 .clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cabecalho > button { flex-shrink: 0; }
 .tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }

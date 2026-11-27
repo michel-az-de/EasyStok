@@ -89,13 +89,12 @@
 /* #1761 (L16): etiqueta de contexto que não cabe inteira some, em vez de cortar em "Automático
    não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
 .contextoLinha {
-  display: flex; flex-wrap: nowrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
+  display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
   font-size: var(--t-micro); line-height: 1.35; height: 1.75em; color: var(--tinta-3); white-space: nowrap; /* #3282: a pílula ganhou 3 px de respiro vertical; a fileira cresce junto */
 }
 
-/* #3386 (r6, H4): a fileira não quebra: o estado encolhe (reticência, o texto inteiro no title) para o "Pago" e o selo de
-   dinheiro aparecerem em toda largura, em vez de caírem para uma segunda fileira cortada. */
-.etiquetaEstado { flex-shrink: 1; min-width: 0; }
+/* #3386 (r7, H6): nenhum chip aparece cortado. O que não cabe inteiro na primeira fileira quebra para a segunda, que fica escondida;
+   o texto todo segue no `title` e no aria-label da linha. A ordem do DOM é a prioridade (dinheiro, depois o estado). */
 
 /* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
 .seloDinheiro { order: -1; }
