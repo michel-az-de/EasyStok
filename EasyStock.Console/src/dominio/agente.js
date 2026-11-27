@@ -135,6 +135,24 @@ const mensagemComPista = (conversa, teste, quantas = 3) => [...conversa.mensagen
 const falaRecenteDoCliente = (conversa, quantas = 3) => conversa.mensagens
   .filter((m) => m.dir === 'in').slice(-quantas).map((m) => normalizar(m.texto)).join(' ')
 
+// #3381: o que evitar, dito pela cliente, para o aviso dizer "Sem lactose" em vez de só "Restrição alimentar". Vale o item
+// dito por último nas falas recentes: "massa sem leite?" e depois "ela não pode lactose" fica com lactose. Sem item, null.
+const ROTULO_DO_ITEM = { gluten: 'glúten', celiac: 'glúten', laticinio: 'laticínio', crustace: 'crustáceo', camarao: 'camarão' }
+const PADRAO_ITEM = /\b(?:sem|alergi\w*\s+(?:a|ao|aos|as)?|alergic\w*\s+(?:a|ao|aos|as)?|nao\s+(?:pode|posso|podem|consigo|consegue)\s+(?:comer\s+|beber\s+|tomar\s+)?|nao\s+(?:come|como|comem|tolera|tolero)\s+)\s*(?:o\s+|a\s+)?(lactose|laticinio\w*|leite|gluten|ovo|amendoim|castanha\w*|crustace\w*|camarao|peixe|soja|trigo|carne|\w{4,})/g
+export function itemDaRestricao(conversa) {
+  const texto = falaRecenteDoCliente(conversa)
+  let achado = null
+  for (const [, palavra] of texto.matchAll(PADRAO_ITEM)) {
+    if (PALAVRAS_SEM_SEM_RESTRICAO.has(palavra)) continue
+    achado = palavra
+  }
+  const celiaca = texto.match(/celiac\w*/)
+  if (celiaca && (!achado || celiaca.index > texto.lastIndexOf(achado))) achado = 'celiac'
+  if (!achado) return null
+  const chave = Object.keys(ROTULO_DO_ITEM).find((k) => achado.startsWith(k))
+  return chave ? ROTULO_DO_ITEM[chave] : achado
+}
+
 // Itens do cardápio citados nas últimas falas do cliente e que estão sem
 // saldo. Exigir todas as palavras do nome juntas deixa passar apelido ou nome
 // parcial ("a de carne", "aquela lasanha"). Uma palavra-chave de 5+ letras já

@@ -286,6 +286,7 @@
 .modoLinha { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
 .modoLinha > :first-child { flex: 1 1 auto; min-width: 0; }
 .modoEstado { flex: none; }
+.modoLinha > .modoEstado { flex: none; } /* #3381: a pílula não cresce e o aviso de restrição cabe a 1280 */
 .modoTexto {
   flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);

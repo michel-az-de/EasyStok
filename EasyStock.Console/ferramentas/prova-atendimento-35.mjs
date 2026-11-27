@@ -317,6 +317,27 @@ for (const [tema, w, h] of [['light', 1440, 900], ['light', 1920, 1080], ['dark'
   await p.close()
 }
 
+// #3381 (r3 P1-3): o aviso de restrição alimentar do cabeçalho diz o item a evitar e não é cortado (a 1280 e 1440, com o
+// Assistente aberto, que é quando o cabeçalho mais aperta). Marcelo Teixeira: "ela não pode lactose".
+for (const w of [1280, 1440]) {
+  const p = await navegador.newPage({ viewport: { width: w, height: 800 } })
+  await p.goto(`${origem}/#/m/atendimento/balcao`, { timeout: 90000 })
+  await p.locator('main[aria-label="Atendimento"]').getByText('Marcelo Teixeira').first().click()
+  await p.locator('section[aria-label="Conversa com Marcelo Teixeira"]').waitFor({ timeout: 30000 })
+  await p.getByRole('button', { name: /Abrir assistente/i }).first().click()
+  await p.locator('section[role=dialog]').first().waitFor()
+  await p.mouse.move(0, 0)
+  await p.waitForTimeout(500)
+  const aviso = await p.evaluate(() => {
+    const e = [...document.querySelectorAll('[class*=modoTexto]')].find((x) => x.checkVisibility())
+    return e ? { texto: e.textContent.trim(), title: e.title, cortado: e.scrollHeight > e.clientHeight + 1 } : null
+  })
+  fixas.push([aviso !== null && /lactose/i.test(aviso.texto), `restrição ${w}: o aviso não diz o item a evitar: ${JSON.stringify(aviso)}`])
+  fixas.push([aviso !== null && !aviso.cortado, `restrição ${w}: o aviso do cabeçalho está cortado (scrollHeight > clientHeight): ${JSON.stringify(aviso)}`])
+  fixas.push([aviso !== null && /ficha do prato antes de responder/.test(aviso.title), `restrição ${w}: o motivo inteiro saiu do title: ${aviso?.title}`])
+  await p.close()
+}
+
 // r2 P1-3: numa conversa que o Assistente pode retomar (só o WhatsApp tem Assistente; a Renan é do Chat do site), assumida,
 // o Devolver fica à vista na conversa, além do ⋮.
 {
