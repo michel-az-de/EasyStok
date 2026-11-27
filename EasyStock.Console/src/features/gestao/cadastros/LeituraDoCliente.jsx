@@ -58,7 +58,7 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
     {leitura && <div className={css.leitura}>
       <div className={leitura.parada ? `${css.recencia} ${css.parada}` : css.recencia} data-recencia-da-ficha>
         <strong>{leitura.ultimaCompra ?? 'Sem data da última compra'}</strong>
-        {ritmo ? <small>{ritmo.texto}<span>{ritmo.apoio}</span></small> : leitura.parada ? <small>30 dias ou mais sem pedir</small> : null}
+        {ritmo ? <small>{ritmo.texto}<span className="sr">. </span><span>{ritmo.apoio}</span></small> : leitura.parada ? <small>30 dias ou mais sem pedir</small> : null}
       </div>
       <div className={css.estagio}>
         <span className={css.passos} role="img" aria-label={`Estágio ${leitura.posicao + 1} de 4: ${leitura.estagio}`}>
@@ -73,7 +73,7 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
         {leitura.reclamacaoResolvida && <span>{leitura.reclamacaoResolvida}</span>}
       </div>}
       {passo && <p className={leitura.reclamacaoAberta ? `${css.passo} ${css.passoUrgente}` : css.passo} data-passo-da-ficha>
-        <Icone nome={leitura.reclamacaoAberta ? 'alerta' : 'dica'} tamanho={18} /><span>{passo}</span>
+        <Icone nome={leitura.reclamacaoAberta ? 'alerta' : 'dica'} tamanho={20} /><span>{passo}</span>
       </p>}
     </div>}
     <div className={css.linha}>

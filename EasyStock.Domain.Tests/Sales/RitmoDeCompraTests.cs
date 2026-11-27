@@ -45,11 +45,11 @@ public class RitmoDeCompraTests
     [Fact]
     public void SoOsDozeDiasMaisRecentesEntram()
     {
-        // 15 dias: os 3 mais antigos distam 100 dias entre si; os 12 recentes são diários.
-        var antigos = new[] { -300, -200, -100 };
-        var recentes = Enumerable.Range(0, 12);
+        // 24 dias: os 12 antigos são diários; os 12 recentes, de 10 em 10. Só a janela recente dá mediana 10.
+        var antigos = Enumerable.Range(0, 12);
+        var recentes = Enumerable.Range(0, 12).Select(i => 100 + i * 10);
         var r = RitmoDeCompra.Calcular(EmDias(antigos.Concat(recentes).ToArray()));
-        r.Should().Be(new RitmoDeCompra(1, 12));
+        r.Should().Be(new RitmoDeCompra(10, 12));
     }
 
     [Fact]

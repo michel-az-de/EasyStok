@@ -58,6 +58,14 @@ public sealed class FichaClientePdfRendererTests
     }
 
     [Fact]
+    public async Task PedidoComItensDemaisParaUmaPaginaNaoQuebraOLayout()
+    {
+        var gigante = Ped("entregue", 1, 9000, Enumerable.Range(1, 600).Select(i => ($"Salgado sortido número {i}", 1m)).ToArray());
+        var bytes = await new FichaClientePdfRenderer().RenderAsync(Ficha(null) with { UltimosPedidos = [gigante] }, null, Consulta);
+        Assert.StartsWith("%PDF-", Encoding.Latin1.GetString(bytes));
+    }
+
+    [Fact]
     public async Task CancelamentoNaoGeraDocumento()
     {
         using var cancelamento = new CancellationTokenSource();
@@ -98,7 +106,7 @@ public sealed class FichaClientePdfRendererTests
         Assert.Contains("não informado", texto);
         foreach (var rotulo in new[] { "Compras", "Total comprado", "Ticket médio", "Última compra", "Contato e entrega", "Notas internas", "Pedidos recentes" })
             Assert.Contains(rotulo, texto);
-        Assert.Contains("Mostrando os 10 mais recentes de 25 pedidos", texto);
+        Assert.Contains("Os 10 pedidos mais recentes · 25 compras no total", texto);
         Assert.Contains("Cliente desde março de 2025", texto);
         Assert.Contains("há 2 dias", texto);
     }
@@ -106,7 +114,8 @@ public sealed class FichaClientePdfRendererTests
     [Fact]
     public async Task FraseDoRitmoSoApareceComRitmo()
     {
-        Assert.Contains("Pede a cada ~12 dias (mediana das últimas 8 compras)", await TextoDe(Ficha(new(12, 8))));
+        Assert.Contains("Pede a cada ~12 dias (mediana dos últimos 8 dias com compra)", await TextoDe(Ficha(new(12, 8))));
+        Assert.Contains("Pede todo dia (mediana dos últimos 3 dias com compra)", await TextoDe(Ficha(new(1, 3))));
         Assert.DoesNotContain("Pede a cada", await TextoDe(Ficha(null)));
     }
 
@@ -117,7 +126,7 @@ public sealed class FichaClientePdfRendererTests
         Assert.Contains("Cancelado", texto);
         Assert.Contains("Aguardando pagamento", texto);
         Assert.Contains("Saiu para entrega", texto);
-        Assert.DoesNotContain("_", texto.Replace("sem_gluten", ""));
+        Assert.DoesNotContain("_", texto);
     }
 
     [Fact]
@@ -137,9 +146,21 @@ public sealed class FichaClientePdfRendererTests
         Assert.DoesNotContain("Atenção", await TextoDe(Ficha(null)));
     }
 
+    [Theory]
+    [InlineData("11999999999", "(11) 99999-9999")]
+    [InlineData("+5511999999999", "(11) 99999-9999")]
+    [InlineData("1133334444", "(11) 3333-4444")]
+    [InlineData("+1 415 555 0100", "+1 415 555 0100")]
+    public async Task TelefoneSaiComMascaraNoPapel(string gravado, string impresso)
+    {
+        var ficha = Ficha(null);
+        var texto = await TextoDe(ficha with { Cliente = ficha.Cliente with { Telefone = gravado } });
+        Assert.Contains(impresso, texto);
+    }
+
     [Fact]
     public async Task SemCaixaDeAtencaoQuandoNaoHaNadaParaAvisar_TagsFicamNoContato()
     {
-        Assert.Contains("Tags: sem_gluten", await TextoDe(Ficha(null)));
+        Assert.Contains("Tags: sem gluten", await TextoDe(Ficha(null)));
     }
 }

@@ -73,7 +73,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
                 row.RelativeItem().Column(info =>
                 {
                     info.Item().Text(nome).FontSize(22).SemiBold();
-                    info.Item().PaddingTop(2).Text($"{Ou(dossie.Cliente.Telefone)} · {Ou(dossie.Cliente.Email)}").FontSize(10);
+                    info.Item().PaddingTop(2).Text($"{Ou(TelefoneNoPapel(dossie.Cliente.Telefone))} · {Ou(dossie.Cliente.Email)}").FontSize(10);
                     var desde = dossie.PrimeiraCompraEm is { } primeira ? $"Cliente desde {NaFuso(primeira).ToString("MMMM 'de' yyyy", PtBr)} · " : "";
                     info.Item().PaddingTop(2).Text($"{desde}Emitida em {Data(consultaEm)}").FontSize(9).FontColor(Suave);
                 });
@@ -128,7 +128,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
 
         var fatos = new List<string>();
         if (dossie.Ritmo is { } ritmo)
-            fatos.Add($"Pede a cada ~{ritmo.MedianaDias} dias (mediana das últimas {ritmo.ComprasAnalisadas} compras)");
+            fatos.Add($"{(ritmo.MedianaDias == 1 ? "Pede todo dia" : $"Pede a cada ~{ritmo.MedianaDias} dias")} (mediana dos últimos {ritmo.ComprasAnalisadas} dias com compra)");
         if (dossie.ItemFavorito is { } fav)
             fatos.Add($"Mais pedido: {fav.Nome} ({fav.Pedidos} {(fav.Pedidos == 1 ? "pedido" : "pedidos")})");
         if (dossie.Preferencias is { } pref)
@@ -160,7 +160,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
         }
         if (dossie.Enderecos.Count == 0) col.Item().PaddingBottom(6).Text("Nenhum endereço cadastrado.").FontColor(Suave);
         Campo(col, "Observações", dossie.Cliente.Observacoes);
-        if (dossie.Tags.Count > 0) Campo(col, "Tags", string.Join(" · ", dossie.Tags.Select(t => t.Tag)));
+        if (dossie.Tags.Count > 0) Campo(col, "Tags", string.Join(" · ", dossie.Tags.Select(t => t.Tag.Replace('_', ' '))));
     }
 
     private static void Notas(ColumnDescriptor col, DossieClienteDto dossie)
@@ -191,7 +191,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
         var n = dossie.UltimosPedidos.Count;
         var legenda = dossie.TotalPedidos <= n
             ? $"{n} {(n == 1 ? "pedido" : "pedidos")}"
-            : $"Mostrando os {n} mais recentes de {dossie.TotalPedidos} pedidos";
+            : $"Os {n} pedidos mais recentes · {dossie.TotalPedidos} compras no total";
         col.Item().PaddingBottom(4).Text(legenda).FontSize(9).FontColor(Suave);
         col.Item().Table(tabela =>
         {
@@ -229,7 +229,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
 
     private static void Celula(IContainer c, string texto, string cor, string fundo, bool direita, bool negrito = false)
     {
-        var x = c.ShowEntire().Background(fundo).PaddingVertical(4).PaddingHorizontal(4);
+        var x = c.Background(fundo).PaddingVertical(4).PaddingHorizontal(4);
         var t = (direita ? x.AlignRight() : x).Text(texto).FontSize(9.5f).FontColor(cor);
         if (negrito) t.SemiBold();
     }
@@ -249,6 +249,20 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
     {
         if (string.IsNullOrWhiteSpace(valor)) return;
         col.Item().PaddingBottom(6).Text(t => { t.Span(nome + ": ").SemiBold(); t.Span(valor); });
+    }
+
+    /// <summary>Mesma máscara da tela (mascaraTelefone do Console): <c>+5511999999999</c> vira <c>(11) 99999-9999</c>.
+    /// Número de fora do Brasil ou fora do tamanho sai como foi gravado.</summary>
+    private static string? TelefoneNoPapel(string? telefone)
+    {
+        if (string.IsNullOrWhiteSpace(telefone)) return telefone;
+        var bruto = telefone.Trim();
+        var digitos = new string(bruto.Where(char.IsAsciiDigit).ToArray());
+        if (bruto.StartsWith('+') && !digitos.StartsWith("55")) return bruto;
+        if (digitos.Length is 12 or 13 && digitos.StartsWith("55")) digitos = digitos[2..];
+        if (digitos.Length is not (10 or 11)) return bruto;
+        var linha = digitos.Length == 11 ? 5 : 4;
+        return $"({digitos[..2]}) {digitos.Substring(2, linha)}-{digitos[(2 + linha)..]}";
     }
 
     private static string Ou(string? valor) => string.IsNullOrWhiteSpace(valor) ? NaoInformado : valor.Trim();

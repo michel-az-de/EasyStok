@@ -17,8 +17,8 @@ const caso = (nome, corpo) => { try { corpo(); console.log(`ok    ${nome}`) } ca
 const agora = Date.parse('2026-11-25T15:00:00Z')
 
 caso('ritmo vem da API e só aparece com amostra', () => {
-  assert.deepEqual(ritmoDoCliente({ dias: 14, compras: 6 }), { texto: 'Pede a cada ~14 dias', apoio: 'mediana das últimas 6 compras' })
-  assert.deepEqual(ritmoDoCliente({ dias: 1, compras: 3 }), { texto: 'Pede todo dia', apoio: 'mediana das últimas 3 compras' })
+  assert.deepEqual(ritmoDoCliente({ dias: 14, compras: 6 }), { texto: 'Pede a cada ~14 dias', apoio: 'mediana dos últimos 6 dias com compra' })
+  assert.deepEqual(ritmoDoCliente({ dias: 1, compras: 3 }), { texto: 'Pede todo dia', apoio: 'mediana dos últimos 3 dias com compra' })
   for (const r of [null, undefined, {}, { dias: 0, compras: 5 }, { dias: 9, compras: 2 }]) assert.equal(ritmoDoCliente(r), null)
 })
 caso('última compra parada há 30 dias ou mais fica destacada; antes disso não', () => {

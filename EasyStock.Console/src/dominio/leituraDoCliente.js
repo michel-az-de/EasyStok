@@ -7,7 +7,7 @@ import { estagioDoCliente, posicaoDoEstagio, diasDesde } from './relacionamento'
 export const ESTAGIOS_DA_LEITURA = Object.freeze(['Sem pedido', 'Primeira compra', 'Recorrente', 'Fiel'])
 // #3387: 30 dias sem pedir é o mesmo marco do "Em risco" da API (RegraDeRecompra). Aqui não vira rótulo nem sinal
 // novo (o sinal é da API, spec 3237): só destaca o fato "pediu há N dias" para quem olha.
-const DIAS_PARADA = 30
+export const DIAS_PARADA = 30
 
 export const textoDosDias = (d) => (d === 0 ? 'hoje' : d === 1 ? 'há 1 dia' : `há ${d} dias`)
 
@@ -47,5 +47,5 @@ export function proximoPassoDoCliente(leitura) {
 export function ritmoDoCliente(ritmo) {
   const dias = Number(ritmo?.dias), compras = Number(ritmo?.compras)
   if (!Number.isInteger(dias) || dias < 1 || !Number.isInteger(compras) || compras < 3) return null
-  return { texto: dias === 1 ? 'Pede todo dia' : `Pede a cada ~${dias} dias`, apoio: `mediana das últimas ${compras} compras` }
+  return { texto: dias === 1 ? 'Pede todo dia' : `Pede a cada ~${dias} dias`, apoio: `mediana dos últimos ${compras} dias com compra` }
 }
