@@ -21,6 +21,12 @@ assert.equal(itemDaRestricao(fala('meu neto não pode comer amendoim')), 'amendo
 assert.equal(itemDaRestricao(fala('tenho alergia a camarão')), 'camarão')
 assert.equal(itemDaRestricao(fala('Quanto custa a lasanha?')), null)
 assert.equal(itemDaRestricao(fala('Claro, sem pressa')), null)
+// Revisão da #3381: lista fechada; palavra livre não vira item, "sem" pede espaço, e o item dito lá atrás ainda vale.
+assert.equal(itemDaRestricao(fala('não consigo abrir o link')), null)
+assert.equal(itemDaRestricao(fala('não posso esperar')), null)
+assert.equal(itemDaRestricao(fala('no semestre que vem')), null)
+assert.equal(itemDaRestricao(fala('não pode ingerir lactose')), 'lactose')
+assert.equal(itemDaRestricao(fala('ela é alérgica a camarão', 'ok', 'pode ser às 19h', 'e o pix?')), 'camarão')
 
 assert.equal(avisoDeRestricao('lactose').texto, 'Sem lactose: confira a ficha do prato')
 assert.match(avisoDeRestricao('lactose').detalhe, /^Restrição alimentar, confira a ficha do prato antes de responder/)

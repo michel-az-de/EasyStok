@@ -80,10 +80,8 @@ function formaCurta(palavras, ehEmpresa) {
   const [primeira, ...resto] = palavras.filter((p, i) => i === 0 || !PARTICULAS.has(p.toLowerCase()))
   const ultima = resto.at(-1)
   if (!ultima) return primeira
-  const abrevia = ehEmpresa
-    ? ultima.length > LIMITE_DA_PALAVRA_DE_EMPRESA
-    : ultima.length > 1
-  if (!abrevia) return `${primeira} ${ultima}`
+  // Revisão da #3381: empresa não vira inicial ("Padaria Q." perdia o nome); fica inteira e o CSS corta com reticências.
+  if (ehEmpresa || ultima.length <= 1) return `${primeira} ${ultima}`
   // #3381: uma regra só, primeiro nome inteiro e inicial do último; o que ainda não couber, o CSS corta com reticências.
   return `${primeira} ${ultima[0].toUpperCase()}.`
 }

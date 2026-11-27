@@ -276,7 +276,7 @@ function PainelDaConversa({
               o menu conforme a conversa (#2185: a ordem dependia de quem montou por último). */}
           {modoNoCabecalho && barraModo}
           {/* #3381 (A4): no desktop o cardápio sai do ⋮ e fica à vista, em contorno (o laranja é da ação da tela). */}
-          {cardapioNoCabecalho && <Botao variante="secundario" className={css.cardapioNoCabecalho} onClick={() => abrirModal('cardapio')}>
+          {cardapioNoCabecalho && <Botao variante="secundario" className={css.cardapioNoCabecalho} aria-haspopup="dialog" onClick={() => abrirModal('cardapio')}>
             <Icone nome="cardapio" tamanho={20} /><span className={css.rotuloCardapio}>Enviar cardápio</span>
           </Botao>}
           <span className={css.ancoraAssistente} data-ancora-assistente />

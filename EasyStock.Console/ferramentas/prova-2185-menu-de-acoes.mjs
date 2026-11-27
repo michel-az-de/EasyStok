@@ -168,7 +168,13 @@ try {
     assert.equal(await botao.count(), 1)
     assert.equal(await botao.isVisible(), true)
     const fundo = await botao.evaluate((el) => getComputedStyle(el).backgroundColor)
+    assert.equal(await botao.getAttribute('aria-haspopup'), 'dialog')
     assert.ok(/rgba\(0, 0, 0, 0\)|transparent/.test(fundo) || fundo !== await p.evaluate(() => { const s = document.createElement('i'); s.style.background = 'var(--acao)'; document.body.append(s); const c = getComputedStyle(s).backgroundColor; s.remove(); return c }), 'não pode ser laranja: ' + fundo)
+    // Revisão da #3381: em 600 o botão sai do cabeçalho e o cardápio volta ao ⋮ (segue acessível no celular).
+    await p.setViewportSize({ width: 600, height: 900 })
+    await p.waitForTimeout(300)
+    assert.equal(await botao.count(), 0)
+    assert.ok((await itensDoMenu(p)).includes('Enviar cardápio'), 'em 600 o cardápio volta ao ⋮')
     await ctx.close()
   })
 

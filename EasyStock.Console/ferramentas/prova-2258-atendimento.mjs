@@ -71,9 +71,9 @@ caso('T5  nome completo: forma curta é o primeiro nome e a inicial do último s
   assert.equal(apresentacaoDoNome('Ana B').curto, 'Ana B', 'a forma curta nunca é maior que o nome')
 })
 
-caso('T5  empresa: abrevia a última palavra, sem a forma legal', () => {
+caso('T5  empresa: com forma legal fica inteira (sem a forma legal); sem ela é a regra de pessoa', () => {
   assert.equal(apresentacaoDoNome('Notelet Eletrônicos').curto, 'Notelet E.')
-  assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').curto, 'Notelet E.')
+  assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').curto, 'Notelet Eletrônicos')
   assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').completo, 'Notelet Eletrônicos Ltda')
   assert.equal(apresentacaoDoNome('Casa Verde Ltda').curto, 'Casa Verde', 'palavra curta não abrevia')
   assert.equal(apresentacaoDoNome('Notelet Eletrônicos').capsula, null)

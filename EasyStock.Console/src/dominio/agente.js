@@ -137,10 +137,12 @@ const falaRecenteDoCliente = (conversa, quantas = 3) => conversa.mensagens
 
 // #3381: o que evitar, dito pela cliente, para o aviso dizer "Sem lactose" em vez de só "Restrição alimentar". Vale o item
 // dito por último nas falas recentes: "massa sem leite?" e depois "ela não pode lactose" fica com lactose. Sem item, null.
-const ROTULO_DO_ITEM = { gluten: 'glúten', celiac: 'glúten', laticinio: 'laticínio', crustace: 'crustáceo', camarao: 'camarão' }
-const PADRAO_ITEM = /\b(?:sem|alergi\w*\s+(?:a|ao|aos|as)?|alergic\w*\s+(?:a|ao|aos|as)?|nao\s+(?:pode|posso|podem|consigo|consegue)\s+(?:comer\s+|beber\s+|tomar\s+)?|nao\s+(?:come|como|comem|tolera|tolero)\s+)\s*(?:o\s+|a\s+)?(lactose|laticinio\w*|leite|gluten|ovo|amendoim|castanha\w*|crustace\w*|camarao|peixe|soja|trigo|carne|\w{4,})/g
+const ROTULO_DO_ITEM = { gluten: 'glúten', celiac: 'glúten', laticinio: 'laticínio', crustace: 'crustáceo', camarao: 'camarão', castanha: 'castanha' }
+// Revisão da #3381: só itens de uma lista fechada; palavra livre depois de "não posso" virava "Sem abrir", "Sem esperar".
+const PADRAO_ITEM = /\b(?:sem\s+|alergi\w*\s+(?:a|ao|aos|as)?\s*|alergic\w*\s+(?:a|ao|aos|as)?\s*|nao\s+(?:pode|posso|podem|consigo|consegue)\s+(?:comer\s+|beber\s+|tomar\s+|ingerir\s+)?|nao\s+(?:come|como|comem|tolera|tolero)\s+)(?:o\s+|a\s+)?(lactose|laticinio\w*|leite|gluten|ovos?|amendoim|castanhas?|crustace\w*|camarao|peixe|soja|trigo|carne)\b/g
 export function itemDaRestricao(conversa) {
-  const texto = falaRecenteDoCliente(conversa)
+  // Todas as falas do cliente recebidas (o chamador já corta na reabertura): "alérgica a camarão" lá atrás ainda vale.
+  const texto = (conversa.mensagens ?? []).filter((m) => m.dir === 'in').map((m) => normalizar(m.texto)).join(' ')
   let achado = null
   for (const [, palavra] of texto.matchAll(PADRAO_ITEM)) {
     if (PALAVRAS_SEM_SEM_RESTRICAO.has(palavra)) continue
