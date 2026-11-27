@@ -32,6 +32,7 @@
   .rotuloCardapio { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .ancoraAssistente:empty { display: none; }
+.reservaDoMenu { flex: none; width: var(--toque); height: var(--toque); }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
