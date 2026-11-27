@@ -574,7 +574,7 @@ function ConteudoMoldura({
     return (
       <div className={css.app}>
         {cabecalho}
-        <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
+        <main className={css.palco} tabIndex={-1} data-inicio-tela data-palco-tablet="" id="conteudo-principal" aria-label="Atendimento">
           <Coluna variante="entrada" titulo="Conversas" semTitulo>
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
