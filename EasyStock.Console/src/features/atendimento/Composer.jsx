@@ -360,7 +360,7 @@ export function Composer({
               esquerda, o campo numa pílula que cresce com o texto, o enviar
               (ou o microfone, com o campo vazio) redondo à direita. A .caixa
               só agrupa; a .acoes some do layout no CSS. */}
-          <div className={`${css.caixa} ${acoes.enxuta ? css.caixaEnxuta : ''}`}>
+          <div className={`${css.caixa} ${acoes.enxuta ? css.caixaEnxuta : ''}`} data-antes-de-assumir={enviaAssumindo || undefined}>
             <div ref={campoRef}>
               <CampoArea
                 rotulo="Mensagem para o cliente"

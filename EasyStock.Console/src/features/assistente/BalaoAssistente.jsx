@@ -244,8 +244,14 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
     raiz.dataset.assistenteEmpurra = ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
-    if (encaixadoTablet) raiz.dataset.assistenteTablet = ''
+    if (encaixadoTablet) {
+      raiz.dataset.assistenteTablet = ''
+      // #3386 (r5 P2-6): o painel não sobe além do topo do palco (a barra de navegação fica por cima dele).
+      const palco = document.querySelector('[data-palco-tablet]')
+      if (palco) raiz.style.setProperty('--assistente-topo-palco', `${Math.round(palco.getBoundingClientRect().top)}px`)
+    }
     return () => {
+      raiz.style.removeProperty('--assistente-topo-palco')
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
       raiz.style.removeProperty('--assistente-conversa-minima')
@@ -409,6 +415,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
             {selecionada && (
               <>
                 <p className={css.contexto}>Revise as sugestões. Cada ação só acontece quando você confirma.</p>
+
+                {/* #3386 (r5 P2-10): o aviso de "sem resposta" vem antes dos cartões, à vista ao abrir o painel. */}
+                {sugestaoAgente}
+
                 <div className={css.cartoes}>
                   {cliente && !dispensados.has('cliente') && (
                     <CartaoCliente dado={cliente} aoDispensar={(e) => dispensar('cliente', e)} />
@@ -430,10 +440,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   )}
                 </div>
 
-                {sugestaoAgente}
-
                 <div className={css.perguntas}>
-                  <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
                   {trocas.length > 0 && (
                     <div className={css.trocas}>
                       {trocas.map((t) => (
@@ -468,6 +475,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
             )}
           </div>
           {selecionada && (
+            <div className={css.rodapePergunta}>
+            {/* #3386 (r5 P2-9): o rótulo mora fora da rolagem, junto do campo, e nunca fica cortado sob ele. */}
+            <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
             <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
               <CampoArea
                 ref={campoRef}
@@ -490,6 +500,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
               />
             </form>
+            </div>
           )}
           </div>
           {ladoEfetivo !== 'direita' && alca}

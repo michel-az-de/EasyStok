@@ -15,7 +15,7 @@ function Cartao({ icone, titulo, tom, aoDispensar, children }) {
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
       <div className={css.cartaoTopo}>
         <h3><Icone nome={icone} tamanho={20} /> {titulo}</h3>
-        <BotaoIcone rotulo={`Dispensar ${titulo.toLowerCase()}`} dica="Ok, entendi" icone="check" onClick={aoDispensar} />
+        <BotaoIcone rotulo={`Dispensar ${titulo.toLowerCase()}`} icone="x" onClick={aoDispensar} />
       </div>
       <div className={css.cartaoCorpo}>{children}</div>
     </article>

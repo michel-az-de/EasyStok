@@ -71,6 +71,8 @@
 :global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
 :global(html[data-assistente-tablet] #conteudo-principal[data-palco-tablet] > section[aria-label='Conversas']) { display: none; }
 :global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet] ~ footer) { padding-left: calc(var(--assistente-reserva-esquerda, 0px) + var(--e-4)); }
+/* #3386 (r5 P2-6): no tablet o painel não passa do topo do palco (variável medida em BalaoAssistente). */
+:global(html[data-assistente-tablet]) .painel { max-height: min(720px, calc(100dvh - 56px - var(--e-4) - var(--e-2) - var(--assistente-topo-palco, 0px))); }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
 .posicoes { display: flex; align-items: center; gap: var(--e-1); margin: 0 0 0 auto; padding: 0; border: 0; min-width: 0; flex-shrink: 0; }
 .botaoPosicao {
@@ -162,7 +164,8 @@
 .acaoBotao { flex-shrink: 0; }
 .acaoFeita { display: flex; align-items: center; gap: var(--e-1); flex-shrink: 0; font-size: var(--t-apoio); color: var(--sucesso); }
 
-.formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-3); flex-shrink: 0; }
+.rodapePergunta { flex-shrink: 0; padding: var(--e-2) var(--e-3) 0; }
+.formPergunta { display: flex; align-items: flex-start; gap: var(--e-2); padding: var(--e-2) 0 var(--e-3); }
 .formPergunta > div { flex: 1; min-width: 0; }
 .campoPergunta { min-height: 64px; max-height: 160px; resize: vertical; }
 .botaoEnviar { flex-shrink: 0; }
