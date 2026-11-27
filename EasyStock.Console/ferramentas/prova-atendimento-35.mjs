@@ -31,8 +31,9 @@ const ESCALA = [4, 8, 12, 16, 24, 32] // --e-1..--e-6
 const ESTADOS_PERMITIDOS = 5 // fundos de estado (sucesso, alerta, erro, info, entregue) somados às 3 superfícies
 
 // Roda no navegador: recebe a escala e devolve as 8 medidas.
-function medir({ escala }) {
-  const raizes = [document.querySelector('main[aria-label="Atendimento"]'), ...document.querySelectorAll('section[role=dialog]')].filter(Boolean)
+function medir({ escala, inteira = false }) {
+  // `inteira` (#3381): a página toda, para contar o laranja do botão flutuante do Assistente, que mora fora do <main>.
+  const raizes = inteira ? [document.body] : [document.querySelector('main[aria-label="Atendimento"]'), ...document.querySelectorAll('section[role=dialog]')].filter(Boolean)
   const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
   ctx.canvas.width = ctx.canvas.height = 1
   const rgba = (css) => {
@@ -281,6 +282,38 @@ const foco = await p.evaluate(() => document.activeElement?.getAttribute('aria-l
 fixas.push([fechou && foco === 'Abrir assistente', `${nome}: Esc ${fechou ? 'fechou' : 'não fechou'}, foco em "${foco}" (esperado "Abrir assistente")`])
 }
 medidas.push({ condicao: nome, ...c, ...m, laranjasPorEstado: porEstado, errosDePagina: erros })
+  await p.close()
+}
+
+// #3381 (r3 P1-1): um laranja por estado também (a) na conversa com pedido aguardando pagamento (Assumir x Reenviar cobrança)
+// e (b) na tela inicial sem conversa aberta (Abrir <cliente> x botão Assistente). Claro/escuro x 1440/1920 e 1280.
+for (const [tema, w, h] of [['light', 1440, 900], ['light', 1920, 1080], ['dark', 1440, 900], ['dark', 1920, 1080], ['light', 1280, 800]]) {
+  const rotulo = `${tema === 'light' ? 'claro' : 'escuro'}-${w}`
+  const p = await navegador.newPage({ viewport: { width: w, height: h } })
+  await p.goto(`${origem}/#/m/atendimento/balcao`, { timeout: 90000 })
+  await p.evaluate((t) => { document.documentElement.dataset.theme = t }, tema)
+  const abrir = p.locator('main[aria-label="Atendimento"]').getByRole('button', { name: /^Abrir .+/ })
+  await abrir.first().waitFor({ timeout: 30000 })
+  await p.waitForTimeout(600)
+  const inicio = (await p.evaluate(medir, { escala: ESCALA, inteira: true })).laranjas
+  fixas.push([inicio.n === 1, `${rotulo} tela inicial: ${inicio.n} laranjas (esperado 1, o Abrir): ${inicio.itens.join(' | ')}`])
+  // Sandra Yamashita: pix aguardando pagamento e conversa ainda de ninguém (a lista de `Abrir` só tem o do vazio).
+  await p.locator('main[aria-label="Atendimento"]').getByText('Sandra Yamashita').first().click()
+  await p.locator('section[aria-label="Conversa com Sandra Yamashita"]').waitFor({ timeout: 30000 })
+  await p.waitForTimeout(400)
+  const achou = (await p.getByRole('button', { name: 'Reenviar cobrança' }).count()) > 0 && (await p.getByRole('button', { name: /^Assumir conversa/ }).count()) > 0
+  fixas.push([achou, `${rotulo}: nenhuma conversa da demonstração tem pedido aguardando pagamento e ainda não assumida`])
+  if (achou) {
+    await p.waitForTimeout(400)
+    const comPedido = (await p.evaluate(medir, { escala: ESCALA, inteira: true })).laranjas
+    fixas.push([comPedido.n === 1 && comPedido.itens.some((t) => t.includes('Assumir')), `${rotulo} pedido a pagar, não assumida: ${comPedido.n} laranjas (esperado 1, o Assumir): ${comPedido.itens.join(' | ')}`])
+    await p.evaluate(() => document.activeElement?.blur())
+    await p.keyboard.press('a')
+    await p.getByRole('button', { name: /^Assumir conversa/ }).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await p.waitForTimeout(300)
+    const assumida = (await p.evaluate(medir, { escala: ESCALA, inteira: true })).laranjas
+    fixas.push([assumida.n <= 1, `${rotulo} pedido a pagar, assumida: ${assumida.n} laranjas (esperado no máximo 1): ${assumida.itens.join(' | ')}`])
+  }
   await p.close()
 }
 
