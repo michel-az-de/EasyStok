@@ -84,9 +84,8 @@ function formaCurta(palavras, ehEmpresa) {
     ? ultima.length > LIMITE_DA_PALAVRA_DE_EMPRESA
     : ultima.length > 1
   if (!abrevia) return `${primeira} ${ultima}`
-  const emPessoa = ultima.length >= 8 || ehEmpresa
-  // Empresa e palavra longa mantêm o começo ("Eletr."); sobrenome vira inicial ("R.").
-  return emPessoa ? `${primeira} ${ultima.slice(0, 5)}.` : `${primeira} ${ultima[0].toUpperCase()}.`
+  // #3381: uma regra só, primeiro nome inteiro e inicial do último; o que ainda não couber, o CSS corta com reticências.
+  return `${primeira} ${ultima[0].toUpperCase()}.`
 }
 
 export function apresentacaoDoNome(nome, { comanda = null } = {}) {

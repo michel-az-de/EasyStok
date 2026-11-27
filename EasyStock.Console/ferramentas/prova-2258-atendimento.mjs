@@ -72,8 +72,8 @@ caso('T5  nome completo: forma curta é o primeiro nome e a inicial do último s
 })
 
 caso('T5  empresa: abrevia a última palavra, sem a forma legal', () => {
-  assert.equal(apresentacaoDoNome('Notelet Eletrônicos').curto, 'Notelet Eletr.')
-  assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').curto, 'Notelet Eletr.')
+  assert.equal(apresentacaoDoNome('Notelet Eletrônicos').curto, 'Notelet E.')
+  assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').curto, 'Notelet E.')
   assert.equal(apresentacaoDoNome('Notelet Eletrônicos Ltda').completo, 'Notelet Eletrônicos Ltda')
   assert.equal(apresentacaoDoNome('Casa Verde Ltda').curto, 'Casa Verde', 'palavra curta não abrevia')
   assert.equal(apresentacaoDoNome('Notelet Eletrônicos').capsula, null)
@@ -118,7 +118,7 @@ caso('T5  emoji no fim fica no fim e não conta na abreviação', () => {
   assert.equal(a.curto, 'Thais R. 🦋')
   assert.equal(a.capsula, null)
   assert.equal(apresentacaoDoNome('Thais ❤️').capsula?.texto, 'Completar nome', 'o emoji não faz segunda palavra')
-  assert.equal(apresentacaoDoNome('Notelet Eletrônicos 🏪').curto, 'Notelet Eletr. 🏪')
+  assert.equal(apresentacaoDoNome('Notelet Eletrônicos 🏪').curto, 'Notelet E. 🏪')
 })
 
 caso('T5  sem nenhum nome: "Contato" e cápsula "Sem nome"', () => {
