@@ -35,7 +35,7 @@
 /* #3386 (r7, H4): em altura de notebook (800 a 920 px) os 12 itens mais a Ajuda não cabiam e Disposição, Lembretes e Simular
    ficavam atrás de uma rolagem sem barra. O item perde o respiro vertical e a altura de folga (o conteúdo já passa de --toque). */
 @media (max-height: 920px) {
-  .item, .filhos > button, .filhos > div > button { min-height: var(--toque); padding: 2px 0; gap: 1px; }
+  .item, .filhos > button, .filhos > div > button { min-height: var(--toque); padding: var(--e-1) 0; gap: 0; }
 }
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {

@@ -122,8 +122,12 @@ export function pilulasDaLinha(estado, etiqueta, contexto) {
     .map((item, i) => ({ item, i }))
     .sort((a, b) => pesoDaPilula(a.item) - pesoDaPilula(b.item) || a.i - b.i)
     .map(({ item }) => item)
-    .filter((item) => { const t = item.texto?.trim().toLowerCase(); if (vistos.has(t)) return false; vistos.add(t); return true })
+    .filter((item) => { const t = item.texto?.trim().toLowerCase(); if (!t) return true; if (vistos.has(t)) return false; vistos.add(t); return true })
 }
+
+// #3386 (revisão): altura da linha de contexto a reservar quando o cartão fica atenuado. Sem linha, ou sem DOM real
+// (prova de render sem navegador), a reserva é zero.
+export const medidaDaLinha = (el) => (typeof el?.getBoundingClientRect === 'function' ? el.getBoundingClientRect().height : 0)
 
 export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
 

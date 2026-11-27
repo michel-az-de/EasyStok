@@ -3,7 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
-import { apresentacaoDoModo } from '../../dominio/resumoDoModo'
+import { apresentacaoDoModo, partesDoAvisoDeRestricao } from '../../dominio/resumoDoModo'
 import { useAssumirSemRepetir } from './useAssumirSemRepetir'
 import css from './atendimento.module.css'
 
@@ -67,10 +67,10 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
         {!faixa && (
           <p
             className={!mostrarLinha ? 'sr' : resumo.motivo === 'restricao' ? `${css.modoTexto} ${css.modoTextoAviso}` : css.modoTexto}
-            title={linha === resumo.linha ? resumo.detalhe : linha}
+            title={(linha === resumo.linha && resumo.detalhe) || linha}
           >
             {mostrarLinha && resumo.motivo === 'restricao'
-              ? <><span className={css.modoEssencial}><Icone nome="alerta" className={css.modoTextoIcone} />{linha.split(': ')[0]}</span>{linha.includes(': ') && <span className={css.modoResto}>{`: ${linha.split(': ').slice(1).join(': ')}`}</span>}</>
+              ? <><span className={css.modoEssencial}><Icone nome="alerta" className={css.modoTextoIcone} />{partesDoAvisoDeRestricao(linha).essencial}</span>{partesDoAvisoDeRestricao(linha).resto && <span className={css.modoResto}>{partesDoAvisoDeRestricao(linha).resto}</span>}</>
               : linha}
           </p>
         )}

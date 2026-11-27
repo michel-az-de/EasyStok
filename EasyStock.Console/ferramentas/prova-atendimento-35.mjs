@@ -275,7 +275,6 @@ fixas.push([conversaLargura !== null && conversaLargura >= 560, `${nome}: conver
 fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1, `${nome}: conversa termina em ${folga?.conversaFim}, painel começa em ${folga?.esq}`])
 fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), `${nome}: rolagem horizontal da página (${largura} px)`])
 // #3386 (r8 P2-2): sem espaço no cabeçalho (menos de 24 rem) a dica "Esc" sai e o X fica com o nome "Fechar (Esc)".
-const cabLargura = await p.evaluate(() => document.querySelector('section[role=dialog] [class*=cabecalho]')?.clientWidth ?? 0)
 const escVisivel = await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible()
 // #3386 (r9): uma regra só em toda largura: o texto "Esc" não aparece e o X visível se chama "Fechar (Esc)".
     fixas.push([!escVisivel && await p.getByRole('button', { name: 'Fechar (Esc)' }).first().isVisible(), `${nome}: X nomeado "Fechar (Esc)" visível e sem a dica "Esc" solta`])

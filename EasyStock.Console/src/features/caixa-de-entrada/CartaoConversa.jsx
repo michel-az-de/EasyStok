@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { Avatar } from '../../componentes/Avatar'
@@ -16,7 +16,7 @@ import { horaMono } from '../../dominio/formato'
 import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, pilulasDaLinha } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, pilulasDaLinha, medidaDaLinha } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
@@ -91,7 +91,13 @@ export const CartaoConversa = memo(function CartaoConversa({
   // a altura da linha de contexto de antes e a mantém enquanto estiver atenuado, para nenhum cartão se deslocar.
   const linhaRef = useRef(null)
   const alturaDaLinha = useRef(0)
-  useLayoutEffect(() => { if (!atenuado && typeof linhaRef.current?.getBoundingClientRect === 'function') alturaDaLinha.current = linhaRef.current.getBoundingClientRect().height })
+  useLayoutEffect(() => { if (!atenuado) alturaDaLinha.current = medidaDaLinha(linhaRef.current) })
+  // Mudou a largura da janela: a medida guardada deixa de valer e é descartada.
+  useEffect(() => {
+    const descartar = () => { alturaDaLinha.current = 0 }
+    window.addEventListener('resize', descartar)
+    return () => window.removeEventListener('resize', descartar)
+  }, [])
   const reservaAltura = atenuado && alturaDaLinha.current > 0 ? alturaDaLinha.current : null
 
   return (

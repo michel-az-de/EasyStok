@@ -15,8 +15,10 @@ import css from './assistente.module.css'
 // Senão dois cartões empurravam o campo de pergunta e cortavam o perfil sob ele (1024x768 e 1280x800).
 const TELA_BAIXA = '(max-height: 899px)'
 const abrirRecolhido = () => typeof window !== 'undefined' && window.matchMedia?.(TELA_BAIXA).matches
-function Cartao({ icone, titulo, tom, aoDispensar, resumo, children }) {
-  const [aberto, setAberto] = useState(() => !abrirRecolhido())
+// #3386 (revisão): cartão de alerta (tom negativo, dica do CDC, foto sem análise) nunca abre recolhido; recolhido à mão,
+// o resumo diz o estado em texto (a cor sozinha não basta, WCAG 1.4.1).
+function Cartao({ icone, titulo, tom, aoDispensar, resumo, alerta = false, children }) {
+  const [aberto, setAberto] = useState(() => alerta || !abrirRecolhido())
   const idCorpo = useId()
   return (
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
@@ -61,7 +63,8 @@ const ROTULO_SENTIMENTO = { positivo: 'Positivo', negativo: 'Negativo', neutro: 
 
 export function CartaoSentimento({ dado, aoDispensar }) {
   return (
-    <Cartao icone="termometro" titulo="Tom da conversa" tom={dado.classificacao === 'negativo' ? 'perigo' : 'ok'} aoDispensar={aoDispensar}>
+    <Cartao icone="termometro" titulo="Tom da conversa" tom={dado.classificacao === 'negativo' ? 'perigo' : 'ok'} aoDispensar={aoDispensar}
+      alerta={dado.classificacao === 'negativo'} resumo={<p><Pilula tom={TOM_SENTIMENTO[dado.classificacao]} fina>{ROTULO_SENTIMENTO[dado.classificacao]}</Pilula></p>}>
       <p><Pilula tom={TOM_SENTIMENTO[dado.classificacao]}>{ROTULO_SENTIMENTO[dado.classificacao]}</Pilula></p>
       {dado.trecho && <p>"{dado.trecho}"</p>}
       <p>Interpretação da mensagem. Confira a conversa antes de usar.</p>
@@ -73,7 +76,7 @@ export function CartaoSentimento({ dado, aoDispensar }) {
 // que sai sozinha para o cliente.
 export function CartaoCDC({ dado, aoDispensar }) {
   return (
-    <Cartao icone="dica" titulo={dado.titulo} tom="perigo" aoDispensar={aoDispensar}>
+    <Cartao icone="dica" titulo={dado.titulo} tom="perigo" aoDispensar={aoDispensar} alerta resumo={<p><Pilula tom="perigo" fina>{dado.artigo}</Pilula></p>}>
       <p><Pilula tom="perigo" fina>{dado.artigo}</Pilula></p>
       <p>{dado.dica}</p>
     </Cartao>
@@ -85,7 +88,7 @@ export function CartaoCDC({ dado, aoDispensar }) {
 // apressada ler "confiança 80%" como prova.
 export function CartaoFotoSuspeita({ dado, aoDispensar }) {
   return (
-    <Cartao icone="camera" titulo="Exemplo de análise de foto" tom="perigo" aoDispensar={aoDispensar}>
+    <Cartao icone="camera" titulo="Exemplo de análise de foto" tom="perigo" aoDispensar={aoDispensar} alerta resumo={<p>Esta foto não foi analisada.</p>}>
       <p>Demonstração do protótipo. Esta foto não foi analisada.</p>
       <p>Valor simulado: <b>{Math.round(dado.confianca * 100)}%</b></p>
       <ul>

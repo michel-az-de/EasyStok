@@ -603,6 +603,10 @@
 
 @media (max-width: 759px) {
   .modoLinha { gap: var(--e-2); }
+  /* #3386 (revisão): no celular o aviso de restrição vai para a linha de baixo, com a largura toda: a parte essencial
+     ("Restrição alimentar") nunca é cortada pela pílula e pelo Assumir. */
+  .modoLinha:has(.modoTextoAviso) { flex-wrap: wrap; }
+  .modoLinha > .modoTextoAviso { flex: 1 1 100%; order: 3; }
   .caixa textarea,
   .caixa textarea:hover,
   .caixa textarea:focus,
