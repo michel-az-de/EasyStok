@@ -15,6 +15,7 @@
 .itens::-webkit-scrollbar { display: none; }
 .inicio { composes: inicio from '../../componentes/Trilho.module.css'; margin-bottom: var(--e-2); }
 .item { composes: item from '../../componentes/Trilho.module.css'; cursor: pointer; }
+button.ajuda { background: none; border: 0; font: inherit; color: inherit; }
 .atual { composes: ativo from '../../componentes/Trilho.module.css'; }
 .atual:is(span) { cursor: default; }
 .conta { composes: avatar from '../../componentes/Trilho.module.css'; flex: none; }
