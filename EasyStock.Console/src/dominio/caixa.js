@@ -469,8 +469,10 @@ export function linhaDoFluxo(dia) {
   return { data: dia?.data ?? null, entrou: entrou / 100, saiu: saiu / 100, saldo: (entrou - saiu) / 100, situacao, depoisDoFechamento: depois / 100 }
 }
 
-// #3389 (6): dia aberto com entrou e saiu em zero não teve movimento; a `situacao` segue alimentando a pílula.
-export const diasComMovimento = (linhas) => linhas.filter((linha) => linha.entrou !== 0 || linha.saiu !== 0).length
+// #3389 (6): a regra de antes (tudo menos "sem movimento"), tirando só o dia aberto com entrou e saiu em zero.
+// O fechado conta mesmo zerado; a `situacao` segue alimentando a pílula.
+const abertoZerado = (linha) => linha.situacao === 'aberto' && linha.entrou === 0 && linha.saiu === 0
+export const diasComMovimento = (linhas) => linhas.filter((linha) => linha.situacao !== 'sem-movimento' && !abertoZerado(linha)).length
 
 // As linhas da tabela: hoje primeiro, depois os dias anteriores. Caixa esquecido aberto (#596): a
 // linha de hoje soma a sessão desde a abertura, então os dias que já estão dentro dela saem da

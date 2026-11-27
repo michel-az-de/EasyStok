@@ -44,6 +44,8 @@ caso('#3389 (6): dia aberto com entrou e saiu em zero não é dia com movimento'
   ]
   assert.equal(caixa.diasComMovimento(linhas), 3)
   assert.equal(caixa.diasComMovimento([]), 0)
+  // #3389 (revisão): só o dia aberto zerado sai; o fechado zerado e o fechado com Pix depois do fechamento seguem contando, como antes.
+  assert.equal(caixa.diasComMovimento([{ situacao: 'fechado', entrou: 0, saiu: 0, depoisDoFechamento: 0 }, { situacao: 'fechado', entrou: 0, saiu: 0, depoisDoFechamento: 30 }]), 2)
 })
 
 caso('#3389 (6): a situação do dia segue "aberto" com tudo zerado (alimenta a pílula)', () => {
