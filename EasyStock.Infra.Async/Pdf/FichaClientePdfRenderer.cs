@@ -169,10 +169,9 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
         if (dossie.Notas.Count == 0) col.Item().Text("Nenhuma nota interna.").FontColor(Suave);
         foreach (var nota in dossie.Notas)
         {
-            // #3387: nota curta nunca racha entre páginas; a muito longa não cabe numa página e precisa poder quebrar.
-            var caixa = col.Item().PaddingBottom(6);
-            if (nota.Texto.Length <= 700) caixa = caixa.ShowEntire();
-            caixa.Border(1).BorderColor(Linha).Background(Zebra).Padding(8).Column(c =>
+            // #3387: a nota não começa espremida no pé da página, mas pode quebrar: com muitas linhas ela passa
+            // de uma página, e ShowEntire travaria o layout.
+            col.Item().PaddingBottom(6).EnsureSpace(90).Border(1).BorderColor(Linha).Background(Zebra).Padding(8).Column(c =>
             {
                 c.Item().Text($"{nota.Autor} · {Data(nota.CriadoEm)}").FontSize(8.5f).FontColor(Suave);
                 c.Item().PaddingTop(2).Text(nota.Texto).FontSize(9.5f);
@@ -189,9 +188,11 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
             return;
         }
         var n = dossie.UltimosPedidos.Count;
-        var legenda = dossie.TotalPedidos <= n
+        // A lista vem cortada no teto e inclui cancelados; TotalPedidos conta só compras válidas. Só abaixo do
+        // teto a lista é o histórico inteiro.
+        var legenda = n < ObterDossieClienteUseCase.UltimosPedidos
             ? $"{n} {(n == 1 ? "pedido" : "pedidos")}"
-            : $"Os {n} pedidos mais recentes · {dossie.TotalPedidos} compras no total";
+            : $"Os {n} pedidos mais recentes · {dossie.TotalPedidos} {(dossie.TotalPedidos == 1 ? "compra válida" : "compras válidas")} no total";
         col.Item().PaddingBottom(4).Text(legenda).FontSize(9).FontColor(Suave);
         col.Item().Table(tabela =>
         {

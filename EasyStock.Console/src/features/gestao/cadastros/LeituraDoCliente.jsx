@@ -6,7 +6,7 @@ import { Icone } from '../../../componentes/Icone'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { ehRestricao, rotuloDaTag } from '../../../dominio/cliente'
-import { ESTAGIOS_DA_LEITURA, leituraDoCliente, proximoPassoDoCliente, ritmoDoCliente } from '../../../dominio/leituraDoCliente'
+import { DIAS_PARADA, ESTAGIOS_DA_LEITURA, leituraDoCliente, proximoPassoDoCliente, ritmoDoCliente } from '../../../dominio/leituraDoCliente'
 import { perguntaSobreOCliente, pratosParaOferecer } from '../../../dominio/pratosParaOferecer'
 import { primeiroNome } from '../../../dominio/mensagem'
 import css from './leituraDoCliente.module.css'
@@ -57,8 +57,8 @@ export function LeituraDoCliente({ cliente, relacao, relacionamento, contexto, a
     </p>}
     {leitura && <div className={css.leitura}>
       <div className={leitura.parada ? `${css.recencia} ${css.parada}` : css.recencia} data-recencia-da-ficha>
-        <strong>{leitura.ultimaCompra ?? 'Sem data da última compra'}</strong>
-        {ritmo ? <small>{ritmo.texto}<span className="sr">. </span><span>{ritmo.apoio}</span></small> : leitura.parada ? <small>30 dias ou mais sem pedir</small> : null}
+        <strong>{leitura.parada && <Icone nome="alerta" tamanho={24} />}{leitura.parada && ritmo && <span className="sr">{DIAS_PARADA} dias ou mais sem pedir: </span>}{leitura.ultimaCompra ?? 'Sem data da última compra'}</strong>
+        {ritmo ? <small>{ritmo.texto}<span className="sr">. </span><span>{ritmo.apoio}</span></small> : leitura.parada ? <small>{DIAS_PARADA} dias ou mais sem pedir</small> : null}
       </div>
       <div className={css.estagio}>
         <span className={css.passos} role="img" aria-label={`Estágio ${leitura.posicao + 1} de 4: ${leitura.estagio}`}>

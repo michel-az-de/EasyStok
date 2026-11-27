@@ -8,8 +8,9 @@
 .recencia strong { font-size: var(--t-valor); line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); font-variant-numeric: tabular-nums; }
 .recencia small { color: var(--tinta); font-size: var(--t-apoio); font-weight: 600; }
 .recencia small span { display: block; font-weight: 400; color: var(--tinta-2); }
-/* Parada há 30 dias ou mais: o número ganha a cor de alerta e um selo de texto abaixo (nunca só a cor). */
-.parada strong { color: var(--alerta); }
+/* Parada há 30 dias ou mais: o número ganha a cor de alerta e o ícone de alerta, e o texto (visível sem ritmo,
+   para leitor de tela com ritmo) diz o fato: nunca só a cor. */
+.parada strong { display: inline-flex; align-items: center; gap: var(--e-2); color: var(--alerta); }
 .estagio { min-width: 0; }
 .passos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-1); }
 .passos > span { display: grid; gap: 6px; min-width: 0; }

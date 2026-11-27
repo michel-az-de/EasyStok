@@ -45,8 +45,9 @@ public class RitmoDeCompraTests
     [Fact]
     public void SoOsDozeDiasMaisRecentesEntram()
     {
-        // 24 dias: os 12 antigos são diários; os 12 recentes, de 10 em 10. Só a janela recente dá mediana 10.
-        var antigos = Enumerable.Range(0, 12);
+        // 25 dias: os 13 antigos são diários; os 12 recentes, de 10 em 10. Sem a janela, a mediana dos 24
+        // intervalos cairia para 6; só os 12 dias mais recentes dão mediana 10.
+        var antigos = Enumerable.Range(0, 13);
         var recentes = Enumerable.Range(0, 12).Select(i => 100 + i * 10);
         var r = RitmoDeCompra.Calcular(EmDias(antigos.Concat(recentes).ToArray()));
         r.Should().Be(new RitmoDeCompra(10, 12));

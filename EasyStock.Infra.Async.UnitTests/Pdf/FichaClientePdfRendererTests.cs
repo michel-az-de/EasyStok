@@ -58,6 +58,28 @@ public sealed class FichaClientePdfRendererTests
     }
 
     [Fact]
+    public async Task LegendaNaoEscondePedidosQuandoCanceladosDerrubamAContagem()
+    {
+        // 10 listados (o teto), só 7 compras válidas: a lista não está completa e a legenda não pode dizer "10 pedidos".
+        var texto = await TextoDe(Ficha(null) with { TotalPedidos = 7 });
+        Assert.Contains("Os 10 pedidos mais recentes · 7 compras válidas no total", texto);
+        var curta = Ficha(null);
+        var tres = await TextoDe(curta with { UltimosPedidos = curta.UltimosPedidos.Take(3).ToList(), TotalPedidos = 2 });
+        Assert.Contains("3 pedidos", tres);
+        Assert.DoesNotContain("mais recentes", tres);
+    }
+
+    [Fact]
+    public async Task NotaCheiaDeQuebrasDeLinhaNaoQuebraOLayout()
+    {
+        var alta = string.Concat(Enumerable.Repeat("x\n", 240));
+        var ficha = Ficha(null);
+        var bytes = await new FichaClientePdfRenderer().RenderAsync(
+            ficha with { Notas = [new(Guid.NewGuid(), alta, "Ana", null, null, Consulta)] }, null, Consulta);
+        Assert.StartsWith("%PDF-", Encoding.Latin1.GetString(bytes));
+    }
+
+    [Fact]
     public async Task PedidoComItensDemaisParaUmaPaginaNaoQuebraOLayout()
     {
         var gigante = Ped("entregue", 1, 9000, Enumerable.Range(1, 600).Select(i => ($"Salgado sortido número {i}", 1m)).ToArray());
@@ -106,7 +128,7 @@ public sealed class FichaClientePdfRendererTests
         Assert.Contains("não informado", texto);
         foreach (var rotulo in new[] { "Compras", "Total comprado", "Ticket médio", "Última compra", "Contato e entrega", "Notas internas", "Pedidos recentes" })
             Assert.Contains(rotulo, texto);
-        Assert.Contains("Os 10 pedidos mais recentes · 25 compras no total", texto);
+        Assert.Contains("Os 10 pedidos mais recentes · 25 compras válidas no total", texto);
         Assert.Contains("Cliente desde março de 2025", texto);
         Assert.Contains("há 2 dias", texto);
     }
