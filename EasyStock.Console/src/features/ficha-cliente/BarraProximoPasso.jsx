@@ -378,7 +378,7 @@ export function BarraProximoPasso({
           {aReceberDoEntregue > 0 && (
             <>
               <p className={css.motivoDesabilitado}>
-                Entregue com {moeda(aReceberDoEntregue)} a receber. Marque pago quando o dinheiro entrar.
+                Entregue, falta {moeda(aReceberDoEntregue)}. Marque pago quando o dinheiro entrar.
               </p>
               <Botao largo variante="primario" icone="dollar-sign" onClick={() => setAbrindoBaixa(true)}>
                 Marcar pago ({moeda(aReceberDoEntregue)})

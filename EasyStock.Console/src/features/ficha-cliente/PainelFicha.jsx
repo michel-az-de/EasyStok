@@ -189,8 +189,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const tituloPedido = 'Revisar pedido'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = faltaPagar(pedido, cardapio)
-  const estadoDoResumo = pedido?.estado === 'aguardando' && pedido.cobranca && situacaoDaCobranca(pedido.cobranca, agora).chave === 'aguardando'
-    ? 'Cobrança pendente' : rotuloDoResumo(pedido?.estado, saldo, Array.isArray(pedido?.pagamentosApi) ? totalPago(pedido) : null)
+  // #3386 (revisão): com cobrança emitida, o resumo diz o mesmo nome da barra e do cartão (por meio); sem ela, o do pedido.
+  const situacaoDaCob = pedido?.estado === 'aguardando' && pedido.cobranca ? situacaoDaCobranca(pedido.cobranca, agora) : null
+  const estadoDoResumo = situacaoDaCob?.chave === 'aguardando' ? situacaoDaCob.rotulo
+    : situacaoDaCob?.chave === 'expirada' ? situacaoDaCob.rotuloVencido
+      : rotuloDoResumo(pedido?.estado, saldo, Array.isArray(pedido?.pagamentosApi) ? totalPago(pedido) : null)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
   // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
   const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
