@@ -410,33 +410,7 @@ export function Composer({
             </div>
 
             <div className={css.acoes}>
-              {/* Rodada 10, pedido literal do dono (25/09 23h42): "não vi pra
-                  enviar uma lista de mensagens do sistema". O ícone sozinho
-                  (rótulo escondido, decisão 60) não foi achado por ele. Só
-                  este botão ganha rótulo visível, mesma ideia de "Automáticas"
-                  no trilho (ícone e palavra juntos); os vizinhos (Anexar,
-                  Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
-              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}><Botao
-                ref={respostasRef}
-                disabled={!podeEscrever && !podeEnviarModelo}
-                aria-haspopup={podeEscrever ? 'listbox' : 'true'}
-                aria-expanded={podeEscrever ? barra.aberto : modeloAberto}
-                aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                aria-label="Respostas" className={css.botaoRespostas}
-                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : (modeloAberto ? aoFecharModelos : aoAbrirModelos)}
-              >
-                <Icone nome="respostas" />
-                <span>Respostas</span>
-              </Botao></Tooltip>
-              <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
-                <Botao
-                  aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota}
-                  onPointerDown={(evento) => { if (barra.pelaBarra) evento.stopPropagation() }}
-                  onClick={abrirNotaInterna}
-                >
-                  <Icone nome="nota" /><span className={css.rotuloNota}>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
-                </Botao>
-              </Tooltip>
+              {/* #3386 (r9): a ordem do DOM é a ordem visual (Emoji, Mais, Respostas, Nota, Enviar); o CSS .acoes não reordena mais. */}
               {/* #2833: emoji no cursor, com busca por :nome. */}
               <span className={css.ancoraEmoji}>
                 {/* Só o ícone, como no WhatsApp: com nome visível, a fileira não cabia em 320 px (prova-2134). */}
@@ -483,6 +457,33 @@ export function Composer({
                   },
                 ]}
               />
+              {/* Rodada 10, pedido literal do dono (25/09 23h42): "não vi pra
+                  enviar uma lista de mensagens do sistema". O ícone sozinho
+                  (rótulo escondido, decisão 60) não foi achado por ele. Só
+                  este botão ganha rótulo visível, mesma ideia de "Automáticas"
+                  no trilho (ícone e palavra juntos); os vizinhos (Anexar,
+                  Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
+              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}><Botao
+                ref={respostasRef}
+                disabled={!podeEscrever && !podeEnviarModelo}
+                aria-haspopup={podeEscrever ? 'listbox' : 'true'}
+                aria-expanded={podeEscrever ? barra.aberto : modeloAberto}
+                aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
+                aria-label="Respostas" className={css.botaoRespostas}
+                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : (modeloAberto ? aoFecharModelos : aoAbrirModelos)}
+              >
+                <Icone nome="respostas" />
+                <span>Respostas</span>
+              </Botao></Tooltip>
+              <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
+                <Botao
+                  aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota}
+                  onPointerDown={(evento) => { if (barra.pelaBarra) evento.stopPropagation() }}
+                  onClick={abrirNotaInterna}
+                >
+                  <Icone nome="nota" /><span className={css.rotuloNota}>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
+                </Botao>
+              </Tooltip>
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}

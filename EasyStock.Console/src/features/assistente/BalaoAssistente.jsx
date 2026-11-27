@@ -13,6 +13,7 @@ import { CHAVE_ASSISTENTE, usePreferenciaDePainel } from '../../aplicacao/prefer
 import {
   ASSISTENTE, CONVERSA_MINIMA, MARGEM_ASSISTENTE, TRILHO, VAO, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
 } from '../../dominio/paineis'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
@@ -380,7 +381,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
               <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> <span>Assistente</span></h2>
-              {selecionada && <p className={css.clienteDoPainel} title={selecionada.nome}>{selecionada.nome}</p>}
+              {selecionada && <p className={css.clienteDoPainel} title={selecionada.nome}>{apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda }).curto}</p>}
             </div>
             {!celular && (
               <fieldset className={css.posicoes}>
@@ -412,8 +413,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
             {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
-            {/* #3374 (C10): a tecla que fecha, à vista; o botão leva o mesmo atalho na dica. */}
-            <kbd className={css.tecla} aria-hidden="true">Esc</kbd>
+            {/* #3386 (r9): a dica "Esc" saiu do texto em toda largura; o X leva "Fechar (Esc)" no rótulo e na dica. */}
             <BotaoIcone rotulo="Fechar (Esc)" icone="x" onClick={fechar} aria-keyshortcuts="Escape" />
           </div>
 

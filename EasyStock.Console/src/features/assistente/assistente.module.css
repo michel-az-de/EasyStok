@@ -89,7 +89,6 @@
   flex-shrink: 0;
   container: cabecalho-assistente / inline-size; /* #3386 (r8 P2-2): os controles ficam numa linha; sem espaço, a dica "Esc" sai e o X fica */
 }
-@container cabecalho-assistente (max-width: 24rem) { .tecla { display: none; } }
 @container cabecalho-assistente (max-width: 25rem) { .identidade h2 > svg { display: none; } } /* sem espaço, o ícone do título cede a vez ao texto inteiro */
 .cabecalho h2 {
   display: flex; align-items: center; gap: var(--e-1);
@@ -100,7 +99,6 @@
 .identidade { flex: 1 1 0; min-width: 6.25rem; } /* #3386 (r7): o título é o último a encolher; se não cabe ao lado dos controles, eles descem para a linha de baixo. */
 .clienteDoPainel { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cabecalho > button { flex-shrink: 0; }
-.tecla { flex-shrink: 0; padding: 0 var(--e-1); background: var(--preenchimento); border-radius: var(--r-ponta); font: inherit; font-size: var(--t-micro); color: var(--tinta-2); }
 
 /* Crítica r1 (P1): o rodapé (pergunta) tem altura própria fora da rolagem; só o corpo rola. O texto cortado na borda
    ("Bancada de teste", "Pergunte ao assistente") parecia escondido atrás da caixa: a borda de baixo agora esmaece,

@@ -192,7 +192,7 @@ try {
           const c = getComputedStyle(el)
           return { desabilitado: el.disabled, estilo: c.borderTopStyle, cursor: c.cursor }
         })
-        cobrar(m.desabilitado && m.estilo === 'dashed' && m.cursor === 'not-allowed', `${w} px: desabilitado com o desenho do sistema (contorno ${m.estilo}, cursor ${m.cursor})`)
+        cobrar(m.desabilitado && m.estilo === 'solid' && m.cursor === 'not-allowed', `${w} px: desabilitado com o desenho do sistema (contorno ${m.estilo}, cursor ${m.cursor})`)
       }
       await p.close()
     }

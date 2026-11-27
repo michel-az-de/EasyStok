@@ -773,7 +773,7 @@
    vira o laranja e o Assumir cede (#3368). */
 /* #3386 (r6, P2-4): a crítica r6 mediu que, com contorno contínuo e tinta-2, ele lia como ativo. Agora tem o desenho do desabilitado do
    Botao (sem preenchimento, contorno tracejado, tinta-3, cursor not-allowed); o motivo segue no Tooltip. */
-.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) dashed var(--linha-forte); color: var(--tinta-3); cursor: not-allowed; }
+.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) solid var(--linha); color: var(--tinta-3); cursor: not-allowed; } /* #3386 (r9): desabilitado neutro, contorno sólido na cor --linha, sem tracejado de rascunho */
 /* Crítica r2 (P2): o Enviar desabilitado também tem contorno contínuo de 1px (o tracejado do Botao lia como quebrado); segue sem
    preenchimento e em tinta-3, o que ainda o separa do ativo. */
 .acoes > .enviar:disabled { border-style: solid; }

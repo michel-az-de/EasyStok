@@ -277,7 +277,8 @@ fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > docu
 // #3386 (r8 P2-2): sem espaço no cabeçalho (menos de 24 rem) a dica "Esc" sai e o X fica com o nome "Fechar (Esc)".
 const cabLargura = await p.evaluate(() => document.querySelector('section[role=dialog] [class*=cabecalho]')?.clientWidth ?? 0)
 const escVisivel = await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible()
-fixas.push([escVisivel || (cabLargura < 384 && await p.getByRole('button', { name: 'Fechar (Esc)' }).first().isVisible()), `${nome}: dica "Esc" invisível no painel e sem o X nomeado "Fechar (Esc)"`])
+// #3386 (r9): uma regra só em toda largura: o texto "Esc" não aparece e o X visível se chama "Fechar (Esc)".
+    fixas.push([!escVisivel && await p.getByRole('button', { name: 'Fechar (Esc)' }).first().isVisible(), `${nome}: X nomeado "Fechar (Esc)" visível e sem a dica "Esc" solta`])
 await p.keyboard.press('Escape')
 await p.waitForTimeout(200)
 const fechou = (await p.locator('section[role=dialog]').count()) === 0

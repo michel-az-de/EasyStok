@@ -165,7 +165,7 @@
    cor de ação cheia. A forma muda junto com a cor (WCAG 1.4.1). */
 .chipFiltro {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: var(--e-2);
-  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
+  min-height: var(--toque); padding: 0 var(--e-2); border-radius: var(--r-pilula); /* #3386 (r9): 8 px de cada lado; com 12 o "Precisa de você 12" passava 11 px do contêiner a 1280 */
   border: var(--b-1) solid var(--linha-media); background: transparent; color: var(--tinta-2);
   font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
@@ -252,3 +252,11 @@
 .sinalAtencao { color: var(--alerta); }
 /* #2427: o motivo `perigo` era o traço vermelho; sem o traço, a gravidade fica no ícone. */
 .cartao.atrasada .sinalAtencao { color: var(--erro); }
+
+/* #3386 (r9): na largura de tablet o cartão da fila fica mais baixo (até 100 px com 2 fileiras de chips inteiros) para a fila mostrar 4 conversas a 1024 x 768. */
+@media (min-width: 760px) and (max-width: 1179px) {
+  .cartao { padding-block: var(--e-2); }
+  .cartao .corpo { gap: 0; }
+  .contextoLinha { min-height: 1.5em; max-height: 3em; }
+  .cartao .contextoLinha > * { min-height: 1.5em; padding-block: 0; }
+}
