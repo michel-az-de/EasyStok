@@ -79,6 +79,5 @@ assert.equal(semCobranca.texto, 'Pedido 0194: Pagamento vencido')
 
 // Valor: "Falta R$ X" na ficha.
 assert.equal(resumoDoPagamento({ saldo: 69 }), `Falta ${moeda(69)}`)
-assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /Falta \{moeda\(saldo\)\}/)
-assert.ok(!/\} a receber<\/p>/.test(fonte('features/ficha-cliente/PainelFicha.jsx')), 'PainelFicha ainda diz "a receber"')
+// A Ficha renderizada ("Falta R$ X", sem "a receber") é provada em prova-1785-ficha.mjs, que monta o PainelFicha.
 console.log('prova-3386-vocabulario: ok')

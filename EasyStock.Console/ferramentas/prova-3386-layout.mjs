@@ -13,7 +13,7 @@ await servidor.listen()
 const origem = servidor.resolvedUrls.local[0].replace(/\/$/, '')
 const navegador = await chromium.launch({ headless: true })
 const falhas = []
-const itens = (process.env.ITENS ?? '3,4,6,8,9,10').split(',')
+const itens = (process.env.ITENS ?? '3,4,6,8,9,10,11').split(',')
 const cobrar = (ok, msg) => { console.log(ok ? 'ok   ' : 'FALHA', msg); if (!ok) falhas.push(msg) }
 
 async function pagina(w, h, tema = 'light') {
@@ -104,14 +104,21 @@ try {
       cobrar(achou, `item 6: ${tema}: achei conversa com o aviso`)
       const topo = await p.evaluate(() => ({ painel: Math.round([...document.querySelectorAll('section[role="dialog"]')].find((s) => s.getBoundingClientRect().width > 0).getBoundingClientRect().top), palco: Math.round(document.querySelector('#conteudo-principal').getBoundingClientRect().top) }))
       console.log('item 6 medida', tema, JSON.stringify(topo))
-      if (tema === 'light') cobrar(topo.painel >= topo.palco, `item 6: 1024: topo do painel (${topo.painel}) abaixo do topo do palco (${topo.palco})`)
+      cobrar(topo.painel >= topo.palco, `item 6: ${tema} 1024: topo do painel (${topo.painel}) abaixo do topo do palco (${topo.palco})`)
       if (achou) { const c = await contraste(p); cobrar(c >= 4.5, `item 6: ${tema}: "sem resposta" com contraste ${c}:1 (mín. 4,5)`) }
       await p.close()
     }
   }
   if (itens.includes('8')) {
     const p = await pagina(1440, 900)
-    await abrir(p)
+    // Só vale conversa ainda não assumida (com o botão "Assumir conversa"): assumida, o campo já tem o foco da loja.
+    const total = await p.locator('button[data-conversa-id]').count()
+    let naoAssumida = false
+    for (let i = 0; i < total && !naoAssumida; i++) {
+      await p.locator('button[data-conversa-id]').nth(i).click(); await p.waitForTimeout(300)
+      naoAssumida = await p.getByRole('button', { name: /^Assumir conversa/ }).first().isVisible().catch(() => false)
+    }
+    cobrar(naoAssumida, 'item 8a: achei conversa não assumida para medir')
     const anelDoCampo = () => p.evaluate(() => {
       const t = document.querySelector('textarea'); if (!t) return 'sem-campo'
       if (![...document.querySelectorAll('button')].some((x) => /^Assumir conversa/.test(x.textContent.trim()))) return 'ja-assumida'
@@ -123,7 +130,7 @@ try {
     await p.locator('textarea').first().click({ force: true }); await p.waitForTimeout(300)
     const aoFocar = await anelDoCampo()
     console.log('item 8a medida', JSON.stringify({ aoAbrir, aoFocar }))
-    cobrar(aoAbrir !== marca && aoFocar !== marca, `item 8a: antes de assumir o campo não ganha o anel laranja (${marca})`)
+    cobrar(naoAssumida && aoAbrir !== 'ja-assumida' && aoAbrir !== marca && aoFocar !== marca, `item 8a: antes de assumir o campo não ganha o anel laranja (${marca})`)
     await p.close()
     const q = await pagina(1440, 900)
     const achou = await comAviso(q)
@@ -157,6 +164,48 @@ try {
       if (itens.includes('10')) cobrar(achou && r.aviso && r.aviso.fundo <= r.corpoFundo - r.fade + 1, `item 10: ${w}x${h}: aviso "sem resposta" à vista sem rolar`)
       await p.close()
     }
+  }
+  if (itens.includes('9')) {
+    // Celular: o rótulo "Pergunte ao assistente" inteiro à vista, dentro da tela de 390 x 844.
+    const p = await pagina(390, 844)
+    await p.locator('button[data-conversa-id]').first().click(); await p.waitForTimeout(500)
+    await abrirAssistente(p)
+    const r = await p.evaluate(() => {
+      const e = [...document.querySelectorAll('p')].find((x) => /^Pergunte ao assistente$/.test(x.textContent.trim()) && x.getBoundingClientRect().width > 0)
+      if (!e) return null
+      const b = e.getBoundingClientRect()
+      return { topo: Math.round(b.top), fundo: Math.round(b.bottom), esq: Math.round(b.left), dir: Math.round(b.right), alto: innerHeight, largo: innerWidth }
+    })
+    console.log('item 9 medida 390', JSON.stringify(r))
+    cobrar(r && r.topo >= 0 && r.fundo <= r.alto && r.esq >= 0 && r.dir <= r.largo, 'item 9: 390x844: "Pergunte ao assistente" inteiro à vista')
+    await p.close()
+  }
+  if (itens.includes('11')) {
+    // Tablet: o painel acompanha o topo do palco quando um elemento acima dele muda de altura (sem trocar de conversa).
+    const p = await pagina(1024, 768)
+    await abrir(p)
+    await abrirAssistente(p)
+    const medir = () => p.evaluate(() => ({
+      painel: Math.round([...document.querySelectorAll('section[role="dialog"]')].find((x) => x.getBoundingClientRect().width > 0).getBoundingClientRect().top),
+      palco: Math.round(document.querySelector('#conteudo-principal').getBoundingClientRect().top),
+    }))
+    const antes = await medir()
+    await p.evaluate(() => {
+      const palco = document.querySelector('#conteudo-principal')
+      const faixa = document.createElement('div'); faixa.id = 'faixa-da-prova'; faixa.style.height = '48px'
+      palco.parentElement.insertBefore(faixa, palco)
+    })
+    await p.waitForTimeout(500)
+    const depois = await medir()
+    console.log('item 11 medida', JSON.stringify({ antes, depois }))
+    cobrar(depois.palco !== antes.palco, 'item 11: a faixa de prova moveu o topo do palco')
+    cobrar(Math.abs(depois.painel - depois.palco) <= 1 || depois.painel >= depois.palco, `item 11: painel (${depois.painel}) acompanha o topo do palco (${depois.palco})`)
+    await p.setViewportSize({ width: 1000, height: 768 }); await p.waitForTimeout(500)
+    await p.evaluate(() => { document.querySelector('#faixa-da-prova').style.height = '96px' })
+    await p.waitForTimeout(500)
+    const fim = await medir()
+    cobrar(fim.painel >= fim.palco, `item 11: depois de redimensionar a janela, painel (${fim.painel}) abaixo do topo do palco (${fim.palco})`)
+    await p.close()
   }
 } finally {
   await navegador.close()

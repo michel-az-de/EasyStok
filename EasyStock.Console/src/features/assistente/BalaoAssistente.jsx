@@ -244,13 +244,27 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
     raiz.dataset.assistenteEmpurra = ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
+    let desmedir = null
     if (encaixadoTablet) {
       raiz.dataset.assistenteTablet = ''
       // #3386 (r5 P2-6): o painel não sobe além do topo do palco (a barra de navegação fica por cima dele).
+      // O topo muda quando algo acima do palco troca de altura ou a janela é redimensionada: mede de novo nos dois casos.
       const palco = document.querySelector('[data-palco-tablet]')
-      if (palco) raiz.style.setProperty('--assistente-topo-palco', `${Math.round(palco.getBoundingClientRect().top)}px`)
+      if (palco) {
+        const medir = () => raiz.style.setProperty('--assistente-topo-palco', `${Math.round(palco.getBoundingClientRect().top)}px`)
+        medir()
+        // Adiado para o próximo quadro: mudar a variável redimensiona o painel e o observador não pode se realimentar no mesmo quadro.
+        let quadro = 0
+        const adiar = () => { cancelAnimationFrame(quadro); quadro = requestAnimationFrame(medir) }
+        const observador = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(adiar)
+        observador?.observe(palco)
+        observador?.observe(document.body)
+        window.addEventListener('resize', medir)
+        desmedir = () => { cancelAnimationFrame(quadro); observador?.disconnect(); window.removeEventListener('resize', medir) }
+      }
     }
     return () => {
+      desmedir?.()
       raiz.style.removeProperty('--assistente-topo-palco')
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
@@ -476,30 +490,30 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           </div>
           {selecionada && (
             <div className={css.rodapePergunta}>
-            {/* #3386 (r5 P2-9): o rótulo mora fora da rolagem, junto do campo, e nunca fica cortado sob ele. */}
-            <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
-            <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
-              <CampoArea
-                ref={campoRef}
-                rotulo="Pergunte ao assistente sobre esta conversa"
-                rotuloOculto
-                className={css.campoPergunta}
-                value={pergunta}
-                onChange={(e) => setPergunta(e.target.value)}
-                placeholder="Ex.: sugira uma resposta ou prepare uma nota"
-                rows={2}
-                limite={LIMITE_PERGUNTA}
-                dica={DICA_DO_ATALHO}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
-                  enviarPergunta(e)
-                }}
-              />
-              <BotaoIcone
-                tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
-                disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
-              />
-            </form>
+              {/* #3386 (r5 P2-9): o rótulo mora fora da rolagem, junto do campo, e nunca fica cortado sob ele. */}
+              <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
+              <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
+                <CampoArea
+                  ref={campoRef}
+                  rotulo="Pergunte ao assistente sobre esta conversa"
+                  rotuloOculto
+                  className={css.campoPergunta}
+                  value={pergunta}
+                  onChange={(e) => setPergunta(e.target.value)}
+                  placeholder="Ex.: sugira uma resposta ou prepare uma nota"
+                  rows={2}
+                  limite={LIMITE_PERGUNTA}
+                  dica={DICA_DO_ATALHO}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
+                    enviarPergunta(e)
+                  }}
+                />
+                <BotaoIcone
+                  tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
+                  disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
+                />
+              </form>
             </div>
           )}
           </div>
