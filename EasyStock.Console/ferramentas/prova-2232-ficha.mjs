@@ -151,7 +151,7 @@ await confereAsync('F2  copiar devolve se copiou; sem permissão ou sem API devo
 
 confere('F3  o valor do saldo aparece uma vez no Resumo (destaque), sem repetir na linha de apoio', () => {
   const resumo = trecho(renderizarFicha(), '<section class="resumoAtual"', '</section>')
-  assert.match(resumo, /19,00 a receber/, 'destaque')
+  assert.match(resumo, /Falta R\$\s19,00/, 'destaque')
   assert.equal((resumo.match(/19,00/g) ?? []).length, 1, resumo)
 })
 confere('F3  linha de apoio: itens e, com sinal a receber, "sinal de R$ X"; o total some só quando repete o destaque', () => {

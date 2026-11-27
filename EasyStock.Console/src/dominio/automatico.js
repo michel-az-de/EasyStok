@@ -16,7 +16,8 @@ import { duracao, moeda } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
 import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
-import { pedidoEncerrado } from './pedido.js'
+import { numeroCurto, pedidoEncerrado } from './pedido.js'
+import { rotuloDoPedido } from './rotulos.js'
 import { MOTIVO_PERGUNTA_FORA_DO_ROTEIRO, ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { INTENCOES, classificarIntencao, itemDaRestricao, sinalDoCliente } from './agente.js'
@@ -349,7 +350,7 @@ function pedidoAtrasadoVisivel(conversa, janelas, agora) {
     chave: 'pedido-atrasado',
     rotulo: 'Pedido atrasado',
     tom: 'perigo',
-    texto: `Pedido ${conversa.pedido.numero} passou do horário calculado para começar o preparo`,
+    texto: `${rotuloDoPedido(conversa.pedido.numero)} passou do horário calculado para começar o preparo`,
   }
 }
 
@@ -361,11 +362,11 @@ function aguardandoAprovacao(conversa) {
     chave: 'aprovacao',
     rotulo: 'Aguardando aprovação',
     tom: 'aviso',
-    texto: `Pedido ${conversa.pedido.numero} espera a aprovação da loja`,
+    texto: `${rotuloDoPedido(conversa.pedido.numero)} espera a aprovação da loja`,
   }
 }
 
-// Cobrança vencida nos dois mundos: com Pix emitido vale o relógio dele, e sem
+// Pix vencido nos dois mundos: com Pix emitido vale o relógio dele, e sem
 // Pix vale o prazo da comanda gerada, que é o mesmo do lembrete de pagamento.
 function cobrancaVencida(conversa, agora) {
   const pedido = conversa.pedido
@@ -376,9 +377,9 @@ function cobrancaVencida(conversa, agora) {
   if (!expirou) return null
   return {
     chave: 'cobranca',
-    rotulo: 'Cobrança vencida',
+    rotulo: 'Pix vencido',
     tom: 'perigo',
-    texto: `Pedido ${pedido.numero} gerado e o pagamento não caiu`,
+    texto: `${rotuloDoPedido(pedido.numero)}: Pix vencido`,
   }
 }
 
@@ -407,7 +408,7 @@ function valorDiferente(conversa, agora) {
     chave: 'valor-diferente',
     rotulo: 'Valor diferente',
     tom: 'aviso',
-    texto: `Pagou ${moeda(cobranca.valorPago)} de ${moeda(cobranca.valor)} do pedido ${conversa.pedido.numero}, confira`,
+    texto: `Pagou ${moeda(cobranca.valorPago)} de ${moeda(cobranca.valor)} do pedido ${numeroCurto(conversa.pedido.numero)}, confira`,
   }
 }
 
@@ -452,7 +453,7 @@ export function sinalUrgente(conversa, agora) {
       chave: 'diz-que-pagou',
       rotulo: 'Diz que pagou',
       tom: 'aviso',
-      texto: `Diz que pagou o pedido ${pedido.numero} e o pagamento não caiu, confira`,
+      texto: `${rotuloDoPedido(pedido.numero)}: diz que pagou, mas o Pix não foi confirmado, confira`,
     }
   }
   // "Já paguei" com o dinheiro reconhecido é assunto encerrado, não pendência.
@@ -467,7 +468,7 @@ export function sinalUrgente(conversa, agora) {
       chave: 'insistencia',
       rotulo: 'Cobrando o pedido',
       tom: 'perigo',
-      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
+      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${numeroCurto(pedido.numero)} e ninguém respondeu`,
     }
   }
   return null

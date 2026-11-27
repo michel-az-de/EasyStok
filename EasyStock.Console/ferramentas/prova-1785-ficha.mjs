@@ -90,7 +90,7 @@ provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => 
   assert.match(html, /Sem cobrança/)
   assert.doesNotMatch(html, /Cobrança pendente|Próximo: Pago/)
   assert.match(html, /81,00/)
-  assert.match(html, /43,00 a receber/)
+  assert.match(html, /Falta R\$\s43,00/)
   assert.match(html, /Revisar pedido/)
   assert.doesNotMatch(html, /Lasanha da compra anterior|<dialog|Histórico financeiro/)
 })

@@ -677,7 +677,7 @@ await confere('F  link vencido: no modo API o texto substitui "Reenviar cobranç
   comoApi()
   const api = new Tela(BarraProximoPasso, propsDaBarra(vencido, { aoReenviarPix: nada }))
   assert.equal(botao(api, 'Reenviar cobrança'), undefined)
-  assert.ok(texto(api.arvore).includes('Cobrança venceu'))
+  assert.ok(texto(api.arvore).includes('Pix vencido'))
   assert.ok(texto(api.arvore).includes(cobrancaDom.avisoDeLinkVencidoApi(vencido.cobranca, vencido.statusApi)))
   assert.ok(botao(api, 'Marcar pago'), '#1683: com o link vencido a baixa à mão continua na barra')
   api.encerrar()

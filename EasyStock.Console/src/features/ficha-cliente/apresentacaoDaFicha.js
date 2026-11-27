@@ -19,7 +19,7 @@ export function resumoDoPagamento({ cancelado = false, saldo = 0, destaque = fal
   if (cancelado && aDevolver > 0) return `${moeda(aDevolver)} a devolver`
   if (cancelado) return 'Confira recebimentos e devoluções'
   if (saldo <= 0) return 'Pagamento completo'
-  return destaque ? 'Receber o saldo e ver o extrato' : `${moeda(saldo)} a receber`
+  return destaque ? 'Receber o saldo e ver o extrato' : `Falta ${moeda(saldo)}`
 }
 
 // Modal Pagamento: com o Extrato acima (modo API com pedido no EasyStok), o bloco

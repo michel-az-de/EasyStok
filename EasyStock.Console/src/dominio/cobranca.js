@@ -277,7 +277,7 @@ export function situacaoDaCobranca(cobranca, agora) {
   return {
     chave: 'aguardando',
     tom: restamMs <= 5 * MS_POR_MINUTO ? 'aviso' : 'info',
-    rotulo: 'Aguardando pagamento',
+    rotulo: 'Aguardando Pix',
     restamMs,
   }
 }

@@ -42,7 +42,7 @@ const MOTIVO_NO_CARTAO = {
   reclamacao: { texto: 'Reclamação', icone: 'message-square-warning' },
   passagem: { texto: 'Passou para você', icone: 'hand' },
   esperando: { texto: 'Esperando você', icone: 'relogio' },
-  cobranca: { texto: 'Cobrança venceu', icone: 'dollar-sign' },
+  cobranca: { texto: 'Pix vencido', icone: 'dollar-sign' },
   restricao: { texto: 'Restrição alimentar', icone: 'alerta' },
   'diz-que-pagou': { texto: 'Diz que pagou', icone: 'dollar-sign' },
   devolucao: { texto: 'Problema no pedido', icone: 'message-square-warning' },

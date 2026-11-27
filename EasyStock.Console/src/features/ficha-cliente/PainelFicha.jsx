@@ -291,7 +291,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
             : pedido ? linhaDoResumo({ estado: pedidoCriado ? estadoDoResumo : 'Em montagem', itens, total, saldo, destaque: destacaSaldo, sinal: sinalDoResumo })
               : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
                 : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
-          {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
+          {destacaSaldo && <p className={css.saldoFicha}>Falta {moeda(saldo)}</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
           {/* #2420: a ação de montar mora dentro do cartão da comanda. */}
           {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}

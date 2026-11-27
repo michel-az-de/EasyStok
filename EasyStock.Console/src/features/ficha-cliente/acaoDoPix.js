@@ -29,7 +29,7 @@ export function acaoDoPix(situacaoCob, {
       // dizia "gere uma cobrança nova" e não havia onde gerar).
       if (linkVencidoApi && aoMandarLinkNovo) {
         return {
-          rotuloEstado: 'Cobrança venceu', motivo: bloqueado ? MOTIVO_BLOQUEADO_AO_ENVIAR : linkVencidoApi,
+          rotuloEstado: 'Pix vencido', motivo: bloqueado ? MOTIVO_BLOQUEADO_AO_ENVIAR : linkVencidoApi,
           botoes: [
             { rotulo: 'Mandar link novo', icone: 'refresh-cw', onClick: aoMandarLinkNovo, desabilitado: bloqueado },
             { rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true },
@@ -38,12 +38,12 @@ export function acaoDoPix(situacaoCob, {
       }
       if (linkVencidoApi) {
         return {
-          rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
+          rotuloEstado: 'Pix vencido', motivo: linkVencidoApi,
           botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
         }
       }
       return {
-        rotuloEstado: 'Cobrança venceu',
+        rotuloEstado: 'Pix vencido',
         ...(bloqueado ? { motivo: MOTIVO_BLOQUEADO_AO_ENVIAR } : null),
         botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix, desabilitado: bloqueado, secundario: true }],
       }
@@ -60,14 +60,14 @@ export function acaoDoPix(situacaoCob, {
       // maquininha e no sinal manual não há link e o botão segue primário.
       if (linkPendenteApi && situacaoCob.chave === 'aguardando') {
         return {
-          rotuloEstado: 'Aguardando pagamento',
+          rotuloEstado: 'Aguardando Pix',
           // #2232 (F6): a ajuda cabe em uma linha; o valor vem na pergunta da baixa.
           nota: 'O Mercado Pago confirma sozinho. Só marque se pagou por fora.',
           botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true }],
         }
       }
       return {
-        rotuloEstado: 'Aguardando pagamento',
+        rotuloEstado: 'Aguardando Pix',
         botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
       }
   }
