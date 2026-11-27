@@ -7,11 +7,11 @@ import { MODOS, listaDeModos } from '../../dominio/modosDeConexao'
 import css from './agente.module.css'
 
 // O que a linha fechada diz. Número e palavra: recolhido não pode virar silêncio.
-function resumoFechado(estado, temSugestao) {
+function resumoFechado(estado, temSugestao, semResposta) {
   if (estado === 'pensando') return 'lendo a conversa'
   if (estado === 'erro') return 'consulta não concluída'
   if (temSugestao) return 'sugestão pronta'
-  return 'nada pendente'
+  return semResposta ?? 'nada pendente'
 }
 
 // O agente PROPÕE, a dona decide. Ela pede a sugestão apertando "Sugerir";
@@ -21,7 +21,7 @@ function resumoFechado(estado, temSugestao) {
 // conversa passou para ela, e fecha de novo quando ela descarta (corte #43:
 // Descartar é o único jeito de recolher, não tem toggle separado).
 export function PainelAgente({
-  modo, estado, sugestao, erro, esperado, passouParaVoce = false,
+  modo, estado, sugestao, erro, esperado, passouParaVoce = false, semResposta = null,
   bloqueada = false,
   aoConsultar, aoUsar, aoDescartar, aoTrocarModo,
 }) {
@@ -32,7 +32,7 @@ export function PainelAgente({
     ? esperado.acao === sugestao.acao
     : null
 
-  const chamaAtencao = Boolean(sugestao) || passouParaVoce || estado === 'pensando' || estado === 'erro'
+  const chamaAtencao = Boolean(sugestao) || passouParaVoce || Boolean(semResposta) || estado === 'pensando' || estado === 'erro'
   // Ajuste de estado durante a renderização, não em efeito: sugestão nova ou
   // devolução chegando abre a gaveta, e Descartar fecha de novo. A chave da
   // conversa remonta o painel, então a escolha não vaza para a conversa seguinte.
@@ -43,7 +43,7 @@ export function PainelAgente({
     setAberto(chamaAtencao)
   }
 
-  const pendencias = resumoFechado(estado, Boolean(sugestao))
+  const pendencias = resumoFechado(estado, Boolean(sugestao), semResposta)
 
   const descartar = () => {
     setAberto(false)
@@ -83,11 +83,15 @@ export function PainelAgente({
 
       {aberto && (
         <div className={css.corpo}>
-          {estado === 'ocioso' && (
+          {estado === 'ocioso' && (semResposta ? (
+            <p className={css.semResposta}>
+              <Icone nome="alerta" /> {semResposta[0].toUpperCase() + semResposta.slice(1)} nesta conversa.
+            </p>
+          ) : (
             <p className={css.tranquilo}>
               <Icone nome="check" /> Nada pendente nesta conversa.
             </p>
-          )}
+          ))}
 
           {estado === 'pensando' && (
             <output className={css.pensando}>

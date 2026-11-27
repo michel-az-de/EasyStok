@@ -31,6 +31,11 @@
   margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--sucesso);
 }
 
+.semResposta {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--alerta); font-weight: 600;
+}
+
 .sugestao {
   margin: var(--e-3) 0 0; padding: var(--e-2);
   background: var(--marca-claro); border-radius: var(--r-1);

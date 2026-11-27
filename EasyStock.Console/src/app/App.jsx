@@ -30,6 +30,7 @@ import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { ContextoFichaUnicaDoCliente } from '../aplicacao/fichaUnicaDoCliente'
 import { ContextoPainelDoAssistente } from '../aplicacao/painelDoAssistente'
+import { fraseSemResposta } from '../dominio/mensagem'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
@@ -272,6 +273,7 @@ function Composicao({ rota }) {
   const sugestaoAgente = selecionada ? (
     <PainelAgente
       key={chaveAssistencia}
+      semResposta={fraseSemResposta(selecionada)}
       passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
       // #2185 (E11): "Usar no rascunho" também não vale com o campo fechado (janela de 24 h, concluída, bloqueio).
       bloqueada={!permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).pode}

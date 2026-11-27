@@ -66,6 +66,12 @@ export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falh
 // "N mensagens sem resposta" (features/caixa-de-entrada/CartaoConversa.jsx)
 // e o lembrete automático de responder (dominio/lembrete.js), para as três
 // contas baterem entre si.
+// #3384: o painel do Assistente ocioso diz essa frase em vez de "Nada pendente" quando há o que responder.
+export function fraseSemResposta(conversa) {
+  const n = mensagensSemRespostaReal(conversa).length
+  return n === 0 ? null : `${n} ${n === 1 ? 'mensagem sem resposta' : 'mensagens sem resposta'}`
+}
+
 export function mensagensSemRespostaReal(conversa) {
   const mensagens = conversa?.mensagens ?? []
   const pendentes = []
