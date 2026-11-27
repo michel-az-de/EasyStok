@@ -10,7 +10,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { telefoneNaTela } from '../../../dominio/cadastros'
 import { AVISO_NAO_CELULAR, avisoDeCelularBr } from '../../../dominio/validacaoDoCadastro'
-import { abasDaFicha, aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, numerosDoRelacionamento, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
+import { abasDaFicha, aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
 import { dataHora, mascaraCep, moeda } from '../../../dominio/formato'
 import { rotuloDaSituacao, tituloDoPedido } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
@@ -53,9 +53,8 @@ function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
 // `aoAbrirConversa` (cadastro com mudança por salvar) as conversas ficam listadas, mas não abrem.
 // `conversasNoAtendimento` são as que o Atendimento já carregou. Vem por prop: este editor também abre pela
 // Buscar na Casa, fora do AtendimentoProvider, e lá as conversas ficam só como registro.
-// #2792: `carregandoRelacionamento` vale só até o primeiro dossiê chegar; em releitura o valor anterior fica na tela.
 // `aoGravar` avisa quem mostra a mesma pessoa (a Ficha do Atendimento) de que endereço ou telefone mudou.
-export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, carregandoRelacionamento = false, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
+export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
   const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId(), abas: useId() }
   // #3249: Pedidos, Endereços, Telefones e Conversas em abas, um painel por vez (padrão do ModalHistorico). Os ids são
   // desta ficha: o `painel-da-aba` padrão da BarraDeAbas já é o da Moldura no celular.
@@ -90,7 +89,6 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
     alvo.current?.focus()
   })
   const resumo = resumoDePedidos(cliente)
-  const numeros = numerosDoRelacionamento(relacionamento)
   const telefones = telefonesDaFicha(listas.telefones)
   const recentes = relacionamento?.conversas ?? []
   const abas = abasDaFicha({ pedidos: cliente.orderCount, enderecos: listas.enderecos.length, telefones: telefones.length, comConversas: Boolean(relacionamento) })
@@ -159,15 +157,16 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
     <BarraDeAbas abas={abas} ativa={ativa} aoTrocar={escolherAba} idPainel={idPainel} prefixoId={prefixoAba} rotulo="Partes da ficha" rolavel className={perfil.abas} />
     <div role="tabpanel" id={idPainel} aria-labelledby={`${prefixoAba}-${ativa}`} tabIndex={0} className={perfil.painelDaAba}>
     {ativa === 'pedidos' && <section aria-labelledby={ids.pedidos}>
-      <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
+      {/* #3387: a aba já diz "Pedidos"; o título fica para o leitor de tela. Valor total e o que costuma pedir saíram
+          daqui: o total está no cartão e o prato em "O que oferecer", e a ficha não repete o mesmo número. */}
+      <h3 id={ids.pedidos} className="sr">Pedidos</h3>
       <p><strong>{resumo.contagem}</strong>{resumo.ultimo && <> · {resumo.ultimo}</>}</p>
-      {/* #2792: sem o dossiê, "Valor total" e "Costuma pedir" não aparecem e a ficha parece sem histórico: diz que está lendo. */}
-      {carregandoRelacionamento ? <p className={css.legenda}>Carregando valor total e o que costuma pedir…</p>
-        : numeros.length > 0 && <p>{numeros.join(' · ')}</p>}
       {vePedidos && (pedidos.erro ? <div className={css.erro} role="alert"><p>{pedidos.erro}</p><Botao onClick={pedidos.recarregar}>Tentar de novo</Botao></div>
         : pedidos.carregando ? <p className={css.legenda}>Carregando pedidos…</p>
-        : pedidos.itens.length > 0 && <ul className={css.itensFicha} aria-label="Últimos pedidos">{pedidos.itens.map(p => <li key={p.id}>
-          <span><strong>{tituloDoPedido(p)}</strong><small>{[p.criadoEm && dataHora(p.criadoEm), rotuloDaSituacao(p.status), moeda(p.total)].filter(Boolean).join(' · ')}</small></span>
+        : pedidos.itens.length > 0 && <ul className={`${css.itensFicha} ${perfil.pedidos}`} aria-label="Últimos pedidos">{pedidos.itens.map(p => <li key={p.id}>
+          {/* #3387: data e situação à esquerda, o valor alinhado à direita em algarismos de mesma largura. */}
+          <span><strong>{tituloDoPedido(p)}</strong><small>{[p.criadoEm && dataHora(p.criadoEm), rotuloDaSituacao(p.status)].filter(Boolean).join(' · ')}</small></span>
+          <span className={perfil.valorDoPedido}>{moeda(p.total)}</span>
           <Botao disabled={Boolean(abrindo)} onClick={() => verPedido(p)} aria-label={`Abrir ${tituloDoPedido(p)}`}>{abrindo === p.id ? 'Abrindo…' : 'Abrir'}</Botao>
         </li>)}</ul>)}
     </section>}

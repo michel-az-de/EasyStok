@@ -104,14 +104,6 @@ export function clienteDaHash(hash) {
 }
 
 // As palavras são as da Ficha do Atendimento ("valor total", "costuma pedir"). Sem compra não há soma.
-export function numerosDoRelacionamento(relacionamento) {
-  if (!relacionamento) return []
-  return [
-    relacionamento.pedidos > 0 && relacionamento.totalGasto > 0 ? `Valor total ${moeda(relacionamento.totalGasto)}` : null,
-    relacionamento.favorito ? `Costuma pedir ${relacionamento.favorito}` : null,
-  ].filter(Boolean)
-}
-
 // #2849: o quadro que abre a ficha em qualquer tela, com as palavras do Atendimento ("compras válidas",
 // "total comprado", "Ticket médio"). Sem o dossiê lido não há número; sem compra não há soma nem média.
 export function quadroDoCliente(relacionamento) {

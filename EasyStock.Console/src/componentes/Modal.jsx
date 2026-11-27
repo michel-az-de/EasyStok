@@ -5,7 +5,8 @@ import css from './Modal.module.css'
 
 // Camada sobreposta. Usa <dialog>.showModal(), que entrega trap de foco e
 // fundo inerte pelo próprio navegador, em vez de imitar isso na mão.
-// `largura` é opcional e vale um de três nomes (#2185, R14): `sm` (560, a padrão), `md` (760) e `lg` (880),
+// `largura` é opcional e vale um destes nomes (#2185, R14): `sm` (560, a padrão), `md` (760), `lg` (880) e
+// `xl` (1120, só a ficha do cliente, #3387, que tem cartão e leitura lado a lado),
 // definidos em `estilos/tokens.css`. Sem ela, o CSS padrão de `Modal.module.css` continua valendo. Um
 // valor CSS qualquer ainda é aceito para as telas fora do Atendimento que ainda não migraram.
 //
@@ -33,7 +34,7 @@ import css from './Modal.module.css'
 //   dado digitado, Esc, clique no fundo e o X não fecham calados nem descartam calados: o modal pergunta
 //   ali mesmo, e o foco vai para "Continuar editando". Esc na pergunta volta para a edição.
 //   `segurarFechamento` segue para o caso em que nem descartar pode (envio em andamento).
-export const LARGURAS_DO_MODAL = Object.freeze({ sm: 'var(--modal-sm)', md: 'var(--modal-md)', lg: 'var(--modal-lg)' })
+export const LARGURAS_DO_MODAL = Object.freeze({ sm: 'var(--modal-sm)', md: 'var(--modal-md)', lg: 'var(--modal-lg)', xl: 'var(--modal-xl)' })
 
 export function Modal({
   titulo, descricao, aoFechar, rodape, largura, className, focarCampo = false, segurarFechamento = false, confirmarDescarte = false, children,

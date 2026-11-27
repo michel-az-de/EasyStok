@@ -71,7 +71,8 @@ async function abrirFicha(largura, altura, { alteracoes = [] } = {}) {
   await ficha.getByRole('region', { name: `Resumo de ${cliente.nome}`, exact: true }).waitFor()
   // O dossiê e os pedidos chegaram: a medida vale para a ficha completa.
   await ficha.getByText('Alergia a camarão. Prefere entrega depois das 18h.', { exact: true }).waitFor()
-  await ficha.getByText(/Costuma pedir Feijoada/).first().waitFor()
+  // #3387: o favorito chega em "O que oferecer" (a aba Pedidos não repete mais "Costuma pedir").
+  await ficha.getByRole('listitem').filter({ hasText: 'Feijoada' }).filter({ hasText: 'Costuma pedir' }).first().waitFor()
   return { contexto, page, ficha }
 }
 // O miolo que rola é o filho do diálogo com rolagem vertical própria.

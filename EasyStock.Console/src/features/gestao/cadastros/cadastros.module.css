@@ -149,7 +149,7 @@
 }
 .acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }
 /* #2946: o convite é um link (abre outra aba), com a cara de ação da linha. */
-.chamar { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
+.chamar { display: inline-flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
 .chamar:hover { background: var(--sucesso-pastel); }
 
 /* #3254 (S2): linha do cliente com a relação. Colunas em porcentagem, tabela fixa: sem rolagem lateral em 1440 e 1920.
@@ -186,9 +186,13 @@
 .traco { display: inline-block; width: 14px; height: 2px; background: var(--tinta-3); vertical-align: middle; border-radius: 1px; }
 .estagio, .gasto, .sinais { display: grid; gap: var(--e-1); justify-items: start; min-width: 0; }
 .estagio strong, .gasto strong { font-weight: 700; }
+/* #3387: a mesma régua da ficha. O passo apagado tinha contorno de 1,2:1 (some na tela); agora o fundo é o
+   preenchimento forte e o aceso é a marca, com pílulas arredondadas como na leitura da ficha. */
 .passos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; width: 100%; max-width: 96px; height: 8px; }
-.passos i { background: var(--preenchimento); border: var(--b-1) solid var(--linha); border-radius: 2px; }
+.passos i { background: var(--preenchimento-forte); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-pilula); }
 .passos i.passoAceso { background: var(--marca); border-color: var(--marca); }
+/* #3387: última compra há 30 dias ou mais: o número ganha a cor de alerta (o fato, sem rótulo novo). */
+.recenciaParada strong { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--alerta); }
 .trilhoGasto { display: block; width: 100%; max-width: 120px; height: 8px; border-radius: 999px; background: var(--preenchimento); border: var(--b-1) solid var(--linha); overflow: hidden; }
 .trilhoGasto i { display: block; height: 100%; background: var(--marca); }
 .lista .gasto small { margin-top: 0; }
