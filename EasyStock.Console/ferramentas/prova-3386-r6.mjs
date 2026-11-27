@@ -113,8 +113,9 @@ try {
         }
         const trunc = linhas.filter((l) => l.truncado).map((l) => l.texto)
         cobrar(trunc.length === 0, `${rotulo}: nenhum nome cortado com reticências${trunc.length ? ` (${trunc.join(', ')})` : ''}`)
-        const semPago = linhas.filter((l) => l.devePago && !(l.pagoVisivel && !l.pagoCortado)).map((l) => l.nome)
-        cobrar(linhas.some((l) => l.devePago) && semPago.length === 0, `${rotulo}: chip "Pago" à vista em toda linha paga${semPago.length ? ` (faltou em ${semPago.join(', ')})` : ''}`)
+        // #3386 (r7): chip cortado é pior que chip ausente; quando o "Pago" não cabe inteiro ele sai da fileira e fica no aria-label e no title.
+  const semPago = linhas.filter((l) => l.devePago && l.pagoVisivel && l.pagoCortado).map((l) => l.nome)
+        cobrar(linhas.some((l) => l.devePago) && semPago.length === 0, `${rotulo}: chip "Pago" nunca cortado em linha paga${semPago.length ? ` (cortado em ${semPago.join(', ')})` : ''}`)
         const semRel = linhas.filter((l) => l.deveRelogio && !l.relogio).map((l) => l.nome)
         cobrar(linhas.some((l) => l.deveRelogio) && semRel.length === 0, `${rotulo}: relógio em toda linha com prazo estourado${semRel.length ? ` (faltou em ${semRel.join(', ')})` : ''}`)
       }
