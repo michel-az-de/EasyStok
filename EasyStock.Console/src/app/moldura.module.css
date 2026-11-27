@@ -62,7 +62,7 @@
   --t-atd: 1rem; /* #3374 (G1): 16 px só aqui dentro; fora do palco o --t-atd global cai para o corpo */
 }
 /* Em repouso o palco tem 1 realce só; no hover, ativo e foco o controle troca para um tom abaixo dele (estado, não superfície). */
-.palco :is(button, a, label, input, select, textarea, [role='button'], [role='tab'], [role='option']):is(:hover, :active, :focus) { --preenchimento-forte: var(--atd-preenchimento-hover); }
+.palco :is(button, a, label, input, select, textarea, [role='button'], [role='tab'], [role='option']):is(:hover, :active, :focus-visible) { --preenchimento-forte: var(--atd-preenchimento-hover); }
 .palcoTres { padding: 0; }
 .palcoTres > .coluna {
   border-radius: var(--r-2); border: 0;

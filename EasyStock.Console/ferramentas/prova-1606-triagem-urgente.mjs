@@ -70,6 +70,9 @@ confere('restrição já respondida continua no motivo enquanto a conversa está
   assert.equal(motivoDePrecisar(conversa(falas), AGORA, true)?.chave, 'restricao')
   assert.equal(motivo(conversa([...falas, cliente('Obrigada!', 1)]))?.chave, 'restricao')
   assert.equal(precisaDeVoce(conversa(falas, { estado: 'Encerrado' }), AGORA, true), false)
+  // Revisão da #3374: a restrição de antes de uma reabertura não volta com a conversa nova (#1600).
+  const reaberta = [...falas, { id: 'reab', dir: 'out', texto: 'Conversa reaberta', reabertura: true, em: falas[1].em }, casa('Oi de novo!', 1)]
+  assert.equal(motivoDePrecisar(conversa(reaberta), AGORA, true)?.chave === 'restricao', false)
 })
 
 confere('"sem querer ser chato" não vira restrição: pedido de desligar avisos sobe como Precisa de você', () => {
