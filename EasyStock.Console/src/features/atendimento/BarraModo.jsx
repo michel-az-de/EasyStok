@@ -63,7 +63,15 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
         ) : (
           <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
         )}
-        {!faixa && <p className={mostrarLinha ? css.modoTexto : 'sr'} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>}
+        {/* #3384 (r4 P1-3): a restrição alimentar é o que não pode escapar; a frase ganha o tom de aviso, não só a pílula. */}
+        {!faixa && (
+          <p
+            className={!mostrarLinha ? 'sr' : resumo.motivo === 'restricao' ? `${css.modoTexto} ${css.modoTextoAviso}` : css.modoTexto}
+            title={linha === resumo.linha ? resumo.detalhe : linha}
+          >
+            {mostrarLinha && resumo.motivo === 'restricao' && <Icone nome="alerta" className={css.modoTextoIcone} />}{linha}
+          </p>
+        )}
         {acoes.assumir && (
           <Botao
             ref={botaoAssumir} aria-keyshortcuts="A"
