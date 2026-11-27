@@ -167,8 +167,8 @@
 /* #3386 (r6, H6): enquanto há o que rolar, a borda inferior esmaece (a ficha no tablet escondia "Falta R$" abaixo da dobra, sem sinal).
    Some no fim da rolagem e quando tudo cabe. */
 .conteudo[data-mais-abaixo='true'] {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--e-6)), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--e-6)), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, var(--tinta) calc(100% - var(--e-6)), transparent);
+  mask-image: linear-gradient(to bottom, var(--tinta) calc(100% - var(--e-6)), transparent);
 }
 
 /* #2420: a comanda é um cartão com contorno, e a ação de montar fica dentro dele. */
