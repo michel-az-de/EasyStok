@@ -30,29 +30,38 @@ public class ConfiguracaoAtendimento
     public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom ter você de volta.";
 
     /// <summary>Frase de espera enviada junto da saudação, antes do agente responder (RN-01).</summary>
-    public string FraseEspera { get; set; } = "Um instante, a Casa já responde.";
+    public string FraseEspera { get; set; } = FraseEsperaPadrao;
+
+    /// <summary>#3379: o padrão gravado anuncia robô; a saudação não o manda. Só a frase escrita pela loja sai.</summary>
+    public const string FraseEsperaPadrao = "Um instante, a Casa já responde.";
 
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 
     public const int MoldeTamanhoMaximo = 500;
     /// <summary>
     /// Texto padrão gravado da escalada. Fica sem marcador para um rollback só de código (<c>vps-deploy.sh --rollback</c>)
-    /// nunca mandar "{dona}" ao cliente; a escalada com ele sai como <see cref="MensagemEscaladaComDona"/> (S68, #2597).
+    /// nunca mandar marcador ao cliente; a escalada padrão sai como <see cref="MensagemEscaladaHumana"/> (S68, #2597).
     /// </summary>
     public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
-    /// <summary>S68 (#2597): <c>{dona}</c> vira <see cref="NomeDona"/>; sem nome, "a equipe" (o mesmo texto do padrão).</summary>
-    public const string MensagemEscaladaComDona = "Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.";
+    /// <summary>#3379: o que a cliente lê quando a conversa passa à equipe. Fala como a atendente: não anuncia repasse à dona.</summary>
+    public const string MensagemEscaladaHumana = "Só um instante, já te confirmo isso por aqui.";
+    /// <summary>Texto padrão gravado (default da coluna); por dizer "automático", sai como <see cref="MensagemEncaminhamentoHumana"/> (#3379).</summary>
     public const string MensagemEncaminhamentoPadrao =
         "Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.";
+    public const string MensagemEncaminhamentoHumana = "Oi, {nome}! Recebi sua mensagem e já passei para {dona}, que te responde por aqui.";
 
     /// <summary>#2249: o que o robô diz ao passar a conversa de cliente para a equipe. Com <c>{nome}</c>.</summary>
     public string MensagemEscalada { get; private set; } = MensagemEscaladaPadrao;
 
     /// <summary>S68 (#2597): o molde que a escalada usa; o texto padrão gravado passa a citar a dona.</summary>
-    public string MoldeEscalada() => MensagemEscalada == MensagemEscaladaPadrao ? MensagemEscaladaComDona : MensagemEscalada;
+    public string MoldeEscalada() => MensagemEscalada == MensagemEscaladaPadrao ? MensagemEscaladaHumana : MensagemEscalada;
 
     /// <summary>#2249: o que o robô diz a quem não é cliente (fornecedor, pessoal) ao encaminhar à responsável. Com <c>{nome}</c>.</summary>
     public string MensagemEncaminhamento { get; private set; } = MensagemEncaminhamentoPadrao;
+
+    /// <summary>#3379: o molde que o encaminhamento usa; o padrão gravado não se diz automático.</summary>
+    public string MoldeEncaminhamento() =>
+        MensagemEncaminhamento == MensagemEncaminhamentoPadrao ? MensagemEncaminhamentoHumana : MensagemEncaminhamento;
 
     /// <summary>#2249: vazio mantém o molde atual.</summary>
     public void DefinirMoldes(string? escalada, string? encaminhamento)

@@ -57,7 +57,7 @@ internal sealed class FinalizacaoDoTurno(
         if (conversa.Situacao == SituacaoConversa.Assumida && !jaAvisado)
         {
             var aoContato = contexto.Encaminhou
-                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome, configuracao.NomeDona)
+                ? MoldeMensagemContato.Preencher(configuracao.MoldeEncaminhamento(), primeiroNome, configuracao.NomeDona)
                 : encaminhamento;
             respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
         }

@@ -20,7 +20,7 @@ public partial class AgenteAtendimentoServiceTests
     private static readonly TimeSpan AlemDoPrazo = TimeSpan.FromSeconds(61);
     private static readonly TimeSpan AntesDoPrazo = TimeSpan.FromSeconds(30);
 
-    private const string Encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+    private const string Encaminhamento = "Só um instante, já te confirmo isso por aqui.";
 
     private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais) =>
         CriarServicoComRetomada(null, segundos, adicionais);
@@ -57,7 +57,7 @@ public partial class AgenteAtendimentoServiceTests
         _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Sistema, quando, TipoConteudoMensagem.Texto,
             EscalarConversaUseCase.PrefixoMotivo + "cliente pediu uma pessoa"));
         _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, quando, TipoConteudoMensagem.Texto,
-            "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.", "wamid.out9"));
+            "Só um instante, já te confirmo isso por aqui.", "wamid.out9"));
         _conversa.Escalar(quando, "cliente pediu uma pessoa");
         return entrada;
     }

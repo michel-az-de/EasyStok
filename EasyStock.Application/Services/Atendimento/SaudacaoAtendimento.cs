@@ -45,7 +45,9 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
         var saudacao = modelo.Replace("{nome}", primeiroNome ?? string.Empty, StringComparison.Ordinal);
         saudacao = saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal);
 
+        // #3379: a frase de espera padrão anuncia robô; só a escrita pela loja sai.
         return semFraseEspera || string.IsNullOrWhiteSpace(configuracao.FraseEspera)
+            || configuracao.FraseEspera == ConfiguracaoAtendimento.FraseEsperaPadrao
             ? saudacao
             : $"{saudacao}\n\n{configuracao.FraseEspera}";
     }

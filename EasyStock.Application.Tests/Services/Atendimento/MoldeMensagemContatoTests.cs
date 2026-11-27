@@ -25,15 +25,15 @@ public class MoldeMensagemContatoTests
     public void PreencheADonaOuFalaDaEquipe(string molde, string? dona, string esperado) =>
         MoldeMensagemContato.Preencher(molde, molde.Contains("{nome}") ? "Maria" : null, dona).Should().Be(esperado);
 
-    /// <summary>S68 (#2597): a escalada padrão cita a dona; sem nome, o texto é o mesmo de antes.</summary>
+    /// <summary>#3379: a escalada padrão fala como a atendente, sem anunciar repasse à dona nem encaminhamento.</summary>
     [Fact]
-    public void MoldePadraoDaEscaladaCitaADona()
+    public void MoldePadraoDaEscaladaNaoAnunciaRepasse()
     {
-        ConfiguracaoAtendimento.MensagemEscaladaComDona.Should().Contain(MoldeMensagemContato.Dona);
-        MoldeMensagemContato.Preencher(ConfiguracaoAtendimento.MensagemEscaladaComDona, "Maria")
-            .Should().Be(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
-        MoldeMensagemContato.Preencher(ConfiguracaoAtendimento.MensagemEscaladaComDona, "Maria", "Michele")
-            .Should().Be("Vou encaminhar sua mensagem para Michele conferir e responder por aqui.");
+        var texto = MoldeMensagemContato.Preencher(ConfiguracaoAtendimento.MensagemEscaladaHumana, "Maria", "Michele");
+        texto.Should().Be("Só um instante, já te confirmo isso por aqui.");
+        texto.Should().NotContain("Michele").And.NotContain("encaminh");
+        MoldeMensagemContato.Preencher(ConfiguracaoAtendimento.MensagemEscaladaHumana, null)
+            .Should().Be("Só um instante, já te confirmo isso por aqui.");
     }
 
     /// <summary>Revisão da #2618: com o nome do cliente, o molde sai como a loja escreveu, como antes da S68.</summary>
