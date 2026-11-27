@@ -46,11 +46,10 @@ assert.equal(cadastro.clienteDaHash('#/m/cadastros/clientes'), null)
 assert.equal(cadastro.clienteDaHash(`#/m/cadastros/produtos/${ID}`), null)
 assert.equal(cadastro.clienteDaHash('#/m/cadastros/clientes/novo'), null)
 
-// Números do relacionamento, com as palavras da Ficha ("valor total", "costuma pedir").
-assert.deepEqual(cadastro.numerosDoRelacionamento({ pedidos: 7, totalGasto: 1234.5, favorito: 'Lasanha' }),
-  [`Valor total ${moeda(1234.5)}`, 'Costuma pedir Lasanha'])
-assert.deepEqual(cadastro.numerosDoRelacionamento({ pedidos: 0, totalGasto: 0, favorito: null }), [])
-assert.deepEqual(cadastro.numerosDoRelacionamento(null), [])
+// #3387: o total comprado mora no quadro do cartão ("total comprado") e o favorito em "O que oferecer"; a aba
+// Pedidos não repete os dois. O quadro segue com as palavras da Ficha do Atendimento.
+assert.equal(cadastro.numerosDoRelacionamento, undefined)
+assert.deepEqual(cadastro.quadroDoCliente({ pedidos: 7, totalGasto: 1234.5 }).map(n => n.valor), ['7', moeda(1234.5), moeda(1234.5 / 7)])
 
 // O dossiê traz as 20 notas mais recentes: com 20 na tela, o cadastro diz onde estão as outras.
 assert.equal(cadastro.avisoDasNotas(20), 'Aqui aparecem as 20 notas mais recentes. As anteriores estão na Ficha do Atendimento.')

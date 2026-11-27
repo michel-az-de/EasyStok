@@ -129,7 +129,9 @@ try {
   // O alerta não fica só no ícone: quem usa leitor de tela ouve que a tag é restrição.
   assert.equal(await secaoTags.getByRole('img', { name: 'Restrição alimentar', exact: true }).count(), 1, 'o alerta da restrição tem nome')
   const secaoPedidos = editor.getByRole('region', { name: 'Pedidos', exact: true })
-  await secaoPedidos.getByText('Valor total R$ 412,50 · Costuma pedir Feijoada').waitFor()
+  // #3387: total no cartão, uma vez; a aba Pedidos não repete "Valor total".
+  await editor.getByLabel('Números do cliente').getByText('R$ 412,50', { exact: true }).waitFor()
+  assert.equal(await secaoPedidos.getByText(/Valor total/).count(), 0, 'a aba Pedidos não repete o total')
 
   // Telefones: o principal primeiro, com selo e sem Remover.
   await editor.getByRole('tab', { name: /^Telefones/ }).click() // #3249: cada parte da ficha é uma aba

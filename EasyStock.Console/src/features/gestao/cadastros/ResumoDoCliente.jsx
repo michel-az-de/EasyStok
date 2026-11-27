@@ -10,6 +10,7 @@ import { dadosDeContato, situacaoDaLinha, telefoneCadastro } from '../../../domi
 import { nomeExibido } from '../../../dominio/nomeDoContato'
 import { quadroDoCliente } from '../../../dominio/fichaCliente'
 import { avisoDeCelularBr } from '../../../dominio/validacaoDoCadastro'
+import { mesPorExtenso } from '../../../dominio/formato'
 import css from './cadastros.module.css'
 import perfil from './perfilDoCliente.module.css'
 
@@ -52,10 +53,13 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
       <div>
         <strong>{nome}</strong>
         {situacao && <Pilula tom={situacao.tom} titulo={situacao.titulo}>{situacao.rotulo ?? situacao.texto}</Pilula>}
+        {/* #3387: desde quando compra, pela primeira compra que a API leu; sem ela a linha não aparece. */}
+        {relacionamento?.primeiraCompraEm && <small className={perfil.desde}>Cliente desde {mesPorExtenso(relacionamento.primeiraCompraEm)}</small>}
       </div>
-      {aoEditar && !editando && <Botao icone="lapis" largo onClick={aoEditar}>Editar dados</Botao>}
     </header>
+    {/* #3387: as ações do cartão numa faixa só (editar, foto e PDF), em vez de três linhas empilhadas. */}
     <div className={`${css.acoesDoResumo} ${perfil.acoes}`}>
+      {aoEditar && !editando && <Botao variante="texto" icone="lapis" onClick={aoEditar}>Editar dados</Botao>}
       {aoMudarFoto && <>
         <input ref={arquivo} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="Foto do cliente"
           onChange={(e) => { const escolhido = e.target.files?.[0]; e.target.value = ''; if (escolhido) mudarFoto(escolhido) }} />
@@ -72,7 +76,8 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
     {(erro || foto.erro) && <p role="alert" className={css.erro}>{erro || foto.erro}</p>}
     {carregando && <p role="status" className={css.legenda}>Carregando os números do cliente…</p>}
     {quadro.length > 0 && <dl className={`${css.quadroCliente} ${perfil.quadro}`} aria-label="Números do cliente">
-      {quadro.map(n => <div key={n.rotulo}><dt>{n.rotulo}</dt><dd>{n.valor}</dd></div>)}
+      {/* #3387: o total comprado é o número grande do cartão; compras e ticket ficam lado a lado abaixo dele. */}
+      {quadro.map(n => <div key={n.rotulo} data-destaque={n.rotulo === 'total comprado' || undefined}><dt>{n.rotulo}</dt><dd>{n.valor}</dd></div>)}
     </dl>}
     {!editando && <dl className={`${css.contatoCliente} ${perfil.contatos}`} aria-label="Dados de contato">
       {dadosDeContato(dados).map(d => <div key={d.rotulo}><dt>{d.rotulo}</dt><dd className={d.valor ? undefined : css.naoInformado}>{d.valor ?? 'Não informado'}</dd>

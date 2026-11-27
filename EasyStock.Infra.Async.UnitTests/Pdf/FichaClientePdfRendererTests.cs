@@ -2,7 +2,9 @@ using System.Text;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.ClienteCrm;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Async.Pdf;
+using UglyToad.PdfPig;
 
 namespace EasyStock.Infra.Async.UnitTests.Pdf;
 
@@ -61,5 +63,83 @@ public sealed class FichaClientePdfRendererTests
         using var cancelamento = new CancellationTokenSource();
         cancelamento.Cancel();
         await Assert.ThrowsAsync<OperationCanceledException>(() => new FichaClientePdfRenderer().RenderAsync(Dados(), null, Consulta, cancelamento.Token));
+    }
+
+    // ---- #3387: o texto que sai no papel (extraído do PDF), não só a estrutura ----
+
+    private static readonly Guid ClienteId = Guid.Parse("a1111111-1111-4111-8111-111111111111");
+
+    private static PedidoResumoCliente Ped(string status, int diasAtras, decimal total, params (string, decimal)[] itens) =>
+        new(Guid.NewGuid(), status, Consulta.AddDays(-diasAtras), total, itens.Select(i => new ItemPedidoResumo(i.Item1, i.Item2)).ToList());
+
+    /// <summary>Cliente sem telefone nem e-mail, 25 pedidos no total (10 listados, um cancelado), ritmo opcional.</summary>
+    private static DossieClienteDto Ficha(RitmoDeCompraDossie? ritmo, bool bloqueado = false) => new(
+        new(ClienteId, "Mária André", null, null, null, bloqueado ? "Chargeback em outubro" : null),
+        [], [new("sem_gluten", "dona", Consulta)],
+        [new(Guid.NewGuid(), "Prefere retirar no sábado.", "Ana", null, null, Consulta)],
+        new[] { Ped("cancelado", 1, 50, ("Brigadeiro", 2)) }
+            .Concat(Enumerable.Range(2, 9).Select(i => Ped(i % 2 == 0 ? "aguardando_pagamento" : "saiu_para_entrega", i, 38, ("Ravióli", 1)))).ToList(),
+        new("Ravióli", 7, 9), Consulta.AddDays(-2), 25, bloqueado, new(true, true, Consulta), [],
+        [new(Guid.NewGuid(), CanalConversa.WhatsApp, SituacaoConversa.Automatica, Consulta, Consulta)], null,
+        TotalGasto: 950, Ritmo: ritmo, PrimeiraCompraEm: new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc));
+
+    private static async Task<string> TextoDe(DossieClienteDto dossie)
+    {
+        var bytes = await new FichaClientePdfRenderer().RenderAsync(dossie, null, Consulta);
+        using var pdf = PdfDocument.Open(bytes);
+        var texto = string.Join(" ", pdf.GetPages().Select(p => p.Text));
+        return System.Text.RegularExpressions.Regex.Replace(texto, @"\s+", " ");
+    }
+
+    [Fact]
+    public async Task TextoDoPapelTemAcentosRotulosELegendaDaLista()
+    {
+        var texto = await TextoDe(Ficha(null));
+        Assert.Contains("não informado", texto);
+        foreach (var rotulo in new[] { "Compras", "Total comprado", "Ticket médio", "Última compra", "Contato e entrega", "Notas internas", "Pedidos recentes" })
+            Assert.Contains(rotulo, texto);
+        Assert.Contains("Mostrando os 10 mais recentes de 25 pedidos", texto);
+        Assert.Contains("Cliente desde março de 2025", texto);
+        Assert.Contains("há 2 dias", texto);
+    }
+
+    [Fact]
+    public async Task FraseDoRitmoSoApareceComRitmo()
+    {
+        Assert.Contains("Pede a cada ~12 dias (mediana das últimas 8 compras)", await TextoDe(Ficha(new(12, 8))));
+        Assert.DoesNotContain("Pede a cada", await TextoDe(Ficha(null)));
+    }
+
+    [Fact]
+    public async Task PedidoCanceladoDizCanceladoEStatusNaoVazaCodigo()
+    {
+        var texto = await TextoDe(Ficha(null));
+        Assert.Contains("Cancelado", texto);
+        Assert.Contains("Aguardando pagamento", texto);
+        Assert.Contains("Saiu para entrega", texto);
+        Assert.DoesNotContain("_", texto.Replace("sem_gluten", ""));
+    }
+
+    [Fact]
+    public async Task CabecalhoNaoMostraOGuid()
+    {
+        var texto = await TextoDe(Ficha(null));
+        Assert.DoesNotContain(ClienteId.ToString(), texto);
+        Assert.DoesNotContain("a1111111", texto);
+    }
+
+    [Fact]
+    public async Task CadastroBloqueadoGanhaCaixaDeAtencaoComMotivo()
+    {
+        var texto = await TextoDe(Ficha(null, bloqueado: true));
+        Assert.Contains("Atenção", texto);
+        Assert.Contains("Cadastro bloqueado: Chargeback em outubro", texto);
+        Assert.DoesNotContain("Atenção", await TextoDe(Ficha(null)));
+    }
+
+    [Fact]
+    public async Task SemCaixaDeAtencaoQuandoNaoHaNadaParaAvisar_TagsFicamNoContato()
+    {
+        Assert.Contains("Tags: sem_gluten", await TextoDe(Ficha(null)));
     }
 }

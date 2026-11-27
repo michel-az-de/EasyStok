@@ -1,16 +1,33 @@
 /* #3344: o painel de leitura que abre a Ficha. Um cartão só, contorno uniforme de 1px e fundo; sem barra de um lado só. */
-.painel { display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-3); background: var(--papel); min-width: 0; }
+.painel { display: grid; gap: var(--e-4); padding: var(--e-4) var(--e-5); border: 1px solid var(--linha); border-radius: var(--r-3); background: var(--papel); min-width: 0; }
 .painel h3 { margin: 0; font-size: var(--t-corpo); }
-.leitura { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
-.estagio { display: flex; align-items: center; gap: var(--e-3); }
-.estagio strong { font-size: var(--t-corpo); }
-.estagio small { color: var(--tinta); font-size: var(--t-apoio); }
-.passos { display: inline-flex; gap: 3px; }
-.passos i { width: 22px; height: 8px; border-radius: 4px; background: transparent; box-shadow: inset 0 0 0 1px var(--tinta-2); }
-.passos i.aceso { background: var(--marca, var(--tinta)); box-shadow: none; }
-.sinais { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); color: var(--tinta-2); font-size: var(--t-apoio); }
-.passoUrgente { border: 1px solid var(--erro); background: var(--erro-pastel, var(--elevado)); color: var(--tinta); font-weight: 600; }
-.passo { flex-basis: 100%; margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--elevado); font-size: var(--t-apoio); }
+/* #3387: a leitura é o destaque da ficha. Grade de 2 colunas: à esquerda o número que decide a conversa (há quantos
+   dias pediu e o ritmo), à direita a régua do estágio com o nome dos 4 passos; sinais e próximo passo em largura total. */
+.leitura { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: center; gap: var(--e-3) var(--e-5); }
+.recencia { display: grid; gap: 2px; min-width: 0; }
+.recencia strong { font-size: var(--t-valor); line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); font-variant-numeric: tabular-nums; }
+.recencia small { color: var(--tinta); font-size: var(--t-apoio); font-weight: 600; }
+.recencia small span { font-weight: 400; }
+.recencia small span { display: block; color: var(--tinta-2); }
+/* Parada há 30 dias ou mais: o número ganha a cor de alerta e um selo de texto abaixo (nunca só a cor). */
+.parada strong { color: var(--alerta); }
+.estagio { min-width: 0; }
+.passos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-1); }
+.passos > span { display: grid; gap: 6px; min-width: 0; }
+.passos i { height: 8px; border-radius: var(--r-pilula); background: var(--preenchimento-forte); }
+.passos small { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-compacto); overflow-wrap: anywhere; }
+.passos .feito i { background: color-mix(in srgb, var(--marca) 55%, var(--papel)); }
+.passos .atual i { background: var(--marca); }
+.passos .atual small { color: var(--tinta); font-weight: 700; }
+.sinais { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); color: var(--tinta-2); font-size: var(--t-apoio); }
+.passo { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: var(--e-2); margin: 0; padding: var(--e-2) var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--elevado); color: var(--tinta); font-size: var(--t-corpo); font-weight: 600; }
+.passo > svg { flex: none; margin-block-start: 2px; color: var(--marca-forte); }
+.passoUrgente { border-color: var(--atd-borda-erro); background: var(--erro-pastel); }
+.passoUrgente > svg { color: var(--erro); }
+/* Restrição alimentar: a primeira coisa do painel, contorno uniforme, fundo de alerta e ícone. */
+.restricao { display: flex; align-items: center; gap: var(--e-2); margin: 0; padding: var(--e-2) var(--e-3); border: 1px solid var(--atd-borda-alerta); border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-corpo); }
+.restricao > svg { flex: none; color: var(--alerta); }
+.restricao strong { color: var(--alerta); }
 .linha { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--e-3) var(--e-4); padding-block-start: var(--e-3); border-block-start: 1px solid var(--linha); }
 .painel > .linha:first-child { padding-block-start: 0; border-block-start: 0; }
 .oferta { display: grid; gap: var(--e-2); flex: 1 1 280px; min-width: 0; }
@@ -28,3 +45,7 @@
 .erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
 .assistente button[aria-pressed='true'] { border: 1px solid var(--marca, var(--tinta)); font-weight: 600; }
 @media (max-width: 899px) { .assistente > button, .respostaAcoes > button { min-height: var(--toque); } }
+@media (max-width: 599px) {
+  .painel { padding: var(--e-3); }
+  .leitura { grid-template-columns: minmax(0, 1fr); }
+}

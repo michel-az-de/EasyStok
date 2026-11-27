@@ -24,7 +24,12 @@ public sealed record DossieClienteDto(
     IReadOnlyList<ConversaRecenteDossie> ConversasRecentes,
     PedidoResumoCliente? PedidoEmAndamento,
     ContatoInformadoDossie? ContatoInformado = null,
-    decimal TotalGasto = 0m);
+    decimal TotalGasto = 0m,
+    RitmoDeCompraDossie? Ritmo = null,
+    DateTime? PrimeiraCompraEm = null);
+
+/// <summary>#3387: de quantos em quantos dias o cliente compra (mediana) e em quantos dias de compra a conta se baseia (<c>RitmoDeCompra</c>).</summary>
+public sealed record RitmoDeCompraDossie(int MedianaDias, int ComprasAnalisadas);
 
 /// <summary>
 /// Dados primários. Sem cliente vinculado (conversa de lead), <c>Id</c> é nulo e nome e telefone vêm do

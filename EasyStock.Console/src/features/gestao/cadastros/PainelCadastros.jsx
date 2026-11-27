@@ -69,7 +69,7 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
       {Number.isFinite(totalDaCarteira) && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 && totalDaCarteira > 0 ? Math.max(pct, 2) : 0}%` }} /></span>}
       {r.gastoTotal > 0 && totalDaCarteira > 0 && <small>{textoDoPercentual(pct)} da carteira</small>}
       {Number.isFinite(r.ticketMedio) && r.compras > 0 && <small>ticket {moedaCheia(r.ticketMedio)}</small>}</div> : <Traco />}</td>
-    <td>{dias === null && !desde && r.compras !== 0 ? <Traco /> : <div className={css.gasto}>{dias !== null ? <strong>{textoDosDias(dias)}</strong> : r.compras === 0 ? <strong>Sem compra ainda</strong> : <Traco />}{desde && <small>desde {desde}</small>}</div>}</td>
+    <td>{dias === null && !desde && r.compras !== 0 ? <Traco /> : <div className={dias !== null && dias >= 30 && r.compras > 0 ? `${css.gasto} ${css.recenciaParada}` : css.gasto}>{dias !== null ? <strong>{textoDosDias(dias)}</strong> : r.compras === 0 ? <strong>Sem compra ainda</strong> : <Traco />}{desde && <small>desde {desde}</small>}</div>}</td>
     <td><div className={css.sinais}>
       {r.ocorrenciasAbertas > 0 ? <Pilula tom="perigo" tamanho="inline" titulo={r.ocorrenciasAbertas === 1 ? "1 reclamação ainda aberta." : `${r.ocorrenciasAbertas} reclamações ainda abertas.`}>Reclamação</Pilula>
         : r.ocorrenciasTotal > 0 ? <small>{r.ocorrenciasTotal === 1 ? '1 reclamação resolvida' : `${r.ocorrenciasTotal} reclamações resolvidas`}</small> : null}

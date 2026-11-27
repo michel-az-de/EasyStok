@@ -52,13 +52,15 @@ caso('o atalho gerado do título já cabe em 40, cortado em palavra inteira, e o
   assert.equal(gerarAtalho('/' + 'abc '.repeat(9) + 'abcde'), '/abc-abc-abc-abc-abc-abc-abc-abc-abc', 'palavra que termina no teto fica inteira')
 })
 
-caso('FichaCliente recebe carregandoRelacionamento e mostra "Carregando" no lugar de Valor total e Costuma pedir', () => {
-  assert.match(ficha, /carregandoRelacionamento/, 'a ficha não recebe o estado de carregando do dossiê')
-  assert.match(ficha, /carregandoRelacionamento[\s\S]{0,200}Carregando valor total/, 'sem a legenda de carregando')
+// #3387: o total comprado saiu da aba Pedidos (vive no cartão), então o "carregando" do dossiê é o do cartão.
+caso('o cartão da ficha mostra "Carregando" no lugar dos números enquanto o dossiê não chega', () => {
+  const resumo = semComentario(ler('features/gestao/cadastros/ResumoDoCliente.jsx'))
+  assert.match(resumo, /carregando && <p role="status"[^>]*>Carregando os números do cliente/, 'sem a legenda de carregando no cartão')
+  assert.doesNotMatch(ficha, /Valor total/, 'a aba Pedidos não repete o total do cartão')
 })
 
 caso('EditorCadastro só marca carregando até o primeiro dossiê (em releitura mantém o valor anterior)', () => {
-  assert.match(editor, /carregandoRelacionamento=\{relacionamento\.carregando && !relacionamento\.dados\}/)
+  assert.match(editor, /carregando=\{relacionamento\.carregando && !relacionamento\.dados\}/)
 })
 
 caso('Atalho e Texto usam limite 40 e 4096 e o Título migra para a mesma primitiva', () => {

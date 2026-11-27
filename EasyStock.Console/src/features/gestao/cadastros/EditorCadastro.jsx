@@ -24,6 +24,8 @@ const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridic
 const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisico', rotulo: 'Produto físico' }, { valor: 'Servico', rotulo: 'Serviço' }]
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
+// #3387: a ficha do cliente usa até 1120 px; o modal `lg` (880 px) segue para os outros cadastros.
+const LARGURA_DA_FICHA = 'min(1120px, calc(100vw - var(--e-6)))'
 
 export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes, editarAoAbrir = false, complemento, novoPedido = null }) {
   const idForm = useId()
@@ -201,8 +203,9 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     finally { atividadeEmVoo.current = false; if (montado.current) alternar(false) }
   }
   const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
+  // #3387: a ficha é um perfil em duas colunas; com 880 px a coluna da direita apertava a leitura e as abas.
   const titulo = ehFicha ? 'Ficha do cliente' : `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
-  return <Modal titulo={titulo} largura={ehFicha ? 'lg' : 'md'} focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+  return <Modal titulo={titulo} largura={ehFicha ? LARGURA_DA_FICHA : 'md'} focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
@@ -288,7 +291,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       </fieldset>
     </form>
     {comRelacionamento && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento}
-      relacionamento={relacionamento.dados} carregandoRelacionamento={relacionamento.carregando && !relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
+      relacionamento={relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
     {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
     </div>
     </div>

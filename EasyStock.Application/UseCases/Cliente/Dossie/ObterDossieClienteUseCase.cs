@@ -91,7 +91,12 @@ public sealed class ObterDossieClienteUseCase(
             mesmoDomicilio,
             recentes.Select(Resumo).ToList(),
             pedidoEmAndamentoId is { } pedidoId ? historico.FirstOrDefault(p => p.Id == pedidoId) : null,
-            TotalGasto: compras.Sum(p => p.Total));
+            TotalGasto: compras.Sum(p => p.Total),
+            // #3387: ritmo e "cliente desde" saem das mesmas compras válidas dos demais números do cartão.
+            Ritmo: RitmoDeCompra.Calcular(compras.Select(p => p.CriadoEm)) is { } ritmo
+                ? new RitmoDeCompraDossie(ritmo.MedianaDias, ritmo.ComprasAnalisadas)
+                : null,
+            PrimeiraCompraEm: compras.Count == 0 ? null : compras.Min(p => p.CriadoEm));
     }
 
     /// <summary>Lead sem cadastro: só o que o canal informou.</summary>

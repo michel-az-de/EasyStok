@@ -45,6 +45,38 @@ public class ObterDossieClienteUseCaseTests
             itens.Select(i => new ItemPedidoResumo(i.Nome, i.Qtd)).ToList());
 
     [Fact]
+    public async Task RitmoEPrimeiraCompraIgnoramCancelados()
+    {
+        // #3387: compras em 3 dias distintos (0, 7 e 14) e um cancelado mais antigo e outro mais novo que não contam.
+        var pedidos = new List<PedidoResumoCliente>
+        {
+            Pedido(30, StatusPedidoMapper.Cancelado, ("Brigadeiro", 1m)),
+            Pedido(14, StatusPedidoMapper.Entregue, ("Brigadeiro", 1m)),
+            Pedido(7, StatusPedidoMapper.Entregue, ("Brigadeiro", 1m)),
+            Pedido(0, StatusPedidoMapper.Entregue, ("Brigadeiro", 1m)),
+            Pedido(-60, StatusPedidoMapper.Cancelado, ("Brigadeiro", 1m)),
+        };
+        _pedidos.ListarAsync(_empresaId, _cliente.Id, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(pedidos);
+
+        var dossie = await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, _cliente.Id));
+
+        dossie!.Ritmo.Should().Be(new RitmoDeCompraDossie(7, 3));
+        dossie.PrimeiraCompraEm.Should().Be(Base);
+    }
+
+    [Fact]
+    public async Task SemComprasSuficientesNaoHaRitmoNemPrimeiraCompra()
+    {
+        _pedidos.ListarAsync(_empresaId, _cliente.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([Pedido(0, StatusPedidoMapper.Entregue, ("Brigadeiro", 1m)), Pedido(5, StatusPedidoMapper.Cancelado)]);
+
+        var dossie = await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, _cliente.Id));
+
+        dossie!.Ritmo.Should().BeNull();
+        dossie.PrimeiraCompraEm.Should().Be(Base);
+    }
+
+    [Fact]
     public async Task FavoritoEUltimos10()
     {
         // 12 pedidos, mais novo primeiro (contrato da consulta). Brigadeiro aparece em 7 pedidos;

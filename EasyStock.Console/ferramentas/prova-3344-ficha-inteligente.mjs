@@ -37,7 +37,9 @@ caso('reclamação aberta vem antes de qualquer oferta', () => {
 })
 caso('só resolvidas: diz quantas e não bloqueia', () => {
   const l = leituraDoCliente({ estagio: 'fiel', ocorrenciasAbertas: 0, ocorrenciasTotal: 1 }, agora)
-  assert.equal(l.reclamacaoResolvida, '1 reclamação resolvida'); assert.equal(proximoPassoDoCliente(l), null)
+  assert.equal(l.reclamacaoResolvida, '1 reclamação resolvida')
+  // #3387: a resolvida não vira o passo de reclamação; a fiel recebe o passo de quem está em dia.
+  assert.equal(proximoPassoDoCliente(l), 'Cliente fiel: agradeça a preferência e apresente uma novidade.')
 })
 caso('sem data de compra e com compras: não inventa "há N dias"', () => {
   assert.equal(leituraDoCliente({ estagio: 'recorrente', compras: 2 }, agora).ultimaCompra, null)
