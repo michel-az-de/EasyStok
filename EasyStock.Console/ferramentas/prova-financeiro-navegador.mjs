@@ -86,6 +86,9 @@ const parcelaId = '55555555-5555-4555-8555-555555555555'
 const pagamentoId = '66666666-6666-4666-8666-666666666666'
 const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 const instante = `${hoje}T12:00:00-03:00`
+// #3389: o rótulo do fluxo é o do mês corrente (antes, "Outubro" fixo em novembro) e os dias anteriores do Caixa variam.
+const mesDoRotulo = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' }).format(new Date(`${hoje}T12:00:00Z`)).replace(/^./, (letra) => letra.toUpperCase())
+const diasAtras = (dia) => Math.round((Date.parse(`${hoje}T12:00:00Z`) - Date.parse(`${dia}T12:00:00Z`)) / 86400000)
 const conta = { id: contaId, empresaId, descricao: 'Compra de embalagens', categoriaFinanceiraId: categoriaId, centroCustoId: null, valorTotal: 100, totalPago: 0, totalRecebido: 0, pendente: 100, status: 'Aberta', dataEmissao: instante, observacoes: 'Conferir comprovante', parcelas: [{ id: parcelaId, numero: 1, valor: 100, valorPago: 0, saldo: 100, status: 'Pendente', dataVencimento: instante, pagamentos: [] }] }
 const contaReceber = structuredClone(conta)
 contaReceber.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
@@ -160,13 +163,20 @@ try {
     if (caminho === '/api/financeiro/categorias') return ok([{ id: categoriaId, nome: 'Operação', tipo: 'Ambas', ativa: true }])
     if (caminho === '/api/financeiro/centros-custo') return ok([])
     if (caminho === '/api/financeiro/dashboard') return ok({ totalAVencer30dPagar: 100, totalAVencer30dReceber: 100, totalVencidoPagar: 0, totalVencidoReceber: 0, totalPagoMes: 100, totalRecebidoMes: 200, qtdContasPagarAVencer30d: 1, qtdContasReceberAVencer30d: 1 })
-    if (caminho === '/api/financeiro/fluxo-caixa') return ok([{ inicioBucket: instante, fimBucket: instante, rotulo: 'Outubro', previstoPagar: 100, previstoReceber: 200, realizadoPagar: 50, realizadoReceber: 200 }])
+    if (caminho === '/api/financeiro/fluxo-caixa') return ok([{ inicioBucket: instante, fimBucket: instante, rotulo: mesDoRotulo, previstoPagar: 100, previstoReceber: 200, realizadoPagar: 50, realizadoReceber: 200 }])
     if (/^\/api\/contas-a-(pagar|receber)$/.test(caminho)) return ok([contaAtual], { total: 1, page: 1, limit: 20 })
     if (/^\/api\/contas-a-(pagar|receber)\//.test(caminho)) return ok(contaAtual)
     if (caminho === '/api/caixa/movimentos') return ok([{ id: '88888888-8888-4888-8888-888888888888', tipo: 'saida', descricao: 'Despesa avulsa', valor: 30, dataMovimento: instante, metodo: 'dinheiro' }], { total: 1, page: 1, limit: 100 })
     // #2262: o Pix do pedido pago pelo Mercado Pago chega pelas linhas do Caixa, fora dos movimentos.
     if (caminho === '/api/caixa/linhas') return ok([{ hora: instante, tipo: 'pagamento', valor: 19, metodo: 'pix', origem: 'Pedido', pedidoNumeroDoDia: 5 }])
-    if (caminho === '/api/caixa/dia') return ok({ data: url.searchParams.get('data') ?? hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
+    if (caminho === '/api/caixa/dia') {
+      const data = url.searchParams.get('data') ?? hoje
+      // #3389: hoje segue aberto; os anteriores alternam fechado, sem movimento e aberto (o aberto sem lançamento é o caso do "dia com movimento").
+      const situacao = ['aberto', 'fechado', 'sem-movimento'][Math.max(0, diasAtras(data)) % 3]
+      if (situacao === 'fechado') return ok({ data, aberto: false, fechado: true, saldoInicial: 100, saldoEsperado: 220, totalVendas: 120, movimentos: [], linhasExtras: [] })
+      if (situacao === 'sem-movimento') return ok({ data, aberto: false, fechado: false, saldoInicial: 0, saldoEsperado: 0, movimentos: [], linhasExtras: [] })
+      return ok({ data, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
+    }
     // #2813: a API do aparelho antigo responde `{ itens, ignorados }` cru, fora do envelope `{ data }`.
     if (caminho === '/api/mobile/legacy-import/fechamentos') { leiturasDosFechamentos++; return route.fulfill({ json: { itens: [fechamentoDoAparelho], ignorados: 1 } }) }
     if (caminho === '/api/atendimento/configuracao') return ok({})
@@ -310,12 +320,19 @@ try {
   await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).click()
   const pagamento = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
-  await pagamento.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  // #3389: a forma de pagamento nasce vazia e obrigatória; o botão traz o valor e fica desligado até escolher a forma.
+  const formaDoPagamento = pagamento.getByRole('combobox', { name: 'Forma de pagamento', exact: true })
+  assert.equal(await formaDoPagamento.inputValue(), '', '#3389: forma sem valor inicial')
+  assert.equal(await pagamento.getByRole('button', { name: /^Pagar R\$\s100,00$/ }).isDisabled(), true, '#3389: sem a forma o botão fica desligado')
+  await formaDoPagamento.selectOption('pix')
+  await pagamento.getByRole('button', { name: /^Pagar R\$\s100,00$/ }).click()
   await pagamento.waitFor({ state: 'hidden' })
   assert.equal(await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).count(), 0)
   await modal.getByRole('button', { name: 'Estornar', exact: true }).click()
   const estorno = page.getByRole('dialog', { name: 'Estornar registro', exact: true })
   await estorno.getByRole('textbox', { name: 'Motivo', exact: true }).fill('Registro de teste incorreto')
+  // #3389: estornar é ação destrutiva: o botão que confirma leva a variante perigo.
+  assert.match(await estorno.getByRole('button', { name: 'Confirmar', exact: true }).getAttribute('class'), /perigo/, '#3389: confirmar estorno em perigo')
   await estorno.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await estorno.waitFor({ state: 'hidden' })
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).waitFor()
@@ -329,7 +346,12 @@ try {
   // #2095: "Pagar" na linha abre o registro da próxima parcela direto (2 cliques em vez de 3).
   await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).click()
   const pagamentoDireto = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
-  await pagamentoDireto.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  // #3389: a forma de pagamento nasce vazia e obrigatória; o botão traz o valor e fica desligado até escolher a forma.
+  const formaDireta = pagamentoDireto.getByRole('combobox', { name: 'Forma de pagamento', exact: true })
+  assert.equal(await formaDireta.inputValue(), '', '#3389: forma sem valor inicial')
+  assert.equal(await pagamentoDireto.getByRole('button', { name: /^Pagar R\$\s100,00$/ }).isDisabled(), true, '#3389: sem a forma o botão fica desligado')
+  await formaDireta.selectOption('pix')
+  await pagamentoDireto.getByRole('button', { name: /^Pagar R\$\s100,00$/ }).click()
   await pagamentoDireto.waitFor({ state: 'hidden' })
   assert.equal(escritas.filter((item) => item.caminho === `/api/contas-a-pagar/${contaId}/parcelas/${parcelaId}/pagamentos`).length, 2)
   // Revisão #2105 (2): a conta selecionada não fica presa na lista ao trocar de chip.
@@ -351,13 +373,20 @@ try {
   modal = page.getByRole('dialog', { name: 'Venda de encomenda', exact: true })
   await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).click()
   const recebimento = page.getByRole('dialog', { name: 'Registrar recebimento', exact: true })
-  await recebimento.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  // #3389: a forma de pagamento nasce vazia e obrigatória; o botão traz o valor e fica desligado até escolher a forma.
+  const formaDoRecebimento = recebimento.getByRole('combobox', { name: 'Forma de recebimento', exact: true })
+  assert.equal(await formaDoRecebimento.inputValue(), '', '#3389: forma sem valor inicial')
+  assert.equal(await recebimento.getByRole('button', { name: /^Receber R\$\s100,00$/ }).isDisabled(), true, '#3389: sem a forma o botão fica desligado')
+  await formaDoRecebimento.selectOption('pix')
+  await recebimento.getByRole('button', { name: /^Receber R\$\s100,00$/ }).click()
   await recebimento.waitFor({ state: 'hidden' })
   assert.ok(escritas.some((item) => item.caminho === `/api/contas-a-receber/${contaReceber.id}/parcelas/${contaReceber.parcelas[0].id}/pagamentos`))
   assert.equal(await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).count(), 0)
   await modal.getByRole('button', { name: 'Estornar', exact: true }).click()
   const estornoRecebimento = page.getByRole('dialog', { name: 'Estornar registro', exact: true })
   await estornoRecebimento.getByRole('textbox', { name: 'Motivo', exact: true }).fill('Recebimento de teste incorreto')
+  // #3389: estornar é ação destrutiva: o botão que confirma leva a variante perigo.
+  assert.match(await estornoRecebimento.getByRole('button', { name: 'Confirmar', exact: true }).getAttribute('class'), /perigo/, '#3389: confirmar estorno em perigo')
   await estornoRecebimento.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await estornoRecebimento.waitFor({ state: 'hidden' })
   await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).waitFor()
@@ -419,6 +448,8 @@ try {
   await page.keyboard.press('Escape')
   conta.status = 'Aberta'
   falhaDeGravacao = true
+  // #3389: com a janela baixa, o erro da API precisa estar à vista sem rolar o modal.
+  await page.setViewportSize({ width: 1440, height: 600 })
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByRole('textbox', { name: 'Descrição', exact: true }).fill('Conta recusada')
@@ -427,9 +458,12 @@ try {
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).waitFor()
   assert.equal(await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).isVisible(), true)
+  const erroAVista = await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).evaluate((no) => { const r = no.getBoundingClientRect(); const topo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return r.top >= 0 && r.bottom <= innerHeight && no.contains(topo) })
+  assert.equal(erroAVista, true, '#3389: o erro da API aparece sem rolar o modal')
   await page.screenshot({ path: join(evidencias, 'financeiro-erro-preservado.png') })
   assert.equal(await modal.getByRole('textbox', { name: 'Descrição', exact: true }).inputValue(), 'Conta recusada')
   await descartarDigitado(page, modal)
+  await page.setViewportSize({ width: 1440, height: 960 })
   falhaDeGravacao = false
   // Revisão #2105 (3): "Já foi paga" com falha no registro: a lista recarrega, a conta trava e, ao fechar, abre.
   falhaDoPagamento = true
@@ -439,6 +473,10 @@ try {
   await modal.getByRole('combobox', { name: 'Categoria financeira', exact: true }).selectOption(categoriaId)
   await modal.getByRole('textbox', { name: 'Valor total', exact: true }).fill('100')
   await modal.getByLabel('Já foi paga', { exact: true }).check()
+  // #3389: a forma de pagamento também nasce vazia e obrigatória aqui; sem ela o Salvar fica desligado.
+  assert.equal(await modal.getByRole('combobox', { name: 'Forma de pagamento', exact: true }).inputValue(), '', '#3389: forma sem valor inicial em Já foi paga')
+  assert.equal(await modal.getByRole('button', { name: 'Salvar', exact: true }).isDisabled(), true, '#3389: sem a forma o Salvar fica desligado')
+  await modal.getByRole('combobox', { name: 'Forma de pagamento', exact: true }).selectOption('pix')
   const criacoesAntes = escritas.filter((item) => item.caminho === '/api/contas-a-pagar').length
   const recarga = page.waitForRequest((pedido) => pedido.method() === 'GET' && new URL(pedido.url()).pathname === '/api/contas-a-pagar')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
@@ -478,6 +516,8 @@ try {
   await page.getByRole('heading', { name: /^Vence hoje/ }).first().waitFor()
   assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).isVisible(), true)
   assert.equal(await page.locator('a[href="#/m/financeiro/pagar/hoje"]').count(), 1)
+  // #3389: Pagar e Receber da visão geral são secundários; a tela não tem laranja cheio.
+  assert.deepEqual(await page.locator('main [class*="primario"]:visible').allTextContents(), [], '#3389: visão geral sem botão primário')
   // #3331 (impeccable): o título de cada lado pesa mais que o do bloco, e a frase de lista vazia não ganha respiro extra.
   const hierarquia = await page.evaluate(() => {
     const por = (tag, texto) => [...document.querySelectorAll(tag)].find((no) => no.textContent.trim().startsWith(texto))

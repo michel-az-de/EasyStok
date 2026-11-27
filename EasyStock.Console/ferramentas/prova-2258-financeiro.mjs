@@ -158,8 +158,10 @@ caso('F10: chips quebram linha, sem barra de rolagem, e o ativo é de marca com 
   assert.doesNotMatch(chips, /scrollbar/)
   assert.match(painel, /aria-pressed=\{chip === item\.id && !comAvancado\}/)
   const ativo = regra(estilo, ".chip[aria-pressed='true']")
-  assert.match(ativo, /background:\s*var\(--marca\)/)
-  assert.match(ativo, /color:\s*var\(--marca-contraste\)/)
+  // #3389: o ativo deixou o fundo cheio da marca (repetia o laranja do primário): fundo tingido, contorno uniforme de 1px e o ✓.
+  assert.match(ativo, /background:\s*var\(--marca-claro\)/)
+  assert.match(ativo, /border-color:\s*var\(--marca\)/)
+  assert.match(ativo, /color:\s*var\(--tinta\)/)
 })
 
 // ---- F11: resumo só com seleção

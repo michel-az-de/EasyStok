@@ -25,7 +25,7 @@ import {
 } from '../../../dominio/aberturaDaLoja'
 import {
   CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, avisoForaDoFechamento, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
-  nomeDoMetodoCaixa, observacaoDoFechamento, quandoNoCaixa, resumoEmDuasContas, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
+  diasComMovimento, nomeDoMetodoCaixa, observacaoDoFechamento, quandoNoCaixa, resumoEmDuasContas, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
@@ -240,7 +240,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   const lancamentos = lancamentosEmOrdem(dia)
   const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && !m.devolucaoPedido && !m.pagamentoDeConta && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
-  if (lancamentos.length === 0) return <Vazio variante="linha" titulo="Nenhum lançamento neste caixa." />
+  if (lancamentos.length === 0) return <div className={css.vazioSemRecuo}><Vazio variante="linha" titulo="Nenhum lançamento neste caixa." /></div>
   return (
     <>
       <h3 className={css.tituloSecao}>Lançamentos</h3>
@@ -348,11 +348,12 @@ const ROTULO_TOTAL_DO_CAIXA = 'Total do caixa (com Pix e cartão)'
 // do pedido entregue pelo PWA, #1630) tem linha própria em vez de engordar "Pix e cartão".
 // #2512 (Q08, N3): duas contas, cada uma com a sua grade, que fecham no mesmo total. A grade se ajusta ao
 // número de linhas sozinha; antes o layout trocava quando a conta não dava seis.
-function ContaDoResumo({ titulo, linhas }) {
+function ContaDoResumo({ titulo, linhas, duasColunas = false }) {
   return (
     <section className={css.contaDoResumo} aria-label={titulo}>
-      <h4 className={css.tituloConta}>{titulo}</h4>
-      <dl className={css.resumoLista}>
+      {/* #3389: h3 (o h4 pulava o nível). */}
+      <h3 className={css.tituloConta}>{titulo}</h3>
+      <dl className={duasColunas ? `${css.resumoLista} ${css.duasColunas}` : css.resumoLista}>
         {linhas.map((l) => (
           <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt title={l.rotulo}>{l.rotulo}</dt><dd>{valorDoResumo(l.valor)}</dd></div>
         ))}
@@ -367,7 +368,7 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
     <div className={css.resumoDoDia}>
       <div className={css.contasDoResumo}>
         <ContaDoResumo titulo="Onde está" linhas={lugar} />
-        <ContaDoResumo titulo="De onde veio" linhas={origem} />
+        <ContaDoResumo titulo="De onde veio" linhas={origem} duasColunas />
       </div>
       <dl className={css.resumoLista}>
         <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{valorDoResumo(dia.saldoEsperado)}</dd></div>
@@ -446,7 +447,7 @@ function FluxoDaSemana({ hoje }) {
                 <td data-rotulo="Entrou">{moeda(total.entrou)}</td>
                 <td data-rotulo="Saiu">{moeda(total.saiu)}</td>
                 <td data-rotulo="Resultado" className={total.saldo < 0 ? css.valorSaida : undefined}>{moeda(total.saldo)}</td>
-                <td data-rotulo="Caixa">{plural(linhas.filter((l) => l.situacao !== 'sem-movimento').length, 'dia com movimento', 'dias com movimento')}</td>
+                <td data-rotulo="Caixa">{plural(diasComMovimento(linhas), 'dia com movimento', 'dias com movimento')}</td>
               </tr>
             </tfoot>
           )}

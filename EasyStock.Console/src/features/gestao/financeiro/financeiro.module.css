@@ -30,6 +30,9 @@
 .contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .contexto h2 { font-size: var(--t-forte); margin: 0; }
 .contexto p { margin: 0; color: var(--tinta-2); }
+/* #3389: o secundário tonal some no fundo do resumo (mesmo --preenchimento); aqui ele ganha papel e contorno de 1px. */
+.contexto > button:not(:disabled) { background: var(--papel); border-color: var(--linha-forte); }
+.contexto > button:hover:not(:disabled) { background: var(--preenchimento-forte); }
 .lista { display: grid; align-content: start; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: 0; border-radius: var(--r-2); min-width: 0; }
 /* #2095: a linha da conta é grade (descrição | valor com rótulo | ações); no celular as ações descem para baixo do valor. */
@@ -56,9 +59,10 @@
 .chips { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
 .chip { flex: none; transition: background-color var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao); min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
 .chip:hover { background: var(--preenchimento-forte); }
-.chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
-.chip[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
-.chip[aria-pressed='true']:hover { background: var(--marca); color: var(--marca-contraste); }
+/* #3389: o chip ativo não repete o laranja cheio do primário: fundo tingido, contorno uniforme de 1px e o ✓. */
+.chipAtivo, .chipAtivo:hover { background: var(--marca-claro); border-color: var(--marca); color: var(--tinta); }
+.chip[aria-pressed='true'] { background: var(--marca-claro); border-color: var(--marca); color: var(--tinta); }
+.chip[aria-pressed='true']:hover { background: var(--marca-claro); color: var(--tinta); }
 .chip[aria-pressed='true']::before { content: '✓'; content: '✓' / ''; margin-right: var(--e-1); font-weight: 700; }
 .verLista:focus-visible { outline: none; }
 .barra > .chips { flex: 1 1 360px; }
@@ -116,6 +120,7 @@
 .parcela p { margin: 0; }
 .historico { padding-left: var(--e-4); display: grid; gap: var(--e-2); }
 .paginacao { display: flex; align-items: center; justify-content: center; gap: var(--e-3); }
+.erroRodape { flex: 1 1 100%; min-width: 0; text-align: left; }
 .erro { color: var(--erro); background: var(--erro-pastel); border-radius: var(--r-1); padding: var(--e-3); margin: 0; }
 .aviso { color: var(--tinta-2); font-size: var(--t-apoio); margin: 0; }
 .avisoAtencao { display: block; margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta); background: var(--alerta-pastel); border-radius: var(--r-1); }
@@ -124,6 +129,17 @@
 .escolha + .aviso { margin-top: calc(var(--e-3) * -1); }
 .parcelas { margin: 0; padding-left: var(--e-5); max-height: 180px; overflow-y: auto; }
 .tabelaRolavel { min-width: 0; overflow-x: auto; }
+/* #3389: sombra na borda que ainda rola (só CSS): as duas faixas `local` cobrem a sombra quando a borda foi alcançada. */
+.tabelaRolavel {
+  --sombra-rolagem: color-mix(in srgb, var(--tinta) 28%, transparent);
+  background:
+    linear-gradient(to right, var(--papel) 30%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--papel) 30%, transparent) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sombra-rolagem), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--sombra-rolagem), transparent) right center / 12px 100% no-repeat scroll;
+}
+/* #3389: "Pedidos por anúncio" é outra seção: respiro de seção antes do título, não o gap de formulário. */
+.secaoSeguinte { margin-top: var(--e-6); }
 /* #2762 (VI5): primeira coluna fixa e uma sombra na borda dizem que a tabela rola para o lado. */
 .tabela tbody th, .tabela thead th:first-child { position: sticky; left: 0; background: var(--papel); text-align: left; }
 @media (max-width: 759px) { .tabela tbody th, .tabela thead th:first-child { box-shadow: inset calc(var(--b-1) * -1) 0 0 var(--linha); } }
