@@ -26,6 +26,7 @@ import { conversasDoCliente } from '../../../dominio/conversa'
 import { mesPorExtenso, moeda, moedaCheia, plural } from '../../../dominio/formato'
 import { diasDesde, estagioDoCliente, percentualDoGasto, posicaoDoEstagio, tagsVisiveis } from '../../../dominio/relacionamento'
 import { rotuloDaTag } from '../../../dominio/tag'
+import { DIAS_PARADA } from '../../../dominio/leituraDoCliente'
 import { clienteSemNome, nomeExibido } from '../../../dominio/nomeDoContato'
 import { abrirEdicaoCadastro, ATENCAO_DE_PRODUTOS, ordemPorVendas, ordensDaTela, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { CURVAS, numero, porProduto, sinalDoProduto, TENDENCIAS, textoDosDias as diasDaVenda } from '../../../dominio/desempenhoDoProduto'
@@ -59,6 +60,7 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
   const temGasto = Number.isFinite(r.gastoTotal)
   const pct = percentualDoGasto(r.gastoTotal, totalDaCarteira)
   const dias = diasDesde(r.ultimaCompraEm)
+  const parada = dias !== null && dias >= DIAS_PARADA && r.compras > 0
   const desde = r.criadoEm && Number.isFinite(Date.parse(r.criadoEm)) ? mesPorExtenso(Date.parse(r.criadoEm)) : null
   const tags = tagsVisiveis(r.tags)
   return <>
@@ -69,7 +71,7 @@ function CelulasDaRelacao({ relacao: r = {}, totalDaCarteira }) {
       {Number.isFinite(totalDaCarteira) && <span className={css.trilhoGasto} aria-hidden="true"><i style={{ width: `${r.gastoTotal > 0 && totalDaCarteira > 0 ? Math.max(pct, 2) : 0}%` }} /></span>}
       {r.gastoTotal > 0 && totalDaCarteira > 0 && <small>{textoDoPercentual(pct)} da carteira</small>}
       {Number.isFinite(r.ticketMedio) && r.compras > 0 && <small>ticket {moedaCheia(r.ticketMedio)}</small>}</div> : <Traco />}</td>
-    <td>{dias === null && !desde && r.compras !== 0 ? <Traco /> : <div className={css.gasto}>{dias !== null ? <strong>{textoDosDias(dias)}</strong> : r.compras === 0 ? <strong>Sem compra ainda</strong> : <Traco />}{desde && <small>desde {desde}</small>}</div>}</td>
+    <td>{dias === null && !desde && r.compras !== 0 ? <Traco /> : <div className={parada ? `${css.gasto} ${css.recenciaParada}` : css.gasto}>{dias !== null ? <strong>{parada && <><Icone nome="alerta" tamanho={16} /><span className="sr">{DIAS_PARADA} dias ou mais sem pedir: </span></>}{textoDosDias(dias)}</strong> : r.compras === 0 ? <strong>Sem compra ainda</strong> : <Traco />}{desde && <small>desde {desde}</small>}</div>}</td>
     <td><div className={css.sinais}>
       {r.ocorrenciasAbertas > 0 ? <Pilula tom="perigo" tamanho="inline" titulo={r.ocorrenciasAbertas === 1 ? "1 reclamação ainda aberta." : `${r.ocorrenciasAbertas} reclamações ainda abertas.`}>Reclamação</Pilula>
         : r.ocorrenciasTotal > 0 ? <small>{r.ocorrenciasTotal === 1 ? '1 reclamação resolvida' : `${r.ocorrenciasTotal} reclamações resolvidas`}</small> : null}

@@ -16,7 +16,7 @@ export function PedidosPorAnuncio() {
   const carregar = useCallback(() => obterPedidosPorAnuncio(periodo), [periodo])
   const consulta = useConsultaFinanceira(carregar)
   const linhas = consulta.dados ?? []
-  return <section className={css.painel} aria-label="Pedidos por anúncio">
+  return <section className={`${css.painel} ${css.secaoSeguinte}`} aria-label="Pedidos por anúncio">
     <h2>Pedidos por anúncio</h2>
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}>
       <CampoTexto rotulo="De" tipo="date" required value={rascunho.inicio} onChange={(e) => setRascunho({ ...rascunho, inicio: e.target.value })} />

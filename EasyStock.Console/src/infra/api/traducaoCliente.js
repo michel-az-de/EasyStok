@@ -65,6 +65,9 @@ export function relacionamentoDoDossie(dossie) {
   const { notas, tags, totalGasto, favorito, pedidos, fotoUrl } = lido.cliente
   return {
     bloqueio: lido.bloqueio, notas, tags, totalGasto, favorito, pedidos, fotoUrl: fotoUrl ?? null,
+    // #3387: ritmo de compra e primeira compra calculados pela API; API antiga sem os campos dá nulo.
+    ritmo: dossie.ritmo ? { dias: dossie.ritmo.medianaDias, compras: dossie.ritmo.comprasAnalisadas } : null,
+    primeiraCompraEm: dossie.primeiraCompraEm ? Date.parse(instante(dossie.primeiraCompraEm)) || null : null,
     conversas: (dossie.conversasRecentes ?? []).map((c) => ({
       id: c.id, canal: nomeDoCanal(c.canal), estado: estadoDaSituacao(c.situacao),
       em: quando(instante(c.ultimaMensagemEm ?? c.iniciadaEm)),

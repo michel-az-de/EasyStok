@@ -178,6 +178,7 @@
   --modal-sm: min(560px, calc(100vw - var(--e-6)));
   --modal-md: min(760px, calc(100vw - var(--e-6)));
   --modal-lg: min(880px, calc(100vw - var(--e-6)));
+  --modal-xl: min(1120px, calc(100vw - var(--e-6)));
 
   /* A mesma família na operação. Caveat é opt-in nos papéis de nota/comanda. */
   --f-corpo: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;

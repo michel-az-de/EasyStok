@@ -201,8 +201,9 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     finally { atividadeEmVoo.current = false; if (montado.current) alternar(false) }
   }
   const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
+  // #3387: a ficha é um perfil em duas colunas; com 880 px a coluna da direita apertava a leitura e as abas.
   const titulo = ehFicha ? 'Ficha do cliente' : `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
-  return <Modal titulo={titulo} largura={ehFicha ? 'lg' : 'md'} focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+  return <Modal titulo={titulo} largura={ehFicha ? 'xl' : 'md'} focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
@@ -288,7 +289,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       </fieldset>
     </form>
     {comRelacionamento && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento}
-      relacionamento={relacionamento.dados} carregandoRelacionamento={relacionamento.carregando && !relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
+      relacionamento={relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
     {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
     </div>
     </div>

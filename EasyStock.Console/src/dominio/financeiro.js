@@ -9,6 +9,8 @@ export function nomeStatusConta(status, lado = 'pagar') {
 }
 // #2095 (C2): a Pilula tem ok, aviso, perigo e neutro; "erro" não existe e apagava o vencido.
 export const tomDoStatusConta = (status) => status === 'Vencida' ? 'perigo' : status === 'Paga' ? 'ok' : status === 'ParcialmentePaga' ? 'aviso' : 'neutro'
+// #3389 (14): o valor da API continua `Ambas`; só o rótulo diz o que a categoria faz.
+export const nomeDoTipoDeCategoria = (tipo) => ({ Ambas: 'Pagar e receber' })[tipo] ?? tipo
 export const nomeStatusPagamento = (status) => ({ Confirmado: 'Registrado', Estornado: 'Estornado', Pendente: 'Pendente' })[status] ?? status
 // #3193: `emitir` é o `emitirAposCriar` da API: marcado, a conta entra nas contas a pagar (ou a receber), e "Já foi paga" só existe
 // com ele marcado; desmarcado, fica Rascunho. O texto não pode dizer "aberta": a conta que já foi paga sai Paga.

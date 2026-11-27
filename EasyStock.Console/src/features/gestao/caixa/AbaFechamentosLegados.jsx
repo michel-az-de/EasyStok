@@ -2,10 +2,11 @@
 // É arquivo histórico: o aparelho nunca mais envia fechamento (#2030), então a tela não edita, não apaga nem reenvia nada.
 // A rota é da policy Gerente; quem não pode nem vê a tela (`acao` em dominio/modulos.js).
 import { Botao } from '../../../componentes/Botao'
+import { Pilula } from '../../../componentes/Pilula'
 import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Vazio } from '../../../componentes/Vazio'
 import { useFechamentosLegados } from '../../../aplicacao/fechamentosLegados'
-import { avisoDeIgnorados, diaDoFechamento, quemFechou, totaisDoFechamento } from '../../../dominio/fechamentosLegados'
+import { ROTULO_GAVETA_NAO_CONFERIDA, avisoDeIgnorados, diaDoFechamento, quemFechou, totaisDoFechamento } from '../../../dominio/fechamentosLegados'
 import css from './fechamentosLegados.module.css'
 
 // Só desenha o estado recebido; a leitura mora no hook. Carregando, erro e vazio nunca aparecem juntos: lista vazia
@@ -42,9 +43,10 @@ export function CorpoDosFechamentosLegados({ carregando, erro, itens, ignorados,
               {fechamento.observacoes && <p className={css.observacoes}><strong>Observações:</strong> {fechamento.observacoes}</p>}
               <dl className={css.totais}>
                 {totaisDoFechamento(fechamento).map((total) => (
-                  <div key={total.rotulo} className={css.total}>
+                  <div key={total.rotulo} className={total.rotulo === 'Saldo' ? `${css.total} ${css.totalSaldo}` : css.total}>
                     <dt>{total.rotulo}</dt>
-                    <dd>{total.valor}</dd>
+                    {/* #3389: gaveta sem conferência é aviso de estado (Pílula), não texto solto que parece um valor. */}
+                    <dd>{total.valor === ROTULO_GAVETA_NAO_CONFERIDA ? <Pilula tom="aviso">{total.valor}</Pilula> : total.valor}</dd>
                   </div>
                 ))}
               </dl>

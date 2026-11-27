@@ -17,7 +17,9 @@
 .observacoes { margin: 0; font-size: var(--t-corpo); color: var(--tinta); overflow-wrap: anywhere; white-space: pre-line; }
 
 /* Os totais lado a lado enquanto couberem; no celular empilham. */
-.totais { margin: 0; display: grid; gap: var(--e-2) var(--e-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.totais { margin: 0; display: grid; gap: var(--e-2) var(--e-3); grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .total { display: grid; gap: 2px; }
 .total dt { font-size: var(--t-apoio); color: var(--tinta-2); }
 .total dd { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+/* #3389: o saldo é o número que a dona procura; maior que os outros totais, sem cor nova. */
+.totalSaldo dd { font-size: var(--t-forte); }

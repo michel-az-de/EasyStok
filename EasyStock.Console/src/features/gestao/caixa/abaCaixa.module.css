@@ -143,7 +143,10 @@
 .resumoDoDia .resumoLista dd { font-size: var(--t-forte); line-height: var(--lh-compacto); white-space: nowrap; }
 /* #2078 (E6): o número herói (a gaveta) com o tamanho de valor do Hall, não o de título. */
 .resumoDoDia .resumoLista .resumoForte dd { font-size: var(--t-valor); letter-spacing: var(--ls-display); }
-.resumoDoDia .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; padding: 0; }
+.resumoDoDia .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: baseline; padding: 0; }
+/* #3389: "De onde veio" em grade 2x2 (eram 4 itens em grade de 3) e o total como linha de soma, com divisor neutro de 1px. */
+.resumoDoDia .resumoLista.duasColunas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.resumoDoDia > .resumoLista { padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
 .notaGaveta { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); }
 .caixaApi .extrato { gap: var(--e-6); }
 .caixaApi .lista { gap: 0; }
@@ -203,7 +206,6 @@
   .resumoDoDia .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
   .resumoDoDia .resumoLista dt { white-space: normal; }
   .resumoDoDia .resumoLista .resumoForte { grid-column: auto; }
-  .resumoDoDia .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: var(--e-2); }
   .caixaApi .linha { gap: var(--e-2); padding-inline: var(--e-2); }
   .caixaApi .linhaInfo strong, .caixaApi .linhaValor { font-size: var(--t-apoio); }
 }
@@ -212,7 +214,6 @@
   .caixaApi .acoesTopo { gap: var(--e-1); }
   .caixaApi .acoesTopo > button { padding-inline: var(--e-2); }
   .resumoDoDia .resumoLista .resumoForte { grid-column: 1 / -1; }
-  .resumoDoDia .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
 }
 
 /* #2258 (F3): esqueleto do valor do resumo enquanto o dado não chegou (mesmos tokens do T2 do Atendimento). */
@@ -223,3 +224,5 @@
 }
 @keyframes esqueletoValorPulso { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .esqueletoValor { animation: none; } }
+/* #3389: o vazio em linha alinha com o título da seção; o recuo de 16 px do componente o empurrava para dentro. */
+.vazioSemRecuo > div { padding-inline: 0; }
