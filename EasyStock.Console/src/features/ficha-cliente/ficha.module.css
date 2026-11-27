@@ -164,6 +164,13 @@
   padding: 0 0 var(--e-3);
 }
 
+/* #3386 (r6, H6): enquanto há o que rolar, a borda inferior esmaece (a ficha no tablet escondia "Falta R$" abaixo da dobra, sem sinal).
+   Some no fim da rolagem e quando tudo cabe. */
+.conteudo[data-mais-abaixo='true'] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--e-6)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--e-6)), transparent);
+}
+
 /* #2420: a comanda é um cartão com contorno, e a ação de montar fica dentro dele. */
 /* #3374 (C5): o Pedido deixou de ser cartão (borda, raio e fundo) e é a primeira linha da lista da ficha: o botão
    "Itens" não fica mais num cartão dentro de cartão, e a divisória de 1px é a mesma das linhas de acesso. */

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { abrirSecao } from '../../hooks/useRecolhido'
+import { useMaisAbaixo } from '../../hooks/useMaisAbaixo'
 import { useDroppable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -125,6 +126,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // J2 (#1990): pedido pago cancelado diz no Resumo e no Pagamento quanto falta devolver.
   const aDevolver = useADevolver(fonteApi ? selecionada?.pedido : null)
   const [secao, setSecao] = useState(null)
+  const refConteudo = useMaisAbaixo()
   // #2849: quem pediu para editar (menu, endereço) cai na ficha única já com o formulário aberto.
   const [editarFicha, setEditarFicha] = useState(false)
   // #3207: "Cadastrar cliente" do cartão do lead abre a ficha já no formulário de cadastro; toda outra
@@ -282,7 +284,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         </output>
       ))}
 
-      <div className={css.conteudo}>
+      <div className={css.conteudo} ref={refConteudo}>
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
         <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={abrirFicha} aoCadastrar={editavel ? abrirCadastroDoLead : undefined}
           aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}

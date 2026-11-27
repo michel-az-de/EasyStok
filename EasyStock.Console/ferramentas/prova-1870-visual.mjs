@@ -146,7 +146,7 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
   assert.match(regra('cabecalhoFicha'), /flex-shrink: 0;/, 'cabeçalho não participa da rolagem')
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
   assert.match(painel, /<header className=\{css\.cabecalhoFicha\} data-cabecalho-ficha>/)
-  assert.match(painel, /<div className=\{css\.conteudo\}>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
+  assert.match(painel, /<div className=\{css\.conteudo\}[^>]*>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /<nav className=\{css\.acessosFicha\} aria-label="Detalhes do atendimento">/)
   assert.match(painel, /titulo="Pós-venda"/)
 })
