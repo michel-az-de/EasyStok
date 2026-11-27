@@ -28,7 +28,8 @@ function motivoDaLinha(motivo, origem) {
   return {
     ...motivo,
     tom: tomDoMotivo(motivo),
-    rotulo: resumido?.texto ?? motivo.rotulo,
+    // O rótulo de cobrança vem do domínio: depende do meio (Pix, link de cartão) e de haver cobrança.
+    rotulo: motivo.chave === 'cobranca' ? motivo.rotulo : (resumido?.texto ?? motivo.rotulo),
     icone: resumido?.icone ?? null,
     texto: motivo.texto ?? resumido?.titulo ?? null,
   }

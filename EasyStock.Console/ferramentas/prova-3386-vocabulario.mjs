@@ -53,6 +53,30 @@ assert.equal(pix('expirada').rotuloEstado, 'Pix vencido')
 assert.equal(pix('aguardando').rotuloEstado, 'Aguardando Pix')
 assert.equal(situacaoDaCobranca({ valor: 10, expiraEm: AGORA + 60 * 60000 }, AGORA).rotulo, 'Aguardando Pix')
 
+// Um nome por estado e por meio (r5 revisão, item 1): Pix, link de cartão e pedido sem cobrança emitida.
+const NOMES = [
+  ['Pix', { valor: 10, meio: 'pix' }, 'Aguardando Pix', 'Pix vencido'],
+  ['Pix sem meio (massa antiga)', { valor: 10 }, 'Aguardando Pix', 'Pix vencido'],
+  ['cartão por link', { valor: 10, meio: 'cartao-link' }, 'Aguardando cartão', 'Link vencido'],
+]
+for (const [nome, base, aguardando, vencido] of NOMES) {
+  const aberta = situacaoDaCobranca({ ...base, expiraEm: AGORA + 60 * 60000 }, AGORA)
+  assert.equal(aberta.rotulo, aguardando, `${nome}: aguardando`)
+  assert.equal(acaoDoPix(aberta, { aoAbrirBaixa() {}, aoReenviarPix() {}, linkVencidoApi: null }).rotuloEstado, aguardando, `${nome}: barra aguardando`)
+  const expirada = situacaoDaCobranca({ ...base, expiraEm: AGORA - 60000 }, AGORA)
+  assert.equal(acaoDoPix(expirada, { aoAbrirBaixa() {}, aoReenviarPix() {}, linkVencidoApi: null }).rotuloEstado, vencido, `${nome}: barra vencido`)
+  const m = motivoDePrecisar(conversa({ numero: NUMERO, cobranca: { ...base, criadaEm: AGORA - 90 * 60000, expiraEm: AGORA - 30 * 60000 } }), AGORA, false)
+  assert.equal(m.rotulo, vencido, `${nome}: motivo`)
+  assert.equal(m.texto, `Pedido 0194: ${vencido}`, `${nome}: texto do motivo`)
+}
+const semCobranca = motivoDePrecisar({
+  ...conversa({ numero: NUMERO, estado: 'aguardando', itens: [{ nome: 'Lasanha' }] }),
+  mensagens: [{ dir: 'out', regra: 'resumo', texto: 'Sua comanda', em: ha(300) }],
+}, AGORA, false)
+assert.equal(semCobranca?.chave, 'cobranca')
+assert.equal(semCobranca.rotulo, 'Pagamento vencido')
+assert.equal(semCobranca.texto, 'Pedido 0194: Pagamento vencido')
+
 // Valor: "Falta R$ X" na ficha.
 assert.equal(resumoDoPagamento({ saldo: 69 }), `Falta ${moeda(69)}`)
 assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /Falta \{moeda\(saldo\)\}/)

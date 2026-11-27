@@ -10,7 +10,7 @@
 // Puro. Conversa antiga, sem os campos novos, cai no padrão seguro: automático
 // ligado e nada de "precisa de você".
 
-import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
+import { aguardaAprovacao, rotuloDeVencido, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
 import { duracao, moeda } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
@@ -375,11 +375,12 @@ function cobrancaVencida(conversa, agora) {
     ? situacaoDaCobranca(pedido.cobranca, agora).chave === 'expirada'
     : (prazoDoPagamento(conversa, agora) ?? Infinity) <= agora
   if (!expirou) return null
+  const rotulo = rotuloDeVencido(pedido.cobranca)
   return {
     chave: 'cobranca',
-    rotulo: 'Pix vencido',
+    rotulo,
     tom: 'perigo',
-    texto: `${rotuloDoPedido(pedido.numero)}: Pix vencido`,
+    texto: `${rotuloDoPedido(pedido.numero)}: ${rotulo}`,
   }
 }
 
