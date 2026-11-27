@@ -319,7 +319,9 @@ await confere('#1989-4 cabeçalho da conversa: um "Link de compra" e nenhuma cha
   assert.ok(de >= 0 && direita.length > 0, 'cabeçalho não encontrado')
   const chaves = [...direita.matchAll(/key=\{([^}]+)\}/g)].map((m) => m[1].trim())
   assert.equal(new Set(chaves).size, chaves.length, `chaves repetidas entre irmãos: ${chaves.join(' | ')}`)
-  assert.equal((direita.match(/chave: 'cardapio'/g) ?? []).length, 1, 'um item só no cabeçalho')
+  // #3386 (r7): os itens do menu saíram para `itensDoMenu`, antes do JSX; o cardápio continua um item só no painel.
+  assert.equal((painel.match(/chave: 'cardapio'/g) ?? []).length, 1, 'um item só no cabeçalho')
+  assert.match(direita, /itens=\{itensDoMenu\}/, 'o menu do cabeçalho usa a lista única')
   // O botão que a Moldura passa à Ficha também não usa o id puro como chave.
   assert.doesNotMatch(fonte('app/Moldura.jsx'), /<CompartilharComanda key=\{selecionada\.id\}/)
 })
