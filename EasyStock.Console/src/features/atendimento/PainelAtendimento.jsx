@@ -9,11 +9,11 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { motivoDePrecisar } from '../../dominio/automatico'
+import { esperaAtrasada, motivoDePrecisar } from '../../dominio/automatico'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
-import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, esperaNoCabecalho, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
@@ -222,6 +222,7 @@ function PainelDaConversa({
   // Com o Assumir a faixa fica: na coluna de 750 px (1440 com o cliente aberto) selo e botão empurravam a linha
   // da janela para baixo. Sem ação nem frase, a faixa era só a pílula: essa sobe.
   const motivoDaBarraAtual = motivoDaBarra(motivoDaFila, motivo, pausado)
+  const esperaDoCabecalho = esperaNoCabecalho(esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera, motivoDaBarraAtual)
   // #3374 (C0): o selo no cabeçalho fica desligado até a C8. Ligado, o cabeçalho passou de 64 para 77 px em 1280
   // e a comanda cobriu o "Total dos itens" (prova-1738), a quebra medida na crítica de 23/11.
   const cardapioNoCabecalho = desktop && Boolean(acoesTela.enviarCardapio)
@@ -259,13 +260,15 @@ function PainelDaConversa({
             <span className={css.nomeCliente}>
               <NomeDoContato completo={apresentacao.completo} curto={apresentacao.curto} capsula={apresentacao.capsula} titulo={apresentacao.titulo} />
             </span>
-            {/* Comanda, canal e, com a janela aberta, o prazo, em uma linha. #1761 (L4): a quantidade de
+            {/* Comanda, canal e, com a janela aberta, o prazo (e a espera atrasada, se a barra não a diz), em uma linha. #1761 (L4): a quantidade de
                 pedidos saiu (está em Histórico). #3234 (C2): fechada, quem diz é a faixa junto do campo. */}
             <small>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {/* #3384 (revisão): o atraso fica à vista em qualquer largura; só a janela folgada some abaixo de 1280. */}
               {prazo && <span className={prazoFolgado(janela) ? css.prazoFolgado : undefined}>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></span>}
+              {/* Espera atrasada: a barra a diz quando é o motivo dela; com outro motivo na barra, é aqui, uma vez só. */}
+              {esperaDoCabecalho && <span>{' · '}{esperaDoCabecalho}</span>}
               {/* O foco vai a este título ao trocar de conversa: o leitor de tela ouve a janela que só a faixa mostra. */}
               {!prazo && janela && !janela.textoLivre && <span className="sr"> · {janela.rotulo}</span>}
             </small>

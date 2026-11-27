@@ -79,7 +79,7 @@ export function estadoDaJanela(conversa, agora, canal) {
 // Bloqueada com a janela aberta, o prazo promete uma escrita que o bloqueio impede: não aparece.
 const FAIXA_DE_OUTRO_ASSUNTO = new Set(['bloqueio', 'reabrir'])
 // #3384 (P1-4): a janela é o que o WhatsApp deixa aberto, não o prazo da loja. #3386: o canal já vem escrito antes
-// ("WhatsApp · aberto até ..."), então o prazo não repete o nome; a espera atrasada é da barra, não daqui.
+// ("WhatsApp · aberto até ..."), então o prazo não repete o nome. A espera atrasada tem `esperaNoCabecalho`.
 export function prazoNoCabecalho(janela, motivo = null) {
   if (!janela) return null
   if (janela.textoLivre) {
@@ -88,6 +88,11 @@ export function prazoNoCabecalho(janela, motivo = null) {
   }
   return motivo && !FAIXA_DE_OUTRO_ASSUNTO.has(motivo.acao) ? null : janela.rotulo
 }
+// #3386 (revisão): a espera atrasada aparece uma vez só e nunca escondida. Se a barra já a diz (motivo "esperando"),
+// o cabeçalho não repete; se a barra mostra outro motivo (passagem, reclamação, restrição), o cabeçalho a diz.
+// `espera` é a duração já escrita ("2 h 50"), a mesma que o motivo da fila usa.
+export const esperaNoCabecalho = (espera, motivoDaBarra = null) =>
+  espera && motivoDaBarra?.chave !== 'esperando' ? `Cliente espera há ${espera}` : null
 // Abaixo de 1280 px a linha do cabeçalho volta a quebrar: lá o prazo só aparece perto do fim (#1761 L4).
 export const MINUTOS_PARA_MOSTRAR_PRAZO = 120
 export const prazoFolgado = (janela) => Boolean(janela?.textoLivre) && janela.restam != null && janela.restam >= MINUTOS_PARA_MOSTRAR_PRAZO
