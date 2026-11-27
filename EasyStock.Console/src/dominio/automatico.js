@@ -310,6 +310,8 @@ function esperaDoCliente(conversa, agora, pausado = true, expediente = null) {
     // Minuto cru acima de uma hora nunca mais (seção 1): "duracao" já sabe
     // virar "1 h 12", "23 h" ou "2 d".
     texto: `Cliente falou por último e espera ${duracao(agora - new Date(ultima.em).getTime())}`,
+    // #3384: só a duração, para o cabeçalho dizer o mesmo atraso da fila.
+    espera: duracao(agora - new Date(ultima.em).getTime()),
   }
 }
 
@@ -530,9 +532,12 @@ export const motivoVisivel = (conversa, agora, pausado = true, aberta = true, ja
 // topo de "Precisa de você". Independe da precedência do motivo do cartão:
 // passagem ou reclamação com o cliente esperando além do prazo também piscam,
 // porque quem espera é o mesmo cliente.
-export const respostaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
+export const esperaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
   Boolean(conversa) && !foraDeAlcance(conversa)
-  && esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente) != null
+    ? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)
+    : null
+export const respostaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
+  esperaAtrasada(conversa, agora, pausado, expediente) != null
 
 // A Frente A do Balcão (rodada 5) passa o valor real de `automaticoPausado`
 // aqui: contar com o default (automático pausado) inflava "Precisa de você"

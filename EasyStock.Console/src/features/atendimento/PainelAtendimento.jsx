@@ -9,7 +9,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { motivoDePrecisar } from '../../dominio/automatico'
+import { esperaAtrasada, motivoDePrecisar } from '../../dominio/automatico'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
@@ -217,7 +217,7 @@ function PainelDaConversa({
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   // #3206: lead sem cadastro também envia; o servidor decide.
   const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
-  const prazo = prazoNoCabecalho(janela, motivo)
+  const prazo = prazoNoCabecalho(janela, motivo, esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera)
   // #2134: quem responde e o Assumir ficam fora da área que rola. No modo nota a barra sai de cena.
   // Com o Assumir a faixa fica: na coluna de 750 px (1440 com o cliente aberto) selo e botão empurravam a linha
   // da janela para baixo. Sem ação nem frase, a faixa era só a pílula: essa sobe.
