@@ -91,7 +91,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   // a altura da linha de contexto de antes e a mantém enquanto estiver atenuado, para nenhum cartão se deslocar.
   const linhaRef = useRef(null)
   const alturaDaLinha = useRef(0)
-  useLayoutEffect(() => { if (!atenuado && linhaRef.current) alturaDaLinha.current = linhaRef.current.getBoundingClientRect().height })
+  useLayoutEffect(() => { if (!atenuado && typeof linhaRef.current?.getBoundingClientRect === 'function') alturaDaLinha.current = linhaRef.current.getBoundingClientRect().height })
   const reservaAltura = atenuado && alturaDaLinha.current > 0 ? alturaDaLinha.current : null
 
   return (
