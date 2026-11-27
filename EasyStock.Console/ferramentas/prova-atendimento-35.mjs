@@ -6,11 +6,10 @@
 //   c fundos    cores de fundo distintas                                  d fonteMin      menor tamanho de fonte
 //   e aninhados cartão (borda + raio + fundo) dentro de outro igual       f contraste     textos com contraste < 4,5
 //   g alvos     alvos interativos < 24 px                                 h bordaEsq      borda colorida só à esquerda
-// SEMPRE sai 0 gravando a medida (o `rodar-provas.mjs` roda todo prova-*.mjs). Só cobra o alvo com ALVO_35=1
+// Grava a medida e SEMPRE cobra o alvo (sai 1 se algum não for atingido):
 // (laranjas==1 e no máximo 1 em cada estado da conversa (antes de assumir, assumida, com texto), espaçamentos só da escala --e-1..--e-6, fundos <= 3 superfícies + 5 estados, fonte >= 13, e/f/g/h == 0).
-// A C15 tira essa chave: o alvo passa a ser cobrado sempre.
 //
-//   PLAYWRIGHT_MODULE=<pasta do playwright> [ALVO_35=1] node ferramentas/prova-atendimento-35.mjs
+//   PLAYWRIGHT_MODULE=<pasta do playwright> node ferramentas/prova-atendimento-35.mjs
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -331,8 +330,6 @@ fixas.push([devolverProvado > 0, 'nenhuma condição ofereceu Devolver ao Assist
 const quebradas = fixas.filter(([ok]) => !ok).map(([, t]) => t)
 if (quebradas.length) { console.log(['', `C9/C10: ${quebradas.length} falha(s)`, ...quebradas.map((l) => `  ${l}`)].join('\n')); process.exit(1) }
 console.log(`C9/C10 e r1 ok (${fixas.length} verificações: Assumir à vista com o painel, conversa fora do painel, Esc devolve o foco, botões sem sobreposição e em 1 linha, Assistente sem texto coberto)`)
-if (process.env.ALVO_35 === '1') {
-  if (cobranca.length) { console.log(`\nALVO_35: ${cobranca.length} alvo(s) não atingido(s)\n${cobranca.map((l) => `  ${l}`).join('\n')}`); process.exit(1) }
-  console.log('ALVO_35: todos os alvos atingidos')
-} else console.log('Alvo não cobrado (defina ALVO_35=1 para cobrar).')
+if (cobranca.length) { console.log(`\nAlvo: ${cobranca.length} não atingido(s)\n${cobranca.map((l) => `  ${l}`).join('\n')}`); process.exit(1) }
+console.log('Alvo: todos atingidos')
 process.exit(0)
