@@ -126,7 +126,7 @@ confere('5c guarda: passagem genérica sem sinal específico segue como motivo d
 })
 
 confere('5c guarda: passagem com motivo específico (restrição) continua na frente', () => {
-  const c = conversaComPassagem('Restrição alimentar, confira a ficha do prato antes de responder', 'Mandei o pix agora')
+  const c = conversaComPassagem('Restrição alimentar, confira os ingredientes antes de responder', 'Mandei o pix agora')
   assert.equal(motivoDePrecisar(c, AGORA, false)?.chave, 'passagem')
 })
 

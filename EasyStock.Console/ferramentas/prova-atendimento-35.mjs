@@ -334,7 +334,7 @@ for (const w of [1280, 1440]) {
   })
   fixas.push([aviso !== null && /lactose/i.test(aviso.texto), `restrição ${w}: o aviso não diz o item a evitar: ${JSON.stringify(aviso)}`])
   fixas.push([aviso !== null && !aviso.cortado, `restrição ${w}: o aviso do cabeçalho está cortado (scrollHeight > clientHeight): ${JSON.stringify(aviso)}`])
-  fixas.push([aviso !== null && /ficha do prato antes de responder/.test(aviso.title), `restrição ${w}: o motivo inteiro saiu do title: ${aviso?.title}`])
+  fixas.push([aviso !== null && /ingredientes antes de responder/.test(aviso.title), `restrição ${w}: o motivo inteiro saiu do title: ${aviso?.title}`])
   await p.close()
 }
 

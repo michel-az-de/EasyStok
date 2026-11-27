@@ -1,4 +1,4 @@
-// #3384 (r4 P1-3): a restrição alimentar só tingia a pílula; a frase "Sem lactose: confira a ficha do prato" saía
+// #3384 (r4 P1-3): a restrição alimentar só tingia a pílula; a frase "Sem lactose: confira os ingredientes" saía
 // cinza como qualquer outra. O resumo diz qual motivo é (`motivo`) e a barra dá à frase o tom de aviso, sem laranja.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -13,11 +13,11 @@ registerHooks({
 })
 const { resumoDoModo } = await import('../src/dominio/resumoDoModo.js')
 const conversa = { id: 1, mensagens: [{ dir: 'in', texto: 'ela não pode lactose' }] }
-const restricao = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: 'Sem lactose: confira a ficha do prato' }
+const restricao = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso', texto: 'Sem lactose: confira os ingredientes' }
 
 const r = resumoDoModo(conversa, false, false, { motivo: restricao })
 assert.equal(r.motivo, 'restricao', 'o resumo diz que o motivo é a restrição')
-assert.equal(r.linha, 'Sem lactose: confira a ficha do prato')
+assert.equal(r.linha, 'Sem lactose: confira os ingredientes')
 assert.equal(resumoDoModo(conversa, false, false, { motivo: null }).motivo, null, 'sem motivo, nada a destacar')
 
 const barra = readFileSync(new URL('../src/features/atendimento/BarraModo.jsx', import.meta.url), 'utf8')

@@ -151,7 +151,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, confira a ficha do prato antes de responder',
+  restricao: 'Restrição alimentar, confira os ingredientes antes de responder',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
   'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
@@ -417,12 +417,12 @@ function valorDiferente(conversa, agora) {
 // mensagens ainda sem resposta. Sem texto carregado (resumo da API), não opina.
 const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
 
-// #3381: o aviso diz o que evitar ("Sem lactose: confira a ficha do prato"), curto para caber sem corte no cabeçalho;
+// #3381: o aviso diz o que evitar ("Sem lactose: confira os ingredientes"), curto para caber sem corte no cabeçalho;
 // o motivo inteiro fica em `detalhe` (title e leitor de tela). Sem item reconhecido, o texto genérico de sempre.
 export function avisoDeRestricao(item) {
   const base = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso' }
   if (!item) return { ...base, texto: MOTIVO_POR_INTENCAO.restricao }
-  return { ...base, texto: `Sem ${item}: confira a ficha do prato`, detalhe: MOTIVO_POR_INTENCAO.restricao }
+  return { ...base, texto: `Sem ${item}: confira os ingredientes`, detalhe: MOTIVO_POR_INTENCAO.restricao }
 }
 
 export function sinalUrgente(conversa, agora) {
