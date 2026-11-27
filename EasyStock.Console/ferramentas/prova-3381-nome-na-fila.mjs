@@ -19,6 +19,7 @@ assert.equal(curto('Maria de Fátima Albuquerque'), 'Maria A.', 'partícula some
 assert.equal(curto('Ana Clara Montenegro Souza'), 'Ana S.')
 assert.equal(curto('Notelet Eletrônicos'), 'Notelet E.')
 assert.equal(curto('Notelet Eletrônicos Ltda'), 'Notelet Eletrônicos')
+assert.equal(curto('Supermercado Bom Preço Comércio de Alimentos Eireli'), 'Supermercado Bom Preço Comércio de Alimentos')
 assert.equal(curto('Beatriz'), 'Beatriz', 'uma palavra fica como veio (o CSS corta com reticências)')
 assert.equal(curto('Anastácia-Maria Vasconcelos'), 'Anastácia-Maria V.', 'primeiro nome composto fica inteiro')
 assert.equal(curto('Renan O'), 'Renan O', 'já curto: não muda')
