@@ -32,6 +32,11 @@
    meio da palavra e, sem dicionário (WebKit no Windows), cortava na borda. "Configurações" mede ~77 px em 12 px sem
    espaçamento negativo e o item tem 72: o rótulo do trilho é "Ajustes" (`dominio/trilhoDoConsole.js`). O `title` tem o nome inteiro. */
 .item > span { max-width: 100%; white-space: normal; overflow-wrap: normal; hyphens: none; }
+/* #3386 (r7, H4): em altura de notebook (800 a 920 px) os 12 itens mais a Ajuda não cabiam e Disposição, Lembretes e Simular
+   ficavam atrás de uma rolagem sem barra. O item perde o respiro vertical e a altura de folga (o conteúdo já passa de --toque). */
+@media (max-height: 920px) {
+  .item, .filhos > button, .filhos > div > button { min-height: var(--toque); padding: 2px 0; gap: 1px; }
+}
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);

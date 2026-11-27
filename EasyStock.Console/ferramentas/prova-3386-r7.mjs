@@ -85,11 +85,13 @@ try {
         const lr = lista.getBoundingClientRect()
         const filhos = [...lista.children].filter((e) => e.getBoundingClientRect().width > 0)
         const fora = filhos.filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > lr.bottom + 1 || r.top < lr.top - 1 }).map((e) => e.innerText.trim() || e.getAttribute('aria-label') || e.title)
-        return { rolagem: lista.scrollHeight - lista.clientHeight, n: filhos.length, fora, texto: lista.innerText }
+        const aj = [...nav.querySelectorAll('button')].find((b) => /^Ajuda$/.test(b.innerText.trim()))
+        const ar = aj?.getBoundingClientRect()
+        return { rolagem: lista.scrollHeight - lista.clientHeight, n: filhos.length, fora, texto: lista.innerText, ajudaNaTela: Boolean(ar && ar.top >= 0 && ar.bottom <= innerHeight) }
       })
       contagem[`${w}${tema}`] = m.n
       cobrar(m.rolagem <= 1 && m.fora.length === 0, `${w} px ${tema}: trilho sem rolagem escondida (sobra ${m.rolagem} px; fora: ${m.fora.join(', ') || 'nenhum'})`)
-      cobrar(/Disposição/.test(m.texto) && /Ajuda/.test(m.texto), `${w} px ${tema}: Disposição e Ajuda no trilho`)
+      cobrar(/Disposição/.test(m.texto) && m.ajudaNaTela, `${w} px ${tema}: Disposição no trilho e Ajuda à vista`)
       await p.close()
     }
     const valores = new Set(Object.values(contagem))

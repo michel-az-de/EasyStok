@@ -13,6 +13,7 @@
   scrollbar-width: none;
 }
 .itens::-webkit-scrollbar { display: none; }
+@media (max-height: 920px) { .itens { gap: 0; } }
 .inicio { composes: inicio from '../../componentes/Trilho.module.css'; margin-bottom: var(--e-2); }
 .item { composes: item from '../../componentes/Trilho.module.css'; cursor: pointer; }
 button.ajuda { background: none; border: 0; font: inherit; color: inherit; }
