@@ -700,7 +700,7 @@ await confere('#2079-C2 entregue com saldo: sem "nada pendente", com "Marcar pag
   const tela = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo(), { aoConfirmarPagamento: async (...a) => { idas.push(a) }, aoEncerrarAtendimento: nada }))
   const tudo = texto(tela.arvore).replace(/ /g, ' ')
   assert.ok(!tudo.includes('nada pendente'), 'dizia "nada pendente" com R$ 88,00 a receber')
-  assert.match(tudo, /R\$ 88,00 a receber/)
+  assert.match(tudo, /Entregue, falta R\$ 88,00\./)
   const marcar = botao(tela, 'Marcar pago (R$')
   assert.ok(marcar, 'falta o "Marcar pago" com o saldo')
   assert.match(texto(marcar).replace(/ /g, ' '), /Marcar pago \(R\$ 88,00\)/)
