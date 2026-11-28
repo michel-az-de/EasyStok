@@ -195,6 +195,12 @@ try {
   const confirma = painel(page).getByRole('button', { name: 'Sim, marcar todas', exact: true })
   await confirma.waitFor()
   assert.match(await painel(page).innerText(), /equipe/i, 'a confirmação diz que vale para a equipe')
+  // O botão clicado some: o foco vai para a saída segura (Cancelar) e, cancelando, volta para Marcar todas.
+  const focado = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? '')
+  assert.equal(await focado(), 'Cancelar', 'ao pedir a confirmação, o foco vai para Cancelar')
+  await painel(page).getByRole('button', { name: 'Cancelar', exact: true }).click()
+  assert.equal(await focado(), 'Marcar todas como lidas', 'ao cancelar, o foco volta para Marcar todas')
+  await painel(page).getByRole('button', { name: 'Marcar todas como lidas', exact: true }).click()
   await confirma.click()
   await painel(page).getByText('Tudo em dia', { exact: false }).waitFor({ timeout: 3000 })
   assert.ok(escritas.includes('POST marcar-todas'))
@@ -282,6 +288,19 @@ try {
   estado.atrasoTodasMs = 0
   console.log('ok 8b: resposta velha da aba Todas não desfaz a leitura')
 
+  // 8e. Atualizar a aba Todas com uma leitura ainda pendente: a resposta, que saiu antes da gravação, não traz
+  // o aviso de volta nem agora nem depois que a leitura termina.
+  estado.atrasoMs = 1500
+  const semPontoEm = async (id) => (await painel(pagina).locator(`[data-aviso="${id}"] [data-nao-lida]`).count()) === 0
+  await painel(pagina).getByRole('button', { name: 'Marcar como lido: Validade perto: molho branco', exact: true }).click()
+  await painel(pagina).getByRole('button', { name: 'Atualizar avisos', exact: true }).click()
+  await pagina.waitForTimeout(400)
+  assert.ok(await semPontoEm('a2'), 'a aba Todas pedida com leitura pendente trouxe o aviso lido de volta')
+  await pagina.waitForTimeout(1800)
+  assert.ok(await semPontoEm('a2'), 'depois da leitura, a aba Todas ficou com o aviso lido como não lido')
+  estado.atrasoMs = 0
+  console.log('ok 8e: aba Todas pedida durante a leitura não desfaz a leitura')
+
   // 8c. O 11º que sobe para os recentes depois da leitura é antigo: não entra realçado como se tivesse chegado.
   await abaNaoLidas.click()
   await painel(pagina).locator('[data-aviso="x7"]').waitFor()
@@ -292,6 +311,15 @@ try {
   await painel(pagina).locator('[data-aviso="n1"][class*="chegou"]').waitFor({ timeout: 3000 })
   await pagina.waitForFunction(() => window.__balancou === true, null, { timeout: 3000 })
   console.log('ok 8c/8d: só o aviso novo de fato realça e balança o sino')
+
+  // 8f. A consulta sozinha (a de 30 s, aqui pela volta à aba do navegador) não tira o foco de quem está no sino.
+  await sinoBanca.focus()
+  estado.naoLidas.unshift({ id: 'n2', tipo: 'Sistema', titulo: 'Mesa 4 pediu a conta', mensagem: 'Pedido 0044.', severidade: 'Media', createdAt: new Date().toISOString(), lida: false })
+  await pagina.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await painel(pagina).locator('[data-aviso="n2"]').waitFor({ timeout: 3000 })
+  await pagina.waitForTimeout(100)
+  assert.match(await pagina.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? ''), /^Avisos/, 'a consulta automática puxou o foco do sino para o painel')
+  console.log('ok 8f: consulta automática não rouba o foco')
   await banca.context.close()
 
   assert.deepEqual(erros, [], 'erros no console')

@@ -44,14 +44,16 @@
   padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-1);
   overflow-wrap: anywhere; transition: background var(--dur-curta) var(--ease-saida);
 }
+/* Não lido tem o fundo tingido da marca (como o Facebook); o lido só ganha cinza ao passar o mouse, para não
+   parecer não lido. */
 .aviso:hover { background: var(--preenchimento); }
-.naoLida { background: var(--preenchimento); }
+.naoLida { background: var(--marca-claro); }
 .naoLida:hover { background: var(--preenchimento-forte); }
-.chegou { animation: chegar 1.4s var(--ease-saida) both; }
+/* Sem fill-mode: terminada a entrada, vale o fundo da própria linha (lido ou não, com ou sem mouse). */
+.chegou { animation: chegar 1.4s var(--ease-saida); }
 @keyframes chegar {
   from { background: var(--marca-claro); transform: translateY(-4px); }
   30% { transform: none; }
-  to { background: var(--preenchimento); }
 }
 
 .selo {

@@ -41,6 +41,9 @@ export function SinoDaSessao({ avisos, aparelho }) {
   const botaoRef = useRef(null)
   const painelRef = useRef(null)
   const focoDepoisRef = useRef(null)
+  const marcarTodasRef = useRef(null)
+  const cancelarRef = useRef(null)
+  const voltarParaMarcarTodasRef = useRef(false)
   const idPainel = useId()
 
   // O sino balança quando chega aviso novo de fato, não quando o total sobe porque uma leitura falhou e voltou.
@@ -109,15 +112,26 @@ export function SinoDaSessao({ avisos, aparelho }) {
     }
   }, [aberto])
 
-  // Ao abrir, o foco vai para a aba ativa; depois de ler um aviso, para o próximo da lista (o botão lido sumiu).
+  // Ao abrir, o foco vai para a aba ativa.
   useEffect(() => {
-    if (!aberto) return
-    const painel = painelRef.current
+    if (aberto) painelRef.current?.querySelector('[role="tab"][aria-selected="true"]')?.focus()
+  }, [aberto])
+  // Depois de ler um aviso, o foco vai para o próximo não lido (o botão lido sumiu) ou para a aba. Só depois de
+  // uma leitura: a consulta de 30 s muda a lista sem tirar o foco de onde a pessoa está.
+  useEffect(() => {
     const alvo = focoDepoisRef.current
+    if (!aberto || alvo === null) return
     focoDepoisRef.current = null
+    const painel = painelRef.current
     const proximo = alvo ? painel?.querySelector(`[data-aviso="${CSS.escape(alvo)}"] button`) : null
-    ;(proximo || (alvo !== null || !painel?.contains(document.activeElement) ? painel?.querySelector('[role="tab"][aria-selected="true"]') : null))?.focus()
+    ;(proximo || painel?.querySelector('[role="tab"][aria-selected="true"]'))?.focus()
   }, [aberto, recentes, todas.itens])
+  // O botão clicado some com a confirmação: o foco vai para Cancelar e, cancelando, volta para Marcar todas.
+  useEffect(() => {
+    if (confirmandoTodas) cancelarRef.current?.focus()
+    else if (voltarParaMarcarTodasRef.current) marcarTodasRef.current?.focus()
+    voltarParaMarcarTodasRef.current = false
+  }, [confirmandoTodas])
 
   const trocarAba = (id) => {
     setAba(id)
@@ -170,14 +184,14 @@ export function SinoDaSessao({ avisos, aparelho }) {
           <BotaoIcone icone="refresh-cw" rotulo="Atualizar avisos"
             onClick={() => { setAgora(Date.now()); if (aba === 'todas') carregarTodas(); else carregar() }} disabled={carregando || todas.carregando} />
           {aba === 'naoLidas' && naoLidas > 0 && !confirmandoTodas && (
-            <Botao variante="texto" icone="circle-check" onClick={() => setConfirmandoTodas(true)}>Marcar todas como lidas</Botao>
+            <Botao ref={marcarTodasRef} variante="texto" icone="circle-check" onClick={() => setConfirmandoTodas(true)}>Marcar todas como lidas</Botao>
           )}
         </header>
         {confirmandoTodas && (
           <div className={css.confirmacao}>
             <p>Marcar {naoLidas === 1 ? 'o aviso' : `os ${naoLidas} avisos`} como {naoLidas === 1 ? 'lido' : 'lidos'}? Os avisos gerais saem da lista da equipe toda.</p>
             <div>
-              <Botao variante="texto" onClick={() => setConfirmandoTodas(false)}>Cancelar</Botao>
+              <Botao ref={cancelarRef} variante="texto" onClick={() => { voltarParaMarcarTodasRef.current = true; setConfirmandoTodas(false) }}>Cancelar</Botao>
               <Botao variante="primario" onClick={() => { setConfirmandoTodas(false); focoDepoisRef.current = ''; marcarTodas() }}>Sim, marcar todas</Botao>
             </div>
           </div>
