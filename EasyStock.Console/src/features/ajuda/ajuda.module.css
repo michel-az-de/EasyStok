@@ -26,3 +26,7 @@
 .telas { display: flex; flex-wrap: wrap; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .telas a { display: inline-flex; align-items: center; min-height: var(--toque); padding-inline: var(--e-3); border-radius: var(--r-1); color: var(--marca-forte); font-weight: 600; text-decoration: none; background: var(--preenchimento); }
 .telas a:hover { background: var(--preenchimento-forte); }
+
+/* #3392: interruptor dos atalhos de uma tecla. */
+.interruptor { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-corpo); }
+.atalhos { margin: 0; padding-left: var(--e-4); }

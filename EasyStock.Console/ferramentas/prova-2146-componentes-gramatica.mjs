@@ -80,7 +80,7 @@ await confere('1. o Composer não tem `title` nativo em controle nem <button> cr
   // #2706: a única exceção é o parágrafo "Só texto neste canal" (texto, não controle), que leva a
   // frase inteira no title como antes da #2143 (prova 1868).
   const titulos = [...composer.matchAll(/<(\w+)([^<>]*?)\stitle=/g)]
-    .filter((m) => !(m[1] === 'p' && /^ id=\{idRestricao\} className=\{css\.restricao\}$/.test(m[2])))
+    .filter((m) => !(m[1] === 'p' && /^ id=\{idRestricao\} className=\{css\.restricao(NaBarra)?\}$/.test(m[2]))) // #3392: o curto mora na barra
     .map((m) => m[1])
   assert.deepEqual(titulos, [], `title em: ${titulos.join(', ')}`)
   assert.equal((composer.match(/<button\b/g) ?? []).length, 0, '<button> cru no Composer')

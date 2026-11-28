@@ -487,6 +487,11 @@ export function Composer({
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
+              {/* #3392 (r10, H8): o aviso curto do canal só de texto mora na barra, ao lado do Enviar que ele explica: a linha
+                  de baixo saía da altura das mensagens. O motivo inteiro segue no title e no leitor de tela. */}
+              {restricao && !(podeAnexar || podeAudio) && (
+                <p id={idRestricao} className={css.restricaoNaBarra} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>
+              )}
               {temTexto || anexo || !acoes.audio ? (
                 <Tooltip texto={variavelSobrando ?? (excedeLimite ? limite.texto : temTexto || anexo ? (enviaAssumindo ? 'Enviar e assumir a conversa' : 'Enviar mensagem') : restricao ?? 'Escreva a mensagem para enviar')}
                   atalho={temTexto || anexo ? 'Enter' : undefined}>
@@ -527,9 +532,7 @@ export function Composer({
           {/* #1870: em coluna estreita a frase inteira quebrava em 2 linhas. Canal só de texto mostra
               o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. A #2143 tinha
               deixado só o texto de leitor de tela e os botões sumiam sem explicação (#2706). */}
-          {restricao && (podeAnexar || podeAudio
-            ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
-            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
+          {restricao && (podeAnexar || podeAudio) && <p id={idRestricao} className={css.restricao}>{restricao}</p>}
         </>
       )}
 

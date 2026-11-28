@@ -6,6 +6,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { Popover } from '../../componentes/Popover'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAtalhosLigados } from '../../aplicacao/atalhoDeTecla'
 import { precisaDeVoce } from '../../dominio/automatico'
 import { congelado } from '../../dominio/congelados'
 import {
@@ -62,6 +63,7 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 // #2227: `semContagem` enquanto a lista não chegou da API; 0 ali seria "não há conversa".
 export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = false }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
+  const [atalhosLigados] = useAtalhosLigados()
   const botaoFiltros = useRef(null)
   const { canais, janelas } = useCatalogo()
   const { conversas, agora, automaticoPausado, aberta, horarioDaLoja, sessao } = useAtendimento()
@@ -133,7 +135,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = fa
         <span className={css.campoBusca}>
           <Icone nome="search" tamanho={20} />
           <label className="sr" htmlFor="balcao-busca">Buscar comanda, nome, telefone, mensagem ou tag</label>
-          <input id="balcao-busca" type="search" className={css.entradaBusca} placeholder="Buscar conversa" value={filtros.busca}
+          <input id="balcao-busca" type="search" className={css.entradaBusca} placeholder="Buscar conversa" value={filtros.busca} aria-keyshortcuts={atalhosLigados ? '/' : undefined}
             onChange={e => {
               if (e.target.value.trim() && filtros.aba === 'precisa') aoMudar('aba', 'todas')
               aoMudar('busca', e.target.value)
