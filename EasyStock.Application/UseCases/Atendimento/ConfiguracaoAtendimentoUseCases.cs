@@ -1,6 +1,8 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Options;
 
@@ -192,9 +194,11 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
 
 /// <summary>
 /// S58 (#1391): define (ou limpa, com nome vazio) o modelo aprovado que reabre a conversa fora da janela de 24 h.
-/// O nome tem de existir aprovado na Meta, com uma variável no corpo (o primeiro nome do cliente).
+/// O nome tem de existir aprovado na Meta, com uma variável no corpo (o primeiro nome do cliente). #3415: na sessão web
+/// o nome é conferido no catálogo da loja (mensagens padrão), que já está no banco; na Meta segue sem consulta.
 /// </summary>
-public sealed class DefinirModeloRetomadaUseCase(IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork)
+public sealed class DefinirModeloRetomadaUseCase(
+    IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICatalogoModelosAtendimento catalogo)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(Guid empresaId, string? nome, string? idioma)
     {
@@ -211,6 +215,9 @@ public sealed class DefinirModeloRetomadaUseCase(IConfiguracaoAtendimentoReposit
         {
             throw new UseCaseValidationException(ex.Message);
         }
+        // Conferido depois do domínio, com o idioma já normalizado (o Console não manda idioma).
+        if (configuracao.ModeloRetomada is { } modelo && await catalogo.UsaModelosLocaisAsync(empresaId))
+            await EnviarModeloConversaUseCase.ModeloDeRetomadaAsync(catalogo, empresaId, modelo, CancellationToken.None);
 
         if (nova) await repository.AddAsync(configuracao);
         else await repository.UpdateAsync(configuracao);

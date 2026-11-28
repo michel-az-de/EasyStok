@@ -42,7 +42,8 @@ public class ReenviarMensagemUseCaseTests
     {
         var canais = new ResolvedorCanal([_whatsapp]);
         return new(_conversas, _configuracoes, canais,
-            new ReservaSmsAtendimento(canais, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance), _uow, _relogio);
+            new ReservaSmsAtendimento(canais, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance), _uow, _relogio,
+            Substitute.For<ICatalogoModelosAtendimento>());
     }
 
     [Fact]
@@ -272,7 +273,7 @@ public class ReenviarMensagemRetomadaTests
         var canais = new ResolvedorCanal([_whatsapp, _sms]);
         var useCase = new ReenviarMensagemUseCase(_conversas, _configuracoes, canais,
             new ReservaSmsAtendimento(canais, _opcoesSms, NullLogger<ReservaSmsAtendimento>.Instance),
-            _uow, new FakeTimeProvider(new DateTimeOffset(Agora)));
+            _uow, new FakeTimeProvider(new DateTimeOffset(Agora)), Substitute.For<ICatalogoModelosAtendimento>());
         return useCase.ExecuteAsync(_empresaId, _conversa.Id, _falhou.Id);
     }
 
@@ -308,7 +309,7 @@ public class ReenviarMensagemRetomadaTests
         var canais = new ResolvedorCanal([_whatsapp, _sms]);
         var useCase = new ReenviarMensagemUseCase(_conversas, _configuracoes, canais,
             new ReservaSmsAtendimento(canais, _opcoesSms, NullLogger<ReservaSmsAtendimento>.Instance),
-            _uow, new FakeTimeProvider(new DateTimeOffset(Agora)));
+            _uow, new FakeTimeProvider(new DateTimeOffset(Agora)), Substitute.For<ICatalogoModelosAtendimento>());
 
         await useCase.ExecuteAsync(_empresaId, lead.Id, falhou.Id);
 

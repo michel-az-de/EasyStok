@@ -226,7 +226,7 @@ public class CorridasAtendimentoIntegrationTests(PostgreSqlDatabaseFixture fixtu
         var canais = new ResolvedorCanal([canal]);
         return new(new ConversaRepository(db), Substitute.For<IConfiguracaoAtendimentoRepository>(), canais,
             new ReservaSmsAtendimento(canais, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
-            db, TimeProvider.System);
+            db, TimeProvider.System, Substitute.For<EasyStock.Application.Ports.Output.Atendimento.ICatalogoModelosAtendimento>());
     }
 
     private static ProcessarEventoWhatsAppUseCase Webhook(EasyStockDbContext db, Guid empresaId)

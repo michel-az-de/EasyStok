@@ -16,6 +16,8 @@ namespace EasyStock.Application.UseCases.Atendimento.Reenvio;
 /// dele. Fora da janela (pelo relógio ou pela Meta, 131047), com modelo de retomada configurado, o modelo sai uma vez
 /// por contato e a mensagem espera o cliente responder; sem modelo, a falha é permanente com o motivo.
 /// S60: quando o WhatsApp desiste, a reserva por SMS tenta (se estiver ligada).
+/// #3415: na sessão web não há modelo da Meta; o modelo de retomada é a mensagem padrão local e sai como texto, com as
+/// regras do envio manual (cliente escreveu até 7 dias atrás e não pediu para parar).
 /// </para>
 /// </summary>
 public sealed class ReenviarMensagemUseCase(
@@ -25,6 +27,7 @@ public sealed class ReenviarMensagemUseCase(
     ReservaSmsAtendimento reservaSms,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
+    ICatalogoModelosAtendimento catalogo,
     ILogger<ReenviarMensagemUseCase>? logger = null)
 {
     public const string MotivoForaDaJanela = "Fora da janela de 24 h: só um modelo aprovado alcança o cliente.";
@@ -102,8 +105,7 @@ public sealed class ReenviarMensagemUseCase(
         {
             try
             {
-                var externoId = await resolvedorCanal.Obter(conversa.Canal).EnviarModeloAsync(
-                    conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, [NomesDeContato.PrimeiroNome(conversa.ContatoNome, "cliente")], ct);
+                var externoId = await EnviarRetomadaAsync(empresaId, conversa, modelo, agora, ct);
                 var aviso = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, $"[modelo {modelo.Nome}]", externoId);
                 await conversaRepository.AddMensagemAsync(aviso, ct);
@@ -120,6 +122,27 @@ public sealed class ReenviarMensagemUseCase(
 
         mensagem.AguardarCliente(agora, MotivoAguardandoCliente);
     }
+
+    private async Task<string> EnviarRetomadaAsync(Guid empresaId, Conversa conversa, ModeloRetomada modelo, DateTime agora, CancellationToken ct)
+    {
+        var canal = resolvedorCanal.Obter(conversa.Canal);
+        IReadOnlyList<string> parametros = [NomesDeContato.PrimeiroNome(conversa.ContatoNome, "cliente")];
+        if (!await catalogo.UsaModelosLocaisAsync(empresaId, ct))
+            return await canal.EnviarModeloAsync(conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, parametros, ct);
+
+        // #3415: a mensagem padrão local segue as regras do envio manual; vale a entrada mais recente do contato.
+        var local = await EnviarModeloConversaUseCase.ModeloDeRetomadaAsync(catalogo, empresaId, modelo, ct);
+        var aberta = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, conversa.Canal, conversa.ContatoIdExterno, ct);
+        EnviarModeloConversaUseCase.GarantirJanelaDoModeloLocal(
+            MaisRecente(conversa.UltimaMensagemEntradaEm, aberta?.UltimaMensagemEntradaEm), agora);
+        await EnviarModeloConversaUseCase.GarantirSemPedidoDeOptOutAsync(conversaRepository, conversa, ct);
+        var texto = EnviarModeloConversaUseCase.TextoDoModelo(local, parametros);
+        if (texto.Length > Mensagem.TextoTamanhoMaximo)
+            throw new UseCaseValidationException("A mensagem padrão de retomada preenchida excede o tamanho máximo da mensagem.");
+        return await canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
+    }
+
+    private static DateTime? MaisRecente(DateTime? a, DateTime? b) => a is null ? b : b is null ? a : a > b ? a : b;
 }
 
 /// <summary>Mensagem inexistente, de outra conversa ou de outra empresa: 404.</summary>

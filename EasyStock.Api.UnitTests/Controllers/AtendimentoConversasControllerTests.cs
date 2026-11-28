@@ -90,7 +90,7 @@ public partial class AtendimentoConversasControllerTests
             _enviarUseCase,
             new ReenviarMensagemUseCase(_repositorio, ConfiguracoesPadrao(), resolvedor,
                 new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
-                _unitOfWork, TimeProvider.System),
+                _unitOfWork, TimeProvider.System, Substitute.For<EasyStock.Application.Ports.Output.Atendimento.ICatalogoModelosAtendimento>()),
             new ListarNaoEntreguesUseCase(_repositorio),
             new GerenciarConversaAtendimentoUseCase(_repositorio, _unitOfWork),
             new TransferirConversaUseCase(_repositorio, _atendentes, _unitOfWork),

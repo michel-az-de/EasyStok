@@ -15,7 +15,7 @@ public class AtendimentoConfiguracaoController(
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Set the approved template that reopens a conversation after 24 h (S58, Admin only)",
-        Description = "Nome vazio desliga a retomada. O modelo precisa estar aprovado na Meta com uma variável (o primeiro nome).")]
+        Description = "Nome vazio desliga a retomada. O modelo precisa estar aprovado na Meta com uma variável (o primeiro nome); na sessão web, precisa existir nas mensagens padrão da loja (#3415).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [HttpPut("modelo-retomada")]
