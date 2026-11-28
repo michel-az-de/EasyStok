@@ -9,6 +9,7 @@ on:
       - '.github/workflows/console.yml'
       - 'scripts/deploy/console-deploy*.sh'
       - 'scripts/poka-yoke/posttooluse-lint-console.mjs'
+      - '.claude/settings.json'
   push:
     branches: [master]
     paths:
@@ -16,6 +17,7 @@ on:
       - '.github/workflows/console.yml'
       - 'scripts/deploy/console-deploy*.sh'
       - 'scripts/poka-yoke/posttooluse-lint-console.mjs'
+      - '.claude/settings.json'
   workflow_dispatch:
 
 permissions:

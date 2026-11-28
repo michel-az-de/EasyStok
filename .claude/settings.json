@@ -23,11 +23,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd",
+            "command": "node",
             "args": [
-              "/d",
-              "/c",
-              "${CLAUDE_PROJECT_DIR}\\scripts\\poka-yoke\\posttooluse-lint-console.cmd"
+              "${CLAUDE_PROJECT_DIR}\\scripts\\poka-yoke\\posttooluse-lint-console.mjs"
             ],
             "timeout": 30
           }

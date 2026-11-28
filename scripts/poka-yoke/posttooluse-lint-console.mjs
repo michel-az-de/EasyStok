@@ -8,8 +8,11 @@ ate 10 linhas, que o Claude Code mostra ao agente na hora (a edicao ja aconteceu
 seguinte). Limpo ou fora do escopo: calado. oxlint ausente ou quebrado: aviso no contexto. Sempre exit 0,
 no padrao do pretooluse-block-generated.ps1 (JSON, sem misturar com exit code).
 
-Recebe o payload via STDIN; o fast-gate posttooluse-lint-console.cmd so chama este script quando o payload
-cita o Console. Worktree sem node_modules usa o oxlint de outro checkout com a config e o cwd dela.
+Recebe o payload via STDIN e e chamado direto pelo node, sem fast-gate cmd+findstr: o findstr cala com
+linha acima de 128 KiB (Write de arquivo grande) e o %RANDOM% do arquivo temporario colide entre hooks em
+paralelo, entregando o erro de um arquivo a outra edicao (medido na revisao da #3404). O node direto custa
+~30 ms a mais por edicao fora do Console. Worktree sem node_modules usa o oxlint de outro checkout com a
+config e o cwd dela.
 Configurado em .claude/settings.json. Ver .poka-yoke/registry.yaml (traps.ia-import-inexistente).
 */
 import { spawnSync } from 'node:child_process'
@@ -40,6 +43,7 @@ function oxlintDisponivel(raiz) {
 }
 
 function lintar(entrada) {
+  if (!/EasyStock\.Console/i.test(entrada)) return null
   let arquivo
   try {
     arquivo = String(JSON.parse(entrada)?.tool_input?.file_path ?? '')

@@ -120,7 +120,7 @@ traps:
   - id: ia-import-inexistente
     class: M
     desc: "agente escreve no Console import de arquivo, pacote ou export que nao existe, variavel sem uso ou hook do React condicional; so caia no build ou no CI"
-    detector: "hook PostToolUse posttooluse-lint-console.{cmd,mjs} (oxlint so no arquivo tocado, so erros, ate 10 linhas, decision block) + regra local/import-existe (EasyStock.Console/ferramentas/oxlint-local.mjs) + prova-3401-lint-na-edicao.mjs"
+    detector: "hook PostToolUse posttooluse-lint-console.mjs (node direto, sem findstr; oxlint so no arquivo tocado, so erros, ate 10 linhas, decision block) + regra local/import-existe (EasyStock.Console/ferramentas/oxlint-local.mjs) + prova-3401-lint-na-edicao.mjs"
     status: active
     evidence: "#3401: oxlint 1.85 nao tem import/no-unresolved; import './naoExiste' passava no lint"
 

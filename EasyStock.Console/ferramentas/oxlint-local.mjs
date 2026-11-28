@@ -2,8 +2,8 @@
 //
 // local/import-existe: o oxlint não tem `import/no-unresolved`. Sem esta regra, `import x from './naoExiste'`
 // (erro típico de código escrito por IA) passava no lint e só caía no build. Barra:
-//   - especificador relativo sem arquivo, com as extensões que o Vite resolve no src, e com a caixa exata do
-//     último nome (o Windows acha `./botao` para Botao.jsx; o build do CI em Linux, não);
+//   - especificador relativo sem arquivo, com as extensões que o Vite resolve no src, e com a caixa exata de
+//     cada nome do caminho (o Windows acha `./botao` para Botao.jsx; o build do CI em Linux, não);
 //   - pacote que não está no package.json mais próximo (pacote inventado ou dependência fantasma). Confere o
 //     package.json, não o node_modules: worktree sem npm ci não dá falso positivo.
 // Não olha caminho absoluto (`/logo.svg`, servido de public/), `node:`, `virtual:`, URL nem import com template.
@@ -16,15 +16,37 @@ const EXTENSOES = ['', '.js', '.jsx', '.mjs', '.json', '/index.js', '/index.jsx'
 const NATIVOS = new Set(builtinModules)
 const pacotesPorPasta = new Map()
 
+const nomesPorPasta = new Map()
+
 const ehArquivo = (caminho) => existsSync(caminho) && statSync(caminho).isFile()
-const nomeExato = (caminho) => readdirSync(dirname(caminho)).includes(basename(caminho))
 const nomeDoPacote = (especificador) => especificador.split('/').slice(0, especificador.startsWith('@') ? 2 : 1).join('/')
 
-// A caixa se confere no último nome escrito no import: o arquivo, ou a pasta quando resolve para index.
-function arquivoDoImport(base) {
+function nomesDaPasta(pasta) {
+  if (!nomesPorPasta.has(pasta)) nomesPorPasta.set(pasta, new Set(readdirSync(pasta)))
+  return nomesPorPasta.get(pasta)
+}
+
+// Confere a caixa de cada nome escrito no import (pastas e arquivo), andando a partir da pasta de quem importa.
+// No último nome vale o que existe no disco: `Botao` resolve para Botao.jsx, ou para a pasta com index.
+function caixaConfere(pastaDeQuemImporta, especificador, achado) {
+  const partes = especificador.split('/')
+  let atual = pastaDeQuemImporta
+  for (const [i, parte] of partes.entries()) {
+    if (parte === '' || parte === '.') continue
+    if (parte === '..') { atual = dirname(atual); continue }
+    const nome = i === partes.length - 1 ? basename(achado) : parte
+    if (!nomesDaPasta(atual).has(nome)) return false
+    atual = join(atual, nome)
+  }
+  return true
+}
+
+function arquivoDoImport(pastaDeQuemImporta, especificador) {
+  const base = resolve(pastaDeQuemImporta, especificador)
   const extensao = EXTENSOES.find((candidata) => ehArquivo(base + candidata))
   if (extensao === undefined) return 'não existe'
-  return nomeExato(extensao.startsWith('/') ? base : base + extensao) ? null : 'não existe com essa caixa no nome'
+  const achado = extensao.startsWith('/') ? base : base + extensao
+  return caixaConfere(pastaDeQuemImporta, especificador, achado) ? null : 'não existe com essa caixa no nome'
 }
 
 function pacotesDeclarados(pasta) {
@@ -44,7 +66,7 @@ function pacotesDeclarados(pasta) {
 function problema(especificador, arquivo) {
   const limpo = especificador.split(/[?#]/)[0]
   if (limpo.startsWith('.')) {
-    const falta = arquivoDoImport(resolve(dirname(arquivo), limpo))
+    const falta = arquivoDoImport(dirname(resolve(arquivo)), limpo)
     return falta && `arquivo "${especificador}" ${falta}`
   }
   if (!limpo || limpo.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(limpo) || NATIVOS.has(limpo)) return null
