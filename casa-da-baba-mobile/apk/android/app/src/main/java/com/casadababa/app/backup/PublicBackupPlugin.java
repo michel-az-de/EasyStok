@@ -2,6 +2,7 @@ package com.casadababa.app.backup;
 
 import android.app.Activity;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
@@ -28,6 +29,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Plugin de backup público — sobrevive uninstall do app.
@@ -57,71 +63,62 @@ public class PublicBackupPlugin extends Plugin {
         final String json = call.getString("json");
         if (json == null) { call.reject("json obrigatorio"); return; }
 
+        // #3425: cada pasta no seu try; uma falha em Documents não pula a cópia em Download.
+        Uri docsUri = null;
+        Uri dlUri = null;
+        String docsErro = null;
+        String dlErro = null;
         try {
-            Uri docsUri = writeToCollection(filename, json,
+            docsUri = writeToCollection(filename, json,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                     ? MediaStore.Files.getContentUri("external")
                     : null,
                 Environment.DIRECTORY_DOCUMENTS + "/" + SUBDIR);
+        } catch (Exception e) {
+            docsErro = mensagem(e);
+        }
 
-            // Cópia adicional em /Download/ — fácil pro usuário achar pelo
-            // gerenciador de arquivos, e MUITO menos agressivo de scoped storage.
-            Uri dlUri = writeToCollection(filename, json,
+        // Cópia adicional em /Download/ — fácil pro usuário achar pelo
+        // gerenciador de arquivos, e MUITO menos agressivo de scoped storage.
+        try {
+            dlUri = writeToCollection(filename, json,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                     ? MediaStore.Downloads.EXTERNAL_CONTENT_URI
                     : null,
                 Environment.DIRECTORY_DOWNLOADS + "/" + SUBDIR);
-
-            JSObject ret = new JSObject();
-            ret.put("documentsUri", docsUri != null ? docsUri.toString() : null);
-            ret.put("downloadsUri", dlUri != null ? dlUri.toString() : null);
-            ret.put("filename", filename);
-            ret.put("survivesUninstall", true);
-            call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Falha ao salvar backup publico: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()), e);
+            dlErro = mensagem(e);
         }
+
+        if (docsUri == null && dlUri == null) {
+            call.reject("Falha ao salvar backup publico: " + docsErro + "; downloads: " + dlErro);
+            return;
+        }
+        JSObject ret = new JSObject();
+        ret.put("documentsUri", docsUri != null ? docsUri.toString() : null);
+        ret.put("downloadsUri", dlUri != null ? dlUri.toString() : null);
+        ret.put("documentsError", docsErro);
+        ret.put("downloadsError", dlErro);
+        ret.put("filename", filename);
+        ret.put("survivesUninstall", true);
+        call.resolve(ret);
+    }
+
+    private static String mensagem(Exception e) {
+        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
     }
 
     /**
      * Escreve em uma coleção MediaStore (Q+) ou direto no path público (P-).
-     * Atualiza arquivo existente quando filename já existe (UPSERT por display_name).
+     * No Q+ o PublicBackupWriter sobrescreve a cópia do app em vez de criar outra a cada envio.
      */
     private Uri writeToCollection(String filename, String json, Uri collection, String relativePath) throws IOException {
         ContentResolver resolver = getContext().getContentResolver();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && collection != null) {
-            // Procura existente pra fazer update (evita acumular duplicatas
-            // tipo "backup-latest (1).json", "backup-latest (2).json").
-            Uri existing = findExistingByName(resolver, collection, filename, relativePath);
-            if (existing != null) {
-                try (OutputStream out = resolver.openOutputStream(existing, "wt")) {
-                    if (out != null) {
-                        out.write(json.getBytes(StandardCharsets.UTF_8));
-                        out.flush();
-                    }
-                }
-                return existing;
-            }
-
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
-            values.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
-            values.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
-            values.put(MediaStore.MediaColumns.IS_PENDING, 1);
-
-            Uri uri = resolver.insert(collection, values);
-            if (uri == null) throw new IOException("MediaStore insert retornou null");
-
-            try (OutputStream out = resolver.openOutputStream(uri, "wt")) {
-                if (out == null) throw new IOException("openOutputStream retornou null");
-                out.write(json.getBytes(StandardCharsets.UTF_8));
-                out.flush();
-            }
-            values.clear();
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0);
-            resolver.update(uri, values, null, null);
-            return uri;
+            long id = PublicBackupWriter.write(new MediaStoreFolder(resolver, collection, relativePath), filename,
+                json.getBytes(StandardCharsets.UTF_8), new SimpleDateFormat("yyyyMMddHHmmss", Locale.ROOT).format(new Date()));
+            return ContentUris.withAppendedId(collection, id);
         }
 
         // Android P (API 28) e abaixo: usa filesystem direto.
@@ -135,19 +132,85 @@ public class PublicBackupPlugin extends Plugin {
         return Uri.fromFile(file);
     }
 
-    private Uri findExistingByName(ContentResolver resolver, Uri collection, String filename, String relativePath) {
-        String[] proj = { MediaStore.MediaColumns._ID };
-        String sel = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND "
-                   + MediaStore.MediaColumns.RELATIVE_PATH + " LIKE ?";
-        // RELATIVE_PATH no MediaStore termina com '/'; aceitamos com ou sem.
-        String[] args = { filename, relativePath.endsWith("/") ? relativePath : relativePath + "/%" };
-        try (Cursor c = resolver.query(collection, proj, sel, args, null)) {
-            if (c != null && c.moveToFirst()) {
-                long id = c.getLong(0);
-                return Uri.withAppendedPath(collection, String.valueOf(id));
+    /** #3425: a cópia que o writePublicBackup sobrescreve, inclusive "backup-latest (n).json". */
+    private Uri findBackup(ContentResolver resolver, Uri collection, String filename, String relativePath) {
+        try {
+            PublicBackupWriter.Entry e = PublicBackupWriter.find(new MediaStoreFolder(resolver, collection, relativePath), filename);
+            return e != null ? ContentUris.withAppendedId(collection, e.id) : null;
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    /** #3425: uma pasta do MediaStore (Android Q+) entregue ao PublicBackupWriter. */
+    private static final class MediaStoreFolder implements PublicBackupWriter.Store {
+        private final ContentResolver resolver;
+        private final Uri collection;
+        private final String relativePath;
+
+        MediaStoreFolder(ContentResolver resolver, Uri collection, String relativePath) {
+            this.resolver = resolver;
+            this.collection = collection;
+            // RELATIVE_PATH no MediaStore sempre termina com '/'.
+            this.relativePath = relativePath.endsWith("/") ? relativePath : relativePath + "/";
+        }
+
+        /** Sem engolir erro: consulta que falha não pode virar "sem cópia" e criar outra a cada envio. */
+        @Override
+        public List<PublicBackupWriter.Entry> listOwned(String prefix) throws IOException {
+            String[] proj = { MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME };
+            String sel = MediaStore.MediaColumns.RELATIVE_PATH + "=? AND "
+                       + MediaStore.MediaColumns.DISPLAY_NAME + " LIKE ?";
+            String[] args = { relativePath, prefix + "%" };
+            List<PublicBackupWriter.Entry> r = new ArrayList<>();
+            try (Cursor c = resolver.query(collection, proj, sel, args, null)) {
+                if (c == null) throw new IOException("MediaStore query retornou null");
+                while (c.moveToNext()) r.add(new PublicBackupWriter.Entry(c.getLong(0), c.getString(1)));
             }
-        } catch (Exception ignore) {}
-        return null;
+            return r;
+        }
+
+        @Override
+        public void overwrite(long id, byte[] data) throws IOException {
+            try (OutputStream out = resolver.openOutputStream(uri(id), "wt")) {
+                if (out == null) throw new IOException("openOutputStream retornou null");
+                out.write(data);
+                out.flush();
+            }
+        }
+
+        @Override
+        public long insertPending(String name) throws IOException {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
+            values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+            Uri uri = resolver.insert(collection, values);
+            if (uri == null) throw new IOException("MediaStore insert retornou null");
+            return ContentUris.parseId(uri);
+        }
+
+        @Override
+        public void publish(long id, String rename) {
+            ContentValues values = new ContentValues();
+            if (rename != null) values.put(MediaStore.MediaColumns.DISPLAY_NAME, rename);
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            resolver.update(uri(id), values, null, null);
+        }
+
+        @Override
+        public void delete(long id) {
+            try {
+                resolver.delete(uri(id), null, null);
+            } catch (Exception ignore) {
+                // A linha pendente expira sozinha em 7 dias.
+            }
+        }
+
+        private Uri uri(long id) {
+            return ContentUris.withAppendedId(collection, id);
+        }
     }
 
     /**
@@ -175,14 +238,14 @@ public class PublicBackupPlugin extends Plugin {
         ContentResolver resolver = getContext().getContentResolver();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Tenta Documents primeiro, depois Downloads.
-            Uri docsUri = findExistingByName(resolver,
+            Uri docsUri = findBackup(resolver,
                 MediaStore.Files.getContentUri("external"),
                 filename, Environment.DIRECTORY_DOCUMENTS + "/" + SUBDIR);
             if (docsUri != null) {
                 String c = readUri(docsUri);
                 if (c != null) return c;
             }
-            Uri dlUri = findExistingByName(resolver,
+            Uri dlUri = findBackup(resolver,
                 MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                 filename, Environment.DIRECTORY_DOWNLOADS + "/" + SUBDIR);
             if (dlUri != null) {
