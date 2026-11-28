@@ -1,7 +1,45 @@
 // #3394: regras puras do painel de Avisos junto ao sino. O dado chega por parâmetro; quem mede a tela e
 // quem chama a API ficam em `features/notificacoes` e `aplicacao/useNotificacoesDaSessao.js`.
 
+import { podeVerDesacertos } from './acessoModulos'
+import { hashDoModulo, moduloPorId } from './modulos'
+import { ROTA_MODULO, rotaDaHash } from './rota'
+
 const GRUPOS = ['Hoje', 'Ontem', 'Anteriores']
+
+// #3402: como nas redes, tocar no aviso abre a coisa avisada. `tipo` é o nome de TipoAlertaEstoque que a API manda
+// (NotificacaoController: `TipoAlerta.ToString()`), com os três apelidos do enum, porque o banco guarda o texto e
+// Enum.ToString não garante qual nome sai. O Console não tem rota por item: `referenciaId` (o produto ou o lote, no
+// GeradorNotificacoesAutomaticas) não entra no destino, que é a tela onde a coisa se resolve.
+//   Estoque do dia: abaixo do mínimo, reposição, validade perto e lote parado.
+//   Perdas: o lote vencido com saldo, que a própria tela lista para lançar a perda.
+// Sem tela no Console, o aviso fica só com a leitura: pedido ao fornecedor (PedidoAtrasado, PedidoRecebido, este
+// também do canal in-app, com o id do outbox) e AvisoOperacional (aparelho, prazo, caixa, produto vencendo da rotina).
+const ESTOQUE_DO_DIA = ['producao', 'estoque', 'no']
+const PERDAS = ['producao', 'perdas', 'em']
+const TELA_DO_TIPO = {
+  EstoqueCritico: ESTOQUE_DO_DIA, EstoqueBaixo: ESTOQUE_DO_DIA,
+  ReposicaoSugerida: ESTOQUE_DO_DIA, Reposicao: ESTOQUE_DO_DIA,
+  ValidadeProxima: ESTOQUE_DO_DIA, ProximoVencimento: ESTOQUE_DO_DIA,
+  ProdutoParado: ESTOQUE_DO_DIA,
+  ProdutoVencido: PERDAS,
+}
+
+// Para onde o aviso leva: `{ hash, tela, chamada }` ou null; a chamada ("Ver no Estoque do dia") diz a tela, não
+// promete o item. Só vira link o que o perfil abre: o módulo liberado e a permissão
+// de estoque, que a matriz diz com `verDesacertosEstoque` (as duas telas pedem GerenciarEstoque na API). A rota passa
+// pelo mesmo `rotaDaHash` do app: tela congelada ou fora do catálogo cai no hall e deixa o aviso sem link.
+export function destinoDoAviso(aviso, { permite, acoes } = {}) {
+  const alvo = Object.hasOwn(TELA_DO_TIPO, aviso?.tipo ?? '') ? TELA_DO_TIPO[aviso.tipo] : null
+  if (!alvo || typeof permite !== 'function') return null
+  const [moduloId, telaId, preposicao] = alvo
+  if (!permite(moduloId) || !podeVerDesacertos(acoes)) return null
+  const hash = hashDoModulo(moduloId, telaId)
+  const rota = rotaDaHash(hash, { fonteApi: true })
+  if (rota.tipo !== ROTA_MODULO || rota.tela !== telaId) return null
+  const tela = moduloPorId(moduloId).telas.find((t) => t.id === telaId).rotulo
+  return { hash, tela, chamada: `Ver ${preposicao} ${tela}` }
+}
 
 const inicioDoDia = (instante) => {
   const dia = new Date(instante)

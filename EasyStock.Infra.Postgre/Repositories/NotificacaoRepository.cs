@@ -29,7 +29,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (lida.HasValue)
                 query = query.Where(n => n.Lida == lida.Value);
             if (tipo.HasValue)
-                query = query.Where(n => n.TipoAlerta == tipo.Value);
+                query = FiltrarPorTipoExibido(query, tipo.Value);
             if (severidade.HasValue)
                 query = query.Where(n => n.Severidade == severidade.Value);
 
@@ -41,7 +41,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Take(pageSize)
                 .ToListAsync();
 
-            await CompletarTitulosLegadosAsync(empresaId, items);
+            await ExibirLegadosAsync(empresaId, items);
             return (items, totalCount);
         }
 
@@ -54,28 +54,46 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ThenBy(n => n.Severidade)
                 .Take(limit)
                 .ToListAsync();
-            await CompletarTitulosLegadosAsync(empresaId, items);
+            await ExibirLegadosAsync(empresaId, items);
             return items;
         }
 
-        // Envios antigos usavam o título do enum de estoque, mesmo para avisos de caixa.
-        // Recupera o assunto do envio apenas nas cópias AsNoTracking, preservando o registro histórico.
-        private async Task CompletarTitulosLegadosAsync(Guid empresaId, List<Notificacao> items)
+        // Envios antigos usavam o título e o tipo do enum de estoque, mesmo para avisos de caixa.
+        // Recupera o assunto do envio e o tipo operacional apenas nas cópias AsNoTracking, preservando o registro histórico.
+        private async Task ExibirLegadosAsync(Guid empresaId, List<Notificacao> items)
         {
             var legadas = items.Where(n => n.OutboxMensagemId.HasValue
                 && ((n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.Titulo == "Validade Próxima")
                     || (n.TipoAlerta == TipoAlertaEstoque.PedidoRecebido && n.Titulo == "Pedido Recebido"))).ToList();
-            if (legadas.Count == 0) return;
+            if (legadas.Count > 0)
+            {
+                var ids = legadas.Select(n => n.OutboxMensagemId!.Value).ToArray();
+                var assuntos = await dbContext.NotifOutboxMensagens.AsNoTracking()
+                    .Where(m => m.EmpresaId == empresaId && m.Canal == CanalNotificacao.InApp && ids.Contains(m.Id))
+                    .Select(m => new { m.Id, m.AssuntoRenderizado })
+                    .ToDictionaryAsync(m => m.Id, m => m.AssuntoRenderizado);
+                foreach (var aviso in legadas)
+                    if (assuntos.TryGetValue(aviso.OutboxMensagemId!.Value, out var assunto) && !string.IsNullOrWhiteSpace(assunto))
+                        aviso.Titulo = assunto;
+            }
 
-            var ids = legadas.Select(n => n.OutboxMensagemId!.Value).ToArray();
-            var assuntos = await dbContext.NotifOutboxMensagens.AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId && m.Canal == CanalNotificacao.InApp && ids.Contains(m.Id))
-                .Select(m => new { m.Id, m.AssuntoRenderizado })
-                .ToDictionaryAsync(m => m.Id, m => m.AssuntoRenderizado);
-            foreach (var aviso in legadas)
-                if (assuntos.TryGetValue(aviso.OutboxMensagemId!.Value, out var assunto) && !string.IsNullOrWhiteSpace(assunto))
-                    aviso.Titulo = assunto;
+            foreach (var aviso in items)
+                aviso.TipoAlerta = TipoExibido(aviso.TipoAlerta, aviso.OutboxMensagemId.HasValue);
         }
+
+        // #3402: só o InAppCanal grava OutboxMensagemId, e antes da #2304 o aviso operacional saía como ValidadeProxima.
+        // O alerta real de validade não tem envio. Lista, filtro e resumo usam o mesmo tipo; sem isto, o sino do Console
+        // mandaria o aviso de caixa ao Estoque do dia.
+        private static TipoAlertaEstoque TipoExibido(TipoAlertaEstoque tipo, bool doEnvio) =>
+            doEnvio && tipo == TipoAlertaEstoque.ValidadeProxima ? TipoAlertaEstoque.AvisoOperacional : tipo;
+
+        private static IQueryable<Notificacao> FiltrarPorTipoExibido(IQueryable<Notificacao> query, TipoAlertaEstoque tipo) => tipo switch
+        {
+            TipoAlertaEstoque.ValidadeProxima => query.Where(n => n.TipoAlerta == tipo && n.OutboxMensagemId == null),
+            TipoAlertaEstoque.AvisoOperacional => query.Where(n => n.TipoAlerta == tipo
+                || (n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.OutboxMensagemId != null)),
+            _ => query.Where(n => n.TipoAlerta == tipo),
+        };
 
         public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null)
         {
@@ -87,11 +105,13 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var gruposPorTipo = await dbContext.Notificacoes
                 .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
-                .GroupBy(n => n.TipoAlerta)
-                .Select(g => new { Tipo = g.Key, Count = g.Count() })
+                .GroupBy(n => new { n.TipoAlerta, DoEnvio = n.OutboxMensagemId != null })
+                .Select(g => new { Tipo = g.Key.TipoAlerta, g.Key.DoEnvio, Count = g.Count() })
                 .ToListAsync();
 
-            var porTipo = gruposPorTipo.ToDictionary(g => g.Tipo.ToString(), g => g.Count);
+            var porTipo = gruposPorTipo
+                .GroupBy(g => TipoExibido(g.Tipo, g.DoEnvio).ToString())
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Count));
 
             return new NotificacaoResumo
             {
