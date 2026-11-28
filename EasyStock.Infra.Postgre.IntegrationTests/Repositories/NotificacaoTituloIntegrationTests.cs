@@ -56,14 +56,23 @@ public class NotificacaoTituloIntegrationTests(PostgreSqlDatabaseFixture fixture
         var repo = new NotificacaoRepository(db);
         var esperados = casos.Select(c => c.Esperado).Append("Validade Próxima").ToArray();
 
-        (await repo.GetRecentesNaoLidasAsync(casa.Id, 10, pessoa)).Select(n => n.Titulo).Should().Equal(esperados);
+        // #3402: o envio antigo gravado como ValidadeProxima sai como AvisoOperacional, para o sino do Console não
+        // oferecer o Estoque do dia a um aviso de caixa; o alerta real de validade, sem outbox, continua ValidadeProxima.
+        var tiposEsperados = casos.Select(_ => TipoAlertaEstoque.AvisoOperacional).Append(TipoAlertaEstoque.ValidadeProxima).ToArray();
+
+        var recentes = (await repo.GetRecentesNaoLidasAsync(casa.Id, 10, pessoa)).ToList();
+        recentes.Select(n => n.Titulo).Should().Equal(esperados);
+        recentes.Select(n => n.TipoAlerta).Should().Equal(tiposEsperados);
         for (var pagina = 1; pagina <= 3; pagina++)
         {
             var resultado = await repo.GetByEmpresaAsync(casa.Id, page: pagina, pageSize: 2, usuarioId: pessoa);
             resultado.TotalCount.Should().Be(6);
             resultado.Items.Select(n => n.Titulo).Should().Equal(esperados.Skip((pagina - 1) * 2).Take(2));
+            resultado.Items.Select(n => n.TipoAlerta).Should().Equal(tiposEsperados.Skip((pagina - 1) * 2).Take(2));
         }
         db.ChangeTracker.Entries<Notificacao>().Should().BeEmpty();
-        (await db.Notificacoes.SingleAsync(n => n.Id == avisos[0].Id)).Titulo.Should().Be("Validade Próxima");
+        var registro = await db.Notificacoes.SingleAsync(n => n.Id == avisos[0].Id);
+        registro.Titulo.Should().Be("Validade Próxima");
+        registro.TipoAlerta.Should().Be(TipoAlertaEstoque.ValidadeProxima);
     }
 }

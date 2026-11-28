@@ -58,23 +58,29 @@ namespace EasyStock.Infra.Postgre.Repositories
             return items;
         }
 
-        // Envios antigos usavam o título do enum de estoque, mesmo para avisos de caixa.
-        // Recupera o assunto do envio apenas nas cópias AsNoTracking, preservando o registro histórico.
+        // Envios antigos usavam o título e o tipo do enum de estoque, mesmo para avisos de caixa.
+        // Recupera o assunto do envio e o tipo operacional apenas nas cópias AsNoTracking, preservando o registro histórico.
         private async Task CompletarTitulosLegadosAsync(Guid empresaId, List<Notificacao> items)
         {
             var legadas = items.Where(n => n.OutboxMensagemId.HasValue
                 && ((n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.Titulo == "Validade Próxima")
                     || (n.TipoAlerta == TipoAlertaEstoque.PedidoRecebido && n.Titulo == "Pedido Recebido"))).ToList();
-            if (legadas.Count == 0) return;
+            if (legadas.Count > 0)
+            {
+                var ids = legadas.Select(n => n.OutboxMensagemId!.Value).ToArray();
+                var assuntos = await dbContext.NotifOutboxMensagens.AsNoTracking()
+                    .Where(m => m.EmpresaId == empresaId && m.Canal == CanalNotificacao.InApp && ids.Contains(m.Id))
+                    .Select(m => new { m.Id, m.AssuntoRenderizado })
+                    .ToDictionaryAsync(m => m.Id, m => m.AssuntoRenderizado);
+                foreach (var aviso in legadas)
+                    if (assuntos.TryGetValue(aviso.OutboxMensagemId!.Value, out var assunto) && !string.IsNullOrWhiteSpace(assunto))
+                        aviso.Titulo = assunto;
+            }
 
-            var ids = legadas.Select(n => n.OutboxMensagemId!.Value).ToArray();
-            var assuntos = await dbContext.NotifOutboxMensagens.AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId && m.Canal == CanalNotificacao.InApp && ids.Contains(m.Id))
-                .Select(m => new { m.Id, m.AssuntoRenderizado })
-                .ToDictionaryAsync(m => m.Id, m => m.AssuntoRenderizado);
-            foreach (var aviso in legadas)
-                if (assuntos.TryGetValue(aviso.OutboxMensagemId!.Value, out var assunto) && !string.IsNullOrWhiteSpace(assunto))
-                    aviso.Titulo = assunto;
+            // #3402: só o InAppCanal grava OutboxMensagemId, e antes da #2304 o aviso operacional saía como ValidadeProxima.
+            // O alerta real de validade não tem envio; sem isto, o sino do Console mandaria o aviso de caixa ao Estoque do dia.
+            foreach (var aviso in items.Where(n => n.OutboxMensagemId.HasValue && n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima))
+                aviso.TipoAlerta = TipoAlertaEstoque.AvisoOperacional;
         }
 
         public async Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null)
