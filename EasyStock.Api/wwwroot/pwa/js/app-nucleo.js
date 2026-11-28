@@ -15118,8 +15118,23 @@ function pairingInvalidMessage() {
     ? 'Conexão do aparelho inválida. Abra o Início para conectar de novo.'
     : 'Pareamento invalidado. Abra Ajustes > Diagnóstico para parear de novo.';
 }
+// #3424: a recarga que mostra a mudança do servidor espera enquanto isto for verdade. Ela fecharia o que está
+// aberto e apagaria o que só existe na memória: o pedido em construção e a contagem de produção. O rascunho só
+// conta na tela dele; abandonado em outra tela, não segura a recarga para sempre.
+function telaOcupada() {
+  if (document.querySelector('[class*="overlay"].show, [class*="overlay"].open, .modal.show')) return true;
+  if (currentScreen === 'pedidos' && (currentOrderItems.length > 0 || selectedClient)) return true;
+  if (currentScreen === 'producao' && products.some(p => p && p.count > 0)) return true;
+  const el = document.activeElement;
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = String(el.tagName || '').toUpperCase();
+  return tag === 'TEXTAREA'
+    || (tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color)$/i.test(el.type || 'text'));
+}
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
+  telaOcupada,
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
