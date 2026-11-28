@@ -54,11 +54,14 @@
 .menuModal .menu { flex: 1; width: auto; margin: 0; box-shadow: none; border: 0; }
 /* #1870: com o trilho à vista, o Sair é o do avatar no pé dele; a barra não repete. */
 /* O trilho já leva aos módulos e ao Atendimento (Balcão): a barra não repete os dois links. */
-@media (min-width: 1101px) {
+/* #3417: o corte do trilho é o mesmo em toda rota, 1180 px (DESKTOP do useTamanhoTela). */
+@media (min-width: 1180px) {
   .barra .contaNaBarra, .contexto > a.voltar, .acoes > :global([data-ajuda-console]) { display: none; }
 }
-@media (max-width: 1100px) {
+@media (max-width: 1179px) {
   .lateral > nav { display: none; }
+  /* #2258 (G3) no corte novo: o Menu existe exatamente onde o trilho some. */
+  .abrirMenu { display: inline-flex; }
 }
 @media (max-width: 759px) {
   .lateral { display: none; }

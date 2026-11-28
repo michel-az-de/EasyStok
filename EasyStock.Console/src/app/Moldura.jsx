@@ -27,6 +27,7 @@ import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
 import { simularEscondido } from '../aplicacao/simularEscondido'
 import { TrilhoDoConsole } from '../features/hall/TrilhoDoConsole'
+import { MenuDoTrilho } from '../features/hall/MenuDoTrilho'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { MenuDeAcoes } from '../componentes/MenuDeAcoes'
@@ -159,7 +160,8 @@ function Cabecalho({
 }) {
   const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
-  const celular = useTamanhoTela() === CELULAR
+  const tamanho = useTamanhoTela()
+  const celular = tamanho === CELULAR
   const botaoMaisRef = useRef(null)
   const estadoAuto = estadoDasAutomaticas(regras)
 
@@ -167,9 +169,12 @@ function Cabecalho({
     <header className={css.topo}>
       {/* #1582: entre 1024 e 1179 px não há menu Mais nem trilho; a marca é o caminho ao hall,
           como no trilho do desktop. */}
-      <a className={css.marca} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
-        <Marca compacta />
-      </a>
+      {/* #3417: no tablet o trilho não aparece; o Menu abre o trilho num modal, no lugar da marca (o Início está nele). */}
+      {tamanho === TABLET ? <MenuDoTrilho onde="balcao" fonteApi={FONTE_API} aoAbrirAjuda={aoAbrirAjuda} /> : (
+        <a className={css.marca} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
+          <Marca compacta />
+        </a>
+      )}
       <h1 className="sr">Casa da Baba</h1>
       {!celular && <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />}
       <div className={css.controles}>

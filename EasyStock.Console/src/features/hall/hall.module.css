@@ -1,14 +1,14 @@
 /* Direção Contorno: superfície de papel, ícones nítidos e bordas sem relevo.
    O link principal cobre a área; favoritos, atalhos e movimento ficam por cima. */
 .raiz { display: flex; height: 100%; min-height: 0; background: var(--fundo); }
-/* #3004: o Início tem o mesmo trilho dos módulos e do Balcão; abaixo de 1101 px ele some, como neles, e a conta
+/* #3004: o Início tem o mesmo trilho dos módulos e do Balcão; abaixo de 1180 px ele some (#3417), como neles, e a conta
    (Tema, Ajuda e Sair) fica no topo. */
 .lateral { display: flex; flex: none; min-height: 0; }
 .contaNoTopo { display: flex; align-items: center; }
-@media (min-width: 1101px) {
+@media (min-width: 1180px) {
   .contaNoTopo, .acoes > :global([data-ajuda-console]), .topo > :first-child { display: none; }
 }
-@media (max-width: 1100px) {
+@media (max-width: 1179px) {
   .lateral { display: none; }
 }
 .hall {
@@ -28,6 +28,7 @@
   background: var(--papel); border-bottom: 0;
 }
 .acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); }
+.inicioDoTopo { display: flex; align-items: center; gap: var(--e-3); }
 .topo img { width: 84px; height: 56px; }
 /* #2232 (H3): o sino fica numa faixa da altura de toque, alinhado ao avatar e ao Ajuda. */
 .avisos { display: flex; align-items: center; min-height: var(--toque); }
