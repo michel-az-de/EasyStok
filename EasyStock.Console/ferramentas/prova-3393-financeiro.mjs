@@ -75,7 +75,8 @@ caso('#3393 contas: falta da lista soma só o que ainda falta (sem cancelada nem
 
 caso('#3393 visão geral: herói do saldo só com os dois lados e diz o que fica de fora', () => {
   assert.match(painel, /verPagar && verReceber && <SaldoPrevisto/)
-  assert.match(painel, /Não conta as vencidas nem os pedidos sem conta/)
+  assert.match(painel, /Sem o dinheiro em caixa\. Não conta as vencidas nem os pedidos sem conta/)
+  assert.match(painel, /<span>A receber menos a pagar · 30 dias<\/span>/, 'o número não é saldo: o nome diz o que ele é (r4)')
   assert.match(painel, /className=\{css\.barrasSaldo\}/)
 })
 
@@ -88,6 +89,7 @@ caso('#3393 visão geral: atalhos só no celular (o menu lateral já mostra as t
 })
 
 caso('#3393 extrato: sinal explícito e entrada em verde, não só cor', () => {
+  assert.match(estilo, /\.indicadoresTres \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); gap: var\(--e-2\); \}/, 'no celular os 3 totais ficam numa faixa e a lista sobe (r4)')
   assert.match(painel, /item\.lado === 'pagar' \? '−' : '\+'/)
   assert.match(regra(estilo, '.valorEntrada'), /color: var\(--sucesso\)/)
   assert.match(regra(estilo, '.estornado'), /text-decoration: line-through/, 'estornado riscado, não confundido com zero')

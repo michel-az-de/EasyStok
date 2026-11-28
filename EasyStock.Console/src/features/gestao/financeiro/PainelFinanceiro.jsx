@@ -53,8 +53,8 @@ function SaldoPrevisto({ resumo }) {
   const saldo = saldoPrevisto30d(resumo)
   const receber = resumo.totalAVencer30dReceber ?? 0, pagar = resumo.totalAVencer30dPagar ?? 0
   const [largReceber, largPagar] = escalaDasBarras([receber, pagar])
-  return <section className={css.saldo} aria-label="Saldo previsto para os próximos 30 dias">
-    <div className={css.saldoNumero}><span>Saldo previsto em 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Não conta as vencidas nem os pedidos sem conta.</small></div>
+  return <section className={css.saldo} aria-label="A receber menos a pagar nos próximos 30 dias">
+    <div className={css.saldoNumero}><span>A receber menos a pagar · 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Sem o dinheiro em caixa. Não conta as vencidas nem os pedidos sem conta.</small></div>
     <dl className={css.barrasSaldo}>
       <div><dt>A receber</dt><dd><span className={css.trilhoBarra}><i className={css.barraRecebido} style={{ width: `${largReceber}%` }} /></span><b>{moeda(receber)}</b></dd></div>
       <div><dt>A pagar</dt><dd><span className={css.trilhoBarra}><i className={css.barraPago} style={{ width: `${largPagar}%` }} /></span><b>{moeda(pagar)}</b></dd></div>

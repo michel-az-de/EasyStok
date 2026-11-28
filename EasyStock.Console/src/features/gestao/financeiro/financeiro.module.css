@@ -193,7 +193,11 @@
 @media (min-width: 760px) { .atalhos { display: none; } }
 @media (max-width: 1199px) { .comContexto { grid-template-columns: minmax(0, 1fr); } .contexto { grid-template-columns: repeat(2, minmax(0, 1fr)); } .contexto .acoes { justify-content: start; } }
 @media (max-width: 759px) {
-  .indicadoresTres { grid-template-columns: minmax(0, 1fr); }
+  /* #3393 (r4): três totais numa faixa compacta; a lista do Extrato sobe ~200px no celular. */
+  .indicadoresTres { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-2); }
+  .indicadoresTres > .indicador { gap: var(--e-1); padding: var(--e-2); }
+  .indicadoresTres > .indicador > span { font-size: var(--t-micro); }
+  .indicadoresTres > .indicador > strong { font-size: var(--t-apoio); }
   .chip { padding-inline: var(--e-3); }
   .filtros > button[type='submit'] { grid-column: 1 / -1; justify-self: stretch; }
   .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
