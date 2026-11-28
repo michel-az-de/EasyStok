@@ -136,6 +136,8 @@ public sealed class ReenviarMensagemUseCase(
         EnviarModeloConversaUseCase.GarantirJanelaDoModeloLocal(
             MaisRecente(conversa.UltimaMensagemEntradaEm, aberta?.UltimaMensagemEntradaEm), agora);
         await EnviarModeloConversaUseCase.GarantirSemPedidoDeOptOutAsync(conversaRepository, conversa, ct);
+        if (aberta is not null && aberta.Id != conversa.Id)
+            await EnviarModeloConversaUseCase.GarantirSemPedidoDeOptOutAsync(conversaRepository, aberta, ct);
         var texto = EnviarModeloConversaUseCase.TextoDoModelo(local, parametros);
         if (texto.Length > Mensagem.TextoTamanhoMaximo)
             throw new UseCaseValidationException("A mensagem padrão de retomada preenchida excede o tamanho máximo da mensagem.");

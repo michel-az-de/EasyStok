@@ -216,8 +216,15 @@ public sealed class DefinirModeloRetomadaUseCase(
             throw new UseCaseValidationException(ex.Message);
         }
         // Conferido depois do domínio, com o idioma já normalizado (o Console não manda idioma).
-        if (configuracao.ModeloRetomada is { } modelo && await catalogo.UsaModelosLocaisAsync(empresaId))
-            await EnviarModeloConversaUseCase.ModeloDeRetomadaAsync(catalogo, empresaId, modelo, CancellationToken.None);
+        try
+        {
+            if (configuracao.ModeloRetomada is { } modelo && await catalogo.UsaModelosLocaisAsync(empresaId))
+                await EnviarModeloConversaUseCase.ModeloDeRetomadaAsync(catalogo, empresaId, modelo, CancellationToken.None);
+        }
+        catch (CatalogoModelosException ex)
+        {
+            throw new UseCaseValidationException(ex.Message);
+        }
 
         if (nova) await repository.AddAsync(configuracao);
         else await repository.UpdateAsync(configuracao);

@@ -170,13 +170,19 @@ public sealed partial class EnviarModeloConversaUseCase(
         return aprovado;
     }
 
-    /// <summary>#3415: o modelo de retomada (uma variável, o primeiro nome), com o nome dele na frase da recusa.</summary>
+    /// <summary>
+    /// #3415: o modelo de retomada (uma variável, o primeiro nome, categoria UTILITY: ele reabre a conversa, não faz
+    /// propaganda), com o nome dele na frase da recusa.
+    /// </summary>
     internal static async Task<ModeloAtendimento> ModeloDeRetomadaAsync(
         ICatalogoModelosAtendimento catalogo, Guid empresaId, ModeloRetomada modelo, CancellationToken ct)
     {
         try
         {
-            return await ModeloAprovadoAsync(catalogo, empresaId, new ModeloMensagem(modelo.Nome, modelo.Idioma, ["cliente"]), ct);
+            var aprovado = await ModeloAprovadoAsync(catalogo, empresaId, new ModeloMensagem(modelo.Nome, modelo.Idioma, ["cliente"]), ct);
+            if (aprovado.Categoria != "UTILITY")
+                throw new UseCaseValidationException("a retomada só usa modelo da categoria UTILITY.");
+            return aprovado;
         }
         catch (UseCaseValidationException ex)
         {

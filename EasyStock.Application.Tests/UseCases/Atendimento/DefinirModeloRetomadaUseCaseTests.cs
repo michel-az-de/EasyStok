@@ -89,4 +89,28 @@ public class DefinirModeloRetomadaUseCaseTests
         _configuracao.ModeloRetomada.Should().Be(new ModeloRetomada("retomar_conversa", "pt_BR"));
         await _catalogo.DidNotReceiveWithAnyArgs().ListarAsync(default, default);
     }
+
+    [Fact]
+    public async Task ModeloDeMarketingERecusado()
+    {
+        _catalogo.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([
+            new ModeloAtendimento("retomada_conversa", "pt_BR", "MARKETING", "Oi {{1}}, temos promoção!", 1, Origem: OrigemModelo.Local)]);
+
+        var acao = () => UseCase().ExecuteAsync(_empresaId, "retomada_conversa", null);
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*UTILITY*");
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CatalogoForaDoArVira400ComAFrase()
+    {
+        _catalogo.ListarAsync(_empresaId, Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<ModeloAtendimento>>(_ => throw new CatalogoModelosException("Lista de mensagens padrão fora do ar."));
+
+        var acao = () => UseCase().ExecuteAsync(_empresaId, "retomada_conversa", null);
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Lista de mensagens padrão fora do ar.");
+        _uow.CommitCount.Should().Be(0);
+    }
 }

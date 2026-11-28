@@ -146,6 +146,23 @@ public class ReenviarMensagemModeloLocalTests
     }
 
     [Fact]
+    public async Task ContatoQuePediuParaPararNaConversaMaisNovaNaoRecebe()
+    {
+        var (conversa, falhou) = FalhaDeQuemEscreveuHa(TimeSpan.FromDays(8));
+        var aberta = Conversa.Abrir(_empresaId, WaId, Agora.AddHours(-30), "Maria Souza");
+        aberta.RegistrarEntrada(Agora.AddHours(-30));
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, WaId, Arg.Any<CancellationToken>()).Returns(aberta);
+        _conversas.ListarMensagensAsync(_empresaId, aberta.Id, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([Mensagem.Entrada(_empresaId, aberta.Id, Agora.AddHours(-30), TipoConteudoMensagem.Texto, "PARAR")]);
+
+        var r = await Reenviar(conversa, falhou);
+
+        r.Status.Should().Be(StatusMensagem.Falhou);
+        r.Erro.Should().Contain("parar");
+        await _whatsapp.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task CatalogoQueFalhaRegistraAFalhaSemDerrubarOReenvio()
     {
         _catalogo.ListarAsync(_empresaId, Arg.Any<CancellationToken>())
