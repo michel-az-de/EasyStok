@@ -34,9 +34,7 @@ public sealed partial class EnviarModeloConversaUseCase(
         var aprovado = await ModeloAprovadoAsync(catalogo, command.EmpresaId, modelo, ct);
         // #3205: a origem vem do catálogo da empresa, nunca do pedido; ela segue na mensagem gravada e na idempotência.
         modelo = modelo with { Origem = aprovado.Origem };
-        var texto = string.Join("\n", new[] { aprovado.Cabecalho,
-            Parametro().Replace(aprovado.Corpo, m => modelo.Parametros[int.Parse(m.Groups[1].Value) - 1]), aprovado.Rodape }
-            .Where(p => !string.IsNullOrEmpty(p)));
+        var texto = TextoDoModelo(aprovado, modelo.Parametros);
         if (texto.Length > Mensagem.TextoTamanhoMaximo)
             throw new UseCaseValidationException("A prévia preenchida excede o tamanho máximo da mensagem.");
 
@@ -172,6 +170,32 @@ public sealed partial class EnviarModeloConversaUseCase(
         return aprovado;
     }
 
+    /// <summary>
+    /// #3415: o modelo de retomada (uma variável, o primeiro nome, categoria UTILITY: ele reabre a conversa, não faz
+    /// propaganda), com o nome dele na frase da recusa.
+    /// </summary>
+    internal static async Task<ModeloAtendimento> ModeloDeRetomadaAsync(
+        ICatalogoModelosAtendimento catalogo, Guid empresaId, ModeloRetomada modelo, CancellationToken ct)
+    {
+        try
+        {
+            var aprovado = await ModeloAprovadoAsync(catalogo, empresaId, new ModeloMensagem(modelo.Nome, modelo.Idioma, ["cliente"]), ct);
+            if (aprovado.Categoria != "UTILITY")
+                throw new UseCaseValidationException("a retomada só usa modelo da categoria UTILITY.");
+            return aprovado;
+        }
+        catch (UseCaseValidationException ex)
+        {
+            throw new UseCaseValidationException($"Modelo de retomada {modelo.Nome} ({modelo.Idioma}): {ex.Message}");
+        }
+    }
+
+    /// <summary>O texto do modelo preenchido (cabeçalho, corpo com as variáveis e rodapé), como sai na ponte web (#3205).</summary>
+    internal static string TextoDoModelo(ModeloAtendimento modelo, IReadOnlyList<string> parametros) =>
+        string.Join("\n", new[] { modelo.Cabecalho,
+            Parametro().Replace(modelo.Corpo, m => parametros[int.Parse(m.Groups[1].Value) - 1]), modelo.Rodape }
+            .Where(p => !string.IsNullOrEmpty(p)));
+
     internal static FinalidadeContato FinalidadeDaCategoria(string categoria) =>
         categoria == "MARKETING" ? FinalidadeContato.Marketing : FinalidadeContato.Transacional;
 
@@ -209,16 +233,28 @@ public sealed partial class EnviarModeloConversaUseCase(
     /// </summary>
     private async Task GarantirDestinoDoModeloLocalAsync(Conversa conversa, string categoria, DateTime agora, CancellationToken ct)
     {
-        if (conversa.UltimaMensagemEntradaEm is not { } entrada)
-            throw new RegraDeDominioVioladaException("A mensagem padrão só sai depois que o cliente escreve. Este contato ainda não escreveu.");
-        if (entrada < agora.AddDays(-DiasDaJanelaDoModeloLocal))
-            throw new RegraDeDominioVioladaException(
-                $"O cliente escreveu há mais de {DiasDaJanelaDoModeloLocal} dias: a mensagem padrão não pode mais ser enviada. Aguarde ele escrever de novo.");
+        GarantirJanelaDoModeloLocal(conversa.UltimaMensagemEntradaEm, agora);
         if (conversa.ClienteId is not null)
         {
             await GarantirClienteAsync(conversa, categoria, ct);
             return;
         }
+        await GarantirSemPedidoDeOptOutAsync(conversas, conversa, ct);
+    }
+
+    /// <summary>A mensagem padrão local só sai a quem escreveu até 7 dias atrás (S80); o reenvio usa o mesmo prazo (#3415).</summary>
+    internal static void GarantirJanelaDoModeloLocal(DateTime? ultimaEntrada, DateTime agora)
+    {
+        if (ultimaEntrada is not { } entrada)
+            throw new RegraDeDominioVioladaException("A mensagem padrão só sai depois que o cliente escreve. Este contato ainda não escreveu.");
+        if (entrada < agora.AddDays(-DiasDaJanelaDoModeloLocal))
+            throw new RegraDeDominioVioladaException(
+                $"O cliente escreveu há mais de {DiasDaJanelaDoModeloLocal} dias: a mensagem padrão não pode mais ser enviada. Aguarde ele escrever de novo.");
+    }
+
+    /// <summary>Quem escreveu SAIR, PARAR ou STOP na conversa não recebe mensagem padrão.</summary>
+    internal static async Task GarantirSemPedidoDeOptOutAsync(IConversaRepository conversas, Conversa conversa, CancellationToken ct)
+    {
         var recentes = await conversas.ListarMensagensAsync(conversa.EmpresaId, conversa.Id, null, 100, ct);
         if (recentes.Any(m => m.Direcao == DirecaoMensagem.Entrada && PoliticaConsentimento.EhPedidoDeOptOut(m.Texto)))
             throw new RegraDeDominioVioladaException("O contato pediu para parar de receber mensagens: a mensagem padrão não foi enviada.");

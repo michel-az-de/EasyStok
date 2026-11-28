@@ -59,7 +59,7 @@ public class ConsoleTagHumanaTests
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
             new ReenviarMensagemUseCase(_conversas, ConfiguracoesPadrao(), resolvedor,
                 new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
-                _uow, TimeProvider.System),
+                _uow, TimeProvider.System, Substitute.For<EasyStock.Application.Ports.Output.Atendimento.ICatalogoModelosAtendimento>()),
             new ListarNaoEntreguesUseCase(_conversas),
             new GerenciarConversaAtendimentoUseCase(_conversas, _uow),
             new TransferirConversaUseCase(_conversas, Substitute.For<IAtendenteRepository>(), _uow),

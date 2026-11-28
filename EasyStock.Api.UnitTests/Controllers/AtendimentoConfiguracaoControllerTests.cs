@@ -40,7 +40,7 @@ public class AtendimentoConfiguracaoControllerTests
             modelos: Microsoft.Extensions.Options.Options.Create(aprovados));
         _currentUser.EmpresaId.Returns(_empresaId);
         _controller = new AtendimentoConfiguracaoController(obterUseCase, atualizarUseCase,
-            new DefinirModeloRetomadaUseCase(_repository, _unitOfWork), _currentUser);
+            new DefinirModeloRetomadaUseCase(_repository, _unitOfWork, Substitute.For<EasyStock.Application.Ports.Output.Atendimento.ICatalogoModelosAtendimento>()), _currentUser);
     }
 
     // S68 (#2597, ADR-0066): o modelo da loja só vale dentro da lista aprovada.
