@@ -265,15 +265,27 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null)
+        public async Task<IReadOnlyList<Guid>> MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null)
         {
+            // #3400: o instante cortado no microssegundo do Postgres marca esta leitura; os ids saem por ele depois da
+            // gravação, então um aviso que um job ou colega leu no meio não entra no Desfazer.
             var agora = DateTime.UtcNow;
-            await dbContext.Notificacoes
-                .Where(n => n.EmpresaId == empresaId && !n.Lida && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId))
+            agora = agora.AddTicks(-(agora.Ticks % 10));
+            var doEscopo = dbContext.Notificacoes
+                .Where(n => n.EmpresaId == empresaId && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId));
+            await doEscopo.Where(n => !n.Lida)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(n => n.Lida, true)
                     .SetProperty(n => n.LidaEm, agora));
+            return await doEscopo.Where(n => n.Lida && n.LidaEm == agora).Select(n => n.Id).ToListAsync();
         }
+
+        public Task<int> MarcarComoNaoLidasAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, Guid usuarioId) =>
+            dbContext.Notificacoes
+                .Where(n => n.EmpresaId == empresaId && n.Lida && ids.Contains(n.Id) && (n.UsuarioId == null || n.UsuarioId == usuarioId))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.Lida, false)
+                    .SetProperty(n => n.LidaEm, (DateTime?)null));
 
         public async Task DeleteAsync(Guid empresaId, Guid id)
         {

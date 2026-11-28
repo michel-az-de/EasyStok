@@ -35,7 +35,15 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);
-        Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null);
+        /// <summary>#3400: devolve os ids que esta chamada marcou, para o Desfazer do sino voltar só esses.</summary>
+        Task<IReadOnlyList<Guid>> MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null);
+
+        /// <summary>
+        /// #3400: Desfazer do sino. Volta a não lidos só os avisos lidos entre <paramref name="ids"/> que são da empresa e
+        /// da pessoa (os dela e os gerais, que voltam para a equipe toda, como a leitura valeu para todos). Escrita direta,
+        /// fora da unidade de trabalho. Devolve quantos voltaram.
+        /// </summary>
+        Task<int> MarcarComoNaoLidasAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, Guid usuarioId);
 
         /// <summary>
         /// #2258 (F1): marca como lidos os avisos do sino sobre caixa aberto (<c>CaixaAbertoEsquecido</c> e o

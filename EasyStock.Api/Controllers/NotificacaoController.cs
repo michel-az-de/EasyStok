@@ -2,6 +2,9 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
+/// <summary>#3400: os avisos que o Desfazer do sino volta a não lidos (os ids que o marcar lido ou o marcar-todas mudou).</summary>
+public sealed record MarcarNaoLidasRequest(IReadOnlyList<Guid>? Ids);
+
 [SwaggerTag("Notifications / Notificações")]
 [Authorize]
 [ValidateEmpresaId]
@@ -116,8 +119,8 @@ public class NotificacaoController(
         return NoContent();
     }
 
-    [SwaggerOperation(Summary = "Mark all notifications as read")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [SwaggerOperation(Summary = "Mark all notifications as read", Description = "Returns the ids it changed, for the bell's undo.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPut("marcar-todas-lidas")]
     [HttpPost("marcar-todas")]
@@ -126,7 +129,25 @@ public class NotificacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        await notificacaoRepository.MarcarTodasComoLidasAsync(resolvedEmpresaId, currentUser.UsuarioId);
+        var ids = await notificacaoRepository.MarcarTodasComoLidasAsync(resolvedEmpresaId, currentUser.UsuarioId);
+        await unitOfWork.CommitAsync();
+        return DataOk(new { ids });
+    }
+
+    [SwaggerOperation(Summary = "Mark notifications as unread (undo)",
+        Description = "Only read notifications of the company and of the caller (or general ones) go back to unread.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpPost("nao-lidas")]
+    public async Task<IActionResult> MarcarNaoLidas([FromBody] MarcarNaoLidasRequest? request, [FromQuery] Guid empresaId)
+    {
+        if (request?.Ids is not { Count: > 0 } ids)
+            return DataBadRequest("Informe os avisos que voltam a não lidos.");
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        await notificacaoRepository.MarcarComoNaoLidasAsync(resolvedEmpresaId, ids, currentUser.UsuarioId);
         await unitOfWork.CommitAsync();
         return NoContent();
     }

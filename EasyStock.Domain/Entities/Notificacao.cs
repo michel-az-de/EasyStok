@@ -57,6 +57,13 @@ namespace EasyStock.Domain.Entities
             LidaEm = DateTime.UtcNow;
         }
 
+        /// <summary>#3400: o Desfazer do sino volta o aviso ao estado de antes da leitura.</summary>
+        public void MarcarComoNaoLida()
+        {
+            Lida = false;
+            LidaEm = null;
+        }
+
         private static string TituloParaTipo(TipoAlertaEstoque tipo) => tipo switch
         {
             TipoAlertaEstoque.EstoqueCritico => "Estoque Crítico",
