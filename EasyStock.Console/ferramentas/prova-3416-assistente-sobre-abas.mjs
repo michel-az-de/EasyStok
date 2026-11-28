@@ -48,6 +48,18 @@ async function rodar(comFaixa) {
     cobrar(m.faixa === comFaixa, `${comFaixa ? 'com' : 'sem'} a faixa do aparelho (aba ${aba}): faixa à vista = ${m.faixa}`)
     for (const { aba: nome, responde } of m.abas) cobrar(responde, `${comFaixa ? 'com' : 'sem'} faixa, aba ${aba} ativa: o centro de "${nome}" responde à própria aba`)
   }
+  // Painel aberto, com o passo a passo da faixa aberto (o pé mais alto): o topo do painel e o Fechar ficam na tela.
+  if (comFaixa) {
+    const passo = p.locator('button[aria-controls], button[aria-expanded]').filter({ hasText: /bloquead|Som|Avisos/i }).first()
+    if (await passo.count()) { await passo.click(); await p.waitForTimeout(300) }
+    await p.getByRole('button', { name: 'Abrir assistente' }).click()
+    await p.waitForTimeout(600)
+    const topo = await p.evaluate(() => {
+      const fechar = [...document.querySelectorAll('button')].find((b) => /Fechar/.test(b.getAttribute('aria-label') ?? '') && b.closest('[role=dialog],section,aside'))
+      return fechar ? Math.round(fechar.getBoundingClientRect().top) : null
+    })
+    cobrar(topo !== null && topo >= 0, `com faixa e passo a passo aberto: o Fechar do painel fica na tela (topo=${topo})`)
+  }
   await contexto.close()
 }
 
