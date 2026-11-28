@@ -17,7 +17,7 @@ const falhas = []
 const cobrar = (ok, msg) => { console.log(ok ? 'ok···' : 'FALHA', msg); if (!ok) falhas.push(msg) }
 
 const ROTAS = { 'Início': '#/', Atendimento: '#/m/atendimento/balcao', Entregas: '#/m/entregas/painel', Cozinha: '#/m/cozinha' }
-const LARGURAS = [1024, 1140, 1179, 1180, 1440]
+const LARGURAS = [768, 1024, 1140, 1179, 1180, 1440]
 
 // Trilho à vista (um `nav` com link para o Início e para módulos) e botão Menu à vista.
 const estado = (p) => p.evaluate(() => {
@@ -53,12 +53,11 @@ try {
           cobrar(/^Menu/.test(foco), `${w} px, ${nome}: Esc fecha o modal e o foco volta ao Menu (${foco})`)
         }
         if (nome === 'Atendimento' && (w === 1024 || w === 1179)) {
-          const linhas = await p.evaluate(() => {
+          const topoMedido = await p.evaluate(() => {
             const topo = document.querySelector('header')
-            const tops = new Set([...topo.querySelectorAll(':scope > *, :scope > div > *')].filter((el) => el.getBoundingClientRect().height > 0).map((el) => Math.round(el.getBoundingClientRect().top / 8)))
-            return { linhas: tops.size, altura: Math.round(topo.getBoundingClientRect().height) }
+            return { altura: Math.round(topo.getBoundingClientRect().height) }
           })
-          cobrar(linhas.altura <= 72, `${w} px, Atendimento: topo numa linha só (${JSON.stringify(linhas)})`)
+          cobrar(topoMedido.altura <= 72, `${w} px, Atendimento: topo numa linha só (${JSON.stringify(topoMedido)})`)
         }
       }
       await p.close()
