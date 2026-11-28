@@ -406,9 +406,12 @@ try {
   const cores = await page.evaluate(() => {
     const cor = (no) => getComputedStyle(no).color
     const valorDe = (rotulo) => [...document.querySelectorAll('main [class*="indicador"]')].find((no) => no.querySelector(':scope > span')?.textContent.trim() === rotulo).querySelector(':scope > strong')
-    const saida = [...document.querySelectorAll('main span')].find((no) => /^R\$\s30,00$/.test(no.textContent.trim()))
-    return { resultado: cor(valorDe('Resultado dos movimentos')), saida: cor(saida), entradas: cor(valorDe('Entradas do período')) }
+    // #3393: a linha leva o sinal ("− R$ 30,00" na saída, "+ R$ 19,00" na entrada), não só a cor.
+    const saida = [...document.querySelectorAll('main span')].find((no) => /^−\sR\$\s30,00$/.test(no.textContent.trim()))
+    const entrada = [...document.querySelectorAll('main span')].find((no) => /^\+\sR\$\s19,00$/.test(no.textContent.trim()))
+    return { resultado: cor(valorDe('Resultado dos movimentos')), saida: cor(saida), entradas: cor(valorDe('Entradas do período')), entrada: cor(entrada) }
   })
+  assert.notEqual(cores.entrada, cores.saida, '#3393: entrada e saída com cores diferentes, além do sinal')
   assert.notEqual(cores.resultado, cores.entradas, '#3331: resultado negativo não usa a tinta neutra')
   assert.equal(cores.resultado, cores.saida, '#3331: resultado negativo em cor de saída')
   await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link', { name: 'Relatórios', exact: true }).click()

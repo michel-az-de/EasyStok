@@ -9,7 +9,7 @@ import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
-import { nomeDoTipoDeCategoria, STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
+import { nomeDoTipoDeCategoria, STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, saldoPrevisto30d, escalaDasBarras, faltaDaLista, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { dataPorExtenso, moeda } from '../../../dominio/formato'
 import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -35,12 +35,32 @@ function quandoVence(parcela) {
   return `${dia < hoje ? 'Venceu' : 'Vence'} ${dataCurta(parcela.dataVencimento).slice(0, 5)}`
 }
 
+// #3393: a data da coluna de vencimento fica vermelha só quando a parcela venceu e ainda falta.
+const atrasada = (conta, parcela) => Boolean(parcela) && conta.status !== 'Cancelada' && parcelaEmAberto(parcela) && diaFinanceiro(parcela.dataVencimento) < diaFinanceiro()
+
 function EstadoFinanceiro({ consulta, children }) {
   if (consulta.erro) return <div className={css.painel}><ErroFinanceiro erro={consulta.erro} /><Botao icone="refresh-cw" onClick={consulta.recarregar}>Tentar de novo</Botao></div>
   if (consulta.carregando && !consulta.dados) return <EsqueletoDeLista linhas={4} altura="var(--toque)">Carregando financeiro…</EsqueletoDeLista>
   return <div className={css.estado} aria-busy={consulta.carregando}>{children}</div>
 }
-function Indicador({ nome, valor, detalhe, negativoEmErro = false, children }) { return <div className={css.indicador}><span>{nome}</span><strong className={negativoEmErro && valor < 0 ? css.valorSaida : undefined}>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
+// #3393: zero esmaecido; o valor que importa salta sozinho.
+const classeDoValor = (valor, negativoEmErro) => (negativoEmErro && valor < 0 ? css.valorSaida : !valor ? css.zero : undefined)
+function Indicador({ nome, valor, detalhe, negativoEmErro = false, children }) { return <div className={css.indicador}><span>{nome}</span><strong className={classeDoValor(valor, negativoEmErro)}>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
+const comSinal = (valor) => `${valor > 0 ? '+ ' : valor < 0 ? '− ' : ''}${moeda(Math.abs(valor))}`
+const tomDoSaldo = (valor) => (valor > 0 ? css.saldoPositivo : valor < 0 ? css.saldoNegativo : css.zero)
+// #3393: o número principal da Visão geral. Só com os dois lados à vista (#2105, achado 10): com um lado só o sinal mentiria.
+function SaldoPrevisto({ resumo }) {
+  const saldo = saldoPrevisto30d(resumo)
+  const receber = resumo.totalAVencer30dReceber ?? 0, pagar = resumo.totalAVencer30dPagar ?? 0
+  const [largReceber, largPagar] = escalaDasBarras([receber, pagar])
+  return <section className={css.saldo} aria-label="Saldo previsto para os próximos 30 dias">
+    <div className={css.saldoNumero}><span>Saldo previsto em 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Não conta as vencidas nem os pedidos sem conta.</small></div>
+    <dl className={css.barrasSaldo}>
+      <div><dt>A receber</dt><dd><span className={css.trilhoBarra}><i className={css.barraRecebido} style={{ width: `${largReceber}%` }} /></span><b>{moeda(receber)}</b></dd></div>
+      <div><dt>A pagar</dt><dd><span className={css.trilhoBarra}><i className={css.barraPago} style={{ width: `${largPagar}%` }} /></span><b>{moeda(pagar)}</b></dd></div>
+    </dl>
+  </section>
+}
 // #3076 (E4, L3): pedidos sem conta a receber, em linha própria; o número do card segue só com as contas. Sem o campo
 // (API antiga) ou sem pedido, a linha não aparece.
 const SOBRE_PEDIDOS_A_RECEBER = 'Pedidos sem conta a receber e ainda não pagos, com dia da entrega até 30 dias à frente ou em qualquer dia passado. Saldo: total menos pagamentos. Não entra no valor acima.'
@@ -79,11 +99,13 @@ function ResumoFinanceiro() {
   const resumo = consulta.dados?.resumo
   return <EstadoFinanceiro consulta={consulta}>{resumo && <div className={css.painel}>
     <div className={css.barra}><p className={css.aviso}>O que vence hoje e nos próximos 7 dias.</p><Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao></div>
+    {verPagar && verReceber && <SaldoPrevisto resumo={resumo} />}
     <div className={css.dia}>{Object.entries(consulta.dados.porLado).map(([lado, listas]) => {
       const vencido = somaSaldos(listas.vencida)
       return <section key={lado} className={css.ladoDia} aria-label={`Contas a ${lado}`}>
         <h2>{lado === 'pagar' ? 'A pagar' : 'A receber'}</h2>
-        <a className={`${css.cartaoVencidas} ${vencido > 0 ? css.temVencida : ''}`} href={hashDoChip(lado, 'vencidas')}><span>Vencidas</span><strong>{moeda(vencido)}</strong><small>{vencido > 0 ? 'Ver as vencidas' : 'Nada vencido'}</small></a>
+        {/* #3393: "Vencidas R$ 0,00" ocupava o lugar mais nobre sem pedir nada; só aparece quando há o que cobrar. */}
+        {vencido > 0 && <a className={`${css.cartaoVencidas} ${css.temVencida}`} href={hashDoChip(lado, 'vencidas')}><span>Vencidas</span><strong>{moeda(vencido)}</strong><small>Ver as vencidas</small></a>}
         <ListaDoDia titulo="Vence hoje" lado={lado} chip="hoje" itens={listas.hoje} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} hoje.`} />
         <ListaDoDia titulo="Próximos 7 dias" lado={lado} chip="semana" itens={listas.semana} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} nos próximos 7 dias.`} />
       </section>
@@ -170,6 +192,7 @@ function ContasFinanceiras({ lado }) {
   const campo = (nome, valor) => setAvancado((atual) => ({ ...atual, [nome]: valor }))
   const selecionar = (conta) => { setSelecionadaId(conta.id); if (telaEstreita()) setDetalheId(conta.id) }
   const comAvancado = Object.values(avancadoAplicado).some(Boolean)
+  const nomeDaCategoria = (conta) => cadastros.dados?.categorias.find((item) => item.id === conta.categoriaFinanceiraId)?.nome
   const nomeDoChip = CHIPS_CONTAS.find((item) => item.id === chip)?.rotulo
   return <div className={css.painel}>
     <div className={css.barra}>
@@ -201,14 +224,17 @@ function ContasFinanceiras({ lado }) {
             const linha = valorDaLinha(conta, lado)
             const parcelas = conta.parcelas.length
             return <li key={conta.id} className={`${css.linha} ${conta.id === selecionadaId ? css.linhaSelecionada : ''}`}>
-              <button type="button" className={css.selecionar} aria-current={conta.id === selecionadaId ? 'true' : undefined} onClick={() => selecionar(conta)}><strong>{conta.descricao}</strong><small><SituacaoConta status={statusDaConta(conta)} lado={lado} />{conta.status !== 'Cancelada' && parcela ? ` · ${quandoVence(parcela)}` : ''}{parcelas > 1 ? ` · ${parcelas} parcelas` : ''}</small></button>
+              <span className={`${css.vence} ${atrasada(conta, parcela) ? css.venceAtrasada : ''}`}>{parcela && conta.status !== 'Cancelada' ? dataCurta(parcela.dataVencimento).slice(0, 5) : ''}</span>
+              <button type="button" className={css.selecionar} aria-current={conta.id === selecionadaId ? 'true' : undefined} onClick={() => selecionar(conta)}><strong>{conta.descricao}</strong><small><SituacaoConta status={statusDaConta(conta)} lado={lado} />{conta.status !== 'Cancelada' && parcela ? ` · ${quandoVence(parcela)}` : ''}{parcelas > 1 ? ` · ${parcelas} parcelas` : ''}{nomeDaCategoria(conta) ? ` · ${nomeDaCategoria(conta)}` : ''}</small></button>
               <span className={css.valorLinha}><small>{linha.rotulo}</small><span className={css.valor}>{moeda(linha.valor)}</span></span>
               <div className={css.acoesLinha}>
-                {podeRegistrarNaConta(conta, podeGerenciar) && <Botao variante="primario" aria-haspopup="dialog" aria-label={`${palavras.verbo} ${conta.descricao}`} onClick={() => { setSelecionadaId(conta.id); setPagamento({ conta, parcela }) }}>{palavras.verbo}</Botao>}
+                {podeRegistrarNaConta(conta, podeGerenciar) && <Botao aria-haspopup="dialog" aria-label={`${palavras.verbo} ${conta.descricao}`} onClick={() => { setSelecionadaId(conta.id); setPagamento({ conta, parcela }) }}>{palavras.verbo}</Botao>}
                 <Botao aria-label={`Abrir conta ${conta.descricao}`} aria-haspopup="dialog" onClick={() => { setSelecionadaId(conta.id); setDetalheId(conta.id) }}>Abrir</Botao>
               </div>
             </li>
           })}</ul>
+          {/* #3393: o rodapé soma o que ainda falta nas contas à vista. */}
+          {consulta.dados?.itens.length > 0 && faltaDaLista(consulta.dados.itens) > 0 && <p className={css.somaLista}><span>Falta {lado} {total > TAMANHO_PAGINA ? 'nesta página' : 'nesta lista'}</span><strong>{moeda(faltaDaLista(consulta.dados.itens))}</strong></p>}
           {total > TAMANHO_PAGINA && <div className={css.paginacao}><Botao disabled={paginaAtual === 1 || consulta.carregando} onClick={() => setPagina(paginaAtual - 1)}>Anterior</Botao><span>Página {paginaAtual} de {Math.ceil(total / TAMANHO_PAGINA)}</span><Botao disabled={paginaAtual * TAMANHO_PAGINA >= total || consulta.carregando} onClick={() => setPagina(paginaAtual + 1)}>Próxima</Botao></div>}
         </div>
         {selecionada && <aside className={css.contexto} aria-label="Resumo da conta selecionada">
@@ -294,7 +320,7 @@ function ExtratoFinanceiro() {
       <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} negativoEmErro /></div>
       {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro período e toque em Consultar extrato.</Vazio>}
-      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.lado === 'pagar' ? css.valorSaida : ''}`}>{moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
+      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.estornado ? css.zero : item.lado === 'pagar' ? css.valorSaida : css.valorEntrada}`}>{item.lado === 'pagar' ? '−' : '+'} {moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
     </div></EstadoFinanceiro>
     {linha && <Modal titulo="Movimento financeiro" aoFechar={() => setLinha(null)}><dl className={css.detalhes}><div><dt>Descrição</dt><dd>{linha.descricao}</dd></div><div><dt>Data</dt><dd>{dataCurta(linha.em)}</dd></div><div><dt>Valor</dt><dd>{moeda(linha.valor)}</dd></div><div><dt>Situação</dt><dd>{linha.estornado ? 'Estornado' : 'Registrado'}</dd></div></dl>{linha.contaId && <a className={css.atalho} href={hashDoModulo('financeiro', linha.lado)} onClick={() => setLinha(null)}>Consultar conta a {linha.lado}</a>}</Modal>}
   </div>
@@ -311,6 +337,15 @@ function RelatoriosFinanceiros() {
   const [erroExportacao, setErroExportacao] = useState(null)
   const campo = (nome, valor) => setRascunho((atual) => ({ ...atual, [nome]: valor }))
   const tabela = <div className={css.tabelaRolavel}><table className={css.tabela}><caption className="sr">Fluxo de caixa previsto e realizado de {dataPorExtenso(filtros.inicio)} a {dataPorExtenso(filtros.fim)}</caption><thead><tr>{['Período', 'A pagar', 'A receber', 'Pago', 'Recebido', 'Saldo realizado'].map((nome) => <th scope="col" key={nome}>{nome}</th>)}</tr></thead><tbody>{consulta.dados?.map((item) => <tr key={item.inicioBucket ?? item.rotulo}><th scope="row">{item.rotulo}</th>{[item.previstoPagar, item.previstoReceber, item.realizadoPagar, item.realizadoReceber, item.realizadoReceber - item.realizadoPagar].map((valor, indice) => <td key={indice}>{moeda(valor)}</td>)}</tr>)}</tbody></table></div>
+  // #3393: barras pareadas Recebido x Pago por período; a tabela abaixo é o texto equivalente.
+  const linhasGrafico = consulta.dados ?? []
+  const escala = escalaDasBarras(linhasGrafico.flatMap((item) => [item.realizadoReceber, item.realizadoPagar]))
+  const grafico = escala.some(Boolean) && <figure className={css.grafico}>
+    <figcaption className={css.legendaGrafico}><span><i className={css.barraRecebido} />Recebido</span><span><i className={css.barraPago} />Pago</span><span>Saldo do período à direita; os valores exatos estão na tabela.</span></figcaption>
+    <ol aria-hidden="true">{linhasGrafico.map((item, indice) => <li key={item.inicioBucket ?? item.rotulo}><span className={css.rotuloGrafico}>{item.rotulo}</span>
+      <span className={css.parBarras}><i className={css.barraRecebido} style={{ width: `${escala[indice * 2]}%` }} /><i className={css.barraPago} style={{ width: `${escala[indice * 2 + 1]}%` }} /></span>
+      <b className={tomDoSaldo(item.realizadoReceber - item.realizadoPagar)}>{comSinal(item.realizadoReceber - item.realizadoPagar)}</b></li>)}</ol>
+  </figure>
   const exportar = async () => {
     setExportando(true); setErroExportacao(null)
     try {
@@ -326,7 +361,7 @@ function RelatoriosFinanceiros() {
       <CampoSelecao rotulo="Centro de custo" value={rascunho.centroCustoId} onChange={(e) => campo('centroCustoId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todos' }, ...(cadastros.dados?.centros ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
       <Botao tipo="submit" variante="primario">Gerar relatório</Botao>
     </form><ErroFinanceiro erro={cadastros.erro} />
-    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>{filtros.categoriaId || filtros.centroCustoId ? 'Previsto por vencimento; Pago e Recebido só das contas, porque pedidos e vendas não têm categoria nem centro de custo.' : 'Previsto por vencimento; o período já vem até o fim do mês. Pago e Recebido somam contas, pedidos, vendas e movimentos do Caixa, como o Extrato.'}</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{consulta.dados?.every((i) => !i.previstoPagar && !i.previstoReceber && !i.realizadoPagar && !i.realizadoReceber) && <p className={css.aviso}>Sem movimentos neste período. Cadastre contas ou registre vendas para ver o fluxo.</p>}{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
+    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>{filtros.categoriaId || filtros.centroCustoId ? 'Previsto por vencimento; Pago e Recebido só das contas, porque pedidos e vendas não têm categoria nem centro de custo.' : 'Previsto por vencimento; o período já vem até o fim do mês. Pago e Recebido somam contas, pedidos, vendas e movimentos do Caixa, como o Extrato.'}</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{consulta.dados?.every((i) => !i.previstoPagar && !i.previstoReceber && !i.realizadoPagar && !i.realizadoReceber) && <p className={css.aviso}>Sem movimentos neste período. Cadastre contas ou registre vendas para ver o fluxo.</p>}{grafico}{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
     {aberto && <Modal titulo="Relatório de fluxo de caixa" aoFechar={() => setAberto(false)} largura="min(1100px, calc(100vw - 24px))">{tabela}</Modal>}
   </div>
 }

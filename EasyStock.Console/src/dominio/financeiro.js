@@ -79,6 +79,18 @@ export function valorDaLinha(conta, lado = 'pagar') {
   return { rotulo: 'Falta', valor: conta.pendente }
 }
 
+// #3393: o número principal da Visão geral. Não conta vencidas nem pedidos sem conta (estão à parte na tela).
+export const saldoPrevisto30d = (resumo) => (centavosDe(resumo?.totalAVencer30dReceber ?? 0) - centavosDe(resumo?.totalAVencer30dPagar ?? 0)) / 100
+// #3393: largura de cada barra em % do maior valor do conjunto; tudo zero fica zero.
+export function escalaDasBarras(valores) {
+  const maior = Math.max(0, ...valores.map((v) => Math.abs(v)))
+  return valores.map((v) => (maior ? (Math.abs(v) / maior) * 100 : 0))
+}
+// #3393: quanto ainda falta nas contas da lista (rodapé das Contas); cancelada e rascunho não somam.
+export const faltaDaLista = (contas) => contas
+  .filter((conta) => !['Cancelada', 'Rascunho'].includes(conta.status) && conta.pendente > 0)
+  .reduce((soma, conta) => soma + centavosDe(conta.pendente), 0) / 100
+
 export const CHIPS_CONTAS = [
   { id: 'vencidas', rotulo: 'Vencidas' },
   { id: 'hoje', rotulo: 'Vencem hoje' },

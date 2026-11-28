@@ -397,6 +397,8 @@ const diaDaSemana = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('
 // #1624: o fluxo de caixa que faltava no Financeiro. Hoje vem do caixa do dia (relido a cada
 // lançamento); os seis dias anteriores, da mesma conta, lida dia a dia.
 // #1627: cada célula leva o rótulo da coluna, para a tabela virar cartões em tela estreita.
+// #3393: o zero dos 7 dias fica esmaecido; a saída pinta vermelho como antes.
+const valorDoFluxo = (valor, saida = false) => (saida && valor < 0 ? css.valorSaida : valor === 0 ? css.zero : undefined)
 function FluxoDaSemana({ hoje }) {
   const anteriores = useFluxoDeCaixaApi(hoje.data, 6, `${hoje.esquecidoAberto}|${hoje.abertoDesde ?? ''}`)
   const linhas = linhasDoFluxo(hoje, anteriores.dias)
@@ -427,9 +429,9 @@ function FluxoDaSemana({ hoje }) {
             {linhas.map((l, indice) => (
               <tr key={l.data}>
                 <th scope="row">{l.desde ? `Desde ${diaMes(l.desde)}` : indice === 0 ? `Hoje, ${diaMes(l.data)}` : `${diaDaSemana(l.data)}, ${diaMes(l.data)}`}</th>
-                <td data-rotulo="Entrou">{moeda(l.entrou)}</td>
-                <td data-rotulo="Saiu">{moeda(l.saiu)}</td>
-                <td data-rotulo="Resultado do dia" className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
+                <td data-rotulo="Entrou" className={valorDoFluxo(l.entrou)}>{moeda(l.entrou)}</td>
+                <td data-rotulo="Saiu" className={valorDoFluxo(l.saiu)}>{moeda(l.saiu)}</td>
+                <td data-rotulo="Resultado do dia" className={valorDoFluxo(l.saldo, true)}>{moeda(l.saldo)}</td>
                 <td data-rotulo="Caixa">
                   <Pilula tom={l.desde ? tomDoCaixa({ esquecido: true }) : SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula>
                   {/* O dia fechado vem com os números do fechamento; o que entrou depois vem à parte (#1630). */}
