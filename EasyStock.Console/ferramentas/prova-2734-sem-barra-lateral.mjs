@@ -54,10 +54,17 @@ function achadosDe(texto) {
   // (e) barra desenhada por pseudo-elemento: absoluto, colado num lado, com top e bottom, largura fina e fundo pintado.
   for (const m of texto.matchAll(/([^{}]*::?(?:before|after)[^{}]*)\{([^{}]*)\}/g)) {
     const corpo = m[2]
-    const colado = new RegExp(String.raw`(?:^|[;\s])(?:inset-)?(?:${LADO})\s*:\s*0(?![\d.])`).test(corpo)
-    const alto = /(?:^|[;\s])top\s*:/.test(corpo) && /(?:^|[;\s])bottom\s*:/.test(corpo)
-    const fino = new RegExp(String.raw`(?:^|[;\s])width\s*:\s*(?:${ESPESSURA}|[1-6](?:\.\d+)?px)`).test(corpo)
-    const pintado = /background(?:-color)?\s*:\s*(?!none|transparent)/.test(corpo)
+    // Colado num lado: left/right/inset-inline-* em 0 ou negativo pequeno, ou `inset` de 4 valores com um lado `auto`.
+    const colado = new RegExp(String.raw`(?:^|[;\s])(?:inset-)?(?:${LADO})\s*:\s*-?(?:0|[1-3]px)(?![\d.])`).test(corpo)
+      || /(?:^|[;\s])inset\s*:\s*\S+\s+\S+\s+\S+\s+\S+/.test(corpo) && /(?:^|[;\s])inset\s*:[^;]*\bauto\b/.test(corpo)
+    // De cima a baixo: top e bottom, inset-block, height 100% ou o `inset` de 4 valores.
+    const alto = (/(?:^|[;\s])top\s*:/.test(corpo) && /(?:^|[;\s])bottom\s*:/.test(corpo))
+      || /(?:^|[;\s])inset-block\s*:/.test(corpo) || /(?:^|[;\s])height\s*:\s*100%/.test(corpo)
+      || /(?:^|[;\s])inset\s*:\s*\S+\s+\S+\s+\S+\s+\S+/.test(corpo)
+    const fino = new RegExp(String.raw`(?:^|[;\s])width\s*:\s*(?:${ESPESSURA}|[1-6](?:\.\d+)?px|0?\.[1-4]\d*rem)`).test(corpo)
+    // Pintado com cor que não seja a da grade: divisor neutro de 1px é permitido, como em (b).
+    const fundo = corpo.match(/background(?:-color)?\s*:\s*([^;]*)/)
+    const pintado = Boolean(fundo) && !/^(?:none|transparent)\b/.test(fundo[1].trim()) && !corDaGrade.test(fundo[1].trim())
     if (/position\s*:\s*absolute/.test(corpo) && colado && alto && fino && pintado) achados.push(`${linhaDe(m.index + m[1].length)}  barra lateral por pseudo-elemento: ${m[1].trim()}`)
   }
   return achados
@@ -94,6 +101,11 @@ const AMOSTRAS = [
   ['.a::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 4px; background-color: var(--marca); }', 1],
   ['.a::before { content: ""; position: absolute; inset: 0; background: var(--marca); }', 0],
   ['.a::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: var(--linha); }', 0],
+  ['.a::before { content: ""; position: absolute; left: 0; inset-block: 0; width: 4px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 0; height: 100%; width: 0.25rem; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 3px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--linha); }', 0],
 ]
 for (const [amostra, esperado] of AMOSTRAS) assert.equal(achadosDe(amostra).length, esperado, amostra)
 
