@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
@@ -50,6 +51,20 @@ const ICONE_DA_COLUNA = { entrada: 'inbox', ficha: 'ficha' }
 // #1868: `semTitulo` no desktop de três colunas. O trilho já marca o Balcão como ativo e o cartão
 // do Resumo se identifica pelo h3; o cabeçalho de 64 px custava 1 cartão e meio da lista em 1280.
 // O nome da coluna continua no `aria-label` da seção.
+// #3392: acha a âncora visível (fora de `[hidden]`) e acompanha quando o cabeçalho da conversa monta ou desmonta.
+function useAncora(seletor, ativo) {
+  const [ancora, setAncora] = useState(null)
+  useEffect(() => {
+    if (!ativo) { setAncora(null); return undefined }
+    const achar = () => [...document.querySelectorAll(seletor)].find((n) => !n.closest('[hidden]')) ?? null
+    setAncora(achar())
+    const observador = new MutationObserver(() => { const nova = achar(); setAncora((atual) => (atual === nova ? atual : nova)) })
+    observador.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
+    return () => observador.disconnect()
+  }, [seletor, ativo])
+  return ancora
+}
+
 function Coluna({ variante, titulo, contagem, semTitulo = false, children }) {
   return (
     <section className={`${css.coluna} ${css[variante]}`} aria-label={titulo}>
@@ -424,6 +439,7 @@ function ConteudoMoldura({
   const [fichaSolicitada, setFichaSolicitada] = useState(null)
   const [gavetaAberta, setGavetaAberta] = useState(false)
   const botaoFichaRef = useRef(null)
+  const ancoraFicha = useAncora('[data-ancora-ficha]', tamanho === TABLET)
 
   const irParaAtendimento = useCallback(() => setAba('atendimento'), [setAba])
   // #3282: a seta da conversa do celular volta à lista e devolve o foco ao cartão da conversa aberta.
@@ -583,6 +599,8 @@ function ConteudoMoldura({
         <main className={css.palco} tabIndex={-1} data-inicio-tela data-palco-tablet="" id="conteudo-principal" aria-label="Atendimento">
           <Coluna variante="entrada" titulo="Conversas" semTitulo>
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
+            {/* #3392 (r10, H8): sem rodapé de largura inteira, a pílula mora no pé da fila e a conversa ganha a altura dele. */}
+            <div className={css.peDaFila}><BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} /></div>
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           {gavetaAberta && (
@@ -593,13 +611,15 @@ function ConteudoMoldura({
           )}
         </main>
         <div className={css.slotFila} data-fila-canhotos="" />
-        <footer className={css.rodape}>
-          <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
-            Ficha de {selecionada ? apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
-          </Botao>
-          {/* #3384 (r4 P1-1): no tablet a pílula mora no rodapé, ao lado da Ficha: fixa no canto, cobria um ou o outro. */}
-          <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
-        </footer>
+        {/* #3392 (r10, H8): o rodapé de 56 px saiu. A Ficha da conversa aberta mora no cabeçalho dela, ao lado do Assistente,
+            e a conversa fica com a altura toda. O nome segue no nome acessível ("Ficha de X"). */}
+        {ancoraFicha && selecionada && createPortal(
+          <Botao ref={botaoFichaRef} variante="secundario" icone="ficha" aria-haspopup="dialog" onClick={() => setGavetaAberta(true)}
+            aria-label={`Ficha de ${apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda }).rotulo}`}>
+            Ficha
+          </Botao>,
+          ancoraFicha,
+        )}
         {confirmacaoDeFechar}
       </div>
     )

@@ -1,21 +1,109 @@
-.lista { list-style: none; padding: 0; margin: 0; }
-.aviso { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e-4); padding-block: var(--e-4); overflow-wrap: anywhere; }
-.aviso + .aviso { border-top: var(--b-1) solid var(--linha); }
-.texto { min-width: 0; display: grid; justify-items: start; gap: var(--e-2); }
-.cabecaAviso { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
-.quando { font-size: var(--t-apoio); color: var(--tinta-2); }
-.texto h3 { margin: 0; font-size: var(--t-forte); line-height: var(--lh-compacto); }
-.texto p { margin: 0; color: var(--tinta-2); line-height: var(--lh-corpo); }
-.resumo { display: grid; gap: var(--e-1); margin-block: var(--e-3); }
-.resumo strong { font-size: var(--t-titulo); }
-.resumo span { font-size: var(--t-micro); color: var(--tinta-2); }
-.erro { color: var(--erro); background: var(--erro-pastel); padding: var(--e-3); border-radius: var(--r-1); overflow-wrap: anywhere; }
-.aparelho { margin-top: var(--e-4); padding: var(--e-4); background: var(--preenchimento); border-radius: var(--r-2); display: grid; gap: var(--e-3); justify-items: start; }
-.aparelho h3 { margin: 0; font-size: var(--t-apoio); }
-.aparelho p { color: var(--tinta-2); margin: var(--e-1) 0 0; overflow-wrap: anywhere; }
-@media (max-width: 600px) {
-  .aviso { grid-template-columns: minmax(0, 1fr); gap: var(--e-2); justify-items: start; }
-  .aparelho { padding: var(--e-3); }
+/* #3394: painel de Avisos junto ao sino (no lugar do Modal). Vai para a camada de topo como popover; a posição,
+   a largura e a altura máxima vêm do JS (`posicaoDoPainel`), e `data-lado` diz de onde ele nasce: trilho, topo ou
+   folha do celular. A largura e a altura daqui são só a reserva antes da primeira medida. */
+.painel {
+  position: fixed; z-index: 60; inset: auto; margin: 0; padding: 0;
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  width: min(400px, calc(100vw - 24px)); max-height: min(640px, calc(100dvh - 24px));
+  color: var(--tinta); background: var(--papel); border: 0; border-radius: var(--r-2);
+  box-shadow: var(--sombra-alta);
+  transform-origin: top right;
+  animation: abrirPainel var(--dur-media) var(--ease-saida) both;
+}
+.painel[data-lado='direita'] { transform-origin: top left; animation-name: abrirDoLado; }
+/* No celular a folha cobre quase a tela: a cortina do app (a mesma da folha do Popover) separa o painel do resto. */
+.painel[data-lado='folha'] { transform-origin: top center; box-shadow: var(--sombra-alta), 0 0 0 100vmax var(--cortina); }
+@keyframes abrirPainel { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes abrirDoLado { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+
+.cabecalho {
+  display: flex; align-items: center; gap: var(--e-1);
+  padding: var(--e-3) var(--e-3) var(--e-1) var(--e-4);
+}
+.cabecalho h2 { margin: 0 auto 0 0; font-size: var(--t-titulo); line-height: var(--lh-compacto); }
+.abas { padding-inline: var(--e-3); border-bottom: var(--b-1) solid var(--linha); }
+
+.confirmacao {
+  display: grid; gap: var(--e-2); margin: 0 var(--e-3) var(--e-2); padding: var(--e-3);
+  border-radius: var(--r-1); background: var(--alerta-pastel); border: var(--b-1) solid var(--alerta);
+}
+.confirmacao p { margin: 0; font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+.confirmacao div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e-2); }
+
+.corpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--e-2) var(--e-2) var(--e-3); }
+.grupo + .grupo { margin-top: var(--e-2); }
+.grupo h3 {
+  margin: var(--e-2) var(--e-2) var(--e-1); font-size: var(--t-apoio); font-weight: 700;
+  color: var(--tinta-2); line-height: var(--lh-compacto);
+}
+.lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+
+/* Uma linha por aviso: selo da gravidade, texto, ponto de não lido e o botão de ler. */
+.aviso {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-3);
+  padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-1);
+  overflow-wrap: anywhere; transition: background var(--dur-curta) var(--ease-saida);
+}
+/* Não lido tem o fundo tingido da marca (como o Facebook); o lido só ganha cinza ao passar o mouse, para não
+   parecer não lido. */
+.aviso:hover { background: var(--preenchimento); }
+.naoLida { background: var(--marca-claro); }
+.naoLida:hover { background: var(--preenchimento-forte); }
+/* O que chega entra com um contorno da marca que some; o realce é o contorno, não o fundo, que já diz lido ou não
+   lido. Sem fill-mode: terminada a entrada, vale o estilo da própria linha. */
+.chegou { animation: chegar 1.4s var(--ease-saida); }
+@keyframes chegar {
+  from { box-shadow: inset 0 0 0 var(--b-2) var(--marca); transform: translateY(-4px); }
+  30% { transform: none; }
+}
+
+.selo {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-pilula);
+  background: var(--preenchimento-forte); color: var(--tinta-2); align-self: start;
+}
+.aviso[data-tom='perigo'] .selo { background: var(--erro-pastel); color: var(--erro); }
+.aviso[data-tom='aviso'] .selo { background: var(--alerta-pastel); color: var(--alerta); }
+.aviso[data-tom='info'] .selo { background: var(--info-pastel); color: var(--info); }
+
+.texto { min-width: 0; display: grid; gap: 2px; }
+.texto h4 { margin: 0; font-size: var(--t-corpo); font-weight: 500; line-height: var(--lh-compacto); }
+.naoLida .texto h4 { font-weight: 700; }
+.texto p {
+  margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); margin-top: 2px; }
+.meta time { font-size: var(--t-apoio); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+
+.ponto { width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--marca); }
+
+.resumo { margin: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { margin: var(--e-1) var(--e-2) var(--e-2); color: var(--erro); background: var(--erro-pastel); padding: var(--e-3); border-radius: var(--r-1); overflow-wrap: anywhere; }
+
+/* Aparelho: ligado é uma linha discreta no pé; desligado vem antes da lista, com o botão de ativar. */
+.aparelho {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2);
+  padding: var(--e-2) var(--e-3) var(--e-2) var(--e-4); border-top: var(--b-1) solid var(--linha);
+}
+.aparelho p { flex: 1 1 180px; margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); overflow-wrap: anywhere; }
+.iconeAparelho { color: var(--tinta-2); flex-shrink: 0; }
+.aparelhoDesligado {
+  margin: var(--e-1) var(--e-2) var(--e-2); padding: var(--e-2) var(--e-3);
+  border: var(--b-1) solid var(--alerta); border-radius: var(--r-1); background: var(--alerta-pastel);
+}
+.aparelhoDesligado .iconeAparelho, .aparelhoDesligado p { color: var(--tinta); }
+
+/* O sino balança quando chega aviso; o movimento reduzido de base.css encurta para quase nada. */
+.balanca svg { transform-origin: 50% 2px; animation: balancar .6s var(--ease-saida); }
+@keyframes balancar {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(14deg); }
+  45% { transform: rotate(-10deg); }
+  70% { transform: rotate(5deg); }
+}
+
+@media (max-width: 759px) {
+  .aviso { gap: var(--e-2); }
 }
 /* #1989: ponto discreto no sino de quem ainda não ativou os avisos neste aparelho. */
 .pontoErro { display: inline-block; width: 10px; height: 10px; margin-left: var(--e-1); border-radius: var(--r-pilula); background: var(--erro); vertical-align: middle; }

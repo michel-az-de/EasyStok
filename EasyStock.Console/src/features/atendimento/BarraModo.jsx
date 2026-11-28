@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { atalhoLivre } from '../../aplicacao/atalhoDeTecla'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
@@ -32,11 +33,9 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
   useEffect(() => {
     if (!podeAssumir) return undefined
     const ouvir = (e) => {
-      if (e.key?.toLowerCase() !== 'a' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat || e.defaultPrevented || e.isComposing) return
-      const alvo = e.target
-      if (alvo?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role=group][popover], [role=dialog], [role=menu], [role=listbox], [role=combobox], dialog')) return
+      if (e.key?.toLowerCase() !== 'a' || !atalhoLivre(e)) return
       const botao = botaoAssumir.current
-      if (!botao || botao.disabled || botao.offsetParent === null || document.querySelector('dialog[open]')) return
+      if (!botao || botao.disabled || botao.offsetParent === null) return
       e.preventDefault()
       botao.click()
     }

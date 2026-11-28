@@ -8,7 +8,6 @@ import { forwardRef } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
-import { Tooltip } from '../../componentes/Tooltip'
 import {
   amplitudeSimulada, duracaoExcedida, formatarDuracao, formatarTamanho,
 } from '../../dominio/anexos'

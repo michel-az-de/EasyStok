@@ -91,6 +91,15 @@ Fatias (cada uma commit build-verde em master, fecha com `closes #N`), rastreada
 
 Continua dentro do arcabouço da ADR-0025 (meta-lint estático, sem browser/E2E). Não altera a decisão original; só amplia a cobertura do Pilar 1 (manifesto) e do Pilar 4 (gates) ao segundo frontend.
 
+**2026-11-28 (#3401) — lint logo depois da edição no Console (Classe M, nova: referência inventada pelo agente).** O erro típico de código escrito por IA no `EasyStock.Console` (import de arquivo, pacote ou export que não existe, variável sem uso, hook do React condicional) só caía no `npm run qualidade` ou no CI, várias edições depois. O oxlint 1.85 já instalado pega export inventado (`import/named`, `import/default`, `import/namespace`), variável sem uso e hook fora de ordem, mas não tem `import/no-unresolved`: `import x from './naoExiste'` passava. Entram:
+- regra `local/import-existe` (`EasyStock.Console/ferramentas/oxlint-local.mjs`, jsPlugin do oxlint, alpha): relativo sem arquivo ou com caixa errada no nome, pacote fora do `package.json`;
+- as cinco regras como `error` no `.oxlintrc.json` (o `src` tinha 3 `no-unused-vars`, corrigidos; os 263 avisos antigos ficam);
+- hook `PostToolUse` de `Edit|Write|MultiEdit` (`scripts/poka-yoke/posttooluse-lint-console.mjs`): oxlint só no arquivo tocado e só erros, até 10 linhas em `{"decision":"block"}` com exit 0. Pelo Pilar 5 é aviso contextual: a edição já aconteceu, e o import de um arquivo que o agente cria no passo seguinte é legítimo; o gate continua sendo o `npm run lint`.
+
+Sem fast-gate `cmd`+`findstr`, ao contrário dos dois hooks deste ADR: a revisão da #3404 mediu que o `findstr` cala com linha acima de 128 KiB (Write de arquivo grande traz o conteúdo duas vezes no payload) e que o `%RANDOM%` do arquivo temporário colide entre hooks em paralelo, entregando o erro de um arquivo a outra edição. O node direto custa ~30 ms a mais por edição fora do Console (71 contra 42 ms, mediana de 10). Os dois defeitos também valem para `pretooluse-gate.cmd` e `posttooluse-gate.cmd`; ficam para uma issue própria.
+
+Prova em `ferramentas/prova-3401-lint-na-edicao.mjs` (entra no `npm run provas`, confere também o registro no `.claude/settings.json`); o `console.yml` passa a rodar quando o hook ou o `settings.json` mudam.
+
 ## Referências
 - #530 (épico), #531 (Fatia 1), #705 (paridade Admin).
 - Fase 0 (2026-06-08): forense de git, auditoria de gates, leitura de `.csproj`/`.husky`/CI.

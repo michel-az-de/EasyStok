@@ -144,7 +144,8 @@ try {
       const p = await abrir(w, 800)
       for (const nome of ['Sandra', 'Bianca']) {
         await abrirConversa(p, nome)
-        if (w < 1180) { await p.getByRole('button', { name: /^Ficha de / }).click(); await p.waitForTimeout(500) }
+        // #3392: o botão da Ficha mora no cabeçalho; com a gaveta já aberta (troca de conversa) ela mostra a Ficha nova e o cobre.
+        if (w < 1180 && !(await p.locator('dialog[aria-label="Ficha"][open]').count())) { await p.getByRole('button', { name: /^Ficha de / }).click(); await p.waitForTimeout(500) }
         const { antes, fim } = await medirFicha(p)
         const r = `${w} px, ${nome}`
         cobrar(fim.sobreposto === 0 && fim.escondido === 0, `${r}: rolado até o fim, nada fica sob o rodapé (sobreposto ${fim.sobreposto}, escondido ${fim.escondido})`)
@@ -190,9 +191,9 @@ try {
       if (visivel) {
         const m = await b.evaluate((el) => {
           const c = getComputedStyle(el)
-          return { desabilitado: el.disabled, estilo: c.borderTopStyle, cursor: c.cursor }
+          return { desabilitado: el.disabled, estilo: c.borderTopStyle === 'none' || c.borderTopColor === 'rgba(0, 0, 0, 0)' ? 'sem' : c.borderTopStyle, cursor: c.cursor }
         })
-        cobrar(m.desabilitado && m.estilo === 'solid' && m.cursor === 'not-allowed', `${w} px: desabilitado com o desenho do sistema (contorno ${m.estilo}, cursor ${m.cursor})`)
+        cobrar(m.desabilitado && m.estilo === 'sem' && m.cursor === 'not-allowed' /* #3392 (r10): sem contorno, igual aos outros desabilitados da barra */, `${w} px: desabilitado com o desenho do sistema (contorno ${m.estilo}, cursor ${m.cursor})`)
       }
       await p.close()
     }

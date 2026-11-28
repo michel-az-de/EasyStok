@@ -346,7 +346,15 @@
 }
 /* #3386 (r6 H8): com o Assistente no lugar da lista (tablet) a conversa é a coluna estreita e baixa; o campo perde a folga, não o texto. */
 :global(html[data-assistente-tablet]) .composer { padding-block: var(--e-2); }
+/* #3392 (r10, H8): em tela baixa (notebook e tablet deitado) o respiro do composer cede às mensagens, nunca o campo. */
+@media (max-height: 820px) { .composer { padding-block: var(--e-2); } }
 :global(html[data-assistente-tablet]) .restricao { margin-top: 0; }
+/* #3392 (r10, H8): na barra, entre as ações e o Enviar; encolhe com reticências antes de empurrar qualquer botão. */
+.acoes > .restricaoNaBarra {
+  order: 2; margin: 0 0 0 auto; align-self: center; min-width: 0; padding-inline: var(--e-2); flex-shrink: 100;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-apoio); color: var(--tinta-3);
+}
+.acoes > .restricaoNaBarra + .enviar { margin-left: 0; }
 
 /* #2134: o que acabou de acontecer com o "responder é assumir", junto do campo. */
 .avisoAssumiu, .erroAssumir {
@@ -777,7 +785,8 @@
    vira o laranja e o Assumir cede (#3368). */
 /* #3386 (r6, P2-4): a crítica r6 mediu que, com contorno contínuo e tinta-2, ele lia como ativo. Agora tem o desenho do desabilitado do
    Botao (sem preenchimento, contorno tracejado, tinta-3, cursor not-allowed); o motivo segue no Tooltip. */
-.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) solid var(--linha); color: var(--tinta-3); cursor: not-allowed; } /* #3386 (r9): desabilitado neutro, contorno sólido na cor --linha, sem tracejado de rascunho */
+/* #3392 (r10, H8): com contorno, o Enviar desabilitado era o único botão da barra com borda e lia como destaque. Agora tem o
+   desenho dos outros desabilitados da barra (.acoes > button:disabled): sem fundo, sem contorno, tinta-3, cursor not-allowed. */
+.acoes > .enviar:disabled, .acoes > .enviar.enviarAssume:disabled { background: transparent; border-color: transparent; color: var(--tinta-3); cursor: not-allowed; }
 /* Crítica r2 (P2): o Enviar desabilitado também tem contorno contínuo de 1px (o tracejado do Botao lia como quebrado); segue sem
    preenchimento e em tinta-3, o que ainda o separa do ativo. */
-.acoes > .enviar:disabled { border-style: solid; }

@@ -67,10 +67,12 @@
 :global(html[data-assistente-empurra]) :global(#conteudo-principal[data-palco-atendimento] > section[aria-label='Conversa']) { min-width: var(--assistente-conversa-minima, 0px); }
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > section[aria-label='Ficha']),
 :global(html[data-assistente-sem-ficha] #conteudo-principal[data-palco-atendimento] > :has(+ section[aria-label='Ficha'])) { display: none; }
+/* #3392 (r10, H4): à esquerda no computador o painel toma o lugar da fila e da alça dela, como no tablet. */
+:global(html[data-assistente-sem-fila] #conteudo-principal[data-palco-atendimento] > section[aria-label='Conversas']),
+:global(html[data-assistente-sem-fila] #conteudo-principal[data-palco-atendimento] > section[aria-label='Conversas'] + div) { display: none; }
 /* #3384 (r4 P1-5): no tablet o painel encaixado toma o lugar da lista de conversas até fechar; a conversa não fica por baixo dele. */
 :global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet]) { margin-left: var(--assistente-reserva-esquerda, 0px); }
 :global(html[data-assistente-tablet] #conteudo-principal[data-palco-tablet] > section[aria-label='Conversas']) { display: none; }
-:global(html[data-assistente-tablet]) :global(#conteudo-principal[data-palco-tablet] ~ footer) { padding-left: calc(var(--assistente-reserva-esquerda, 0px) + var(--e-4)); }
 /* #3386 (r5 P2-6): no tablet o painel não passa do topo do palco (variável medida em BalaoAssistente). */
 :global(html[data-assistente-tablet]) .painel { max-height: min(720px, calc(100dvh - 56px - var(--e-4) - var(--e-2) - var(--assistente-topo-palco, 0px))); }
 .cabecalhoArrastavel { cursor: move; touch-action: none; user-select: none; }
@@ -89,6 +91,9 @@
   flex-shrink: 0;
   container: cabecalho-assistente / inline-size; /* #3386 (r8 P2-2): os controles ficam numa linha; sem espaço, a dica "Esc" sai e o X fica */
 }
+/* #3392: à esquerda a 1280 (com a Ficha) o painel fica perto do mínimo (320 a 330 px) e o X saía do cabeçalho. Com mouse, os
+   cinco botões de 40 px cedem a 32 px (acima do alvo mínimo de 24 px); no toque seguem com --toque. */
+@media (pointer: fine) { .painelEstreito .cabecalho { --toque: 32px; } }
 @container cabecalho-assistente (max-width: 25rem) { .identidade h2 > svg { display: none; } } /* sem espaço, o ícone do título cede a vez ao texto inteiro */
 .cabecalho h2 {
   display: flex; align-items: center; gap: var(--e-1);

@@ -99,7 +99,6 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const [tocados, setTocados] = useState({})
   const idDoCadastro = useId()
   const nomeRef = useRef(null)
-  const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
