@@ -1,19 +1,18 @@
 using EasyStock.Application.Services.Atendimento;
-using EasyStock.Domain.Entities.Atendimento;
 using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
 
-/// <summary>#3412: sem a seção na configuração, a equipe tem o prazo de primeira resposta padrão antes de o Assistente retomar.</summary>
+/// <summary>#3412: sem a seção na configuração, a equipe tem 5 min antes de o Assistente retomar.</summary>
 public class RetomadaAssistenteOptionsTests
 {
     [Fact]
-    public void Sem_configuracao_o_prazo_e_o_de_primeira_resposta_padrao()
+    public void Sem_configuracao_a_equipe_tem_5_minutos()
     {
         var opcoes = new RetomadaAssistenteOptions();
         opcoes.Ler(new ConfigurationBuilder().Build());
 
-        opcoes.Prazo.Should().Be(TimeSpan.FromMinutes(ConfiguracaoAtendimento.SlaRespostaPadraoMinutos));
+        opcoes.Prazo.Should().Be(TimeSpan.FromMinutes(5));
         opcoes.Prazo.Should().BeLessThan(opcoes.Janela);
     }
 

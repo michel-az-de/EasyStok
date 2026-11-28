@@ -8,12 +8,12 @@ namespace EasyStock.Application.Services.Atendimento;
 /// <summary>
 /// #3068: prazo que a equipe tem para responder antes de o Assistente retomar a conversa. Configuração em
 /// <c>Atendimento:RetomadaAssistente</c>; <see cref="Segundos"/> zero ou negativo desliga a retomada. #3412: o padrão
-/// é o prazo de primeira resposta padrão da loja (5 min); com 60 s a conversa ia e voltava entre o Assistente e a equipe.
+/// é 5 min, o mesmo do prazo de primeira resposta padrão, mas sem depender dele; com 60 s a conversa ia e voltava.
 /// </summary>
 public sealed class RetomadaAssistenteOptions
 {
     public const string Secao = "Atendimento:RetomadaAssistente";
-    public const int PadraoSegundos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos * 60;
+    public const int PadraoSegundos = 300;
     public const int PadraoVarreduraSegundos = 15;
     public const int PadraoJanelaMinutos = 30;
 
