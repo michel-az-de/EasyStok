@@ -41,7 +41,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Take(pageSize)
                 .ToListAsync();
 
-            await CompletarTitulosLegadosAsync(empresaId, items);
+            await ExibirLegadosAsync(empresaId, items);
             return (items, totalCount);
         }
 
@@ -54,13 +54,13 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ThenBy(n => n.Severidade)
                 .Take(limit)
                 .ToListAsync();
-            await CompletarTitulosLegadosAsync(empresaId, items);
+            await ExibirLegadosAsync(empresaId, items);
             return items;
         }
 
         // Envios antigos usavam o título e o tipo do enum de estoque, mesmo para avisos de caixa.
         // Recupera o assunto do envio e o tipo operacional apenas nas cópias AsNoTracking, preservando o registro histórico.
-        private async Task CompletarTitulosLegadosAsync(Guid empresaId, List<Notificacao> items)
+        private async Task ExibirLegadosAsync(Guid empresaId, List<Notificacao> items)
         {
             var legadas = items.Where(n => n.OutboxMensagemId.HasValue
                 && ((n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.Titulo == "Validade Próxima")

@@ -85,4 +85,66 @@ public class NotificacaoTituloIntegrationTests(PostgreSqlDatabaseFixture fixture
         registro.Titulo.Should().Be("Validade Próxima");
         registro.TipoAlerta.Should().Be(TipoAlertaEstoque.ValidadeProxima);
     }
+
+    // #3402 (revisão da PR #3405): aviso novo e antigo do envio convivem com pedido do envio e alertas reais; só o
+    // antigo muda de tipo, e o resumo soma os dois operacionais numa chave só.
+    [SkippableFact]
+    public async Task TipoExibidoSoReclassificaOEnvioAntigoNaListaNoFiltroENoResumo()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        await using var db = fixture.CreateDbContext();
+        var casa = Empresa.Criar("Casa tipo exibido", null);
+        db.Empresas.Add(casa);
+        var pessoa = Guid.NewGuid();
+        var minuto = 0;
+        Notificacao DoEnvio(TipoAlertaEstoque tipo, string titulo, CategoriaConteudoNotificacao categoria)
+        {
+            var evento = EventoNotificacao.Criar(TipoEventoNotificacao.CaixaAbertoEsquecido, casa.Id, "{}");
+            var template = TemplateNotificacao.Criar($"tipo-{Guid.NewGuid():N}", "Tipo exibido", CanalNotificacao.InApp,
+                evento.Tipo, titulo, "corpo", casa.Id);
+            var outbox = OutboxMensagemNotificacao.Criar(evento.Id, template.Id, casa.Id, CanalNotificacao.InApp,
+                pessoa.ToString(), titulo, "corpo", categoria);
+            db.NotifEventos.Add(evento);
+            db.NotifTemplates.Add(template);
+            db.NotifOutboxMensagens.Add(outbox);
+            var aviso = Notificacao.Criar(casa.Id, tipo, titulo, "corpo", SeveridadeNotificacao.Media);
+            aviso.OutboxMensagemId = outbox.Id;
+            aviso.UsuarioId = pessoa;
+            aviso.CriadaEm = DateTime.UtcNow.AddMinutes(-minuto++);
+            return aviso;
+        }
+        var antigo = DoEnvio(TipoAlertaEstoque.ValidadeProxima, "Caixa aberto", CategoriaConteudoNotificacao.Operacional);
+        var novo = DoEnvio(TipoAlertaEstoque.AvisoOperacional, "Prazo estourado", CategoriaConteudoNotificacao.Operacional);
+        var pedido = DoEnvio(TipoAlertaEstoque.PedidoRecebido, "Pedido chegou", CategoriaConteudoNotificacao.Transacional);
+        var validade = Notificacao.Criar(casa.Id, TipoAlertaEstoque.ValidadeProxima, "Validade Próxima", "L-1 vence", SeveridadeNotificacao.Alta);
+        validade.CriadaEm = DateTime.UtcNow.AddMinutes(-minuto++);
+        var critico = Notificacao.Criar(casa.Id, TipoAlertaEstoque.EstoqueCritico, "Estoque Crítico", "abaixo", SeveridadeNotificacao.Alta);
+        critico.CriadaEm = DateTime.UtcNow.AddMinutes(-minuto++);
+        db.Notificacoes.AddRange(antigo, novo, pedido, validade, critico);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        db.SetMobileTenantContext(casa.Id);
+        var repo = new NotificacaoRepository(db);
+
+        (await repo.GetRecentesNaoLidasAsync(casa.Id, 10, pessoa)).Select(n => n.TipoAlerta).Should().Equal(
+            TipoAlertaEstoque.AvisoOperacional, TipoAlertaEstoque.AvisoOperacional, TipoAlertaEstoque.PedidoRecebido,
+            TipoAlertaEstoque.ValidadeProxima, TipoAlertaEstoque.EstoqueCritico);
+        async Task<Guid[]> Ids(TipoAlertaEstoque tipo) =>
+            (await repo.GetByEmpresaAsync(casa.Id, tipo: tipo, usuarioId: pessoa)).Items.Select(n => n.Id).ToArray();
+        (await Ids(TipoAlertaEstoque.AvisoOperacional)).Should().Equal(antigo.Id, novo.Id);
+        (await Ids(TipoAlertaEstoque.ValidadeProxima)).Should().Equal(validade.Id);
+        (await Ids(TipoAlertaEstoque.ProximoVencimento)).Should().Equal(validade.Id);
+        (await Ids(TipoAlertaEstoque.PedidoRecebido)).Should().Equal(pedido.Id);
+        (await Ids(TipoAlertaEstoque.EstoqueCritico)).Should().Equal(critico.Id);
+        var resumo = await repo.GetResumoAsync(casa.Id, pessoa);
+        resumo.PorTipo.Should().BeEquivalentTo(new Dictionary<string, int>
+        {
+            [TipoAlertaEstoque.AvisoOperacional.ToString()] = 2,
+            [TipoAlertaEstoque.ValidadeProxima.ToString()] = 1,
+            [TipoAlertaEstoque.PedidoRecebido.ToString()] = 1,
+            [TipoAlertaEstoque.EstoqueCritico.ToString()] = 1,
+        });
+        resumo.TotalNaoLidas.Should().Be(5);
+        (await db.Notificacoes.AsNoTracking().SingleAsync(n => n.Id == antigo.Id)).TipoAlerta.Should().Be(TipoAlertaEstoque.ValidadeProxima);
+    }
 }
