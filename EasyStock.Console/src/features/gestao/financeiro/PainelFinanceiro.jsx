@@ -9,7 +9,7 @@ import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
-import { nomeDoTipoDeCategoria, STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, saldoPrevisto30d, escalaDasBarras, faltaDaLista, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
+import { nomeDoTipoDeCategoria, STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, saldoPrevisto30d, aReceberAte30d, aPagarAte30d, escalaDasBarras, faltaDaLista, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { dataPorExtenso, moeda } from '../../../dominio/formato'
 import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -51,10 +51,10 @@ const tomDoSaldo = (valor) => (valor > 0 ? css.saldoPositivo : valor < 0 ? css.s
 // #3393: o número principal da Visão geral. Só com os dois lados à vista (#2105, achado 10): com um lado só o sinal mentiria.
 function SaldoPrevisto({ resumo }) {
   const saldo = saldoPrevisto30d(resumo)
-  const receber = resumo.totalAVencer30dReceber ?? 0, pagar = resumo.totalAVencer30dPagar ?? 0
+  const receber = aReceberAte30d(resumo), pagar = aPagarAte30d(resumo)
   const [largReceber, largPagar] = escalaDasBarras([receber, pagar])
-  return <section className={css.saldo} aria-label="A receber menos a pagar nos próximos 30 dias">
-    <div className={css.saldoNumero}><span>A receber menos a pagar · 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Sem o dinheiro em caixa. Não conta as vencidas nem os pedidos sem conta.</small></div>
+  return <section className={css.saldo} aria-label="A receber menos a pagar até 30 dias, com as vencidas">
+    <div className={css.saldoNumero}><span>A receber menos a pagar · vencidas e próximos 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Sem o dinheiro em caixa e sem os pedidos sem conta.</small></div>
     <dl className={css.barrasSaldo}>
       <div><dt>A receber</dt><dd><span className={css.trilhoBarra}><i className={css.barraRecebido} style={{ width: `${largReceber}%` }} /></span><b>{moeda(receber)}</b></dd></div>
       <div><dt>A pagar</dt><dd><span className={css.trilhoBarra}><i className={css.barraPago} style={{ width: `${largPagar}%` }} /></span><b>{moeda(pagar)}</b></dd></div>
@@ -98,7 +98,7 @@ function ResumoFinanceiro() {
   const [pagamento, setPagamento] = useState(null)
   const resumo = consulta.dados?.resumo
   return <EstadoFinanceiro consulta={consulta}>{resumo && <div className={css.painel}>
-    <div className={css.barra}><p className={css.aviso}>O que vence hoje e nos próximos 7 dias.</p><Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao></div>
+    <div className={css.barra}><p className={css.aviso}>Abaixo, por lado: o que venceu, vence hoje e nos próximos 7 dias.</p><Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao></div>
     {verPagar && verReceber && <SaldoPrevisto resumo={resumo} />}
     <div className={css.dia}>{Object.entries(consulta.dados.porLado).map(([lado, listas]) => {
       const vencido = somaSaldos(listas.vencida)

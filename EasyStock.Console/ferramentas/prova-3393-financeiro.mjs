@@ -56,7 +56,9 @@ caso('#3393 menu: o título do grupo não é link (as provas contam os links do 
   assert.match(menu, /<h3 key=\{`grupo-\$\{secao\.rotulo\}`\} className=\{css\.grupoMenu\}>\{secao\.rotulo\}<\/h3>/)
 })
 
-caso('#3393 visão geral: saldo previsto de 30 dias = a receber − a pagar, em centavos', () => {
+caso('#3393 visão geral: saldo previsto de 30 dias = a receber − a pagar, em centavos, com as vencidas (r5)', () => {
+  assert.equal(financeiro.saldoPrevisto30d({ totalAVencer30dReceber: 2620, totalVencidoReceber: 0, totalAVencer30dPagar: 3607.5, totalVencidoPagar: 799.35 }), -1786.85)
+  assert.equal(financeiro.aPagarAte30d({ totalAVencer30dPagar: 0.1, totalVencidoPagar: 0.2 }), 0.3)
   assert.equal(financeiro.saldoPrevisto30d({ totalAVencer30dReceber: 100.1, totalAVencer30dPagar: 40.2 }), 59.9)
   assert.equal(financeiro.saldoPrevisto30d({ totalAVencer30dReceber: 0, totalAVencer30dPagar: 70 }), -70)
   assert.equal(financeiro.saldoPrevisto30d({}), 0)
@@ -75,8 +77,8 @@ caso('#3393 contas: falta da lista soma só o que ainda falta (sem cancelada nem
 
 caso('#3393 visão geral: herói do saldo só com os dois lados e diz o que fica de fora', () => {
   assert.match(painel, /verPagar && verReceber && <SaldoPrevisto/)
-  assert.match(painel, /Sem o dinheiro em caixa\. Não conta as vencidas nem os pedidos sem conta/)
-  assert.match(painel, /<span>A receber menos a pagar · 30 dias<\/span>/, 'o número não é saldo: o nome diz o que ele é (r4)')
+  assert.match(painel, /Sem o dinheiro em caixa e sem os pedidos sem conta/)
+  assert.match(painel, /<span>A receber menos a pagar · vencidas e próximos 30 dias<\/span>/, 'o número não é saldo: o nome diz o que ele é (r4)')
   assert.match(painel, /className=\{css\.barrasSaldo\}/)
 })
 

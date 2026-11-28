@@ -79,8 +79,11 @@ export function valorDaLinha(conta, lado = 'pagar') {
   return { rotulo: 'Falta', valor: conta.pendente }
 }
 
-// #3393: o número principal da Visão geral. Não conta vencidas nem pedidos sem conta (estão à parte na tela).
-export const saldoPrevisto30d = (resumo) => (centavosDe(resumo?.totalAVencer30dReceber ?? 0) - centavosDe(resumo?.totalAVencer30dPagar ?? 0)) / 100
+// #3393: o número principal da Visão geral: o que entra menos o que sai até 30 dias, contando o que já venceu
+// (crítica r5: as vencidas são o dinheiro mais urgente). Pedidos sem conta ficam à parte na tela.
+export const aReceberAte30d = (resumo) => (centavosDe(resumo?.totalAVencer30dReceber ?? 0) + centavosDe(resumo?.totalVencidoReceber ?? 0)) / 100
+export const aPagarAte30d = (resumo) => (centavosDe(resumo?.totalAVencer30dPagar ?? 0) + centavosDe(resumo?.totalVencidoPagar ?? 0)) / 100
+export const saldoPrevisto30d = (resumo) => (centavosDe(aReceberAte30d(resumo)) - centavosDe(aPagarAte30d(resumo))) / 100
 // #3393: largura de cada barra em % do maior valor do conjunto; tudo zero fica zero.
 export function escalaDasBarras(valores) {
   const maior = Math.max(0, ...valores.map((v) => Math.abs(v)))
