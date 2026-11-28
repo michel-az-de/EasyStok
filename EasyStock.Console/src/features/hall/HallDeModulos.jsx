@@ -13,6 +13,7 @@ import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { rotuloDoSair } from '../../componentes/contaDoMenu'
 import { pedirAjuda } from '../../aplicacao/pedirAjuda'
 import { TrilhoDoConsole } from './TrilhoDoConsole'
+import { MenuDoTrilho } from './MenuDoTrilho'
 import { Vazio } from '../../componentes/Vazio'
 import { atalhosDiretos, buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
 import {
@@ -191,8 +192,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
     <aside className={css.lateral}><TrilhoDoConsole onde="hall" fonteApi={fonteApi} rotuloNav="Navegação" aoAbrirAjuda={pedirAjuda} /></aside>
     <div className={[css.hall, !preferencia.movimentos && css.semMovimentos].filter(Boolean).join(' ')}>
       <header className={css.topo}>
-        {/* #2232 (H1): uma marca só no canto, a da loja. */}
-        <Marca compacta />
+        {/* #2232 (H1): uma marca só no canto, a da loja. #3417: sem o trilho, o Menu abre o trilho num modal. */}
+        <div className={css.inicioDoTopo}><MenuDoTrilho onde="hall" fonteApi={fonteApi} aoAbrirAjuda={pedirAjuda} /><Marca compacta /></div>
         <div className={css.acoes}>
           {buscaDaCasa}
           {ajuda}

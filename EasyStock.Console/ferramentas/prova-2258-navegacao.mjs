@@ -131,11 +131,14 @@ await caso('A9/G4: Tema e Sair só atrás do avatar, nas barras dos módulos e d
   assert.match(ler('features/hall/TrilhoDoConsole.jsx'), /<MenuDaConta /)
 })
 
-await caso('G3/F6: o botão Menu só aparece onde o menu lateral some (até 759 px)', () => {
+await caso('G3/F6: o botão Menu aparece exatamente onde o menu lateral some (#3417: até 1179 px)', () => {
   const css = ler('features/hall/moldura.module.css')
-  const faixa1100 = entre(css, '@media (max-width: 1100px) {', '@media (max-width: 759px)')
-  assert.doesNotMatch(faixa1100, /\.abrirMenu/, 'o Menu ainda abre um modal que repete o menu lateral visível')
-  assert.match(entre(css, '@media (max-width: 759px) {', '\n}'), /\.abrirMenu \{ display: inline-flex/)
+  // Fora da faixa em que o trilho some, o Menu fica escondido: não abre um modal que repete o menu lateral visível.
+  assert.match(css, /^\.abrirMenu \{ display: none; \}/m, 'o Menu não nasce escondido')
+  const someTrilho = entre(css, '@media (max-width: 1179px) {', '\n}')
+  assert.match(someTrilho, /\.lateral > nav \{ display: none; \}/, 'o trilho não some até 1179 px')
+  assert.match(someTrilho, /\.abrirMenu \{ display: inline-flex; \}/, 'onde o trilho some não há Menu')
+  assert.doesNotMatch(css, /@media \(max-width: 1100px\) \{\s*\.lateral/, 'sobrou o corte antigo de 1100 px')
 })
 
 await caso('K2: módulo com uma tela só no menu filtrado não tem menu lateral', () => {

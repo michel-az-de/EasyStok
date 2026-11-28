@@ -60,8 +60,8 @@ confere('1  o Sair mora no menu do avatar: trilho do Balcão, trilho dos módulo
 })
 confere('1  com o trilho à vista a barra do módulo não repete Sair nem os links do trilho; sem ele, o Sair fica na barra', () => {
   const css = fonte('features/hall/moldura.module.css')
-  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar, \.acoes > :global\(\[data-ajuda-console\]\) \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
-  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > nav \{ display: none; \}/)
+  assert.match(css, /@media \(min-width: 1180px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar, \.acoes > :global\(\[data-ajuda-console\]\) \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
+  assert.match(css, /@media \(max-width: 1179px\) \{\s*\.lateral > nav \{ display: none; \}/)
   assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /<div className=\{css\.contaNaBarra\}>\s*<MenuDaConta/)
 })
 confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o trilho passava de 720 px)', () => {

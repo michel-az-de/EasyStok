@@ -55,6 +55,8 @@ export function TrilhoDoConsole({
           }
           if (balcao && desenhado[item.id]) return <Fragment key={item.id}>{desenhado[item.id]}</Fragment>
           if (item.soNoBalcao) return <ItemParaOBalcao key={item.id} item={item} aoNavegar={aoNavegar} />
+          // #3417: no Menu do tablet do Balcão os comandos (Loja, Gestão...) moram no topo; sem destino, ficam fora.
+          if (!item.href && !(item.atual && onde === 'balcao')) return null
           return <ItemDeLink key={item.id} item={{ ...item, noBalcao: onde === 'balcao' }} aoNavegar={aoNavegar} />
         })}
       </div>
