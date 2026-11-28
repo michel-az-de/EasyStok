@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { useAtalhosLigados } from '../../aplicacao/atalhoDeTecla'
 import { Botao } from '../../componentes/Botao'
 import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
@@ -12,6 +13,7 @@ import css from './ajuda.module.css'
 
 export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
   const { permite, acoes } = useAcessoModulos()
+  const [atalhosLigados, alternarAtalhos] = useAtalhosLigados()
   const [aviso, setAviso] = useState('')
   const [diagnostico, setDiagnostico] = useState('')
   const dadosRef = useRef(null)
@@ -58,6 +60,19 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
             </details>
           ))}
         </section>
+        {rota.tipo === 'principal' && (
+          <section className={css.detalhes} aria-label="Atalhos do Balcão">
+            <p>No Balcão, fora dos campos de texto:</p>
+            <ul className={css.atalhos}>
+              <li><kbd>J</kbd> Próxima conversa</li>
+              <li><kbd>K</kbd> Conversa anterior</li>
+              <li><kbd>/</kbd> Buscar conversa (fora do campo; no campo da mensagem, busca respostas prontas)</li>
+              <li><kbd>A</kbd> Assumir a conversa</li>
+            </ul>
+            {/* #3392 (WCAG 2.1.4): quem erra tecla com frequência desliga os atalhos de uma letra. */}
+            <label className={css.interruptor}><input type="checkbox" checked={atalhosLigados} onChange={alternarAtalhos} /> Atalhos de uma tecla</label>
+          </section>
+        )}
         <details className={css.detalhes}>
           <summary>Usar pelo teclado</summary>
           <p><kbd>Tab</kbd> e <kbd>Shift</kbd> + <kbd>Tab</kbd> percorrem os controles. <kbd>Enter</kbd> abre links; <kbd>Enter</kbd> ou <kbd>Espaço</kbd> aciona botões. <kbd>Esc</kbd> fecha a janela ou menu aberto.</p>

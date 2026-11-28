@@ -48,7 +48,8 @@ export function normalizarCardapio(salvo) {
 export function normalizarAssistente(salvo) {
   const { lado, largura, x, y } = objeto(salvo)
   return {
-    lado: ladoValido(lado, LADOS_ASSISTENTE, 'direita'),
+    // #3392 (r10, H4): à esquerda por padrão, o mesmo lado do tablet (onde ele toma o lugar da fila); a escolha salva vale.
+    lado: ladoValido(lado, LADOS_ASSISTENTE, 'esquerda'),
     largura: numero(largura) === null ? ASSISTENTE.padrao : limitar(largura, ASSISTENTE.min, ASSISTENTE.max),
     x: numero(x),
     y: numero(y),

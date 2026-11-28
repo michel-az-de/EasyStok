@@ -2,7 +2,7 @@
 // #3386 (crítica r9): provas renderizadas do Atendimento em 1024, 1280 e 1440 px, claro e escuro.
 // A: no tablet o cartão de duas fileiras mede até 100 px e a fila mostra 4 conversas inteiras a 1024 x 768.
 // B: o cabeçalho do Assistente mostra o nome inteiro (ou a forma curta da fila), sem "Esc" solto, e o X leva "Fechar (Esc)".
-// C: "Enviar e assumir" desabilitado tem contorno sólido de 1px na cor --linha, cursor not-allowed, sem tracejado.
+// C: "Enviar e assumir" desabilitado sem contorno (#3392), cursor not-allowed.
 // D: o chip "Precisa de você" aparece inteiro em toda largura, com o Assistente aberto ou fechado.
 // E: a ordem do Tab no campo de mensagem segue a ordem visual, sem tabindex positivo.
 // F (revisão do PR): o alerta de restrição tem sempre uma parte essencial curta e inteira, e o title nunca é vazio (390, 1024, 1280).
@@ -98,8 +98,9 @@ try {
         return { estilo: s.borderTopStyle, largura: s.borderTopWidth, cor: s.borderTopColor, linha, cursor: s.cursor }
       })
     }
-    cobrar(Boolean(achado) && achado.estilo === 'solid' && achado.largura === '1px' && achado.cor === achado.linha && achado.cursor === 'not-allowed',
-      `${w} px ${tema}: "Enviar e assumir" desabilitado, contorno sólido 1px --linha, not-allowed (${JSON.stringify(achado)})`)
+    // #3392 (r10, H8): o contorno virou destaque; o desabilitado agora não tem contorno, como os outros da barra.
+    cobrar(Boolean(achado) && (achado.estilo === 'none' || achado.cor === 'rgba(0, 0, 0, 0)') && achado.cursor === 'not-allowed',
+      `${w} px ${tema}: "Enviar e assumir" desabilitado sem contorno, not-allowed (${JSON.stringify(achado)})`)
     await p.close()
   }
 
