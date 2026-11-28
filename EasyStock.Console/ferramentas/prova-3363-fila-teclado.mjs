@@ -30,8 +30,16 @@ async function subir(fonteDeDados) {
 const origemDemo = process.env.CONSOLE_DEMO_URL ?? await subir(null)
 const origemApi = process.env.CONSOLE_TEST_URL ?? await subir('api')
 
+// #3398: sem argumento roda S1 e S2; S3 e S4 rodam em prova-3363-fila-teclado-parte2.mjs, num processo próprio. Inteira,
+// a prova levava de 124 a 129 s no runner do CI e estourou o teto de 180 s do rodar-provas no master 18b89f186.
+// Uso: node ferramentas/prova-3363-fila-teclado.mjs [S1|S2|S3|S4 ...]
+const pedidos = process.argv.slice(2).map((s) => s.toUpperCase())
+const grupos = new Set(pedidos.length ? pedidos : ['S1', 'S2'])
+let rodados = 0
 const falhas = []
 const confere = async (descricao, fn) => {
+  if (!grupos.has(descricao.slice(0, 2))) return
+  rodados += 1
   try { await fn(); console.log('ok ' + descricao) } catch (erro) {
     falhas.push(descricao); console.log(`FALHA ${descricao}\n ${String(erro.message).split('\n').slice(0, 4).join(' ')}`)
   }
@@ -491,5 +499,6 @@ try {
   await navegador.close()
   for (const servidor of servidores) await servidor.close()
 }
+if (rodados === 0) { console.log(`prova-3363: nenhum caso de ${[...grupos].join(', ')}`); process.exit(1) }
 console.log(falhas.length === 0 ? '\nprova-3363: tudo ok' : `\nprova-3363: ${falhas.length} falharam`)
 process.exit(falhas.length > 0 ? 1 : 0)
