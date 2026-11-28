@@ -115,7 +115,7 @@ const novaPagina = async ({ width = 1440, height = 900, escuro = false } = {}) =
       // A resposta se monta agora e só sai depois: é a resposta velha que chega depois de uma leitura.
       if (estado.atrasoTodasMs) await new Promise((r) => setTimeout(r, estado.atrasoTodasMs))
       const pg = Number(url.searchParams.get('page') ?? 1), tam = Number(url.searchParams.get('pageSize') ?? 20)
-      return ok(todas.slice((pg - 1) * tam, pg * tam), { total: todas.length, pages: Math.max(1, Math.ceil(todas.length / tam)), page: pg, limit: tam })
+      return ok(todas.slice((pg - 1) * tam, pg * tam), { total: todas.length, pages: Math.ceil(todas.length / tam), page: pg, limit: tam })
     }
     if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
     if (caminho === '/api/atendimento/configuracao') return ok({})
@@ -328,9 +328,8 @@ try {
   const verMais = painel(pagina).getByRole('button', { name: /^Ver mais/ })
   await verMais.focus()
   await pagina.keyboard.press('Enter')
-  await verMais.waitFor({ state: 'detached', timeout: 3000 })
-  await pagina.waitForTimeout(100)
-  assert.ok(await pagina.evaluate(() => Boolean(document.activeElement?.closest('[data-painel-avisos]'))), 'depois do último Ver mais, o foco saiu do painel')
+  await pagina.waitForFunction(() => document.activeElement?.matches('[data-painel-avisos] [role="tab"][aria-selected="true"]'), null, { timeout: 3000 })
+    .catch(async () => assert.fail(`depois do último Ver mais, o foco foi para ${await pagina.evaluate(() => document.activeElement?.tagName)}, não para a aba ativa`))
   console.log('ok 8h: último Ver mais deixa o foco no painel')
   await abaNaoLidas.click()
 
