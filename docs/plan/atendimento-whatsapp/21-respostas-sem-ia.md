@@ -155,7 +155,7 @@ Ordem: S75 → S78 → S76 → S77. S75 e S78 juntas já entregam o ganho medido
 
 Fora de escopo desta onda: devolver a conversa ao Assistente por tempo. `Conversa.LiberarAutomatico` dizia "nunca por
 tempo" e foi isso que deixou a conversa `6bb73f77` 13 dias sem resposta automática. A decisão de produto veio depois
-(Felipe, 21/11/2026) e está na #3068: a equipe tem 60 s para responder; passado o prazo, o Assistente retoma
+(Felipe, 21/11/2026) e está na #3068: a equipe tem 60 s para responder; passado o prazo, o Assistente retoma. Em 28/11/2026 (#3412) o padrão subiu para 300 s, o prazo de primeira resposta padrão, porque com 60 s a conversa ia e voltava entre o Assistente e a equipe
 (`Conversa.RetomarPorTempo`, `RetomadaDoAssistente`). Prazo em `Atendimento:RetomadaAssistente:Segundos`; 0 desliga.
 
 ## Decisões do Felipe

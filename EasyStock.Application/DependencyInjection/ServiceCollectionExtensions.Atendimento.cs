@@ -67,7 +67,7 @@ public static partial class ServiceCollectionExtensions
                 if (int.TryParse(configuracao[LimiteRespostasAgenteOptions.ChaveMaximoPorHora], out var maximo))
                     opcoes.MaximoPorHora = maximo;
             });
-        // #3068: prazo da equipe antes de o Assistente retomar; o padrão (60 s) vale sem a seção na configuração.
+        // #3068: prazo da equipe antes de o Assistente retomar; o padrão (300 s, #3412) vale sem a seção na configuração.
         services.AddOptions<RetomadaAssistenteOptions>()
             .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));
         // #3291: prazo total das chamadas ao modelo em um turno; o padrão (180 s) vale sem a chave na configuração.
