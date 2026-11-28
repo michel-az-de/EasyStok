@@ -40,6 +40,7 @@
 
 /* Uma linha por aviso: selo da gravidade, texto, ponto de não lido e o botão de ler. */
 .aviso {
+  position: relative;
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-3);
   padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-1);
   overflow-wrap: anywhere; transition: background var(--dur-curta) var(--ease-saida);
@@ -74,6 +75,15 @@
 }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); margin-top: 2px; }
 .meta time { font-size: var(--t-apoio); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+
+/* #3402: aviso com destino. O título é o link e se estica sobre a linha toda, como no Facebook (o mesmo jeito do
+   cartão do hall); o botão de ler fica por cima dele. O foco do teclado contorna a linha inteira. */
+.abrir { color: inherit; text-decoration: none; outline: none; }
+.abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.aviso:has(.abrir):hover .abrir { text-decoration: underline; }
+.aviso:has(.abrir:focus-visible) { outline: 3px solid var(--marca); outline-offset: -3px; }
+.aviso:has(.abrir) button { position: relative; z-index: 1; }
+.chamada { font-size: var(--t-apoio); font-weight: 500; color: var(--marca-forte); }
 
 .ponto { width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--marca); }
 

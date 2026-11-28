@@ -13,7 +13,34 @@ registerHooks({ resolve(spec, contexto, proximo) {
   return proximo(spec, contexto)
 } })
 const { MODULOS } = await import('../src/dominio/modulos.js')
-const { agruparAvisos, posicaoDoPainel } = await import('../src/dominio/avisosDaSessao.js')
+const { agruparAvisos, posicaoDoPainel, destinoDoAviso } = await import('../src/dominio/avisosDaSessao.js')
+const { rotaDaHash } = await import('../src/dominio/rota.js')
+
+// --- Domínio puro: para onde o toque no aviso leva (#3402) --------------------------------------------------
+{
+  assert.equal(typeof destinoDoAviso, 'function', 'falta destinoDoAviso em dominio/avisosDaSessao.js (#3402)')
+  const tudo = { permite: () => true, acoes: {} }
+  const ESTOQUE = { hash: '#/m/producao/estoque', tela: 'Estoque do dia', chamada: 'Ver no Estoque do dia' }
+  const PERDAS = { hash: '#/m/producao/perdas', tela: 'Perdas', chamada: 'Ver em Perdas' }
+  // Os nomes do enum TipoAlertaEstoque e os três apelidos (EstoqueBaixo, ProximoVencimento, Reposicao): o banco guarda
+  // o texto e Enum.ToString não garante qual dos dois nomes sai.
+  for (const tipo of ['EstoqueCritico', 'EstoqueBaixo', 'ReposicaoSugerida', 'Reposicao', 'ValidadeProxima', 'ProximoVencimento', 'ProdutoParado']) {
+    assert.deepEqual(destinoDoAviso({ tipo, referenciaId: 'r' }, tudo), ESTOQUE, `${tipo} leva ao Estoque do dia`)
+  }
+  assert.deepEqual(destinoDoAviso({ tipo: 'ProdutoVencido', referenciaId: 'r' }, tudo), PERDAS, 'o lote vencido leva a Perdas')
+  for (const tipo of ['PedidoAtrasado', 'PedidoRecebido', 'AvisoOperacional', 'Sistema', 'constructor', '', undefined]) {
+    assert.equal(destinoDoAviso({ tipo }, tudo), null, `${tipo}: sem tela no Console, sem destino`)
+  }
+  assert.equal(destinoDoAviso(null, tudo), null, 'sem aviso, sem destino')
+  assert.equal(destinoDoAviso({ tipo: 'EstoqueCritico' }, { permite: (id) => id !== 'producao', acoes: {} }), null, 'perfil sem Produção não ganha link')
+  assert.equal(destinoDoAviso({ tipo: 'EstoqueCritico' }, { permite: () => true, acoes: { verDesacertosEstoque: false } }), null, 'perfil sem estoque não ganha link')
+  assert.equal(destinoDoAviso({ tipo: 'EstoqueCritico' }, {}), null, 'sem a regra do perfil, sem link')
+  for (const destino of [ESTOQUE, PERDAS]) {
+    const rota = rotaDaHash(destino.hash, { fonteApi: true })
+    assert.deepEqual([rota.tipo, rota.modulo, rota.tela, rota.aviso], ['modulo', 'producao', destino.hash.split('/').pop(), undefined], `${destino.hash} tem de ser rota que já existe`)
+  }
+  console.log('ok domínio #3402: estoque e apelidos levam ao Estoque do dia, vencido a Perdas; pedido e aviso operacional sem destino; perfil sem estoque sem link')
+}
 
 // --- Domínio puro: grupos por dia e lugar do painel ---------------------------------------------------------
 {
@@ -76,7 +103,16 @@ const LIDOS = [
 ]
 // Mais antigos que os quatro de cima: com eles passam de 10 não lidas, mais que o /recentes devolve.
 const ANTIGOS = Array.from({ length: 8 }, (_, i) => ({ id: `x${i + 1}`, tipo: 'Sistema', titulo: `Aviso antigo ${i + 1}`, mensagem: 'Sem pressa.', severidade: 'Informativa', createdAt: minutosAtras(60 * 24 * (6 + i)) }))
-const estado = { naoLidas: AVISOS.map((a) => ({ ...a, lida: false })), lidas: [...LIDOS], falharLeituraDe: null, atrasoMs: 0, falharMarcarTodas: false, atrasoTodasMs: 0 }
+// #3402: os tipos e as referências que o backend grava de fato (GeradorNotificacoesAutomaticas, DevicePairingController).
+const LOTE = '55555555-5555-4555-8555-555555555555'
+const DE_VERDADE = [
+  { id: 'e1', tipo: 'EstoqueCritico', titulo: 'Estoque Crítico', mensagem: 'Lasanha da casa: abaixo do mínimo. Considere repor este item.', severidade: 'Alta', referenciaId: '33333333-3333-4333-8333-333333333333', createdAt: minutosAtras(2) },
+  { id: 'e2', tipo: 'ValidadeProxima', titulo: 'Validade Próxima', mensagem: 'L-0014 vence amanhã. Estoque atual: 3 un. Priorize a venda ou rotatividade.', severidade: 'Alta', referenciaId: LOTE, createdAt: minutosAtras(4) },
+  { id: 'e3', tipo: 'ProdutoVencido', titulo: 'Produto Vencido', mensagem: 'L-0009 venceu há 1 dia(s). Retire do estoque ou descarte conforme procedimento.', severidade: 'Critica', referenciaId: LOTE, createdAt: minutosAtras(6) },
+  { id: 'p1', tipo: 'PedidoAtrasado', titulo: 'Pedido Atrasado', mensagem: 'Pedido com previsão em 25/11/2026 ainda não foi recebido. Entre em contato com o fornecedor.', severidade: 'Alta', referenciaId: '44444444-4444-4444-8444-444444444444', createdAt: minutosAtras(8) },
+  { id: 'o1', tipo: 'AvisoOperacional', titulo: 'Aparelho reconectado', mensagem: 'A chave do aparelho Caixa 1 foi trocada pelo pareamento automático.', severidade: 'Alta', createdAt: minutosAtras(10) },
+]
+const estado = { naoLidas: AVISOS.map((a) => ({ ...a, lida: false })), lidas: [...LIDOS], falharLeituraDe: null, atrasoMs: 0, falharMarcarTodas: false, atrasoTodasMs: 0, acoes: {} }
 const escritas = []
 const erros = []
 
@@ -107,7 +143,8 @@ const novaPagina = async ({ width = 1440, height = 900, escuro = false } = {}) =
       return route.fulfill({ status: 204, body: '' })
     }
     if (metodo !== 'GET') return ok({})
-    if (caminho === '/api/auth/me/modulos') return ok({ modulos: MODULOS.map(({ id }) => ({ id, liberado: true })), acoes: {} })
+    if (caminho === '/api/auth/me/modulos') return ok({ modulos: MODULOS.map(({ id }) => ({ id, liberado: true })), acoes: estado.acoes })
+    if (caminho === '/api/atendimento/producao/estoque-do-dia') return ok({ alertas: [], pratos: [] })
     if (caminho === '/api/notificacoes/badge') return ok({ count: estado.naoLidas.length })
     if (caminho === '/api/notificacoes/recentes') return ok(estado.naoLidas.slice(0, 10))
     if (caminho === '/api/notificacoes') {
@@ -133,6 +170,15 @@ const assentar = (page) => page.evaluate(async () => {
 })
 const sinoVisivel = (page) => page.getByRole('button', { name: /^Avisos/ }).locator('visible=true').first()
 const painel = (page) => page.locator('[data-painel-avisos]')
+// A escrita chega à rota simulada num instante incerto: espera por ela até 3 s, sem dormir um tempo fixo.
+const gravou = async (escrita, prazo = 3000) => {
+  for (const fim = Date.now() + prazo; !escritas.includes(escrita); await new Promise((r) => setTimeout(r, 50))) {
+    if (Date.now() > fim) return false
+  }
+  return true
+}
+const esperarContador = (page, n) => page.waitForFunction((n) => [...document.querySelectorAll('button')]
+  .some((b) => (b.getAttribute('aria-label') ?? '').includes(`Avisos, ${n} não lidas`)), n, { timeout: 8000 })
 
 try {
   // 1. Desktop: o painel abre junto ao sino, sem modal nem fundo escuro.
@@ -342,6 +388,84 @@ try {
   assert.match(await pagina.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? ''), /^Avisos/, 'a consulta automática puxou o foco do sino para o painel')
   console.log('ok 8f: consulta automática não rouba o foco')
   await banca.context.close()
+
+  // 9. #3402: tocar no aviso leva à tela da coisa avisada, como nas redes. Estoque abre o Estoque do dia, lote vencido
+  //    abre Perdas; pedido ao fornecedor e aviso operacional, sem tela no Console, ficam só com a leitura.
+  estado.naoLidas = DE_VERDADE.map((a) => ({ ...a, lida: false }))
+  estado.lidas = []
+  const destinos = await novaPagina()
+  const pd = destinos.page
+  await pd.goto(origem + '/#/m/atendimento/balcao')
+  const sinoD = sinoVisivel(pd)
+  await sinoD.waitFor()
+  await esperarContador(pd, 5)
+  await sinoD.click()
+  await painel(pd).waitFor({ state: 'visible' })
+  const linha = (id) => painel(pd).locator(`[data-aviso="${id}"]`)
+  await linha('o1').waitFor()
+  for (const id of ['p1', 'o1']) assert.equal(await linha(id).getByRole('link').count(), 0, `${id}: aviso sem tela no Console não vira link`)
+  const linkCritico = linha('e1').getByRole('link', { name: 'Estoque Crítico', exact: true })
+  await linkCritico.waitFor({ timeout: 2000 }).catch(() => assert.fail('o aviso de estoque não virou link para a tela dele'))
+  assert.equal(await linkCritico.getAttribute('href'), '#/m/producao/estoque')
+  assert.match(await linha('e1').innerText(), /Ver no Estoque do dia/, 'o aviso diz para onde leva')
+  assert.equal(await linha('e3').getByRole('link', { name: 'Produto Vencido', exact: true }).getAttribute('href'), '#/m/producao/perdas', 'o lote vencido abre Perdas')
+  assert.match(await linha('e3').innerText(), /Ver em Perdas/)
+  await assentar(pd)
+  await pd.screenshot({ path: `${evidencias}/destinos-painel.png` })
+
+  // 9a. A linha toda leva (toque no selo, fora do título): lê, fecha e abre a tela, com o foco nela.
+  const caixaE1 = await linha('e1').boundingBox()
+  await pd.mouse.click(caixaE1.x + 24, caixaE1.y + caixaE1.height / 2)
+  await painel(pd).waitFor({ state: 'detached', timeout: 3000 }).catch(() => assert.fail('tocar no aviso não fechou o painel'))
+  await pd.waitForFunction(() => location.hash === '#/m/producao/estoque', null, { timeout: 3000 })
+  assert.ok(escritas.includes('PATCH e1'), 'tocar no aviso marca como lido')
+  await esperarContador(pd, 4)
+  await pd.waitForFunction(() => document.activeElement?.matches('main[data-inicio-tela][aria-label="Estoque do dia"]'), null, { timeout: 3000 })
+    .catch(async () => assert.fail(`depois do toque, o foco foi para ${await pd.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))}`))
+  console.log('ok 9a: tocar na linha do aviso de estoque lê, fecha o painel e abre o Estoque do dia com o foco nele')
+
+  // 9b. Já no Estoque do dia (mesmo hash, sem hashchange): o foco vai ao início da tela, não ao body. A leitura que falha
+  //     depois do painel fechado devolve o aviso e o contador, e a mensagem aparece ao reabrir.
+  estado.falharLeituraDe = 'e2'
+  await sinoD.click()
+  await painel(pd).waitFor({ state: 'visible' })
+  await linha('e2').getByRole('link', { name: 'Validade Próxima', exact: true }).click()
+  await painel(pd).waitFor({ state: 'detached', timeout: 3000 })
+  await pd.waitForFunction(() => document.activeElement?.matches('[data-inicio-tela]'), null, { timeout: 3000 })
+    .catch(async () => assert.fail(`no mesmo hash, o foco foi para ${await pd.evaluate(() => document.activeElement?.tagName)}`))
+  assert.ok(await gravou('PATCH e2'), 'tocar no aviso no mesmo hash também lê')
+  await esperarContador(pd, 4)
+  await sinoD.click()
+  await painel(pd).getByRole('alert').filter({ hasText: 'Validade Próxima' }).waitFor({ timeout: 3000 })
+  await linha('e2').waitFor()
+  estado.falharLeituraDe = null
+  console.log('ok 9b: mesmo hash leva o foco à tela; leitura que falha com o painel fechado volta e avisa ao reabrir')
+
+  // 9c. Ctrl+clique abre noutra aba: lê, mas o painel fica aberto e esta aba não troca de tela.
+  const abaNova = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
+  await linha('e3').getByRole('link', { name: 'Produto Vencido', exact: true }).click({ modifiers: ['Control'] })
+  await (await abaNova)?.close()
+  assert.ok(await painel(pd).isVisible(), 'o Ctrl+clique fechou o painel desta aba')
+  assert.equal(await pd.evaluate(() => location.hash), '#/m/producao/estoque', 'o Ctrl+clique trocou a tela desta aba')
+  assert.ok(await gravou('PATCH e3'), 'o Ctrl+clique também lê o aviso')
+  console.log('ok 9c: Ctrl+clique lê sem fechar o painel nem trocar a tela')
+  await destinos.context.close()
+
+  // 9d. Perfil sem estoque (GerenciarEstoque, `verDesacertosEstoque`): nenhum aviso vira link; a leitura continua.
+  estado.naoLidas = DE_VERDADE.map((a) => ({ ...a, lida: false }))
+  estado.acoes = { verDesacertosEstoque: false }
+  const semEstoque = await novaPagina()
+  await semEstoque.page.goto(origem + '/#/m/atendimento/balcao')
+  const sinoS = sinoVisivel(semEstoque.page)
+  await sinoS.waitFor()
+  await esperarContador(semEstoque.page, 5)
+  await sinoS.click()
+  await painel(semEstoque.page).locator('[data-aviso="o1"]').waitFor()
+  assert.equal(await painel(semEstoque.page).getByRole('link').count(), 0, 'perfil sem estoque não pode ganhar link para tela que recusa')
+  assert.equal(await painel(semEstoque.page).getByRole('button', { name: /^Marcar como lido/ }).count(), 5)
+  estado.acoes = {}
+  console.log('ok 9d: perfil sem estoque fica só com a leitura')
+  await semEstoque.context.close()
 
   assert.deepEqual(erros, [], 'erros no console')
   console.log('prova-3394-avisos-no-sino: ok')
