@@ -4,7 +4,8 @@
 // Varre todo .css de src/ e lista arquivo:linha de: (a) border-left/right/inline-start/inline-end grossa (2px ou mais,
 // ou token --trilho/--b-2/--b-3), de qualquer cor; (b) a mesma borda fina com cor que não seja a da grade
 // (--linha, --linha-forte ou transparent; sem cor declarada vale a cor do texto, que também reprova);
-// (c) border-*-color lateral avulso; (d) box-shadow inset só horizontal.
+// (c) border-*-color lateral avulso; (d) box-shadow inset só horizontal; (e) pseudo-elemento ::before/::after
+// posicionado colado num lado, de cima a baixo, fino e pintado (#3393: a barra do menu ativo escapava por aqui).
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -23,10 +24,12 @@ const corDe = (v) => v.replace(/!important/g, ' ')
 const corDaGrade = /^(?:var\(--linha(?:-forte)?\)|transparent)$/
 // inset com deslocamento só no eixo x: os comprimentos iniciais (até 4) têm o primeiro diferente de 0 e o resto 0
 // ou ausente (ex.: `inset 3px 0 0 <cor>` e a forma curta `inset 3px 0 <cor>`).
+// #3393: espessura em token (`inset var(--trilho) 0 0 <cor>`) conta como comprimento diferente de 0.
+const ESPESSURA = String.raw`var\(--(?:trilho|b-[123])\)`
 const horizontal = (v) => v.split(/,(?![^(]*\))/).some((s) => {
-  const m = s.trim().match(/^inset\s+((?:-?[\d.]+(?:px|rem)?\s+){1,4})/)
+  const m = s.trim().match(new RegExp(String.raw`^inset\s+((?:(?:-?[\d.]+(?:px|rem)?|${ESPESSURA})\s+){1,4})`))
   if (!m) return false
-  const n = m[1].trim().split(/\s+/).map((x) => parseFloat(x))
+  const n = m[1].trim().split(/\s+/).map((x) => (x.startsWith('var(') ? 1 : parseFloat(x)))
   return n[0] !== 0 && n.slice(1, 3).every((x) => x === 0) && n.length < 4 + 1
 })
 
@@ -47,6 +50,22 @@ function achadosDe(texto) {
   }
   for (const m of texto.matchAll(sombra)) {
     if (horizontal(m[1])) achados.push(`${linhaDe(m.index)}  sombra inset horizontal: ${m[0].trim()}`)
+  }
+  // (e) barra desenhada por pseudo-elemento: absoluto, colado num lado, com top e bottom, largura fina e fundo pintado.
+  for (const m of texto.matchAll(/([^{}]*::?(?:before|after)[^{}]*)\{([^{}]*)\}/g)) {
+    const corpo = m[2]
+    // Colado num lado: left/right/inset-inline-* em 0 ou negativo pequeno, ou `inset` de 4 valores com um lado `auto`.
+    const colado = new RegExp(String.raw`(?:^|[;\s])(?:inset-)?(?:${LADO})\s*:\s*-?(?:0|[1-3]px)(?![\d.])`).test(corpo)
+      || /(?:^|[;\s])inset\s*:\s*\S+\s+\S+\s+\S+\s+\S+/.test(corpo) && /(?:^|[;\s])inset\s*:[^;]*\bauto\b/.test(corpo)
+    // De cima a baixo: top e bottom, inset-block, height 100% ou o `inset` de 4 valores.
+    const alto = (/(?:^|[;\s])top\s*:/.test(corpo) && /(?:^|[;\s])bottom\s*:/.test(corpo))
+      || /(?:^|[;\s])inset-block\s*:/.test(corpo) || /(?:^|[;\s])height\s*:\s*100%/.test(corpo)
+      || /(?:^|[;\s])inset\s*:\s*\S+\s+\S+\s+\S+\s+\S+/.test(corpo)
+    const fino = new RegExp(String.raw`(?:^|[;\s])width\s*:\s*(?:${ESPESSURA}|[1-6](?:\.\d+)?px|0?\.[1-4]\d*rem)`).test(corpo)
+    // Pintado com cor que não seja a da grade: divisor neutro de 1px é permitido, como em (b).
+    const fundo = corpo.match(/background(?:-color)?\s*:\s*([^;]*)/)
+    const pintado = Boolean(fundo) && !/^(?:none|transparent)\b/.test(fundo[1].trim()) && !corDaGrade.test(fundo[1].trim())
+    if (/position\s*:\s*absolute/.test(corpo) && colado && alto && fino && pintado) achados.push(`${linhaDe(m.index + m[1].length)}  barra lateral por pseudo-elemento: ${m[1].trim()}`)
   }
   return achados
 }
@@ -76,6 +95,17 @@ const AMOSTRAS = [
   ['.a { border-left-width: 0; border-left-style: solid; }', 0],
   ['.a { box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); }', 0],
   ['.a { box-shadow: inset 0 0 0 1px var(--marca); }', 0],
+  ['.a { box-shadow: inset var(--trilho) 0 0 var(--marca), var(--sombra-media); }', 1],
+  ['.a { box-shadow: inset 0 0 0 var(--b-1) var(--marca); }', 0],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: var(--b-3); background: var(--acao); }', 1],
+  ['.a::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 4px; background-color: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; inset: 0; background: var(--marca); }', 0],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: var(--linha); }', 0],
+  ['.a::before { content: ""; position: absolute; left: 0; inset-block: 0; width: 4px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 0; height: 100%; width: 0.25rem; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 3px; background: var(--marca); }', 1],
+  ['.a::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--linha); }', 0],
 ]
 for (const [amostra, esperado] of AMOSTRAS) assert.equal(achadosDe(amostra).length, esperado, amostra)
 
