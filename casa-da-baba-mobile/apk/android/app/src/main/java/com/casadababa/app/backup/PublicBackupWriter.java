@@ -1,5 +1,6 @@
 package com.casadababa.app.backup;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -55,8 +56,9 @@ public final class PublicBackupWriter {
             try {
                 store.overwrite(atual.id, data);
                 return atual.id;
-            } catch (IOException | RuntimeException semArquivo) {
-                // Linha velha que não abre: cria outra, que vira a mais recente e é a do próximo envio.
+            } catch (FileNotFoundException semArquivo) {
+                // Linha sem arquivo: cria outra, que vira a mais recente e é a do próximo envio. Outra falha
+                // sobe, para não criar uma cópia por envio quando a sobrescrita falha sempre.
             }
         }
         String alternativo = base(filename) + "-" + stamp + ext(filename);

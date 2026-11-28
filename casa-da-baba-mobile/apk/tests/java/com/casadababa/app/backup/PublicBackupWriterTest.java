@@ -33,6 +33,7 @@ public final class PublicBackupWriterTest {
         nomesParecidosNaoSaoCopia();
         linhaQuebradaGanhaUmaCopiaNova();
         falhaNaLinhaNovaNaoDeixaPendente();
+        sobrescritaNegadaNaoCriaCopiaPorEnvio();
         System.out.println("PASS: " + checks + " public backup assertions; MediaStore real requires device validation");
     }
 
@@ -105,6 +106,18 @@ public final class PublicBackupWriterTest {
             "linha quebrada: 5 envios criam uma única cópia nova, com o último envio " + p.publicados);
     }
 
+    /** Sobrescrita negada sempre (fabricante): falha visível, sem uma cópia nova por envio. */
+    private static void sobrescritaNegadaNaoCriaCopiaPorEnvio() {
+        Pasta p = new Pasta(false);
+        p.publicar(7L, NOME);
+        p.negadas.add(7L);
+        int falhas = 0;
+        for (int i = 1; i <= 5; i++) {
+            try { PublicBackupWriter.write(p, NOME, json(i), "20261128132700"); } catch (SecurityException | IOException e) { falhas++; }
+        }
+        check(falhas == 5 && p.publicados.size() == 1 && p.pendentes.isEmpty(), "sobrescrita negada: falha sem criar cópias " + p.publicados);
+    }
+
     /** Disco cheio na linha nova: a pendente do app é apagada, não fica oculta por 7 dias. */
     private static void falhaNaLinhaNovaNaoDeixaPendente() {
         Pasta p = new Pasta(false);
@@ -136,6 +149,7 @@ public final class PublicBackupWriterTest {
         final Map<Long, String> pendentes = new LinkedHashMap<>();
         final Map<Long, byte[]> dados = new HashMap<>();
         final Set<Long> quebradas = new HashSet<>();
+        final Set<Long> negadas = new HashSet<>();
         long proximo = 100;
 
         Pasta(boolean nomeNoInsert, String... deOutraInstalacao) {
@@ -161,6 +175,7 @@ public final class PublicBackupWriterTest {
         }
 
         @Override public void overwrite(long id, byte[] data) throws IOException {
+            if (negadas.contains(id)) throw new SecurityException("sem permissão na linha " + id);
             if (quebradas.contains(id) || (!publicados.containsKey(id) && !pendentes.containsKey(id))) {
                 throw new FileNotFoundException("sem arquivo para a linha " + id);
             }
