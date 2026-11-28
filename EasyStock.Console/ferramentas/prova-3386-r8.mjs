@@ -3,14 +3,17 @@
 // A: a fila mostra até duas fileiras de chips inteiros, com o estado que pede ação primeiro (Diz que pagou, Pix vencido).
 // B: o cabeçalho do Assistente fica numa linha, com X e título inteiros. C: os ícones de posição têm nome e dica.
 // D: o alerta de restrição nunca termina em reticências: ou cabe inteiro ou mostra só "Sem lactose".
-// Uso: node ferramentas/prova-3386-r8.mjs [A|B|C|D ...]  (sem argumento roda tudo)
+// Uso: node ferramentas/prova-3386-r8.mjs [A|B|C|D ...]  (sem argumento roda A e B)
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 process.env.VITE_FONTE_DADOS = 'demonstracao'
 const { createServer } = await import('vite')
-const itens = new Set(process.argv.slice(2).map((s) => s.toUpperCase()))
-const roda = (i) => itens.size === 0 || itens.has(i)
+// #3398: sem argumento roda só A e B; C e D rodam em prova-3386-r8-parte2.mjs, num processo próprio. Inteira, a prova
+// levava 142 s no runner do CI com 4 em paralelo (master 3bffd79de) e estourou o teto de 180 s do rodar-provas.
+const pedidos = process.argv.slice(2).map((s) => s.toUpperCase())
+const itens = new Set(pedidos.length ? pedidos : ['A', 'B'])
+const roda = (i) => itens.has(i)
 const raiz = fileURLToPath(new URL('..', import.meta.url))
 const servidor = await createServer({ root: raiz, logLevel: 'error', server: { host: '127.0.0.1', port: 5823, strictPort: false } })
 await servidor.listen()
