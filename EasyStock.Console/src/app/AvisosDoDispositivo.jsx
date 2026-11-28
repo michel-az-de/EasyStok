@@ -15,8 +15,21 @@ export function AvisosDoDispositivo({ children, visitaSoNaMemoria = false }) {
   const [somDispensado, dispensarSom] = useState(false)
   const [passoAberto, abrirPasso] = useState(false)
   const idDoPasso = useId()
+  const quadro = useRef(null)
   const conteudo = useRef(null)
   const botaoDoPasso = useRef(null)
+  // #3416: o que fica abaixo do conteúdo (faixas e avisos) sobe a barra de abas do celular; o que é `fixed` no pé
+  // da janela (o gatilho do Assistente) soma essa altura por `--pe-do-aparelho`, medida aqui.
+  useEffect(() => {
+    const no = quadro.current
+    const area = conteudo.current
+    if (!no || !area || typeof ResizeObserver === 'undefined') return undefined
+    const medir = () => no.style.setProperty('--pe-do-aparelho', `${Math.max(0, Math.round(no.getBoundingClientRect().bottom - area.getBoundingClientRect().bottom))}px`)
+    const observador = new ResizeObserver(medir)
+    observador.observe(no)
+    observador.observe(area)
+    return () => observador.disconnect()
+  }, [])
   const avisos = avisosDoDispositivo({ som, audioBloqueado, permissaoNotificacao })
     .filter(aviso => !(aviso.id === 'som' && somDispensado) && !(aviso.id === 'notificacao' && notificacaoDispensada))
   const resumo = resumoDoAviso(avisos)
@@ -34,7 +47,7 @@ export function AvisosDoDispositivo({ children, visitaSoNaMemoria = false }) {
     conteudo.current?.focus()
   }
   return (
-    <div className={css.quadro}>
+    <div className={css.quadro} ref={quadro}>
       <div className={css.conteudo} ref={conteudo} tabIndex={-1}>{children}</div>
       {(visitaSoNaMemoria || rascunhosSoNaMemoria) && <div className={`${css.faixa} ${css.empilhada}`}>
         {rascunhosSoNaMemoria && <><span role="alert">Não foi possível guardar o texto das conversas neste navegador. Ele continua nesta sessão e pode ser perdido ao recarregar ou fechar a aba.</span><Botao variante="texto" onClick={tentarGuardarRascunhos}>Tentar guardar o texto</Botao></>}
