@@ -24,7 +24,7 @@ export function AjusteLargura(props) {
   const [aberto, setAberto] = useState(false)
   return (
     <span className={css.ancora}>
-      <BotaoIcone rotulo={`Largura ${props.nome}`} dica="Largura" icone="largura" aria-expanded={aberto} aria-haspopup="dialog"
+      <BotaoIcone rotulo={`Largura ${props.nome}`} icone="largura" aria-expanded={aberto} aria-haspopup="dialog"
         onClick={() => setAberto(!aberto)} />
       {aberto && (
         <Popover rotulo={`Largura ${props.nome}`} papel="dialog" portal posicao="abaixo" largura={280} remedir={props.valor} aoFechar={() => setAberto(false)}>

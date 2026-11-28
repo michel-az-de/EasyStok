@@ -106,12 +106,12 @@ confere('2  saldo em destaque só com pedido criado, aberto, não cancelado e co
 })
 confere('2  com o saldo em destaque, o acesso Pagamento não repete o valor; sem destaque, repete', () => {
   assert.equal(ficha.resumoDoPagamento({ saldo: 32.5, destaque: true }), 'Receber o saldo e ver o extrato')
-  assert.equal(ficha.resumoDoPagamento({ saldo: 32.5, destaque: false }), `${moeda(32.5)} a receber`)
+  assert.equal(ficha.resumoDoPagamento({ saldo: 32.5, destaque: false }), `Falta ${moeda(32.5)}`)
   assert.equal(ficha.resumoDoPagamento({ saldo: 0 }), 'Pagamento completo')
   assert.equal(ficha.resumoDoPagamento({ cancelado: true, saldo: 10 }), 'Confira recebimentos e devoluções')
 })
 confere('2  o saldo aparece no Resumo com o peso do valor (24 px, negrito, tinta cheia)', () => {
-  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /\{destacaSaldo && <p className=\{css\.saldoFicha\}>\{moeda\(saldo\)\} a receber<\/p>\}/)
+  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /\{destacaSaldo && <p className=\{css\.saldoFicha\}>Falta \{moeda\(saldo\)\}<\/p>\}/)
   const regra = fonte('features/ficha-cliente/ficha.module.css').match(/\.resumoAtual \.saldoFicha \{[^}]+\}/)?.[0] ?? ''
   assert.match(regra, /font-size: var\(--t-valor\)/)
   assert.match(regra, /font-weight: 700/)

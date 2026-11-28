@@ -19,7 +19,7 @@ export function resumoDoPagamento({ cancelado = false, saldo = 0, destaque = fal
   if (cancelado && aDevolver > 0) return `${moeda(aDevolver)} a devolver`
   if (cancelado) return 'Confira recebimentos e devoluções'
   if (saldo <= 0) return 'Pagamento completo'
-  return destaque ? 'Receber o saldo e ver o extrato' : `${moeda(saldo)} a receber`
+  return destaque ? 'Receber o saldo e ver o extrato' : `Falta ${moeda(saldo)}`
 }
 
 // Modal Pagamento: com o Extrato acima (modo API com pedido no EasyStok), o bloco
@@ -53,13 +53,13 @@ export function linhaDoResumo({ estado, itens = 0, total = 0, saldo = 0, destaqu
 // com endereço e sem janela nem bairro, "a combinar", nunca vazia.
 const FAIXA_COM_HORA = /^(.*?)\s*·\s*(\d{1,2}):(\d{2})\s+às\s+(\d{1,2}):(\d{2})(?:\s*·.*)?$/
 const hora = (h, m) => `${Number(h)}h${m === '00' ? '' : m}`
-// "qui 05/11 · 14:00 às 17:00 · Tarde" -> "qui 05/11, 14h–17h"; "19h30 às 20h30" -> "19h30–20h30".
+// "qui 05/11 · 14:00 às 17:00 · Tarde" -> "qui 05/11, 14h às 17h"; "19h30 às 20h30" fica como está (#3386: um formato só, o "às").
 export function faixaCurta(faixa) {
   if (!faixa) return null
   const texto = String(faixa).trim()
   const comDia = FAIXA_COM_HORA.exec(texto)
-  if (comDia) return `${comDia[1] ? `${comDia[1]}, ` : ''}${hora(comDia[2], comDia[3])}–${hora(comDia[4], comDia[5])}`
-  return texto.replace(/\s+às\s+/, '–')
+  if (comDia) return `${comDia[1] ? `${comDia[1]}, ` : ''}${hora(comDia[2], comDia[3])} às ${hora(comDia[4], comDia[5])}`
+  return texto.replace(/\s+às\s+/, ' às ')
 }
 // Bairro de um endereço em texto livre. "Rua A, 10" não tem bairro (o "10" é o número); sem rua
 // antes dele, o único pedaço também não é bairro.

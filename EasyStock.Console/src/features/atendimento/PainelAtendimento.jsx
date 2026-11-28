@@ -13,7 +13,7 @@ import { esperaAtrasada, motivoDePrecisar } from '../../dominio/automatico'
 import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { podeEnviarModelo as regraPodeEnviarModelo } from '../../dominio/mensagensPadrao'
-import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, esperaNoCabecalho, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
@@ -217,12 +217,12 @@ function PainelDaConversa({
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   // #3206: lead sem cadastro também envia; o servidor decide.
   const podeEnviarModelo = regraPodeEnviarModelo({ fonteApi, podeReabrir, aceitaModelo: canal.aceitaModelo, encerrada, bloqueada })
-  const espera = esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera
-  const prazo = prazoNoCabecalho(janela, motivo, espera)
+  const prazo = prazoNoCabecalho(janela, motivo)
   // #2134: quem responde e o Assumir ficam fora da área que rola. No modo nota a barra sai de cena.
   // Com o Assumir a faixa fica: na coluna de 750 px (1440 com o cliente aberto) selo e botão empurravam a linha
   // da janela para baixo. Sem ação nem frase, a faixa era só a pílula: essa sobe.
   const motivoDaBarraAtual = motivoDaBarra(motivoDaFila, motivo, pausado)
+  const esperaDoCabecalho = esperaNoCabecalho(esperaAtrasada(selecionada, agora, pausado, horarioDaLoja)?.espera, motivoDaBarraAtual)
   // #3374 (C0): o selo no cabeçalho fica desligado até a C8. Ligado, o cabeçalho passou de 64 para 77 px em 1280
   // e a comanda cobriu o "Total dos itens" (prova-1738), a quebra medida na crítica de 23/11.
   const cardapioNoCabecalho = desktop && Boolean(acoesTela.enviarCardapio)
@@ -245,6 +245,16 @@ function PainelDaConversa({
     </div>
   )
 
+  const itensDoMenu = [
+    acoesTela.enviarCardapio && !cardapioNoCabecalho && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
+    acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
+    acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'agente', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
+    // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída
+    // fica sem menu (#2185): a próxima mensagem abre outra, que começa com o robô.
+    fonteApi && !encerrada && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },
+    acoesTela.concluir && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
+  ]
+
   return (
     <>
       <header className={css.cabecalho} data-cabecalho-conversa>
@@ -260,13 +270,15 @@ function PainelDaConversa({
             <span className={css.nomeCliente}>
               <NomeDoContato completo={apresentacao.completo} curto={apresentacao.curto} capsula={apresentacao.capsula} titulo={apresentacao.titulo} />
             </span>
-            {/* Comanda, canal e, com a janela aberta, o prazo, em uma linha. #1761 (L4): a quantidade de
+            {/* Comanda, canal e, com a janela aberta, o prazo (e a espera atrasada, se a barra não a diz), em uma linha. #1761 (L4): a quantidade de
                 pedidos saiu (está em Histórico). #3234 (C2): fechada, quem diz é a faixa junto do campo. */}
-            <small>
+            <small title={[selecionada.numeroComanda && rotuloDoPedido(selecionada.numeroComanda), canal.nome, prazo, esperaDoCabecalho].filter((x) => typeof x === 'string' && x).join(' · ')}>
               {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {/* #3384 (revisão): o atraso fica à vista em qualquer largura; só a janela folgada some abaixo de 1280. */}
-              {prazo && <span className={prazoFolgado(janela) && !espera ? css.prazoFolgado : undefined}>{' · '}<span title={espera ? 'Tempo desde a mensagem do cliente ainda sem resposta' : canal.explicacao[0]}>{prazo}</span></span>}
+              {prazo && <span className={prazoFolgado(janela) ? css.prazoFolgado : undefined}>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></span>}
+              {/* Espera atrasada: a barra a diz quando é o motivo dela; com outro motivo na barra, é aqui, uma vez só. */}
+              {esperaDoCabecalho && <span>{' · '}{esperaDoCabecalho}</span>}
               {/* O foco vai a este título ao trocar de conversa: o leitor de tela ouve a janela que só a faixa mostra. */}
               {!prazo && janela && !janela.textoLivre && <span className="sr"> · {janela.rotulo}</span>}
             </small>
@@ -282,18 +294,11 @@ function PainelDaConversa({
             <Icone nome="cardapio" tamanho={20} /><span className={css.rotuloCardapio}>Enviar cardápio</span>
           </Botao>}
           <span className={css.ancoraAssistente} data-ancora-assistente />
-          <MenuDeAcoes
-            rotulo="Mais opções da conversa"
-            itens={[
-              acoesTela.enviarCardapio && !cardapioNoCabecalho && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
-              acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
-              acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'agente', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
-              // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída
-              // fica sem menu (#2185): a próxima mensagem abre outra, que começa com o robô.
-              fonteApi && !encerrada && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },
-              acoesTela.concluir && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
-            ]}
-          />
+          {/* #3386 (r7, H4): sem itens o menu não existe e, ao assumir, ele entrava e empurrava "Enviar cardápio" e o Assistente 48 px;
+              a reserva do mesmo tamanho mantém os dois onde estavam (só no desktop, onde o cardápio está no cabeçalho). */}
+          {itensDoMenu.some(Boolean)
+            ? <MenuDeAcoes rotulo="Mais opções da conversa" itens={itensDoMenu} />
+            : cardapioNoCabecalho && <span className={css.reservaDoMenu} aria-hidden="true" />}
         </div>
       </header>
 

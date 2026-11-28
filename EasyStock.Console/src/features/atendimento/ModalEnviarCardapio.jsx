@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { primeiroNome } from '../../dominio/mensagem'
+import { rotuloDoPedido } from '../../dominio/rotulos'
 import { devolverFocoAoCampoDepoisDeFechar } from './focoDoComposer'
 import css from './atendimento.module.css'
 
@@ -60,7 +61,7 @@ export function ModalEnviarCardapio({
   return (
     <Modal
       titulo="Enviar cardápio"
-      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Pedido ${numero}` : ''} · ${canalNome}`}
+      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · ${rotuloDoPedido(numero)}` : ''} · ${canalNome}`}
       aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
         <>

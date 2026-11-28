@@ -90,7 +90,8 @@ confere('cliente que insiste sobre pedido em andamento sobe na hora', () => {
     cliente('Cadê meu pedido? Já tá quase na hora do almoço', 1),
   ], { pedido: { numero: '2026-0187', estado: 'em-preparo', cobranca: cobrancaPaga } }))
   assert.equal(m?.chave, 'insistencia')
-  assert.match(m.texto, /2026-0187/)
+  // #3386: o motivo na tela usa o pedido sem o ano, como o resto do Atendimento.
+assert.match(m.texto, /pedido 0187\b/)
 })
 
 confere('uma pergunta só sobre o pedido ainda é do automático (espera o SLA)', () => {
@@ -170,7 +171,7 @@ confere('#1989-3 duas perguntas do pedido sem resposta seguem subindo, com a con
     cliente('Quanto tempo ainda demora?', 1),
   ], { pedido: { numero: '2026-0193', estado: 'em-preparo', cobranca: cobrancaPaga } }))
   assert.equal(m?.chave, 'insistencia')
-  assert.match(m.texto, /perguntou 2 vezes do pedido 2026-0193/)
+  assert.match(m.texto, /perguntou 2 vezes do pedido 0193/)
 })
 
 // Achados da revisão da PR #1997: "demora" sem pergunta e pergunta de área no meio da venda não

@@ -10,12 +10,13 @@ import css from './NomeDoContato.module.css'
 // no layout e de novo quando o contêiner muda de tamanho, e o resultado vai direto para o
 // `data-abreviado` do elemento, sem renderizar de novo.
 
-function useAbreviacao(ativo, completo, curto) {
+function useAbreviacao(ativo, completo, curto, fixo) {
   const raiz = useRef(null)
   useLayoutEffect(() => {
     const elemento = raiz.current
     if (!elemento) return undefined
     // #2258 (banca a11y): sem forma curta não há o que abreviar; o atributo de outra conversa não fica.
+    if (fixo) return undefined
     if (!ativo) { elemento.removeAttribute('data-abreviado'); return undefined }
     const medir = () => {
       const inteiro = elemento.firstElementChild
@@ -27,17 +28,20 @@ function useAbreviacao(ativo, completo, curto) {
     const observador = new ResizeObserver(medir)
     observador.observe(elemento.parentElement ?? elemento)
     return () => observador.disconnect()
-  }, [ativo, completo, curto])
+  }, [ativo, completo, curto, fixo])
   return raiz
 }
 
-export function NomeDoContato({ completo, curto, capsula, titulo, complemento = null, aoCompletar }) {
+// #3386 (r6, H4): `forma="curta"` é a regra única da fila: a forma curta em toda largura, sem medir. O nome inteiro segue
+// no `title` e no texto do leitor de tela. O padrão (`auto`) é o de sempre.
+export function NomeDoContato({ completo, curto, capsula, titulo, complemento = null, aoCompletar, forma = 'auto' }) {
   const temCurto = Boolean(curto) && curto !== completo
-  const raiz = useAbreviacao(temCurto, completo, curto)
+  const fixo = temCurto && forma === 'curta'
+  const raiz = useAbreviacao(temCurto, completo, curto, fixo)
   const comAcao = capsula?.acao === 'completar-nome' && typeof aoCompletar === 'function'
   const classeDaCapsula = capsula ? `${css.capsula} ${css[`capsula_${capsula.tom}`] ?? css.capsula_neutro}` : ''
   return (
-    <span ref={raiz} className={css.nome} title={titulo ?? completo}>
+    <span ref={raiz} className={css.nome} title={titulo ?? completo} data-abreviado={fixo ? 'true' : undefined}>
       <span className={css.completo}>{completo}</span>
       {temCurto && <span className={css.curto} aria-hidden="true">{curto}</span>}
       {complemento && <span className={css.complemento}>{complemento}</span>}

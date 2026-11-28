@@ -14,8 +14,9 @@ export const ROTULOS = {
   CONVERSA_ASSUMIDA_POR_VOCE: 'Conversa assumida por você',
 }
 
-// "Pedido 12": o nome do pedido que a tela diz (a chave de dado segue `numeroComanda`).
-export const rotuloDoPedido = (numero) => `${ROTULOS.PEDIDO} ${numero}`
+// "Pedido 0194": o nome do pedido que a tela diz (a chave de dado segue `numeroComanda`). Sem o prefixo de ano
+// ("2026-0194"), como `numeroCurto` de pedido.js, que importa este arquivo e por isso não pode ser importado aqui.
+export const rotuloDoPedido = (numero) => `${ROTULOS.PEDIDO} ${String(numero).split('-').at(-1)}`
 
 // Valores que a API e o provedor gravam. A tela só os reconhece; quem os escreve é o EasyStok.
 export const CODIGOS = {
