@@ -10,6 +10,26 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#3398): provas do Atendimento passavam do teto de 180 s do `rodar-provas` no CI
+
+O job `qualidade` do workflow `console` caiu com código 143 (`[estourou 180s]`) na `prova-3386-r9.mjs` e na
+`prova-3386-r8.mjs` no master em bcfeee654 (run 46094695856) e 0250268f6, e duas vezes seguidas na PR #3397 (run
+46096512795). Todas as asserções davam ok; faltava tempo.
+
+- **Por que era flaky:** cada prova sobe o próprio Vite e abre uma página por largura (1024, 1280, 1440) e tema (claro,
+  escuro), às vezes com e sem o Assistente. No runner do GitHub, com 4 provas em paralelo, isso leva de 2 a 3 vezes o
+  tempo local: a r9 inteira passa sozinha em 1m47s na máquina do Felipe e chegou a 148 s no CI. Qualquer prova acima de
+  uns 120 s cai quando divide o runner com outras pesadas.
+- **Como foi confirmado:** depois da #3407 (r9 dividida em A a C e D a H), o master 3bffd79de ficou verde (run
+  46119442217), mas ainda com a r8 em 142 s e a r9-parte2 entre 103 s e 134 s nas duas tentativas.
+- **Correção:** dividir sem mudar asserção. `prova-3386-r8.mjs` roda A e B; `prova-3386-r8-parte2.mjs`, C e D.
+  `prova-3386-r9.mjs` roda A a C; `prova-3386-r9-parte2.mjs`, D; `prova-3386-r9-parte3.mjs`, E a H. Cada parte é um
+  processo do `rodar-provas`, que segue com teto de 180 s.
+- **Quando reabrir:** prova de navegador acima de 120 s no CI. A próxima candidata é a `prova-3363-fila-teclado.mjs`
+  (129 s em 3bffd79de, já caiu uma vez): dividir pelos itens dela do mesmo jeito, nunca subir o teto.
+
+---
+
 ## ✅ CORRIGIDO (#3367): a prova da venda de balcão pedia o dia de um `UtcNow` lido depois da venda
 
 Falhou 1 vez no job "Integração (parte 2)" do CI do master em `c191c8b25` (PR #3366, sem relação com caixa ou venda),
