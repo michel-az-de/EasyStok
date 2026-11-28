@@ -14,7 +14,7 @@ export const MENSAGEM_LEITURA_SEM_RESPOSTA = 'O EasyStok demorou a responder.'
 // A escrita pode ter sido gravada: a dona confere antes de mandar de novo.
 export const MENSAGEM_ESCRITA_SEM_RESPOSTA = 'Não houve resposta. Confira antes de repetir.'
 
-export function prazoDaChamada({ metodo = 'GET', arquivo = false, keepalive = false, formulario = null, sinal = null, prazoComCancelamento = false, prazoMs = null }) {
+export function prazoDaChamada({ metodo = 'GET', arquivo = false, formulario = null, sinal = null, prazoComCancelamento = false, prazoMs = null }) {
   if (arquivo || formulario || (sinal && !prazoComCancelamento)) return null
   if (prazoMs) return prazoMs
   return metodo === 'GET' ? PRAZO_DE_LEITURA_MS : PRAZO_DE_ESCRITA_MS
