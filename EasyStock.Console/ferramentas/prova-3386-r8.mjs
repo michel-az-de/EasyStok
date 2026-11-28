@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 process.env.VITE_FONTE_DADOS = 'demonstracao'
 const { createServer } = await import('vite')
-// #3398: sem argumento roda só A e B; C e D rodam em prova-3386-r8-parte2.mjs, num processo próprio. Inteira, a prova
+// #3398: sem argumento roda só A e B; C roda em prova-3386-r8-parte2.mjs e D em prova-3386-r8-parte3.mjs. Inteira, a prova
 // levava 142 s no runner do CI com 4 em paralelo (master 3bffd79de) e estourou o teto de 180 s do rodar-provas.
 const pedidos = process.argv.slice(2).map((s) => s.toUpperCase())
 const itens = new Set(pedidos.length ? pedidos : ['A', 'B'])

@@ -22,11 +22,13 @@ O job `qualidade` do workflow `console` caiu com código 143 (`[estourou 180s]`)
   uns 120 s cai quando divide o runner com outras pesadas.
 - **Como foi confirmado:** depois da #3407 (r9 dividida em A a C e D a H), o master 3bffd79de ficou verde (run
   46119442217), mas ainda com a r8 em 142 s e a r9-parte2 entre 103 s e 134 s nas duas tentativas.
-- **Correção:** dividir sem mudar asserção. `prova-3386-r8.mjs` roda A e B; `prova-3386-r8-parte2.mjs`, C e D.
-  `prova-3386-r9.mjs` roda A a C; `prova-3386-r9-parte2.mjs`, D; `prova-3386-r9-parte3.mjs`, E a H. Cada parte é um
-  processo do `rodar-provas`, que segue com teto de 180 s.
-- **Quando reabrir:** prova de navegador acima de 120 s no CI. A próxima candidata é a `prova-3363-fila-teclado.mjs`
-  (129 s em 3bffd79de, já caiu uma vez): dividir pelos itens dela do mesmo jeito, nunca subir o teto.
+- **Correção:** dividir sem mudar asserção, uma parte por processo do `rodar-provas` (teto segue 180 s).
+  `prova-3386-r8` roda A e B, a `-parte2` C e a `-parte3` D. `prova-3386-r9` roda A a C, a `-parte2` D e a `-parte3`
+  E a H. `prova-3363-fila-teclado` roda S1 e S2 e a `-parte2` S3 e S4; ela aborta se nenhum caso rodar no total.
+- **Segunda rodada:** depois da PR #3409, o master 18b89f186 (run 46142048016, total de 1022 s contra 704 s) derrubou a
+  `prova-3363-fila-teclado` (código 143) e levou a r8-parte2 (C e D) a 117 s. Medido à parte, o C da r8 leva 66 s e o D
+  36 s localmente, daí a terceira parte.
+- **Quando reabrir:** prova de navegador acima de 120 s no CI. Divida pelos itens dela do mesmo jeito; nunca suba o teto.
 
 ---
 
