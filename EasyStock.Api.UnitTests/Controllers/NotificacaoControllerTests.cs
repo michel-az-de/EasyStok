@@ -60,12 +60,39 @@ public class NotificacaoControllerTests
     public async Task MarcarTodasLidas_DevePersistirCommit()
     {
         var empresaId = Guid.NewGuid();
+        Guid[] mudou = [Guid.NewGuid(), Guid.NewGuid()];
+        _notificacaoRepository.MarcarTodasComoLidasAsync(empresaId, _currentUser.UsuarioId).Returns(mudou);
 
         var result = await _controller.MarcarTodasLidas(empresaId);
 
-        result.Should().BeOfType<NoContentResult>();
+        // #3400: devolve os ids que a ação mudou, para o Desfazer do sino voltar só esses.
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        data.GetType().GetProperty("ids")!.GetValue(data).Should().BeEquivalentTo(mudou);
         await _notificacaoRepository.Received(1).MarcarTodasComoLidasAsync(empresaId, _currentUser.UsuarioId);
         await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task MarcarNaoLidas_VoltaOsIdsDaPessoaNaEmpresa()
+    {
+        var empresa = Guid.NewGuid();
+        Guid[] ids = [Guid.NewGuid(), Guid.NewGuid()];
+
+        (await _controller.MarcarNaoLidas(new MarcarNaoLidasRequest(ids), empresa)).Should().BeOfType<NoContentResult>();
+
+        await _notificacaoRepository.Received(1).MarcarComoNaoLidasAsync(empresa,
+            Arg.Is<IReadOnlyCollection<Guid>>(x => x.SequenceEqual(ids)), _currentUser.UsuarioId);
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task MarcarNaoLidas_RecusaListaVaziaOuAusente()
+    {
+        (await _controller.MarcarNaoLidas(new MarcarNaoLidasRequest([]), Guid.NewGuid())).Should().BeOfType<BadRequestObjectResult>();
+        (await _controller.MarcarNaoLidas(new MarcarNaoLidasRequest(null), Guid.NewGuid())).Should().BeOfType<BadRequestObjectResult>();
+        (await _controller.MarcarNaoLidas(null, Guid.NewGuid())).Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
     }
 
     [Fact]
