@@ -24,7 +24,7 @@ O job `qualidade` do workflow `console` caiu com código 143 (`[estourou 180s]`)
   46119442217), mas ainda com a r8 em 142 s e a r9-parte2 entre 103 s e 134 s nas duas tentativas.
 - **Correção:** dividir sem mudar asserção, uma parte por processo do `rodar-provas` (teto segue 180 s).
   `prova-3386-r8` roda A e B, a `-parte2` C e a `-parte3` D. `prova-3386-r9` roda A a C, a `-parte2` D e a `-parte3`
-  E a H. `prova-3363-fila-teclado` roda S1 e S2 e a `-parte2` S3 e S4; ela aborta se nenhum caso do grupo rodar.
+  E a H. `prova-3363-fila-teclado` roda S1 e S2 e a `-parte2` S3 e S4; ela aborta se nenhum caso rodar no total.
 - **Segunda rodada:** depois da PR #3409, o master 18b89f186 (run 46142048016, total de 1022 s contra 704 s) derrubou a
   `prova-3363-fila-teclado` (código 143) e levou a r8-parte2 (C e D) a 117 s. Medido à parte, o C da r8 leva 66 s e o D
   36 s localmente, daí a terceira parte.
