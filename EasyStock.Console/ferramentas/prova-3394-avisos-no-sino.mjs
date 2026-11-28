@@ -45,6 +45,10 @@ const { agruparAvisos, posicaoDoPainel } = await import('../src/dominio/avisosDa
   assert.equal(celular.lado, 'folha')
   assert.deepEqual([celular.left, celular.right], [8, 8])
   assert.ok(celular.maxHeight <= 844 - celular.top - 8)
+  // Banca: o teto de 640 px do painel vale também com o JS medindo (o estilo inline vencia o CSS).
+  assert.ok(topo.maxHeight <= 640, `painel do topo sem teto: ${topo.maxHeight}`)
+  const alto = posicaoDoPainel({ ancora: { top: 600, bottom: 660, left: 0, right: 96 }, janela: { largura: 1920, altura: 1200 }, alturaDoPainel: 900 })
+  assert.ok(alto.maxHeight <= 640 && alto.top + 640 <= 1200 - 12, `painel do trilho sem teto: ${JSON.stringify(alto)}`)
   console.log('ok domínio: grupos Hoje/Ontem/Anteriores e lugar do painel (topo, trilho, celular)')
 }
 
@@ -70,7 +74,9 @@ const AVISOS = [
 const LIDOS = [
   { id: 'l1', tipo: 'Sistema', titulo: 'Caixa fechado ontem', mensagem: 'O fechamento bateu com o esperado.', severidade: 'Informativa', createdAt: minutosAtras(60 * 26), lida: true },
 ]
-const estado = { naoLidas: AVISOS.map((a) => ({ ...a, lida: false })), lidas: [...LIDOS], falharLeituraDe: null, atrasoMs: 0 }
+// Mais antigos que os quatro de cima: com eles passam de 10 não lidas, mais que o /recentes devolve.
+const ANTIGOS = Array.from({ length: 8 }, (_, i) => ({ id: `x${i + 1}`, tipo: 'Sistema', titulo: `Aviso antigo ${i + 1}`, mensagem: 'Sem pressa.', severidade: 'Informativa', createdAt: minutosAtras(60 * 24 * (6 + i)) }))
+const estado = { naoLidas: AVISOS.map((a) => ({ ...a, lida: false })), lidas: [...LIDOS], falharLeituraDe: null, atrasoMs: 0, falharMarcarTodas: false, atrasoTodasMs: 0 }
 const escritas = []
 const erros = []
 
@@ -95,6 +101,7 @@ const novaPagina = async ({ width = 1440, height = 900, escuro = false } = {}) =
     }
     if (caminho === '/api/notificacoes/marcar-todas' && metodo === 'POST') {
       escritas.push('POST marcar-todas')
+      if (estado.falharMarcarTodas) return route.fulfill({ status: 500, json: { success: false, error: { message: 'Falha simulada' } } })
       estado.lidas.unshift(...estado.naoLidas.map((a) => ({ ...a, lida: true })))
       estado.naoLidas = []
       return route.fulfill({ status: 204, body: '' })
@@ -105,6 +112,8 @@ const novaPagina = async ({ width = 1440, height = 900, escuro = false } = {}) =
     if (caminho === '/api/notificacoes/recentes') return ok(estado.naoLidas.slice(0, 10))
     if (caminho === '/api/notificacoes') {
       const todas = [...estado.naoLidas, ...estado.lidas].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      // A resposta se monta agora e só sai depois: é a resposta velha que chega depois de uma leitura.
+      if (estado.atrasoTodasMs) await new Promise((r) => setTimeout(r, estado.atrasoTodasMs))
       return ok(todas.slice(0, 20), { total: todas.length, pages: 1, page: 1, limit: 20 })
     }
     if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
@@ -225,6 +234,65 @@ try {
   await celular.page.screenshot({ path: `${evidencias}/celular-escuro.png` })
   console.log('ok 7: celular 390 px sem rolagem lateral, escuro')
   await celular.context.close()
+
+  // 8. Achados da banca: mais de 10 não lidas, aba Todas lenta e falha do Marcar todas.
+  estado.naoLidas = [...AVISOS, ...ANTIGOS].map((a) => ({ ...a, lida: false }))
+  estado.lidas = [...LIDOS]
+  const banca = await novaPagina()
+  const pagina = banca.page
+  await pagina.goto(origem + '/#/m/atendimento/balcao')
+  const sinoBanca = sinoVisivel(pagina)
+  await sinoBanca.waitFor()
+  await pagina.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Avisos, 12 não lidas/.test(b.getAttribute('aria-label') ?? '')), null, { timeout: 8000 })
+  await pagina.evaluate(() => {
+    window.__balancou = false
+    new MutationObserver(() => {
+      if ([...document.querySelectorAll('button[aria-haspopup="dialog"]')].some((b) => /balanca/.test(b.className))) window.__balancou = true
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] })
+  })
+  await sinoBanca.click()
+  await painel(pagina).waitFor({ state: 'visible' })
+  const abaTodas = painel(pagina).getByRole('tab', { name: /^Todas/ })
+  const abaNaoLidas = painel(pagina).getByRole('tab', { name: /^Não lidas/ })
+  await abaTodas.click()
+  await painel(pagina).locator('[data-aviso="x8"]').waitFor()
+  await abaNaoLidas.click()
+  const pontos = () => painel(pagina).locator('[data-nao-lida]').count()
+
+  // 8a. Marcar todas falha: as 12 voltam, inclusive as 2 que não cabem nos 10 recentes; o sino não balança.
+  estado.falharMarcarTodas = true
+  await painel(pagina).getByRole('button', { name: 'Marcar todas como lidas', exact: true }).click()
+  await painel(pagina).getByRole('button', { name: 'Sim, marcar todas', exact: true }).click()
+  await painel(pagina).getByRole('alert').waitFor({ timeout: 4000 })
+  estado.falharMarcarTodas = false
+  estado.atrasoTodasMs = 1500
+  await abaTodas.click()
+  assert.equal(await pontos(), 12, 'na volta do Marcar todas, a aba Todas tem de mostrar as 12 não lidas de novo')
+  await pagina.waitForTimeout(1700)
+  assert.equal(await pagina.evaluate(() => window.__balancou), false, 'o sino não balança quando a leitura falha e os avisos voltam')
+  console.log('ok 8a: Marcar todas que falha devolve as 12, sem balançar o sino')
+
+  // 8b. Ler na aba Todas enquanto ela recarrega: a resposta velha não traz o aviso lido de volta.
+  await abaNaoLidas.click()
+  await abaTodas.click()
+  await painel(pagina).getByRole('button', { name: 'Marcar como lido: Estoque baixo: Lasanha da casa', exact: true }).click()
+  await pagina.waitForTimeout(1800)
+  assert.ok(escritas.includes('PATCH a1'))
+  assert.equal(await painel(pagina).locator('[data-aviso="a1"] [data-nao-lida]').count(), 0, 'a resposta velha da aba Todas trouxe o aviso lido de volta')
+  estado.atrasoTodasMs = 0
+  console.log('ok 8b: resposta velha da aba Todas não desfaz a leitura')
+
+  // 8c. O 11º que sobe para os recentes depois da leitura é antigo: não entra realçado como se tivesse chegado.
+  await abaNaoLidas.click()
+  await painel(pagina).locator('[data-aviso="x7"]').waitFor()
+  assert.equal(await painel(pagina).locator('[class*="chegou"]').count(), 0, 'aviso antigo realçado como novo')
+  // 8d. Aviso novo de fato: entra realçado e o sino balança.
+  estado.naoLidas.unshift({ id: 'n1', tipo: 'Sistema', titulo: 'Pedido novo no site', mensagem: 'O pedido 0043 chegou.', severidade: 'Media', createdAt: new Date().toISOString(), lida: false })
+  await painel(pagina).getByRole('button', { name: 'Atualizar avisos', exact: true }).click()
+  await painel(pagina).locator('[data-aviso="n1"][class*="chegou"]').waitFor({ timeout: 3000 })
+  await pagina.waitForFunction(() => window.__balancou === true, null, { timeout: 3000 })
+  console.log('ok 8c/8d: só o aviso novo de fato realça e balança o sino')
+  await banca.context.close()
 
   assert.deepEqual(erros, [], 'erros no console')
   console.log('prova-3394-avisos-no-sino: ok')

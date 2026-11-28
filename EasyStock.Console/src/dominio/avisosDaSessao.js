@@ -29,6 +29,7 @@ export function agruparAvisos(avisos, agora) {
 const VAO = 8 // distância entre o sino e o painel
 const MARGEM = 12 // distância mínima entre o painel e a borda da janela
 const LARGURA = 400
+const TETO = 640 // altura máxima do painel; numa tela alta ele não vira uma coluna inteira
 const CELULAR = 760
 
 // Onde o painel abre, em coordenadas da janela. Três lugares, um por casa do sino:
@@ -40,19 +41,19 @@ const CELULAR = 760
 export function posicaoDoPainel({ ancora, janela, alturaDoPainel }) {
   if (janela.largura < CELULAR) {
     const top = ancora.bottom + VAO
-    return { lado: 'folha', top, left: VAO, right: VAO, maxHeight: Math.max(1, janela.altura - top - VAO) }
+    return { lado: 'folha', top, left: VAO, right: VAO, maxHeight: Math.max(1, Math.min(TETO, janela.altura - top - VAO)) }
   }
   const largura = Math.min(LARGURA, janela.largura - 2 * MARGEM)
-  const maxHeight = janela.altura - 2 * MARGEM
+  const maxHeight = Math.min(TETO, janela.altura - 2 * MARGEM)
   const noTrilho = (ancora.left + ancora.right) / 2 < janela.largura / 3 && ancora.bottom > janela.altura / 4
   if (noTrilho) {
     const altura = Math.min(alturaDoPainel, maxHeight)
     const top = Math.max(MARGEM, Math.min(ancora.top, janela.altura - MARGEM - altura))
-    return { lado: 'direita', top, left: ancora.right + VAO, width: largura, maxHeight: janela.altura - MARGEM - top }
+    return { lado: 'direita', top, left: ancora.right + VAO, width: largura, maxHeight: Math.min(TETO, janela.altura - MARGEM - top) }
   }
   // Cresce para a esquerda a partir da borda direita do sino; se assim sairia da tela (sino no começo do topo,
   // como no tablet), encosta na margem, como o Popover faz.
   const top = ancora.bottom + VAO
   const left = Math.max(MARGEM, Math.min(ancora.right - largura, janela.largura - largura - MARGEM))
-  return { lado: 'abaixo', top, left, width: largura, maxHeight: Math.max(1, janela.altura - top - MARGEM) }
+  return { lado: 'abaixo', top, left, width: largura, maxHeight: Math.max(1, Math.min(TETO, janela.altura - top - MARGEM)) }
 }

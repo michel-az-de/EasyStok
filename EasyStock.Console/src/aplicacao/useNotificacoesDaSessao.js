@@ -9,16 +9,20 @@ const maisNovoPrimeiro = (a, b) => String(b.createdAt ?? '').localeCompare(Strin
 const marcarNaLista = (itens, lido, ids) => itens.map((aviso) => (ids === null || ids.has(aviso.id) ? { ...aviso, lida: lido } : aviso))
 
 // #3394: a leitura é otimista, como nas redes: o aviso sai da lista e o contador cai na hora; se a API recusa,
-// o aviso volta e `falha` diz o que houve. Enquanto há leitura pendente, a consulta de 30 s não pinta a tela,
-// senão uma resposta que saiu antes do PATCH faria o aviso lido reaparecer.
+// o aviso volta e `falha` diz o que houve. Resposta que saiu antes de uma leitura não pinta a tela (nem a dos
+// recentes nem a da aba Todas), senão o aviso lido reapareceria.
 export function useNotificacoesDaSessao() {
   const [estado, setEstado] = useState({
     total: null, recentes: [], erro: null, carregando: true, falha: null, chegaram: [], todas: TODAS_VAZIA,
   })
   const ativo = useRef(false)
   const geracao = useRef(0)
+  const geracaoTodas = useRef(0)
+  const ultimoPedidoTodas = useRef(0)
   const pendentes = useRef(0)
-  const conhecidos = useRef(null)
+  // Data do aviso mais novo já visto: só o que é mais novo que ele "chegou". Um aviso antigo que sobe para os
+  // recentes porque outro foi lido não chegou agora.
+  const maisNovoVisto = useRef(null)
   // Os handlers leem o retrato mais recente; atualizado depois de cada render, não durante.
   const atual = useRef(estado)
   useEffect(() => { atual.current = estado })
@@ -29,10 +33,11 @@ export function useNotificacoesDaSessao() {
     try {
       const dados = await carregarNotificacoesDaSessao()
       if (!ativo.current || minha !== geracao.current || pendentes.current > 0) return
-      // O que não estava na última leitura chegou agora: o painel realça. A primeira leitura não realça nada.
-      const ids = dados.recentes.map((aviso) => aviso.id)
-      const chegaram = conhecidos.current === null ? [] : ids.filter((id) => !conhecidos.current.has(id))
-      conhecidos.current = new Set(ids)
+      // A primeira leitura não realça nada; depois, realça o que é mais novo que tudo o que já se viu.
+      const datas = dados.recentes.map((aviso) => String(aviso.createdAt ?? ''))
+      const visto = maisNovoVisto.current
+      const chegaram = visto === null ? [] : dados.recentes.filter((_, i) => datas[i] > visto).map((aviso) => aviso.id)
+      maisNovoVisto.current = datas.reduce((maior, data) => (data > maior ? data : maior), visto ?? '')
       setEstado((s) => aoConcluirConsulta(s, { ...dados, chegaram: chegaram.length > 0 ? chegaram : s.chegaram }))
     } catch (erro) {
       if (ativo.current && minha === geracao.current) setEstado((s) => aoFalharConsulta(s, erro.message))
@@ -41,16 +46,25 @@ export function useNotificacoesDaSessao() {
 
   const carregarTodas = useCallback(async ({ mais = false } = {}) => {
     const pagina = mais ? atual.current.todas.pagina + 1 : 1
+    const minha = ++geracaoTodas.current
+    ultimoPedidoTodas.current = minha
     setEstado((s) => ({ ...s, todas: { ...s.todas, carregando: true, erro: null } }))
+    // Velha é a resposta que perdeu a vez: se há pedido mais novo, ele pinta; se o que veio foi uma leitura, a
+    // lista fica como está (já com a leitura) e só sai do "carregando".
+    const velha = () => {
+      if (minha === geracaoTodas.current) return false
+      if (minha === ultimoPedidoTodas.current) setEstado((s) => ({ ...s, todas: { ...s.todas, carregando: false } }))
+      return true
+    }
     try {
       const dados = await carregarTodasAsNotificacoes(pagina)
-      if (!ativo.current) return
+      if (!ativo.current || velha()) return
       setEstado((s) => ({ ...s, todas: {
         ...dados, carregando: false, erro: null,
         itens: mais ? [...s.todas.itens, ...dados.itens.filter((novo) => !s.todas.itens.some((velho) => velho.id === novo.id))] : dados.itens,
       } }))
     } catch (erro) {
-      if (ativo.current) setEstado((s) => ({ ...s, todas: { ...s.todas, carregando: false, erro: erro.message } }))
+      if (ativo.current && !velha()) setEstado((s) => ({ ...s, todas: { ...s.todas, carregando: false, erro: erro.message } }))
     }
   }, [])
 
@@ -70,31 +84,37 @@ export function useNotificacoesDaSessao() {
     }
   }, [carregar])
 
-  // Tira da tela agora, grava na API e, se der errado, devolve o que tirou.
+  // Tira da tela agora, grava na API e, se der errado, devolve o que tirou. "Voltam" são os não lidos das duas
+  // listas (os recentes trazem só 10; a aba Todas pode ter mais), e é por eles que o contador cai e sobe.
   const lerComVolta = useCallback(async ({ ids, gravar, mensagem }) => {
     const antes = atual.current
-    const tirados = antes.recentes.filter((aviso) => ids === null || ids.has(aviso.id))
+    const escolhido = (aviso) => ids === null || ids.has(aviso.id)
+    const tirados = antes.recentes.filter(escolhido)
+    const voltam = new Set([...tirados, ...antes.todas.itens.filter((aviso) => !aviso.lida && escolhido(aviso))].map((aviso) => aviso.id))
     pendentes.current++
     ++geracao.current
+    ++geracaoTodas.current
     setEstado((s) => ({
-      ...s, falha: null,
-      recentes: ids === null ? [] : s.recentes.filter((aviso) => !ids.has(aviso.id)),
-      total: ids === null ? 0 : Math.max(0, (s.total ?? 0) - tirados.length),
+      ...s, falha: null, carregando: false,
+      recentes: s.recentes.filter((aviso) => !escolhido(aviso)),
+      total: ids === null ? 0 : Math.max(0, (s.total ?? 0) - voltam.size),
       todas: { ...s.todas, itens: marcarNaLista(s.todas.itens, true, ids) },
     }))
     try {
       await gravar()
-      pendentes.current--
-      if (ativo.current) carregar({ silenciosa: true })
     } catch {
+      if (ativo.current) {
+        setEstado((s) => ({
+          ...s, falha: mensagem,
+          recentes: [...s.recentes, ...tirados.filter((aviso) => !s.recentes.some((r) => r.id === aviso.id))].sort(maisNovoPrimeiro),
+          total: ids === null ? antes.total : (s.total ?? 0) + voltam.size,
+          todas: { ...s.todas, itens: marcarNaLista(s.todas.itens, false, voltam) },
+        }))
+      }
+    } finally {
       pendentes.current--
-      if (!ativo.current) return
-      setEstado((s) => ({
-        ...s, falha: mensagem,
-        recentes: [...s.recentes, ...tirados.filter((aviso) => !s.recentes.some((r) => r.id === aviso.id))].sort(maisNovoPrimeiro),
-        total: ids === null ? antes.total : (s.total ?? 0) + tirados.length,
-        todas: { ...s.todas, itens: marcarNaLista(s.todas.itens, false, ids === null ? new Set(tirados.map((a) => a.id)) : ids) },
-      }))
+      // Deu certo ou não, a tela volta a bater com o servidor quando não resta leitura pendente.
+      if (ativo.current && pendentes.current === 0) carregar({ silenciosa: true })
     }
   }, [carregar])
 

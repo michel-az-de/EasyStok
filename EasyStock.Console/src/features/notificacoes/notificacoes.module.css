@@ -1,5 +1,6 @@
-/* #3394: painel de Avisos junto ao sino (no lugar do Modal). Vai para a camada de topo como popover; a posição
-   vem do JS (`posicaoDoPainel`), e `data-lado` diz de onde ele nasce: trilho, topo ou folha do celular. */
+/* #3394: painel de Avisos junto ao sino (no lugar do Modal). Vai para a camada de topo como popover; a posição,
+   a largura e a altura máxima vêm do JS (`posicaoDoPainel`), e `data-lado` diz de onde ele nasce: trilho, topo ou
+   folha do celular. A largura e a altura daqui são só a reserva antes da primeira medida. */
 .painel {
   position: fixed; z-index: 60; inset: auto; margin: 0; padding: 0;
   display: flex; flex-direction: column; min-height: 0; overflow: hidden;
@@ -99,7 +100,6 @@
 }
 
 @media (max-width: 759px) {
-  .painel { width: auto; border-radius: var(--r-2); }
   .aviso { gap: var(--e-2); }
 }
 /* #1989: ponto discreto no sino de quem ainda não ativou os avisos neste aparelho. */

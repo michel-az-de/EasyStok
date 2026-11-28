@@ -41,14 +41,13 @@ export function SinoDaSessao({ avisos, aparelho }) {
   const botaoRef = useRef(null)
   const painelRef = useRef(null)
   const focoDepoisRef = useRef(null)
-  const totalAnteriorRef = useRef(total)
   const idPainel = useId()
 
-  // O sino balança quando chega aviso (o total sobe), não a cada leitura. Movimento reduzido: base.css encurta.
+  // O sino balança quando chega aviso novo de fato, não quando o total sobe porque uma leitura falhou e voltou.
+  // Movimento reduzido: base.css encurta.
   useEffect(() => {
-    if (total > (totalAnteriorRef.current ?? total)) setBalancar(true)
-    totalAnteriorRef.current = total
-  }, [total])
+    if (chegaram.length > 0) setBalancar(true)
+  }, [chegaram])
 
   const fechar = useCallback(({ devolverFoco = true } = {}) => {
     setAberto(false)
