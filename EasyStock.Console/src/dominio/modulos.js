@@ -46,6 +46,7 @@ export const MODULOS = [
       { id: 'pedidos', rotulo: 'Pedidos', tipo: TELA_AJUSTE, aba: 'cadastros-pedidos', soApi: true, acao: 'verPedidos' },
       { id: 'produtos', rotulo: 'Produtos', tipo: TELA_AJUSTE, aba: 'cadastros-produtos', soApi: true, acao: 'verCadastrosProdutos' },
       // #2495 (S4): a API de categorias não tem policy própria; a tela segue o acesso de produtos.
+      // #3393: cadastros e arquivo do Financeiro ficam sob o subtítulo "Ajustes" do menu (mesma rota e aba).
       { id: 'categorias', rotulo: 'Categorias de produto', tipo: TELA_AJUSTE, aba: 'cadastros-categorias', soApi: true, acao: 'verCadastrosProdutos' },
       { id: 'fornecedores', rotulo: 'Fornecedores', tipo: TELA_AJUSTE, aba: 'cadastros-fornecedores', soApi: true, acao: 'verCadastrosFornecedores' },
       { id: 'bancos', rotulo: 'Contas bancárias', tipo: TELA_AJUSTE, aba: 'cadastros-bancos', soApi: true, acao: 'verCadastrosFinanceiros' },
@@ -117,11 +118,11 @@ export const MODULOS = [
       { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true, acao: 'verContasReceber' },
       { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true, acao: 'verContas' },
       { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true, acao: 'verContas' },
-      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras' },
-      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto' },
+      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras', grupo: 'ajustes' },
+      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto', grupo: 'ajustes' },
       // #2813: fechamentos de caixa do aparelho antigo, só leitura (arquivo histórico; o aparelho nunca mais envia fechamento, #2030).
       // A API é da policy Gerente: o Operador abre o Financeiro pelo Caixa do dia e levaria 403, então a tela pede a ação.
-      { id: 'fechamentos-legados', rotulo: 'Fechamentos do aparelho', tipo: TELA_AJUSTE, aba: 'fechamentos-legados', soApi: true, acao: 'verFechamentosLegados' },
+      { id: 'fechamentos-legados', rotulo: 'Fechamentos do aparelho', tipo: TELA_AJUSTE, aba: 'fechamentos-legados', soApi: true, acao: 'verFechamentosLegados', grupo: 'ajustes' },
     ],
   },
   {
@@ -186,6 +187,17 @@ const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !ac
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
   moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id)
     && podeNaTela(t, { fonteApi, acoes }))
+
+// #3393: o menu lateral em seções; as telas sem grupo vêm primeiro e o grupo só aparece com alguma tela dentro.
+const ROTULOS_DE_GRUPO = { ajustes: 'Ajustes' }
+export function secoesDoMenu(telas) {
+  const soltas = telas.filter((t) => !t.grupo)
+  const grupos = [...new Set(telas.filter((t) => t.grupo).map((t) => t.grupo))]
+  return [
+    ...(soltas.length ? [{ rotulo: null, telas: soltas }] : []),
+    ...grupos.map((g) => ({ rotulo: ROTULOS_DE_GRUPO[g] ?? g, telas: telas.filter((t) => t.grupo === g) })),
+  ]
+}
 
 // Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
 // (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
