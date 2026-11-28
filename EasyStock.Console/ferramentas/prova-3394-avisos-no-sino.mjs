@@ -463,13 +463,18 @@ try {
   const linkE4 = linha('e4').getByRole('link', { name: 'Farinha acabando', exact: true })
   await linkE4.waitFor({ timeout: 3000 })
   const abaDoTeclado = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
-  await linkE4.focus()
+  // Chega ao link pelo teclado (do botão de ler, Shift+Tab), como quem usa Tab, para o foco valer como do teclado.
+  await linha('e4').getByRole('button', { name: /^Marcar como lido/ }).focus()
+  await pd.keyboard.press('Shift+Tab')
+  assert.ok(await linkE4.evaluate((el) => el === document.activeElement), `Shift+Tab do botão de ler foi para ${await ondeFoco()}, não para o link`)
   await pd.keyboard.press('Control+Enter')
   assert.ok(await gravou('PATCH e4'), 'o Ctrl+Enter na aba Todas também lê o aviso')
   await (await abaDoTeclado)?.close()
   await pd.waitForTimeout(300)
   assert.ok(await linkE4.isVisible(), 'na aba Todas o aviso lido tem de continuar na lista com o link')
   assert.ok(await linkE4.evaluate((el) => el === document.activeElement), `depois do Ctrl+Enter em Todas, o foco foi para ${await ondeFoco()}, não ficou no link`)
+  // O link esticado não tem contorno próprio: quem mostra o foco do teclado é a linha inteira.
+  assert.equal(await linha('e4').evaluate((el) => getComputedStyle(el).outlineStyle), 'solid', 'com o foco do teclado no link, a linha do aviso tem de ganhar o contorno')
   console.log('ok 9e: Ctrl+Enter na aba Todas lê e o foco fica no mesmo link')
   await destinos.context.close()
 
