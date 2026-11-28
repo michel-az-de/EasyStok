@@ -32,6 +32,7 @@
   .rotuloCardapio { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .ancoraAssistente:empty { display: none; }
+.reservaDoMenu { flex: none; width: var(--toque); height: var(--toque); }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
@@ -230,6 +231,8 @@
 /* #3317 (F19): o anel do campo é o da marca, como o dos outros controles. O --halo (20% de alfa) dava 1,3:1 no
    claro e 1,7:1 no escuro; o mínimo é 3:1 (WCAG 1.4.11). */
 .caixa:has(:focus-visible) { outline: 3px solid var(--marca); outline-offset: 2px; }
+/* #3386 (r5 P2-8a): antes de assumir, o laranja é da ação principal (Assumir); o foco do campo usa o neutro. */
+.caixa[data-antes-de-assumir]:has(:focus-visible) { outline-color: var(--tinta-2); }
 .acoes {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
   padding: var(--e-2) 0 0 0; border-top: 0; margin: 0;
@@ -295,12 +298,16 @@
 .modoTexto {
   flex: 1 1 0; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
-  /* #3374 (r2 P1-2): até 2 linhas, sem dividir a linha com o Assumir; o resto vai ao title. Com reticências numa linha,
-     "Restrição alimentar, confira a fi…" escondia o que fazer. */
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+  /* #3386 (r6 H8): uma linha só, com reticências; a frase inteira está no title. Em duas linhas ela dobrava a altura da barra
+     com o Assistente aberto (1280). A restrição segue na pílula e na tag do perfil. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* #3384 (r4 P1-3): a restrição alimentar na frase, não só na pílula: cor e peso de aviso, nunca o laranja de ação. */
-.modoTextoAviso { color: var(--alerta); font-weight: 600; }
+/* #3386 (r8 P2-3): sem reticências no meio da frase. A parte essencial ("Sem lactose") com o ícone vem inteira; "confira os ingredientes"
+   só aparece se couber na mesma linha: senão quebra para uma segunda linha que a altura fixa esconde (o title diz o resto). */
+.modoTextoAviso { color: var(--alerta); font-weight: 600; display: flex; flex-wrap: wrap; align-content: flex-start; overflow: clip; height: calc(var(--lh-compacto) * 1em); }
+.modoEssencial { flex: none; white-space: nowrap; }
+.modoResto { flex: none; white-space: pre; }
 .modoTextoIcone { display: inline-block; vertical-align: -2px; margin-right: var(--e-1); }
 .modoAssumir { margin-left: auto; flex: none; }
 /* #3374 (C10): a tecla que faz o mesmo que o botão, no próprio botão (contorno uniforme, sem barra lateral). */
@@ -337,6 +344,9 @@
 .restricao {
   margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
 }
+/* #3386 (r6 H8): com o Assistente no lugar da lista (tablet) a conversa é a coluna estreita e baixa; o campo perde a folga, não o texto. */
+:global(html[data-assistente-tablet]) .composer { padding-block: var(--e-2); }
+:global(html[data-assistente-tablet]) .restricao { margin-top: 0; }
 
 /* #2134: o que acabou de acontecer com o "responder é assumir", junto do campo. */
 .avisoAssumiu, .erroAssumir {
@@ -380,7 +390,7 @@
 /* Subtítulo da conversa numa linha só, com reticência, em vez de quebrar em
    pedaços ao lado do Encerrar. O texto inteiro fica no title do navegador. */
 .cabecalho h2 small {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* #3386 (r6): uma linha, o kebab novo não a quebra */
 }
 /* #3234 (C2): o prazo longe do fim cabe só no desktop largo; abaixo disso a linha quebrava (#1761 L4). */
 @media (max-width: 1279px) {
@@ -593,6 +603,10 @@
 
 @media (max-width: 759px) {
   .modoLinha { gap: var(--e-2); }
+  /* #3386 (revisão): no celular o aviso de restrição vai para a linha de baixo, com a largura toda: a parte essencial
+     ("Restrição alimentar") nunca é cortada pela pílula e pelo Assumir. */
+  .modoLinha:has(.modoTextoAviso) { flex-wrap: wrap; }
+  .modoLinha > .modoTextoAviso { flex: 1 1 100%; order: 3; }
   .caixa textarea,
   .caixa textarea:hover,
   .caixa textarea:focus,
@@ -761,7 +775,9 @@
 /* Crítica r1 (P1): com o campo vazio "Enviar e assumir" é secundário de contorno contínuo (o laranja fica com Assumir
    conversa); o tracejado do Botao lia como "indisponível", e a ação existe, só espera o texto. Com texto ou anexo ele
    vira o laranja e o Assumir cede (#3368). */
-.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) solid var(--linha-forte); color: var(--tinta-2); }
+/* #3386 (r6, P2-4): a crítica r6 mediu que, com contorno contínuo e tinta-2, ele lia como ativo. Agora tem o desenho do desabilitado do
+   Botao (sem preenchimento, contorno tracejado, tinta-3, cursor not-allowed); o motivo segue no Tooltip. */
+.acoes > .enviar.enviarAssume:disabled { background: transparent; border: var(--b-1) solid var(--linha); color: var(--tinta-3); cursor: not-allowed; } /* #3386 (r9): desabilitado neutro, contorno sólido na cor --linha, sem tracejado de rascunho */
 /* Crítica r2 (P2): o Enviar desabilitado também tem contorno contínuo de 1px (o tracejado do Botao lia como quebrado); segue sem
    preenchimento e em tinta-3, o que ainda o separa do ativo. */
 .acoes > .enviar:disabled { border-style: solid; }

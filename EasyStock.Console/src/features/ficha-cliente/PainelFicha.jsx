@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { abrirSecao } from '../../hooks/useRecolhido'
+import { useMaisAbaixo } from '../../hooks/useMaisAbaixo'
 import { useDroppable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -125,6 +126,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // J2 (#1990): pedido pago cancelado diz no Resumo e no Pagamento quanto falta devolver.
   const aDevolver = useADevolver(fonteApi ? selecionada?.pedido : null)
   const [secao, setSecao] = useState(null)
+  const refConteudo = useMaisAbaixo()
   // #2849: quem pediu para editar (menu, endereço) cai na ficha única já com o formulário aberto.
   const [editarFicha, setEditarFicha] = useState(false)
   // #3207: "Cadastrar cliente" do cartão do lead abre a ficha já no formulário de cadastro; toda outra
@@ -189,8 +191,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const tituloPedido = 'Revisar pedido'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = faltaPagar(pedido, cardapio)
-  const estadoDoResumo = pedido?.estado === 'aguardando' && pedido.cobranca && situacaoDaCobranca(pedido.cobranca, agora).chave === 'aguardando'
-    ? 'Cobrança pendente' : rotuloDoResumo(pedido?.estado, saldo, Array.isArray(pedido?.pagamentosApi) ? totalPago(pedido) : null)
+  // #3386 (revisão): com cobrança emitida, o resumo diz o mesmo nome da barra e do cartão (por meio); sem ela, o do pedido.
+  const situacaoDaCob = pedido?.estado === 'aguardando' && pedido.cobranca ? situacaoDaCobranca(pedido.cobranca, agora) : null
+  const estadoDoResumo = situacaoDaCob?.chave === 'aguardando' ? situacaoDaCob.rotulo
+    : situacaoDaCob?.chave === 'expirada' ? situacaoDaCob.rotuloVencido
+      : rotuloDoResumo(pedido?.estado, saldo, Array.isArray(pedido?.pagamentosApi) ? totalPago(pedido) : null)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
   // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
   const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
@@ -279,7 +284,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         </output>
       ))}
 
-      <div className={css.conteudo}>
+      <div className={css.conteudo} ref={refConteudo}>
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
         <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={abrirFicha} aoCadastrar={editavel ? abrirCadastroDoLead : undefined}
           aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
@@ -291,7 +296,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
             : pedido ? linhaDoResumo({ estado: pedidoCriado ? estadoDoResumo : 'Em montagem', itens, total, saldo, destaque: destacaSaldo, sinal: sinalDoResumo })
               : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
                 : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
-          {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
+          {destacaSaldo && <p className={css.saldoFicha}>Falta {moeda(saldo)}</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
           {/* #2420: a ação de montar mora dentro do cartão da comanda. */}
           {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}

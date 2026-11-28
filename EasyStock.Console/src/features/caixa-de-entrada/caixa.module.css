@@ -52,7 +52,7 @@
 .corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--e-1); }
 
 /* Linha 1: nome à esquerda, hora à direita. */
-.topo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; width: 100%; }
+.topo { display: flex; align-items: center; gap: var(--e-1); min-width: 0; width: 100%; }
 .topo strong {
   font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-atd);
   line-height: var(--lh-compacto); min-width: 0; color: var(--tinta);
@@ -87,14 +87,15 @@
 /* Linha 3, miúda: quem está com a conversa (ou o motivo de precisar dela)
    e o contexto que existir, cada um na sua `Pilula` em linha. */
 /* #1761 (L16): etiqueta de contexto que não cabe inteira some, em vez de cortar em "Automático
-   não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
+   não s…". A linha quebra e só as duas primeiras fileiras aparecem (#3386 r8); o texto todo segue no `title`. */
 .contextoLinha {
-  display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
-  font-size: var(--t-micro); line-height: 1.35; height: 1.75em; color: var(--tinta-3); white-space: nowrap; /* #3282: a pílula ganhou 3 px de respiro vertical; a fileira cresce junto */
+  display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
+  font-size: var(--t-micro); line-height: 1.35; min-height: 1.75em; max-height: 3.5em; color: var(--tinta-3); white-space: nowrap; /* #3282: a pílula ganhou 3 px de respiro vertical; a fileira cresce junto */
 }
 
-/* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
-.seloDinheiro { order: -1; }
+/* #3386 (r8 P1): até duas fileiras de chips inteiros; o que não cabe nelas fica fora da caixa (overflow) e no `title` e no aria-label.
+   A ordem do DOM é a prioridade de ação (estado, dinheiro, aviso, resto). */
+.contextoLinha > * { min-height: 1.75em; box-sizing: border-box; } /* cada fileira vale 1,75em: a terceira nasce fora do teto de 3,5em */
 
 /* Rodada 10, item 2: selo "novo, não visto" do pagamento, independente do
    sinal verde (RN-25) já ter expirado. Some assim que ela abre a conversa. */
@@ -164,7 +165,7 @@
    cor de ação cheia. A forma muda junto com a cor (WCAG 1.4.1). */
 .chipFiltro {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: var(--e-2);
-  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
+  min-height: var(--toque); padding: 0 var(--e-2); border-radius: var(--r-pilula); /* #3386 (r9): 8 px de cada lado; com 12 o "Precisa de você 12" passava 11 px do contêiner a 1280 */
   border: var(--b-1) solid var(--linha-media); background: transparent; color: var(--tinta-2);
   font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
@@ -251,3 +252,11 @@
 .sinalAtencao { color: var(--alerta); }
 /* #2427: o motivo `perigo` era o traço vermelho; sem o traço, a gravidade fica no ícone. */
 .cartao.atrasada .sinalAtencao { color: var(--erro); }
+
+/* #3386 (r9): na largura de tablet o cartão da fila fica mais baixo (até 100 px com 2 fileiras de chips inteiros) para a fila mostrar 4 conversas a 1024 x 768. */
+@media (min-width: 760px) and (max-width: 1179px) {
+  .cartao { padding-block: var(--e-2); }
+  .cartao .corpo { gap: 0; }
+  .contextoLinha { min-height: 1.5em; max-height: 3em; }
+  .cartao .contextoLinha > * { min-height: 1.5em; padding-block: 0; }
+}

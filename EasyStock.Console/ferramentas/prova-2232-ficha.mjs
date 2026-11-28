@@ -151,7 +151,7 @@ await confereAsync('F2  copiar devolve se copiou; sem permissão ou sem API devo
 
 confere('F3  o valor do saldo aparece uma vez no Resumo (destaque), sem repetir na linha de apoio', () => {
   const resumo = trecho(renderizarFicha(), '<section class="resumoAtual"', '</section>')
-  assert.match(resumo, /19,00 a receber/, 'destaque')
+  assert.match(resumo, /Falta R\$\s19,00/, 'destaque')
   assert.equal((resumo.match(/19,00/g) ?? []).length, 1, resumo)
 })
 confere('F3  linha de apoio: itens e, com sinal a receber, "sinal de R$ X"; o total some só quando repete o destaque', () => {
@@ -167,8 +167,8 @@ confere('F3  linha de apoio: itens e, com sinal a receber, "sinal de R$ X"; o to
 // --- F4 ------------------------------------------------------------------------------------------
 
 confere('F4  a linha Entrega diz a janela e o bairro, e nunca fica vazia', () => {
-  assert.equal(ficha.resumoDaEntrega({ faixa: 'qui 05/11 · 14:00 às 17:00 · Tarde', endereco: 'x', bairro: 'Pinheiros' }), 'qui 05/11, 14h–17h · Pinheiros')
-  assert.equal(ficha.resumoDaEntrega({ faixa: '19h30 às 20h30', endereco: 'x' }), '19h30–20h30')
+  assert.equal(ficha.resumoDaEntrega({ faixa: 'qui 05/11 · 14:00 às 17:00 · Tarde', endereco: 'x', bairro: 'Pinheiros' }), 'qui 05/11, 14h às 17h · Pinheiros')
+  assert.equal(ficha.resumoDaEntrega({ faixa: '19h30 às 20h30', endereco: 'x' }), '19h30 às 20h30')
   assert.equal(ficha.resumoDaEntrega({ endereco: 'x', bairro: 'Pinheiros' }), 'Pinheiros')
   assert.equal(ficha.resumoDaEntrega({ endereco: 'x' }), 'Entrega a combinar')
   assert.equal(ficha.resumoDaEntrega({}), 'Adicionar endereço')
@@ -178,7 +178,7 @@ confere('F4  a linha Entrega diz a janela e o bairro, e nunca fica vazia', () =>
 confere('F4  na Ficha renderizada o acesso Entrega traz o dia, a janela e o bairro', () => {
   const html = renderizarFicha()
   const acesso = trecho(html, '<strong>Entrega</strong>', '</button>')
-  assert.match(acesso, /qui 05\/11, 14h–17h · Pinheiros/, acesso)
+  assert.match(acesso, /qui 05\/11, 14h às 17h · Pinheiros/, acesso)
   assert.doesNotMatch(html, /<small><\/small>/, 'sem linha de apoio vazia')
   const semNada = renderizarFicha({ pedido: pedidoApi({ janela: null }) }, { endereco: 'Rua de teste, 10' })
   assert.match(trecho(semNada, '<strong>Entrega</strong>', '</button>'), /Entrega a combinar/)
@@ -198,7 +198,7 @@ confere('F5  uma rolagem só: .conteudo rola, o cabeçalho fica fora e nenhuma l
   }
   const moldura = fonte('app/moldura.module.css')
   assert.match(regra(moldura, 'painelFicha'), /overflow: hidden;/, 'a coluna da Ficha não rola por cima')
-  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /<header className=\{css\.cabecalhoFicha\}[\s\S]*?<\/header>[\s\S]*?<div className=\{css\.conteudo\}>/)
+  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /<header className=\{css\.cabecalhoFicha\}[\s\S]*?<\/header>[\s\S]*?<div className=\{css\.conteudo\}[^>]*>/)
 })
 
 // --- F6 ------------------------------------------------------------------------------------------

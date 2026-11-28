@@ -90,17 +90,34 @@ provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => 
   assert.match(html, /Sem cobrança/)
   assert.doesNotMatch(html, /Cobrança pendente|Próximo: Pago/)
   assert.match(html, /81,00/)
-  assert.match(html, /43,00 a receber/)
+  assert.match(html, /Falta R\$\s43,00/)
+  assert.doesNotMatch(html, /a receber<\/p>/, 'a Ficha não diz mais "a receber" ao lado do valor')
   assert.match(html, /Revisar pedido/)
   assert.doesNotMatch(html, /Lasanha da compra anterior|<dialog|Histórico financeiro/)
 })
-provar('só uma cobrança criada e em aberto aparece como pendente no resumo', () => {
+provar('só uma cobrança criada e em aberto aparece como "Aguardando Pix" no resumo, igual à barra', () => {
   const cobranca = { expiraEm: Date.parse('2026-10-14T12:30:00Z') }
-  assert.match(renderizar({ pedido: { ...pedido, cobranca } }), /Cobrança pendente/)
-  for (const detalhe of [{ expiraEm: 0 }, { comprovanteEm: 1 }, { pagaEm: 1 }, { canceladaEm: 1 }, { estornadaEm: 1 }]) {
-    assert.doesNotMatch(renderizar({ pedido: { ...pedido, cobranca: { ...cobranca, ...detalhe } } }), /Cobrança pendente/)
+  const vezes = (html, re) => (html.match(re) ?? []).length
+  // Duas vezes: o resumo e a barra dizem o mesmo nome (#3386, revisão), e a palavra antiga não volta.
+  const aberta = renderizar({ pedido: { ...pedido, cobranca } })
+  assert.equal(vezes(aberta, /Aguardando Pix/g), 2)
+  assert.doesNotMatch(aberta, /Cobrança pendente/)
+  const link = renderizar({ pedido: { ...pedido, cobranca: { ...cobranca, meio: 'cartao-link' } } })
+  assert.equal(vezes(link, /Aguardando cartão/g), 2)
+  assert.doesNotMatch(link, /Aguardando Pix/)
+  // Vencida: resumo e barra dizem "Pix vencido", e o pedido deixa de dizer que aguarda.
+  const vencida = renderizar({ pedido: { ...pedido, cobranca: { ...cobranca, expiraEm: 0 } } })
+  assert.equal(vezes(vencida, /Pix vencido/g), 2)
+  for (const detalhe of [{ comprovanteEm: 1 }, { pagaEm: 1 }, { canceladaEm: 1 }, { estornadaEm: 1 }]) {
+    // O resumo não diz "Aguardando Pix" (no máximo a barra, que nesses casos ainda cai no rótulo padrão).
+    assert.ok(vezes(renderizar({ pedido: { ...pedido, cobranca: { ...cobranca, ...detalhe } } }), /Aguardando Pix/g) < 2, JSON.stringify(detalhe))
   }
-  assert.doesNotMatch(renderizar({ pedido: { ...pedido, estado: 'pago', cobranca } }), /Cobrança pendente/)
+  assert.doesNotMatch(renderizar({ pedido: { ...pedido, estado: 'pago', cobranca } }), /Aguardando Pix/)
+})
+provar('entregue com saldo diz "Entregue, falta R$ X" na barra', () => {
+  const html = renderizar({ pedido: { ...pedido, estado: 'entregue' } })
+  assert.match(html, /Entregue, falta R\$\s43,00\. Marque pago quando o dinheiro entrar\./)
+  assert.doesNotMatch(html, /a receber\. Marque pago/)
 })
 provar('rascunho com cliente cadastrado e endereço permite calcular o frete antes de criar pedido', () => {
   const html = renderizar({ pedido: { numero: 'local', estado: 'aguardando', itens: [{ sku: 'lasanha', qtd: 1 }] } })

@@ -13,6 +13,7 @@ import { CHAVE_ASSISTENTE, usePreferenciaDePainel } from '../../aplicacao/prefer
 import {
   ASSISTENTE, CONVERSA_MINIMA, MARGEM_ASSISTENTE, TRILHO, VAO, larguraMaxima, limitar, normalizarAssistente, posicaoDentroDaTela,
 } from '../../dominio/paineis'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
@@ -244,8 +245,28 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
     raiz.dataset.assistenteEmpurra = ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
-    if (encaixadoTablet) raiz.dataset.assistenteTablet = ''
+    let desmedir = null
+    if (encaixadoTablet) {
+      raiz.dataset.assistenteTablet = ''
+      // #3386 (r5 P2-6): o painel não sobe além do topo do palco (a barra de navegação fica por cima dele).
+      // O topo muda quando algo acima do palco troca de altura ou a janela é redimensionada: mede de novo nos dois casos.
+      const palco = document.querySelector('[data-palco-tablet]')
+      if (palco) {
+        const medir = () => raiz.style.setProperty('--assistente-topo-palco', `${Math.round(palco.getBoundingClientRect().top)}px`)
+        medir()
+        // Adiado para o próximo quadro: mudar a variável redimensiona o painel e o observador não pode se realimentar no mesmo quadro.
+        let quadro = 0
+        const adiar = () => { cancelAnimationFrame(quadro); quadro = requestAnimationFrame(medir) }
+        const observador = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(adiar)
+        observador?.observe(palco)
+        observador?.observe(document.body)
+        window.addEventListener('resize', medir)
+        desmedir = () => { cancelAnimationFrame(quadro); observador?.disconnect(); window.removeEventListener('resize', medir) }
+      }
+    }
     return () => {
+      desmedir?.()
+      raiz.style.removeProperty('--assistente-topo-palco')
       raiz.style.removeProperty('--assistente-reserva-esquerda')
       raiz.style.removeProperty('--assistente-reserva-direita')
       raiz.style.removeProperty('--assistente-conversa-minima')
@@ -359,8 +380,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
-              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> Assistente</h2>
-              {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
+              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> <span>Assistente</span></h2>
+              {selecionada && <p className={css.clienteDoPainel} title={selecionada.nome}>{apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda }).curto}</p>}
             </div>
             {!celular && (
               <fieldset className={css.posicoes}>
@@ -392,9 +413,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
             {!celular && <AjusteLargura nome="do assistente" valor={larguraPainel} {...limitesLargura} aoMudar={mudarLargura} />}
-            {/* #3374 (C10): a tecla que fecha, à vista; o botão leva o mesmo atalho na dica. */}
-            <kbd className={css.tecla} aria-hidden="true">Esc</kbd>
-            <BotaoIcone rotulo="Fechar" icone="x" atalho="Esc" onClick={fechar} aria-keyshortcuts="Escape" />
+            {/* #3386 (r9): a dica "Esc" saiu do texto em toda largura; o X leva "Fechar (Esc)" no rótulo e na dica. */}
+            <BotaoIcone rotulo="Fechar (Esc)" icone="x" onClick={fechar} aria-keyshortcuts="Escape" />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>
@@ -408,7 +428,11 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
 
             {selecionada && (
               <>
-                <p className={css.contexto}>Revise as sugestões. Cada ação só acontece quando você confirma.</p>
+                <p className={css.contexto} title="Revise as sugestões. Cada ação só acontece quando você confirma.">Revise as sugestões. Você confirma cada ação.</p>
+
+                {/* #3386 (r5 P2-10): o aviso de "sem resposta" vem antes dos cartões, à vista ao abrir o painel. */}
+                {sugestaoAgente}
+
                 <div className={css.cartoes}>
                   {cliente && !dispensados.has('cliente') && (
                     <CartaoCliente dado={cliente} aoDispensar={(e) => dispensar('cliente', e)} />
@@ -430,10 +454,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   )}
                 </div>
 
-                {sugestaoAgente}
-
                 <div className={css.perguntas}>
-                  <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
                   {trocas.length > 0 && (
                     <div className={css.trocas}>
                       {trocas.map((t) => (
@@ -468,28 +489,32 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
             )}
           </div>
           {selecionada && (
-            <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
-              <CampoArea
-                ref={campoRef}
-                rotulo="Pergunte ao assistente sobre esta conversa"
-                rotuloOculto
-                className={css.campoPergunta}
-                value={pergunta}
-                onChange={(e) => setPergunta(e.target.value)}
-                placeholder="Ex.: sugira uma resposta ou prepare uma nota"
-                rows={2}
-                limite={LIMITE_PERGUNTA}
-                dica={DICA_DO_ATALHO}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
-                  enviarPergunta(e)
-                }}
-              />
-              <BotaoIcone
-                tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
-                disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
-              />
-            </form>
+            <div className={css.rodapePergunta}>
+              {/* #3386 (r5 P2-9): o rótulo mora fora da rolagem, junto do campo, e nunca fica cortado sob ele. */}
+              <p className={css.tituloPerguntas}>Pergunte ao assistente</p>
+              <form className={css.formPergunta} onSubmit={enviarPergunta} aria-busy={perguntando}>
+                <CampoArea
+                  ref={campoRef}
+                  rotulo="Pergunte ao assistente sobre esta conversa"
+                  rotuloOculto
+                  className={css.campoPergunta}
+                  value={pergunta}
+                  onChange={(e) => setPergunta(e.target.value)}
+                  placeholder="Ex.: sugira uma resposta ou prepare uma nota"
+                  rows={2}
+                  limite={LIMITE_PERGUNTA}
+                  dica={DICA_DO_ATALHO}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.nativeEvent?.isComposing || e.keyCode === 229) return
+                    enviarPergunta(e)
+                  }}
+                />
+                <BotaoIcone
+                  tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
+                  disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
+                />
+              </form>
+            </div>
           )}
           </div>
           {ladoEfetivo !== 'direita' && alca}

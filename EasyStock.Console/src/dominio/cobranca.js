@@ -233,6 +233,14 @@ export function cancelarCobranca(cobranca, agora) {
   return { ...cobranca, canceladaEm: agora }
 }
 
+// Um nome por estado e por meio (#3386, r5): o link de cartão não é Pix, e pedido sem cobrança emitida
+// só tem o prazo da comanda. Cartão, barra e ficha leem estas duas funções.
+export const rotuloDeAguardando = (cobranca) => (cobranca?.meio === 'cartao-link' ? 'Aguardando cartão' : 'Aguardando Pix')
+export const rotuloDeVencido = (cobranca) => {
+  if (!cobranca) return 'Pagamento vencido'
+  return cobranca.meio === 'cartao-link' ? 'Link vencido' : 'Pix vencido'
+}
+
 // Situação pelo relógio da tela. Nenhum timer: o tempo entra por parâmetro e a
 // mesma cobrança sempre dá a mesma resposta.
 export function situacaoDaCobranca(cobranca, agora) {
@@ -272,12 +280,12 @@ export function situacaoDaCobranca(cobranca, agora) {
   }
   const restamMs = cobranca.expiraEm - agora
   if (restamMs <= 0) {
-    return { chave: 'expirada', tom: 'perigo', rotulo: 'Expirou sem pagar', restamMs: 0 }
+    return { chave: 'expirada', tom: 'perigo', rotulo: 'Expirou sem pagar', rotuloVencido: rotuloDeVencido(cobranca), restamMs: 0 }
   }
   return {
     chave: 'aguardando',
     tom: restamMs <= 5 * MS_POR_MINUTO ? 'aviso' : 'info',
-    rotulo: 'Aguardando pagamento',
+    rotulo: rotuloDeAguardando(cobranca),
     restamMs,
   }
 }

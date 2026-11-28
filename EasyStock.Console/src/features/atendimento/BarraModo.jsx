@@ -3,7 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
-import { apresentacaoDoModo } from '../../dominio/resumoDoModo'
+import { apresentacaoDoModo, partesDoAvisoDeRestricao } from '../../dominio/resumoDoModo'
 import { useAssumirSemRepetir } from './useAssumirSemRepetir'
 import css from './atendimento.module.css'
 
@@ -61,15 +61,17 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
             </span>
           </p>
         ) : (
-          <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+          <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina ponto>{resumo.rotulo}</Pilula></span>
         )}
         {/* #3384 (r4 P1-3): a restrição alimentar é o que não pode escapar; a frase ganha o tom de aviso, não só a pílula. */}
         {!faixa && (
           <p
             className={!mostrarLinha ? 'sr' : resumo.motivo === 'restricao' ? `${css.modoTexto} ${css.modoTextoAviso}` : css.modoTexto}
-            title={linha === resumo.linha ? resumo.detalhe : linha}
+            title={(linha === resumo.linha && resumo.detalhe) || linha}
           >
-            {mostrarLinha && resumo.motivo === 'restricao' && <Icone nome="alerta" className={css.modoTextoIcone} />}{linha}
+            {mostrarLinha && resumo.motivo === 'restricao'
+              ? <><span className={css.modoEssencial}><Icone nome="alerta" className={css.modoTextoIcone} />{partesDoAvisoDeRestricao(linha).essencial}</span>{partesDoAvisoDeRestricao(linha).resto && <span className={css.modoResto}>{partesDoAvisoDeRestricao(linha).resto}</span>}</>
+              : linha}
           </p>
         )}
         {acoes.assumir && (

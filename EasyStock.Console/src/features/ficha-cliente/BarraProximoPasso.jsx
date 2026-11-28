@@ -9,7 +9,7 @@ import {
 } from '../../dominio/cobranca'
 import { saldoApi, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
-import { totalDoPedido } from '../../dominio/pedido'
+import { numeroCurto, totalDoPedido } from '../../dominio/pedido'
 import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
@@ -378,7 +378,7 @@ export function BarraProximoPasso({
           {aReceberDoEntregue > 0 && (
             <>
               <p className={css.motivoDesabilitado}>
-                Entregue com {moeda(aReceberDoEntregue)} a receber. Marque pago quando o dinheiro entrar.
+                Entregue, falta {moeda(aReceberDoEntregue)}. Marque pago quando o dinheiro entrar.
               </p>
               <Botao largo variante="primario" icone="dollar-sign" onClick={() => setAbrindoBaixa(true)}>
                 Marcar pago ({moeda(aReceberDoEntregue)})
@@ -583,7 +583,7 @@ export function BarraProximoPasso({
           if (!emVoo && !(fonteApi && (motivoCancelar.trim().length < 3 || algumPassaDoLimite([motivoCancelar, LIMITE_MOTIVO_CANCELAR])))) confirmarCancelamento()
         }}>
           <p className={css.corpoBloco}>
-            Cancelar o pedido {pedido.numero}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
+            Cancelar o pedido {numeroCurto(pedido.numero)}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
           </p>
           {fonteApi && <CampoArea rotulo="Motivo do cancelamento" value={motivoCancelar}
             onChange={(e) => setMotivoCancelar(e.target.value)} limite={LIMITE_MOTIVO_CANCELAR} disabled={emVoo} autoFocus />}

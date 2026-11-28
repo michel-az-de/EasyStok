@@ -163,12 +163,12 @@ const abrirBarraDeRespostas = async (campo, pagina) => {
 }
 
 try {
-  await confere('S1a (API, Todas, 35 cartões): até 24 paradas de Tab do início ao campo', async () => {
+  await confere('S1a (API, Todas, 35 cartões): até 25 paradas de Tab do início ao campo (a Ajuda no trilho, #3386, é a 25ª)', async () => {
     const { contexto, pagina } = await abrirApi()
     try {
       const paradas = await paradasDeTabAteOCampo(pagina)
       console.log(`  paradas de Tab até o campo (API): ${paradas}`)
-      assert.ok(paradas <= 24, `${paradas} paradas de Tab até o campo (meta: 24 ou menos)`)
+      assert.ok(paradas <= 25, `${paradas} paradas de Tab até o campo (meta: 25 ou menos)`)
     } finally { await contexto.close() }
   })
 

@@ -10,13 +10,14 @@
 // Puro. Conversa antiga, sem os campos novos, cai no padrão seguro: automático
 // ligado e nada de "precisa de você".
 
-import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
+import { aguardaAprovacao, rotuloDeVencido, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
 import { duracao, moeda } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
 import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
-import { pedidoEncerrado } from './pedido.js'
+import { numeroCurto, pedidoEncerrado } from './pedido.js'
+import { rotuloDoPedido } from './rotulos.js'
 import { MOTIVO_PERGUNTA_FORA_DO_ROTEIRO, ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { INTENCOES, classificarIntencao, itemDaRestricao, sinalDoCliente } from './agente.js'
@@ -151,7 +152,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, confira a ficha do prato antes de responder',
+  restricao: 'Restrição alimentar, confira os ingredientes antes de responder',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
   'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
@@ -349,7 +350,7 @@ function pedidoAtrasadoVisivel(conversa, janelas, agora) {
     chave: 'pedido-atrasado',
     rotulo: 'Pedido atrasado',
     tom: 'perigo',
-    texto: `Pedido ${conversa.pedido.numero} passou do horário calculado para começar o preparo`,
+    texto: `${rotuloDoPedido(conversa.pedido.numero)} passou do horário calculado para começar o preparo`,
   }
 }
 
@@ -361,11 +362,11 @@ function aguardandoAprovacao(conversa) {
     chave: 'aprovacao',
     rotulo: 'Aguardando aprovação',
     tom: 'aviso',
-    texto: `Pedido ${conversa.pedido.numero} espera a aprovação da loja`,
+    texto: `${rotuloDoPedido(conversa.pedido.numero)} espera a aprovação da loja`,
   }
 }
 
-// Cobrança vencida nos dois mundos: com Pix emitido vale o relógio dele, e sem
+// Pix vencido nos dois mundos: com Pix emitido vale o relógio dele, e sem
 // Pix vale o prazo da comanda gerada, que é o mesmo do lembrete de pagamento.
 function cobrancaVencida(conversa, agora) {
   const pedido = conversa.pedido
@@ -374,11 +375,12 @@ function cobrancaVencida(conversa, agora) {
     ? situacaoDaCobranca(pedido.cobranca, agora).chave === 'expirada'
     : (prazoDoPagamento(conversa, agora) ?? Infinity) <= agora
   if (!expirou) return null
+  const rotulo = rotuloDeVencido(pedido.cobranca)
   return {
     chave: 'cobranca',
-    rotulo: 'Cobrança vencida',
+    rotulo,
     tom: 'perigo',
-    texto: `Pedido ${pedido.numero} gerado e o pagamento não caiu`,
+    texto: `${rotuloDoPedido(pedido.numero)}: ${rotulo}`,
   }
 }
 
@@ -407,7 +409,7 @@ function valorDiferente(conversa, agora) {
     chave: 'valor-diferente',
     rotulo: 'Valor diferente',
     tom: 'aviso',
-    texto: `Pagou ${moeda(cobranca.valorPago)} de ${moeda(cobranca.valor)} do pedido ${conversa.pedido.numero}, confira`,
+    texto: `Pagou ${moeda(cobranca.valorPago)} de ${moeda(cobranca.valor)} do pedido ${numeroCurto(conversa.pedido.numero)}, confira`,
   }
 }
 
@@ -417,12 +419,12 @@ function valorDiferente(conversa, agora) {
 // mensagens ainda sem resposta. Sem texto carregado (resumo da API), não opina.
 const COBRANCA_SEM_PAGAMENTO = ['aguardando', 'expirada']
 
-// #3381: o aviso diz o que evitar ("Sem lactose: confira a ficha do prato"), curto para caber sem corte no cabeçalho;
+// #3381: o aviso diz o que evitar ("Sem lactose: confira os ingredientes"), curto para caber sem corte no cabeçalho;
 // o motivo inteiro fica em `detalhe` (title e leitor de tela). Sem item reconhecido, o texto genérico de sempre.
 export function avisoDeRestricao(item) {
   const base = { chave: 'restricao', rotulo: 'Restrição alimentar', tom: 'aviso' }
   if (!item) return { ...base, texto: MOTIVO_POR_INTENCAO.restricao }
-  return { ...base, texto: `Sem ${item}: confira a ficha do prato`, detalhe: MOTIVO_POR_INTENCAO.restricao }
+  return { ...base, texto: `Sem ${item}: confira os ingredientes`, detalhe: MOTIVO_POR_INTENCAO.restricao }
 }
 
 export function sinalUrgente(conversa, agora) {
@@ -452,7 +454,7 @@ export function sinalUrgente(conversa, agora) {
       chave: 'diz-que-pagou',
       rotulo: 'Diz que pagou',
       tom: 'aviso',
-      texto: `Diz que pagou o pedido ${pedido.numero} e o pagamento não caiu, confira`,
+      texto: `${rotuloDoPedido(pedido.numero)}: diz que pagou, mas o Pix não foi confirmado, confira`,
     }
   }
   // "Já paguei" com o dinheiro reconhecido é assunto encerrado, não pendência.
@@ -467,7 +469,7 @@ export function sinalUrgente(conversa, agora) {
       chave: 'insistencia',
       rotulo: 'Cobrando o pedido',
       tom: 'perigo',
-      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
+      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${numeroCurto(pedido.numero)} e ninguém respondeu`,
     }
   }
   return null
