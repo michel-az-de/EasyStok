@@ -180,10 +180,11 @@
 .botaoEnviar { flex-shrink: 0; }
 
 /* Integração do visual: no celular o gatilho de canto sobe para cima da barra
-   de abas (54 px), em vez de cobrir a aba Ficha. */
+   de abas (54 px), em vez de cobrir a aba Ficha. #3416: e para cima das faixas do aparelho, que sobem a barra
+   (`--pe-do-aparelho`, medida em app/AvisosDoDispositivo). */
 @media (max-width: 759px) {
-  .gatilho { bottom: calc(54px + var(--e-3) + env(safe-area-inset-bottom, 0px)); right: var(--e-3); min-width: 52px; height: 52px; padding: 0 var(--e-3); }
-  .painel { right: var(--e-2); bottom: calc(54px + var(--e-2) + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 2 * var(--e-2)); max-height: calc(100dvh - 144px); }
+  .gatilho { bottom: calc(54px + var(--pe-do-aparelho, 0px) + var(--e-3) + env(safe-area-inset-bottom, 0px)); right: var(--e-3); min-width: 52px; height: 52px; padding: 0 var(--e-3); }
+  .painel { right: var(--e-2); bottom: calc(54px + var(--pe-do-aparelho, 0px) + var(--e-2) + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 2 * var(--e-2)); max-height: calc(100dvh - 144px - var(--pe-do-aparelho, 0px)); }
   .acaoProposta { align-items: flex-start; flex-wrap: wrap; }
   .acaoTexto { flex: 1 1 180px; }
   .acaoBotao { min-height: var(--toque); }
