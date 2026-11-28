@@ -1331,17 +1331,27 @@
   // armazenamento; só o redesenho espera, e várias mudanças no meio tempo viram uma recarga.
   const _ESPERA_TELA_LIVRE_MS = 500;
   let _recargaPendente = false;
+  let _recargaAgora = false;
   function _telaOcupada() {
     try { return !!(window.cdbApp && typeof window.cdbApp.telaOcupada === 'function' && window.cdbApp.telaOcupada()); }
     catch (_) { return false; }
   }
-  function _recarregarQuandoLivre() {
-    if (_recargaPendente) return;
+  // Registro que o servidor mudou e que está aberto num formulário de edição: esperar seria pior que recarregar,
+  // porque salvar o formulário devolveria ao servidor o valor antigo dos campos que a operadora não tocou.
+  function _emEdicao(type, id) {
+    try {
+      const abertos = window.cdbApp && typeof window.cdbApp.registrosEmEdicao === 'function' ? window.cdbApp.registrosEmEdicao() : null;
+      return !!(abertos && abertos[type] != null && abertos[type] === id);
+    } catch (_) { return false; }
+  }
+  function _recarregarQuandoLivre(agora) {
+    if (_recargaPendente) { if (agora) _recargaAgora = true; return; }
     _recargaPendente = true;
+    _recargaAgora = !!agora;
     const tentar = async () => {
-      if (!_telaOcupada()) {
+      if (_recargaAgora || !_telaOcupada()) {
         try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
-        if (!_telaOcupada()) { _recargaPendente = false; location.reload(); return; }
+        if (_recargaAgora || !_telaOcupada()) { _recargaPendente = false; _recargaAgora = false; location.reload(); return; }
       }
       setTimeout(tentar, _ESPERA_TELA_LIVRE_MS);
     };
@@ -1357,6 +1367,7 @@
     if (!window.cdbApp) return false;
     const state = window.cdbApp.getState();
     let changed = false;
+    let recarregarJa = false;
     let errorsThisBatch = 0;
     mutations.forEach(m => {
       try {
@@ -1436,6 +1447,7 @@
           if (idx >= 0) { Object.keys(coll[idx]).forEach(k => { delete coll[idx][k]; }); Object.assign(coll[idx], m.payload); }
           else coll.push(m.payload);
           changed = true;
+          if (idx >= 0 && _emEdicao(type, m.payload.id)) recarregarJa = true;
           if (type !== 'product') _espelharNoSnapshot(type, idx >= 0 ? coll[idx] : m.payload);
           // #1520: saldo que veio do servidor nao e movimento deste aparelho. Sem isto, um
           // save antes do reload devolvia a diferenca ao servidor como "stock.delta".
@@ -1447,7 +1459,7 @@
             if (i >= 0) base[i] = copia; else base.push(copia);
           }
         } else if (op === 'delete') {
-          if (idx >= 0) { coll.splice(idx, 1); changed = true; }
+          if (idx >= 0) { coll.splice(idx, 1); changed = true; if (_emEdicao(type, m.payload.id)) recarregarJa = true; }
         }
         localStorage.setItem(map.storage, JSON.stringify(coll));
       } catch (e) {
@@ -1481,7 +1493,7 @@
     if (errorsThisBatch === 0 && _telaDesatualizada) { changed = true; _telaDesatualizada = false; }
     if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando quando a tela estiver livre...');
-      _recarregarQuandoLivre();
+      _recarregarQuandoLivre(recarregarJa);
     }
     return errorsThisBatch === 0 && !_pullDeferred;
   }

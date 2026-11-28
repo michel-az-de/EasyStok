@@ -26,11 +26,11 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
     const S = sandbox.window.cdbSync;
     const original = sandbox.window.cdbApp;
     const reloadOriginal = sandbox.location.reload;
-    const tela = { ocupada: false, reloads: 0 };
+    const tela = { ocupada: false, reloads: 0, emEdicao: {} };
     sandbox.location.reload = () => { tela.reloads++; };
     sandbox.window.cdbApp = Object.assign({}, original, {
       getState: () => state, setPendingSync() {}, markAllSynced() {}, showToast() {}, getOperator: () => 'Thati',
-      telaOcupada: () => tela.ocupada
+      telaOcupada: () => tela.ocupada, registrosEmEdicao: () => tela.emEdicao
     });
     sandbox.AbortController = AbortController;
     sandbox.URLSearchParams = URLSearchParams;
@@ -128,6 +128,26 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
     } finally { await t.desmontar(); }
   });
 
+  test('#3424 servidor mudou o cliente aberto no formulário de edição: recarrega na hora, como antes', async () => {
+    const aberto = { id: 'c-3424-edit', name: 'Ana', apt: null, address: 'Rua A', phone: '1111', lastOrder: 1, orderCount: 1 };
+    const outro = { id: 'c-3424-outro', name: 'Bia', apt: null, address: 'Rua B', phone: null, lastOrder: 1, orderCount: 1 };
+    const state = estado({ clients: [aberto, outro] });
+    const casos = [
+      [outro, 0, 'outro cliente mudou: o formulário aberto não corre risco, espera'],
+      [aberto, 1, 'salvar o formulário devolveria o telefone antigo ao servidor: recarrega já']
+    ];
+    for (const [cliente, esperado, motivo] of casos) {
+      const t = montar(state);
+      try {
+        t.tela.ocupada = true;
+        t.tela.emEdicao = { client: 'c-3424-edit', product: null, cashEntry: null };
+        await t.puxar([mutacao('client.upsert', Object.assign({}, cliente, { phone: 'novo-' + cliente.id }))]);
+        await pausa(ESPERA);
+        assert.strictEqual(t.tela.reloads, esperado, motivo);
+      } finally { await t.desmontar(); }
+    }
+  });
+
   test('#3424 estoque novo do servidor mantém a contagem de produção em andamento no produto', async () => {
     const local = { id: 'p-3424', name: 'Talharim', emoji: null, category: 'massas', unit: 'un', price: 10, stock: 3, isCustom: false, count: 4, photo: null };
     const state = estado({ products: [local] });
@@ -147,20 +167,32 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
     assert.strictEqual(typeof app.telaOcupada, 'function', 'o app diz ao sync se a tela está ocupada');
     assert.strictEqual(app.telaOcupada(), false, 'tela livre');
     const doc = sandbox.document, qs = doc.querySelector;
-    const telaAntes = runInSandbox('currentScreen');
+    runInSandbox('globalThis.__telaAntes3424 = { tela: currentScreen, produtos: products }');
     const naTela = (tela, codigo) => () => runInSandbox(`currentScreen = '${tela}'; ${codigo}`);
-    const sair = codigo => () => runInSandbox(`currentScreen = ${JSON.stringify(telaAntes)}; ${codigo}`);
+    const sair = codigo => () => runInSandbox(`currentScreen = __telaAntes3424.tela; products = __telaAntes3424.produtos; ${codigo}`);
     const modal = sel => () => { doc.querySelector = s => String(s).indexOf(sel) >= 0 ? { id: 'aberto' } : null; };
+    const naAba = aba => () => { doc.querySelector = s => String(s).indexOf('.screen-tab.active') >= 0 ? { dataset: { tab: aba } } : null; };
+    const fecharModal = () => { doc.querySelector = qs; };
+    const focar = el => () => { doc.activeElement = el; };
+    const desfocar = () => { delete doc.activeElement; };
+    const rascunho = "currentOrderItems = [{ productId: 'p1', qty: 1 }]";
     const casos = [
-      ['modal de overlay aberto', true, modal('[class*="overlay"].show'), () => { doc.querySelector = qs; }],
-      ['modal criado na hora (.modal.show) aberto', true, modal('.modal.show'), () => { doc.querySelector = qs; }],
-      ['item no pedido em construção', true, naTela('pedidos', "currentOrderItems = [{ productId: 'p1', qty: 1 }]"), sair('currentOrderItems = []')],
+      ['modal de overlay aberto', true, modal('[class*="overlay"].show'), fecharModal],
+      ['editor de etiqueta e confirmação abertos (.open)', true, modal('[class*="overlay"].open'), fecharModal],
+      ['modal criado na hora (.modal.show) aberto', true, modal('.modal.show'), fecharModal],
+      ['diálogo sem "overlay" na classe aberto', true, modal('[role="dialog"].open'), fecharModal],
+      ['relatório do primeiro pull aberto', true, modal('.ipr-overlay:not([hidden])'), fecharModal],
+      ['item no pedido em construção', true, naTela('pedidos', rascunho), sair('currentOrderItems = []')],
       ['cliente escolhido no pedido em construção', true, naTela('pedidos', "selectedClient = { id: 'c1', name: 'Ana' }"), sair('selectedClient = null')],
-      ['contagem de produção', true, naTela('producao', "products = [{ id: 'p1', count: 2 }]"), sair('products = []')],
-      ['campo de texto focado', true, () => { doc.activeElement = { tagName: 'INPUT', type: 'text' }; }, () => { delete doc.activeElement; }],
-      ['pedido em construção abandonado em outra tela não segura a recarga', false, naTela('home', "currentOrderItems = [{ productId: 'p1', qty: 1 }]"), sair('currentOrderItems = []')],
-      ['contagem abandonada em outra tela não segura a recarga', false, naTela('pedidos', "products = [{ id: 'p1', count: 2 }]"), sair('products = []')],
-      ['caixa de marcar focada não é edição', false, () => { doc.activeElement = { tagName: 'INPUT', type: 'checkbox' }; }, () => { delete doc.activeElement; }]
+      ['contagem de produção', true, naTela('producao', "products = [{ id: 'p1', count: 2 }]"), sair('')],
+      ['campo de texto focado com texto', true, focar({ tagName: 'INPUT', type: 'text', value: 'Ana' }), desfocar],
+      ['observação com texto focada', true, focar({ tagName: 'TEXTAREA', value: 'sem cebola' }), desfocar],
+      ['rascunho na aba Andamento de Pedidos não segura a recarga', false, () => { naTela('pedidos', rascunho)(); naAba('andamento')(); }, () => { fecharModal(); sair('currentOrderItems = []')(); }],
+      ['rascunho na aba Novo de Pedidos segura', true, () => { naTela('pedidos', rascunho)(); naAba('novo')(); }, () => { fecharModal(); sair('currentOrderItems = []')(); }],
+      ['pedido em construção abandonado em outra tela não segura a recarga', false, naTela('home', rascunho), sair('currentOrderItems = []')],
+      ['contagem abandonada em outra tela não segura a recarga', false, naTela('pedidos', "products = [{ id: 'p1', count: 2 }]"), sair('')],
+      ['campo vazio focado (teclado já fechou) não segura', false, focar({ tagName: 'INPUT', type: 'search', value: '' }), desfocar],
+      ['caixa de marcar focada não é edição', false, focar({ tagName: 'INPUT', type: 'checkbox', value: 'on' }), desfocar]
     ];
     casos.forEach(([nome, esperado, ligar, desligar]) => {
       ligar();

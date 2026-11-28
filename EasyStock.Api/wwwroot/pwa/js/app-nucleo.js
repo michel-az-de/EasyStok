@@ -15120,21 +15120,33 @@ function pairingInvalidMessage() {
 }
 // #3424: a recarga que mostra a mudança do servidor espera enquanto isto for verdade. Ela fecharia o que está
 // aberto e apagaria o que só existe na memória: o pedido em construção e a contagem de produção. O rascunho só
-// conta na tela dele; abandonado em outra tela, não segura a recarga para sempre.
+// conta na tela e na aba dele; abandonado em outra, não segura a recarga para sempre. Campo focado só conta com
+// texto: no Android o foco fica no campo depois que o teclado fecha.
 function telaOcupada() {
-  if (document.querySelector('[class*="overlay"].show, [class*="overlay"].open, .modal.show')) return true;
-  if (currentScreen === 'pedidos' && (currentOrderItems.length > 0 || selectedClient)) return true;
+  if (document.querySelector('[class*="overlay"].show, [class*="overlay"].open, .modal.show, '
+    + '[role="dialog"].show, [role="dialog"].open, .ipr-overlay:not([hidden])')) return true;
+  if (currentScreen === 'pedidos' && (currentOrderItems.length > 0 || selectedClient)) {
+    const aba = document.querySelector('[data-screen="pedidos"] .screen-tab.active');
+    if (!aba || !aba.dataset || aba.dataset.tab === 'novo') return true;
+  }
   if (currentScreen === 'producao' && products.some(p => p && p.count > 0)) return true;
   const el = document.activeElement;
   if (!el) return false;
-  if (el.isContentEditable) return true;
+  if (el.isContentEditable) return !!String(el.textContent || '').trim();
   const tag = String(el.tagName || '').toUpperCase();
-  return tag === 'TEXTAREA'
+  const deTexto = tag === 'TEXTAREA'
     || (tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color)$/i.test(el.type || 'text'));
+  return deTexto && !!String(el.value || '').trim();
+}
+// #3424: registro aberto num formulário de edição. Se o servidor mudar este mesmo registro, a recarga sai na hora,
+// como antes: salvar o formulário depois devolveria ao servidor o valor antigo dos campos que ela não tocou.
+function registrosEmEdicao() {
+  return { client: editingClientId, product: editingProductId, cashEntry: editingCashEntryId };
 }
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   telaOcupada,
+  registrosEmEdicao,
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
