@@ -104,6 +104,15 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false, { pod
 // (à vista ou só para o leitor de tela) e a pílula. Com o Assistente desligado na loja, "pausado" e "volta"
 // prometem o que não acontece. #3234 (C5): sem faixa nem frase à vista sobra só a pílula (e o Assumir), que no
 // desktop cabe no cabeçalho como selo, em vez de ocupar uma faixa de 40 px.
+// #3386 (revisão): a frase da restrição vira uma parte essencial curta e inteira ("Sem lactose", "Restrição alimentar") e o
+// resto (": confira os ingredientes", ", confira ... antes de responder"), que a barra mostra só se couber. Separa no primeiro ": "
+// ou, sem ele, na primeira ", "; sem separador, a frase toda é o essencial.
+export function partesDoAvisoDeRestricao(linha) {
+  const texto = String(linha ?? '')
+  const i = texto.includes(': ') ? texto.indexOf(': ') : texto.indexOf(', ')
+  return i < 0 ? { essencial: texto, resto: '' } : { essencial: texto.slice(0, i), resto: texto.slice(i) }
+}
+
 export function apresentacaoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true, agora = null, motivo } = {}) {
   const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir, agora, motivo })
   const faixa = resumo.chave === MODOS.COM_VOCE ? faixaDaTransferencia(conversa.passagem) : null

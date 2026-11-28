@@ -11,6 +11,7 @@ import { useContextoAssistencia } from '../../aplicacao/contextoAssistencia'
 import { comandaDaFichaIa, tituloDoBlocoIa } from '../../dominio/montagemFicha'
 import { horaCurta, moeda } from '../../dominio/formato'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { rotuloDoPedido } from '../../dominio/rotulos'
 import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './AreaColaborativaIa.module.css'
 
@@ -57,7 +58,7 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
     </header>
     <p className={bloco.tipo === 'nota' ? css.nota : css.texto}>{bloco.texto}</p>
     {bloco.tipo === 'comanda' && (comanda ? <div className={css.comanda}>
-      <strong>{comanda.numero ? `Pedido ${comanda.numero}` : 'Pedido em montagem'} · {comanda.nome}</strong>
+      <strong>{comanda.numero ? rotuloDoPedido(comanda.numero) : 'Pedido em montagem'} · {comanda.nome}</strong>
       <ul>{comanda.itens.slice(0, 4).map((item, i) => <li key={`${item.id}:${i}`}>{item.quantidade} × {item.nome}</li>)}</ul>
       {comanda.itens.length > 4 && <p>{comanda.itens.length - 4} outros itens no pedido.</p>}
       {comanda.total != null && <p className={css.total}>{comanda.rotuloTotal} <strong>{moeda(comanda.total)}</strong></p>}

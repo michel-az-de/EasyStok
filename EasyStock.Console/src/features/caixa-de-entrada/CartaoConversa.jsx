@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { Avatar } from '../../componentes/Avatar'
@@ -16,7 +16,7 @@ import { horaMono } from '../../dominio/formato'
 import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, ehSeloDeDinheiro, pilulasVisiveis } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, pilulasDaLinha, medidaDaLinha } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
@@ -28,7 +28,8 @@ function motivoDaLinha(motivo, origem) {
   return {
     ...motivo,
     tom: tomDoMotivo(motivo),
-    rotulo: resumido?.texto ?? motivo.rotulo,
+    // O rótulo de cobrança vem do domínio: depende do meio (Pix, link de cartão) e de haver cobrança.
+    rotulo: motivo.chave === 'cobranca' ? motivo.rotulo : (resumido?.texto ?? motivo.rotulo),
     icone: resumido?.icone ?? null,
     texto: motivo.texto ?? resumido?.titulo ?? null,
   }
@@ -82,12 +83,22 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
   const etiqueta = mostraEtiquetaDoEstado(estado)
-  const seloAFrente = contexto.some(ehSeloDeDinheiro)
   // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
   const hora = horaDaLista(conversa.ultimaEm, agora)
-  // #3374 (C4, L1): no máximo 2 pílulas na linha (estado + 1 contexto, ou 2 de contexto); o resto segue no `title`.
-  // Prioridade: dinheiro, depois aviso/perigo e "Só modelo", depois o resto (pilulasVisiveis).
-  const visiveis = pilulasVisiveis(contexto, etiqueta ? 1 : 2)
+  // #3386 (r8 P1): todas as pílulas, na ordem de ação (estado, dinheiro, aviso, resto); o CSS mostra duas fileiras inteiras.
+  const pilulas = pilulasDaLinha(estado, etiqueta, contexto)
+  // #3363 (S4): ao responder, a conversa aberta sai do estado "Precisa de você" e perderia a segunda fileira; o cartão guarda
+  // a altura da linha de contexto de antes e a mantém enquanto estiver atenuado, para nenhum cartão se deslocar.
+  const linhaRef = useRef(null)
+  const alturaDaLinha = useRef(0)
+  useLayoutEffect(() => { if (!atenuado) alturaDaLinha.current = medidaDaLinha(linhaRef.current) })
+  // Mudou a largura da janela: a medida guardada deixa de valer e é descartada.
+  useEffect(() => {
+    const descartar = () => { alturaDaLinha.current = 0 }
+    window.addEventListener('resize', descartar)
+    return () => window.removeEventListener('resize', descartar)
+  }, [])
+  const reservaAltura = atenuado && alturaDaLinha.current > 0 ? alturaDaLinha.current : null
 
   return (
     <button
@@ -114,18 +125,17 @@ export const CartaoConversa = memo(function CartaoConversa({
         <span className={css.topo}>
           <strong className={pendentes > 0 ? css.semResposta : ''}>
             <NomeDoContato
-              completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
+              completo={nome.principal} curto={nome.curto} forma="curta" capsula={nome.capsula} titulo={nome.titulo}
               complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.numeroPedido ? `#${nome.numeroPedido}` : nome.complemento}</small>}
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}
-          {slaEstourado && motivo?.chave !== 'esperando' && (
+          {slaEstourado && (
             <span className={css.sinalPrazo} title="Prazo de resposta estourado" role="img" aria-label="Prazo de resposta estourado">
               <Icone nome="relogio" tamanho={16} />
             </span>
           )}
-          {/* #3009: com o selo de dinheiro à frente a etiqueta pode sair da fileira visível; o ícone leva o motivo. */}
-          {(seloAFrente ? (motivo || etiqueta) : (!slaEstourado && motivo && !etiqueta)) && (
+          {(!slaEstourado && motivo && !etiqueta) && (
             <span className={`${css.sinalPrazo} ${css.sinalAtencao}`} title={estado.texto} role="img" aria-label={estado.texto}>
               <Icone nome={estado.icone ?? 'hand'} tamanho={16} />
             </span>
@@ -160,12 +170,11 @@ export const CartaoConversa = memo(function CartaoConversa({
             />
           )}
         </span>
-        {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
-          {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
-          {visiveis.map((item) => (
-            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined} className={ehSeloDeDinheiro(item) ? css.seloDinheiro : undefined}>{item.texto}</Pilula>
-          ))}
-        </span>}
+        {(temLinhaDeContexto({ etiqueta, contexto }) || reservaAltura) && <span ref={linhaRef} style={reservaAltura ? { minHeight: reservaAltura } : undefined} className={css.contextoLinha} title={pilulas.map((item) => item.texto).join(' · ')}>
+          {pilulas.map((item) => item.chave === 'estado'
+? <Pilula key="estado" tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>
+: <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined}>{item.texto}</Pilula>)}
+</span>}
       </span>
     </button>
   )

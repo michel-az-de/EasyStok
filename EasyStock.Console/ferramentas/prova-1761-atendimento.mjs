@@ -59,7 +59,7 @@ const { FORMATO_DO_ENDERECO, recusaDoEndereco } = await import('../src/dominio/c
 const { encaixeNaJanela, tempoDoItem } = await import('../src/dominio/lembrete.js')
 const { podeVerAvisosDoCliente, podeVerItensFora } = await import('../src/dominio/acessoModulos.js')
 const { pedidoAcabouDeNascer, porcaoForaDoNome, tituloDaComanda } = await import('../src/dominio/pedido.js')
-const { estadoDaJanela, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } = await import('../src/dominio/janela.js')
+const { esperaNoCabecalho, estadoDaJanela, modelosAVista, permissaoDeEscrita, prazoFolgado, prazoNoCabecalho } = await import('../src/dominio/janela.js')
 const { automaticoDesligadoNaConversa } = await import('../src/dominio/motivoDeEscalada.js')
 const { mostraHistorico, resumoDasTags } = await import('../src/dominio/ficha.js')
 const { mostraChipDoCanal } = await import('../src/dominio/conversa.js')
@@ -321,16 +321,19 @@ const janelaCom = (minutosRestantes) => estadoDaJanela(
 // sem regra, a janela é dita uma vez só.
 await confere('J  prazo no cabeçalho com a janela aberta; fechada ou sem regra, diz uma vez só (a faixa, se ela disser)', () => {
   // #3374 (C13): o prazo é a hora do fim, no fuso da loja (AGORA = 18h45 em São Paulo), não uma contagem.
-  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'WhatsApp aberto até amanhã 18h40')
-  assert.equal(prazoNoCabecalho(janelaCom(119)), 'WhatsApp aberto até 20h44')
-  assert.equal(prazoNoCabecalho(janelaCom(20)), 'WhatsApp aberto até 19h05')
-  assert.equal(prazoNoCabecalho(janelaCom(135)), 'WhatsApp aberto até 21h')
-  assert.equal(prazoNoCabecalho(janelaCom(5 * 60 + 15)), 'WhatsApp aberto até amanhã 0h', 'virada do dia: meia-noite é amanhã')
-  assert.equal(prazoNoCabecalho(janelaCom(30 * 60)), 'WhatsApp aberto até 15/10 0h45', 'além de amanhã vem a data')
+  assert.equal(prazoNoCabecalho(janelaCom(23 * 60 + 55)), 'aberto até amanhã 18h40')
+  assert.equal(prazoNoCabecalho(janelaCom(119)), 'aberto até 20h44')
+  assert.equal(prazoNoCabecalho(janelaCom(20)), 'aberto até 19h05')
+  assert.equal(prazoNoCabecalho(janelaCom(135)), 'aberto até 21h')
+  assert.equal(prazoNoCabecalho(janelaCom(5 * 60 + 15)), 'aberto até amanhã 0h', 'virada do dia: meia-noite é amanhã')
+  assert.equal(prazoNoCabecalho(janelaCom(30 * 60)), 'aberto até 15/10 0h45', 'além de amanhã vem a data')
   assert.equal(prazoNoCabecalho(estadoDaJanela({ mensagens: [] }, AGORA, SITE)), null)
   // #3384 (P1-4): resposta interna atrasada: o cabeçalho diz o atraso (como a fila), não a janela do WhatsApp como prazo.
-  assert.equal(prazoNoCabecalho(janelaCom(119), null, '2 h 50'), 'Cliente espera há 2 h 50', 'atrasada: o cabeçalho mostra o atraso')
-  assert.equal(prazoNoCabecalho(janelaCom(119), { acao: 'bloqueio' }, '2 h 50'), null, 'bloqueada: segue sem prazo')
+  assert.equal(prazoNoCabecalho(janelaCom(119), null), 'aberto até 20h44', 'o prazo da janela não carrega a espera')
+  assert.equal(esperaNoCabecalho('2 h 50', { chave: 'esperando' }), null, 'a barra já diz a espera: o cabeçalho não repete')
+  for (const chave of ['passagem', 'reclamacao', 'restricao', undefined]) assert.equal(esperaNoCabecalho('2 h 50', chave ? { chave } : null), 'Cliente espera há 2 h 50', `barra com ${chave}: o cabeçalho diz a espera`)
+  assert.equal(esperaNoCabecalho(null, { chave: 'passagem' }), null, 'sem espera atrasada não há o que dizer')
+  assert.equal(prazoNoCabecalho(janelaCom(119), { acao: 'bloqueio' }), null, 'bloqueada: segue sem prazo')
   // Cada caso fechado: a faixa da janela diz, o cabeçalho cala. Concluída ou bloqueada, a faixa fala de
   // outra coisa e o cabeçalho segue dizendo a janela (senão ela some da tela).
   const fechada = { janelaExpiraEm: new Date(AGORA - 5 * 60000).toISOString(), mensagens: [], canal: 'X' }

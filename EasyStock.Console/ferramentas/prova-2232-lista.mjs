@@ -151,10 +151,13 @@ confere('C4  com 3+ pílulas, "Só modelo" e o aviso da passagem não caem fora;
     { chave: 'origem', texto: 'Site', tom: 'aviso' }, { chave: 'pedido', texto: 'Falta R$ 40,00', tom: 'neutro' },
     { chave: 'janela', texto: 'Só modelo', tom: 'neutro' }, { chave: 'tag', texto: 'Tag: VIP', tom: 'neutro' },
   ]
-  assert.deepEqual(cartao.pilulasVisiveis(ctx, 2).map((i) => i.chave), ['pedido', 'origem'])
+  // #3386 (r8): a ordem vem de pilulasDaLinha (até duas fileiras no CSS); as duas primeiras continuam dinheiro e aviso.
+  const dois = (estado, etiqueta, c) => cartao.pilulasDaLinha(estado, etiqueta, c).slice(0, 2).map((i) => i.chave)
+  assert.deepEqual(dois(null, false, ctx), ['pedido', 'origem'])
+  assert.deepEqual(dois({ texto: 'Pix vencido', tom: 'erro' }, true, ctx), ['estado', 'pedido'], 'o estado de ação vai antes do dinheiro')
   const semDinheiro = ctx.filter((i) => i.chave !== 'pedido')
-  assert.deepEqual(cartao.pilulasVisiveis(semDinheiro, 2).map((i) => i.chave), ['origem', 'janela'])
-  assert.deepEqual(cartao.pilulasVisiveis([ctx[3], ctx[2]], 1).map((i) => i.chave), ['janela'])
+  assert.deepEqual(dois(null, false, semDinheiro), ['origem', 'janela'])
+  assert.deepEqual(cartao.pilulasDaLinha(null, false, [ctx[3], ctx[2]])[0].chave, 'janela')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

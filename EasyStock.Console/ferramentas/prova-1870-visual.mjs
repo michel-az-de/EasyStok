@@ -146,7 +146,7 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
   assert.match(regra('cabecalhoFicha'), /flex-shrink: 0;/, 'cabeçalho não participa da rolagem')
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
   assert.match(painel, /<header className=\{css\.cabecalhoFicha\} data-cabecalho-ficha>/)
-  assert.match(painel, /<div className=\{css\.conteudo\}>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
+  assert.match(painel, /<div className=\{css\.conteudo\}[^>]*>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /<nav className=\{css\.acessosFicha\} aria-label="Detalhes do atendimento">/)
   assert.match(painel, /titulo="Pós-venda"/)
 })
@@ -164,7 +164,11 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   const css = fonte('features/atendimento/atendimento.module.css')
   // #3374 (r2 P1-2): o motivo quebra em até 2 linhas (reticências numa linha cortavam o que fazer, crítica r2) e o
   // texto inteiro fica no title.
-  assert.match(css, /\.modoTexto\s*\{[^}]*-webkit-line-clamp:\s*2/)
+  // #3386 (r6, r8): o motivo fica numa linha com o texto inteiro no title; a restrição mostra "Sem lactose" inteiro e a frase
+  // de apoio só se couber (segunda linha cortada por altura fixa, sem reticências no meio da frase).
+  assert.match(css, /\.modoTexto\s*\{[^}]*white-space:\s*nowrap/)
+  assert.match(css, /\.modoTextoAviso\s*\{[^}]*flex-wrap:\s*wrap[^}]*overflow:\s*clip/)
+  assert.match(css, /\.modoEssencial\s*\{[^}]*nowrap/)
   assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
   // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
   // #2762 (A1): o anel do item é o da casa (borda de foco na cor da marca), no lugar do halo de 2 px, que sumia no escuro.

@@ -11,6 +11,12 @@
 }
 .fina { font-weight: 400; color: var(--tinta-2); }
 
+/* #3386 (r6, H4): `ponto` dá o ponto neutro ao estado que não tem cor própria (neutro e info); declarado antes dos tons, que o vencem. */
+.ponto::before {
+  content: ''; flex-shrink: 0;
+  width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--tinta-3);
+}
+
 /* Três estados e a marca. Nada mais ganha ponto. */
 .ok::before, .aviso::before, .perigo::before, .marca::before {
   content: ''; flex-shrink: 0;

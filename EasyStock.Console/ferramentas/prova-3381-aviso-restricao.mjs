@@ -1,4 +1,4 @@
-// #3381 (r3 P1-3): o aviso de restrição alimentar diz o que evitar, curto ("Sem lactose: confira a ficha do prato"),
+// #3381 (r3 P1-3): o aviso de restrição alimentar diz o que evitar, curto ("Sem lactose: confira os ingredientes"),
 // a partir da fala do cliente; sem item reconhecido cai no texto genérico. O motivo inteiro segue no detalhe (title).
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
@@ -36,8 +36,8 @@ assert.equal(itemDaRestricao(fala('sou intolerante a lactose')), 'lactose')
 assert.equal(itemDaRestricao(fala('quero zero lactose')), 'lactose')
 assert.equal(itemDaRestricao(fala('alergia a camarão', 'ok', 'tem suco sem leite?')), 'camarão')
 
-assert.equal(avisoDeRestricao('lactose').texto, 'Sem lactose: confira a ficha do prato')
-assert.match(avisoDeRestricao('lactose').detalhe, /^Restrição alimentar, confira a ficha do prato antes de responder/)
-assert.equal(avisoDeRestricao(null).texto, 'Restrição alimentar, confira a ficha do prato antes de responder')
+assert.equal(avisoDeRestricao('lactose').texto, 'Sem lactose: confira os ingredientes')
+assert.match(avisoDeRestricao('lactose').detalhe, /^Restrição alimentar, confira os ingredientes antes de responder/)
+assert.equal(avisoDeRestricao(null).texto, 'Restrição alimentar, confira os ingredientes antes de responder')
 assert.ok(avisoDeRestricao('lactose').texto.length <= 40, 'curto o bastante para não cortar')
 console.log('prova-3381-aviso-restricao: ok')

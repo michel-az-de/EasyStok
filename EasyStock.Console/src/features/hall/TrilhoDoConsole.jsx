@@ -59,6 +59,12 @@ export function TrilhoDoConsole({
         })}
       </div>
       <div className={css.conta}>
+        {/* #3386 (r6, H10): a Ajuda à vista no trilho, com o mesmo destino da Ajuda do tablet (aoAbrirAjuda). */}
+        {aoAbrirAjuda && (
+          <button type="button" className={`${css.item} ${css.ajuda}`} aria-haspopup="dialog" onClick={aoAbrirAjuda}>
+            <Icone nome="ajuda" tamanho={24} /><span>Ajuda</span>
+          </button>
+        )}
         <MenuDaConta nome={atendente ?? conta?.nome} detalhe={conta?.casa} aoSair={aoSair} aoAbrirAjuda={aoAbrirAjuda}
           rotuloSair={rotuloDoSair(sessaoPersistente)}
           tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined} />

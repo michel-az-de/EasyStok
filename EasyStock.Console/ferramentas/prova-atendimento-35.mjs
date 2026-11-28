@@ -274,7 +274,10 @@ const conversaLargura = conversa ? Math.round(conversa.width) : null
 fixas.push([conversaLargura !== null && conversaLargura >= 560, `${nome}: conversa com ${conversaLargura} px (mínimo 560)`])
 fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1, `${nome}: conversa termina em ${folga?.conversaFim}, painel começa em ${folga?.esq}`])
 fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), `${nome}: rolagem horizontal da página (${largura} px)`])
-fixas.push([await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible(), `${nome}: dica "Esc" invisível no painel`])
+// #3386 (r8 P2-2): sem espaço no cabeçalho (menos de 24 rem) a dica "Esc" sai e o X fica com o nome "Fechar (Esc)".
+const escVisivel = await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible()
+// #3386 (r9): uma regra só em toda largura: o texto "Esc" não aparece e o X visível se chama "Fechar (Esc)".
+    fixas.push([!escVisivel && await p.getByRole('button', { name: 'Fechar (Esc)' }).first().isVisible(), `${nome}: X nomeado "Fechar (Esc)" visível e sem a dica "Esc" solta`])
 await p.keyboard.press('Escape')
 await p.waitForTimeout(200)
 const fechou = (await p.locator('section[role=dialog]').count()) === 0
@@ -329,12 +332,19 @@ for (const w of [1280, 1440]) {
   await p.mouse.move(0, 0)
   await p.waitForTimeout(500)
   const aviso = await p.evaluate(() => {
+    // #3386 (r8): o aviso de restrição mostra "Sem lactose" inteiro; a frase de apoio ou cabe inteira ou fica fora da caixa (nunca pela metade).
+    const cortadoNaFrase = (el) => {
+      const partes = [...el.querySelectorAll('span')]
+      if (!partes.length) return el.scrollHeight > el.clientHeight + 1
+      const r = el.getBoundingClientRect()
+      return partes.some((q) => { const b = q.getBoundingClientRect(); const dentro = b.top >= r.top - 1 && b.bottom <= r.bottom + 1 && b.right <= r.right + 1; return b.width > 0 && !dentro && b.top < r.bottom - 1 }) || partes[0].scrollWidth > partes[0].clientWidth + 1
+    }
     const e = [...document.querySelectorAll('[class*=modoTexto]')].find((x) => x.checkVisibility())
-    return e ? { texto: e.textContent.trim(), title: e.title, cortado: e.scrollHeight > e.clientHeight + 1 } : null
+    return e ? { texto: e.textContent.trim(), title: e.title, cortado: cortadoNaFrase(e) } : null
   })
   fixas.push([aviso !== null && /lactose/i.test(aviso.texto), `restrição ${w}: o aviso não diz o item a evitar: ${JSON.stringify(aviso)}`])
   fixas.push([aviso !== null && !aviso.cortado, `restrição ${w}: o aviso do cabeçalho está cortado (scrollHeight > clientHeight): ${JSON.stringify(aviso)}`])
-  fixas.push([aviso !== null && /ficha do prato antes de responder/.test(aviso.title), `restrição ${w}: o motivo inteiro saiu do title: ${aviso?.title}`])
+  fixas.push([aviso !== null && /ingredientes antes de responder/.test(aviso.title), `restrição ${w}: o motivo inteiro saiu do title: ${aviso?.title}`])
   await p.close()
 }
 
