@@ -49,10 +49,11 @@
 .aviso:hover { background: var(--preenchimento); }
 .naoLida { background: var(--marca-claro); }
 .naoLida:hover { background: var(--preenchimento-forte); }
-/* Sem fill-mode: terminada a entrada, vale o fundo da própria linha (lido ou não, com ou sem mouse). */
+/* O que chega entra com um contorno da marca que some (o fundo já é o do não lido). Sem fill-mode: terminada a
+   entrada, vale o estilo da própria linha. */
 .chegou { animation: chegar 1.4s var(--ease-saida); }
 @keyframes chegar {
-  from { background: var(--marca-claro); transform: translateY(-4px); }
+  from { box-shadow: inset 0 0 0 var(--b-2) var(--marca); transform: translateY(-4px); }
   30% { transform: none; }
 }
 

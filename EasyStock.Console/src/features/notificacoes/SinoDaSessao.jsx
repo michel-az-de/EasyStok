@@ -44,6 +44,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
   const marcarTodasRef = useRef(null)
   const cancelarRef = useRef(null)
   const voltarParaMarcarTodasRef = useRef(false)
+  const voltarDepoisDaCargaRef = useRef(null)
   const idPainel = useId()
 
   // O sino balança quando chega aviso novo de fato, não quando o total sobe porque uma leitura falhou e voltou.
@@ -127,6 +128,15 @@ export function SinoDaSessao({ avisos, aparelho }) {
     ;(proximo || painel?.querySelector('[role="tab"][aria-selected="true"]'))?.focus()
   }, [aberto, recentes, todas.itens])
   // O botão clicado some com a confirmação: o foco vai para Cancelar e, cancelando, volta para Marcar todas.
+  // Atualizar e Ver mais ficam desligados enquanto carregam, e o navegador tira o foco de botão desligado: terminada
+  // a carga, o foco volta para quem foi clicado (como o "Atualizar avisos" do Modal antigo fazia).
+  const carregandoAgora = carregando || todas.carregando
+  useEffect(() => {
+    const botao = voltarDepoisDaCargaRef.current
+    if (carregandoAgora || !botao) return
+    voltarDepoisDaCargaRef.current = null
+    if (botao.isConnected && (document.activeElement === document.body || document.activeElement === null)) botao.focus()
+  }, [carregandoAgora])
   useEffect(() => {
     if (confirmandoTodas) cancelarRef.current?.focus()
     else if (voltarParaMarcarTodasRef.current) marcarTodasRef.current?.focus()
@@ -182,7 +192,8 @@ export function SinoDaSessao({ avisos, aparelho }) {
         <header className={css.cabecalho}>
           <h2>Avisos</h2>
           <BotaoIcone icone="refresh-cw" rotulo="Atualizar avisos"
-            onClick={() => { setAgora(Date.now()); if (aba === 'todas') carregarTodas(); else carregar() }} disabled={carregando || todas.carregando} />
+            onClick={(evento) => { voltarDepoisDaCargaRef.current = evento.currentTarget; setAgora(Date.now()); if (aba === 'todas') carregarTodas(); else carregar() }}
+            disabled={carregandoAgora} />
           {aba === 'naoLidas' && naoLidas > 0 && !confirmandoTodas && (
             <Botao ref={marcarTodasRef} variante="texto" icone="circle-check" onClick={() => setConfirmandoTodas(true)}>Marcar todas como lidas</Botao>
           )}
@@ -219,7 +230,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
             <p className={css.resumo}>Mostrando {recentes.length} de {naoLidas}. Os próximos aparecem conforme você lê.</p>
           )}
           {aba === 'todas' && todas.pagina < todas.paginas && (
-            <Botao variante="texto" largo onClick={() => carregarTodas({ mais: true })} disabled={todas.carregando}>
+            <Botao variante="texto" largo onClick={(evento) => { voltarDepoisDaCargaRef.current = evento.currentTarget; carregarTodas({ mais: true }) }} disabled={todas.carregando}>
               {todas.carregando ? 'Carregando…' : `Ver mais (${todas.total - todas.itens.length})`}
             </Botao>
           )}

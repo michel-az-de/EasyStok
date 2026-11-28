@@ -312,6 +312,14 @@ try {
   await pagina.waitForFunction(() => window.__balancou === true, null, { timeout: 3000 })
   console.log('ok 8c/8d: só o aviso novo de fato realça e balança o sino')
 
+  // 8g. Atualizar pelo teclado: o botão fica desligado enquanto carrega, e o foco volta para ele depois.
+  const atualizar = painel(pagina).getByRole('button', { name: 'Atualizar avisos', exact: true })
+  await atualizar.focus()
+  await pagina.keyboard.press('Enter')
+  await pagina.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Atualizar avisos', null, { timeout: 2000 })
+    .catch(async () => assert.fail(`depois de Atualizar, o foco foi para ${await pagina.evaluate(() => document.activeElement?.tagName)}`))
+  console.log('ok 8g: foco volta para Atualizar depois da carga')
+
   // 8f. A consulta sozinha (a de 30 s, aqui pela volta à aba do navegador) não tira o foco de quem está no sino.
   await sinoBanca.focus()
   estado.naoLidas.unshift({ id: 'n2', tipo: 'Sistema', titulo: 'Mesa 4 pediu a conta', mensagem: 'Pedido 0044.', severidade: 'Media', createdAt: new Date().toISOString(), lida: false })
