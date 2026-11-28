@@ -160,12 +160,15 @@ export function SinoDaSessao({ avisos, aparelho }) {
   // #3402: tocar no aviso abre a tela da coisa avisada, como nas redes. Lê na hora (a leitura do hook volta se a API
   // recusar) sem passar por `ler`, que guardaria o foco para a próxima abertura, e fecha o painel sem devolver o foco ao
   // sino: na troca de tela, quem leva o foco é a NavegacaoDoConsole. Ctrl, Cmd, Shift ou Alt deixam o navegador abrir
-  // outra aba, janela ou baixar: lê como o botão de ler (o link sai da lista e o foco vai ao próximo não lido) e esta aba
-  // fica onde está. O botão do meio não dispara click: abre a outra aba sem ler.
+  // outra aba, janela ou baixar e esta aba fica onde está. Em Não lidas o link sai da lista: lê como o botão de ler (o
+  // foco vai ao próximo não lido). Em Todas o aviso lido fica, e o foco fica no link. O botão do meio não dispara click:
+  // abre a outra aba sem ler.
   const destinoDe = (aviso) => destinoDoAviso(aviso, { permite, acoes })
   const abrirDestino = (evento, aviso, destino, lista) => {
     if (evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey) {
-      if (!aviso.lida) ler(aviso, lista)
+      if (aviso.lida) return
+      if (aba === 'naoLidas') ler(aviso, lista)
+      else marcarLida(aviso.id)
       return
     }
     if (!aviso.lida) marcarLida(aviso.id)

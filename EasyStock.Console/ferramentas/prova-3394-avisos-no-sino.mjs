@@ -451,9 +451,26 @@ try {
   assert.ok(await painel(pd).isVisible(), 'o Ctrl+clique fechou o painel desta aba')
   assert.equal(await pd.evaluate(() => location.hash), '#/m/producao/estoque', 'o Ctrl+clique trocou a tela desta aba')
   assert.ok(await gravou('PATCH e3'), 'o Ctrl+clique também lê o aviso')
-  await pd.waitForFunction(() => document.activeElement?.closest('[data-painel-avisos]') !== null && document.activeElement !== document.body, null, { timeout: 2000 })
-    .catch(async () => assert.fail(`depois do Ctrl+clique, o foco foi para ${await pd.evaluate(() => document.activeElement?.tagName)}`))
-  console.log('ok 9c: Ctrl+clique abre outra aba, lê sem fechar o painel nem trocar a tela, e o foco fica no painel')
+  const ondeFoco = () => pd.evaluate(() => `${document.activeElement?.tagName} ${document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''}`)
+  await pd.waitForFunction(() => document.activeElement?.matches('[data-aviso="p1"] button'), null, { timeout: 2000 })
+    .catch(async () => assert.fail(`depois do Ctrl+clique em Não lidas, o foco foi para ${await ondeFoco()}, não para o próximo não lido`))
+  console.log('ok 9c: Ctrl+clique abre outra aba, lê sem fechar o painel nem trocar a tela, e o foco vai ao próximo não lido')
+
+  // 9e. Na aba Todas o aviso lido continua na lista: Ctrl+Enter no link lê e o foco fica no mesmo link, sem pular de
+  //     linha (o teclado não perde o lugar).
+  estado.naoLidas.unshift({ ...DE_VERDADE[0], id: 'e4', titulo: 'Farinha acabando', lida: false, createdAt: new Date().toISOString() })
+  await painel(pd).getByRole('tab', { name: /^Todas/ }).click()
+  const linkE4 = linha('e4').getByRole('link', { name: 'Farinha acabando', exact: true })
+  await linkE4.waitFor({ timeout: 3000 })
+  const abaDoTeclado = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
+  await linkE4.focus()
+  await pd.keyboard.press('Control+Enter')
+  assert.ok(await gravou('PATCH e4'), 'o Ctrl+Enter na aba Todas também lê o aviso')
+  await (await abaDoTeclado)?.close()
+  await pd.waitForTimeout(300)
+  assert.ok(await linkE4.isVisible(), 'na aba Todas o aviso lido tem de continuar na lista com o link')
+  assert.ok(await linkE4.evaluate((el) => el === document.activeElement), `depois do Ctrl+Enter em Todas, o foco foi para ${await ondeFoco()}, não ficou no link`)
+  console.log('ok 9e: Ctrl+Enter na aba Todas lê e o foco fica no mesmo link')
   await destinos.context.close()
 
   // 9d. Perfil sem estoque (GerenciarEstoque, `verDesacertosEstoque`): nenhum aviso vira link; a leitura continua.

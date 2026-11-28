@@ -83,7 +83,9 @@
 .abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .aviso:has(.abrir):hover .abrir { text-decoration: underline; }
 .aviso:has(.abrir:focus-visible) { outline: 3px solid var(--marca); outline-offset: -3px; }
-.aviso:has(.abrir) :is(button, time) { position: relative; z-index: 1; }
+.aviso:has(.abrir) button { position: relative; z-index: 1; }
+/* A hora só fica por cima com mouse, onde o title mostra a data; no toque ela abre o aviso como o resto da linha. */
+@media (hover: hover) { .aviso:has(.abrir) time { position: relative; z-index: 1; } }
 .chamada { font-size: var(--t-apoio); font-weight: 500; color: var(--marca-forte); }
 
 .ponto { width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--marca); }
