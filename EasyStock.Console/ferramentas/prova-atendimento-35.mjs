@@ -267,12 +267,13 @@ const painel = await p.locator('section[role=dialog]').first().boundingBox()
 const sobrepoe = !!(cx && painel && cx.x >= painel.x && cx.x <= painel.x + painel.width && cx.y >= painel.y && cx.y <= painel.y + painel.height)
 const conversa = await p.locator('section[aria-label^="Conversa com"]').boundingBox()
 const largura = await p.evaluate(() => document.documentElement.clientWidth)
-const folga = painel ? { esq: Math.round(painel.x), conversaFim: conversa ? Math.round(conversa.x + conversa.width) : null } : null
+// #3392: o painel encaixado abre à esquerda; não pode cobrir a conversa de nenhum dos lados.
+const folga = painel ? { esq: Math.round(painel.x), dir: Math.round(painel.x + painel.width), conversaIni: conversa ? Math.round(conversa.x) : null, conversaFim: conversa ? Math.round(conversa.x + conversa.width) : null } : null
 fixas.push([clicavel && !sobrepoe, `${nome}: Assumir ${cx ? '' : 'invisível, '}${clicavel ? '' : 'coberto, '}${sobrepoe ? 'sob o painel' : ''}`])
 // r2 P1-5: com o Assistente aberto a conversa continua legível (>= 560 px), em toda condição.
 const conversaLargura = conversa ? Math.round(conversa.width) : null
 fixas.push([conversaLargura !== null && conversaLargura >= 560, `${nome}: conversa com ${conversaLargura} px (mínimo 560)`])
-fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1, `${nome}: conversa termina em ${folga?.conversaFim}, painel começa em ${folga?.esq}`])
+fixas.push([!folga || folga.conversaFim === null || folga.conversaFim <= folga.esq + 1 || folga.dir <= folga.conversaIni + 1, `${nome}: painel (${folga?.esq} a ${folga?.dir}) fora da conversa (${folga?.conversaIni} a ${folga?.conversaFim})`])
 fixas.push([!(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)), `${nome}: rolagem horizontal da página (${largura} px)`])
 // #3386 (r8 P2-2): sem espaço no cabeçalho (menos de 24 rem) a dica "Esc" sai e o X fica com o nome "Fechar (Esc)".
 const escVisivel = await p.locator('section[role=dialog] kbd', { hasText: /^Esc$/ }).first().isVisible()

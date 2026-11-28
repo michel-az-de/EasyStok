@@ -73,8 +73,8 @@ if (paineis && preferencia && larguras) {
     assert.deepEqual(normalizarCardapio({ lado: 'direita', modo: 'amplo' }), { lado: 'direita', modo: 'amplo' })
   })
 
-  await confere('1  assistente: padrão à direita, largura limitada, posição só número finito', () => {
-    const padrao = { lado: 'direita', largura: ASSISTENTE.padrao, x: null, y: null }
+  await confere('1  assistente: padrão à esquerda (#3392), largura limitada, posição só número finito', () => {
+    const padrao = { lado: 'esquerda', largura: ASSISTENTE.padrao, x: null, y: null }
     assert.deepEqual(normalizarAssistente(undefined), padrao)
     assert.deepEqual(normalizarAssistente({ lado: 'meio', largura: 'larga', x: 'a', y: Infinity }), padrao)
     assert.equal(normalizarAssistente({ largura: 9999 }).largura, ASSISTENTE.max)

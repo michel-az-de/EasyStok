@@ -3,7 +3,7 @@
 # Mantido vivo: ampliar com evidencia medida (PS1). NAO editar sem atualizar o ADR.
 version: 1
 adr: docs/adr/0029-camada-poka-yoke-frugalidade-tokens.md  # + ADR-0040 (canonical_commands.gate)
-updated: "2026-07-03"
+updated: "2026-11-28"
 
 # Arquivos gerados/copiados em build: editar a copia e sempre-erro (a fonte manda).
 # severity block = hook PreToolUse nega Edit/Write (Fatia 4).
@@ -117,6 +117,12 @@ traps:
     detector: "worktree-status.ps1 (inventario seguro, exclui atual/principal) + passo 0 do CLAUDE.md reconciliado (worktrees do harness esperados)"
     status: active
     evidence: "9 worktrees nesta sessao; Glob defaultou p/ o worktree stale 01949b2e"
+  - id: ia-import-inexistente
+    class: M
+    desc: "agente escreve no Console import de arquivo, pacote ou export que nao existe, variavel sem uso ou hook do React condicional; so caia no build ou no CI"
+    detector: "hook PostToolUse posttooluse-lint-console.mjs (node direto, sem findstr; oxlint so no arquivo tocado, so erros, ate 10 linhas, decision block) + regra local/import-existe (EasyStock.Console/ferramentas/oxlint-local.mjs) + prova-3401-lint-na-edicao.mjs"
+    status: active
+    evidence: "#3401: oxlint 1.85 nao tem import/no-unresolved; import './naoExiste' passava no lint"
 
 # Gates de CI e o que cada um realmente cobre (medido 2026-06-08 via gh run list).
 ci_gates:

@@ -208,11 +208,15 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   // Entre 1180 e 1307 px esse teto fica abaixo do mínimo do painel: aí não empurra e o painel segue sobreposto, na largura normal.
   // Critica r1 (P1): abaixo disso (1180 a 1307 px) o painel cobria o Assumir. Agora ele toma o lugar da coluna Cliente
   // (a ficha some enquanto ele está aberto e volta ao fechar) e segue empurrando: a conversa nunca fica por baixo.
-  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + 292 + CONVERSA_LEGIVEL) - 2 * VAO
   const encaixado = !celular && !solto && area.colunas
+  // #3392 (r10, H4): encaixado à esquerda no computador, o painel toma o lugar da fila (260 + a alça), como no tablet,
+  // e a Ficha só sai se nem assim couber. Em toda largura quem cede ao Assistente à esquerda é a fila.
+  const semFila = encaixado && lado === 'esquerda'
+  const fila = semFila ? 0 : 260 + VAO
+  const tetoComFicha = area.tela - TRILHO - MARGEM_ASSISTENTE - (fila + 292 + CONVERSA_LEGIVEL) - VAO
   const semFicha = encaixado && tetoComFicha < ASSISTENTE.min
   // Sem a ficha, a conversa também fica em 560 se o painel ainda couber no mínimo; senão (telas de ~1180 a 1243 px) cai ao 320 de antes.
-  const tetoSemFicha = (conversa) => area.tela - TRILHO - MARGEM_ASSISTENTE - (260 + conversa) - VAO
+  const tetoSemFicha = (conversa) => area.tela - TRILHO - MARGEM_ASSISTENTE - (fila + conversa)
   const conversaMinima = semFicha && tetoSemFicha(CONVERSA_LEGIVEL) < ASSISTENTE.min ? CONVERSA_MINIMA : CONVERSA_LEGIVEL
   const tetoEmpurrando = semFicha ? tetoSemFicha(conversaMinima) : tetoComFicha
   const empurra = encaixado && tetoEmpurrando >= ASSISTENTE.min
@@ -245,6 +249,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     raiz.style.setProperty('--assistente-conversa-minima', `${conversaMinima}px`)
     raiz.dataset.assistenteEmpurra = ladoEfetivo === 'esquerda' ? 'esquerda' : 'direita'
     if (semFicha) raiz.dataset.assistenteSemFicha = ''
+    if (semFila) raiz.dataset.assistenteSemFila = ''
     let desmedir = null
     if (encaixadoTablet) {
       raiz.dataset.assistenteTablet = ''
@@ -272,9 +277,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       raiz.style.removeProperty('--assistente-conversa-minima')
       delete raiz.dataset.assistenteEmpurra
       delete raiz.dataset.assistenteSemFicha
+      delete raiz.dataset.assistenteSemFila
       delete raiz.dataset.assistenteTablet
     }
-  }, [reserva, ladoEfetivo, semFicha, conversaMinima, encaixadoTablet])
+  }, [reserva, ladoEfetivo, semFicha, semFila, conversaMinima, encaixadoTablet])
 
   // Altura medida para o solto não passar da borda de baixo quando o conteúdo cresce. O
   // ResizeObserver entrega a primeira medida logo depois do layout, antes de pintar.
@@ -333,7 +339,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     width: `${larguraPainel}px`,
     ...(solto ? { left: `${posicao.x}px`, top: `${posicao.y}px`, right: 'auto', bottom: 'auto' } : {}),
   }
-  const classePainel = [css.painel, !celular && ladoEfetivo === 'esquerda' ? css.painelEsquerda : '', solto ? css.painelSolto : '']
+  // #3392: perto do mínimo (a 1280, à esquerda e com a Ficha) os botões do cabeçalho cedem para o X caber.
+  const classePainel = [css.painel, !celular && ladoEfetivo === 'esquerda' ? css.painelEsquerda : '', solto ? css.painelSolto : '', !celular && larguraPainel < 344 ? css.painelEstreito : '']
     .filter(Boolean).join(' ')
   // #3322: alça e botão Largura mudam a largura pela mesma função.
   const mudarLargura = (valor) => definirPosicaoPainel({ largura: valor })

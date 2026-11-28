@@ -293,6 +293,8 @@ function PainelDaConversa({
           {cardapioNoCabecalho && <Botao variante="secundario" className={css.cardapioNoCabecalho} aria-haspopup="dialog" onClick={() => abrirModal('cardapio')}>
             <Icone nome="cardapio" tamanho={20} /><span className={css.rotuloCardapio}>Enviar cardápio</span>
           </Botao>}
+          {/* #3392: no tablet a Moldura planta aqui o botão da Ficha (gaveta); no desktop e no celular fica vazia. */}
+          <span className={css.ancoraAssistente} data-ancora-ficha />
           <span className={css.ancoraAssistente} data-ancora-assistente />
           {/* #3386 (r7, H4): sem itens o menu não existe e, ao assumir, ele entrava e empurrava "Enviar cardápio" e o Assistente 48 px;
               a reserva do mesmo tamanho mantém os dois onde estavam (só no desktop, onde o cardápio está no cabeçalho). */}
