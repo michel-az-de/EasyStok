@@ -15118,8 +15118,43 @@ function pairingInvalidMessage() {
     ? 'Conexão do aparelho inválida. Abra o Início para conectar de novo.'
     : 'Pareamento invalidado. Abra Ajustes > Diagnóstico para parear de novo.';
 }
+// #3424: a recarga que mostra a mudança do servidor espera enquanto isto for verdade. Ela fecharia o que está
+// aberto e apagaria o que só existe na memória: o pedido em construção e a contagem de produção. O rascunho só
+// conta na tela dele; abandonado em outra, não segura a recarga para sempre. Campo focado só conta com
+// texto: no Android o foco fica no campo depois que o teclado fecha.
+const SELETOR_DIALOGO_ABERTO = '[class*="overlay"].show, [class*="overlay"].open, .modal.show, '
+  + '[role="dialog"].show, [role="dialog"].open, .ipr-overlay:not([hidden])';
+function telaOcupada() {
+  if (document.querySelector(SELETOR_DIALOGO_ABERTO)) return true;
+  // Em qualquer aba de Pedidos: conferir o Andamento não descarta o pedido em construção, a recarga sim. O
+  // Andamento se redesenha enquanto espera (redesenharEnquantoEspera), então não fica velho.
+  if (currentScreen === 'pedidos' && (currentOrderItems.length > 0 || selectedClient)) return true;
+  if (currentScreen === 'producao' && products.some(p => p && p.count > 0)) return true;
+  const el = document.activeElement;
+  if (!el) return false;
+  if (el.isContentEditable) return !!String(el.textContent || '').trim();
+  const tag = String(el.tagName || '').toUpperCase();
+  const deTexto = tag === 'TEXTAREA'
+    || (tag === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color)$/i.test(el.type || 'text'));
+  return deTexto && !!String(el.value || '').trim();
+}
+// #3424: registro aberto num formulário de edição. Se o servidor mudar este mesmo registro, a recarga sai na hora,
+// como antes: salvar o formulário depois devolveria ao servidor o valor antigo dos campos que ela não tocou.
+function registrosEmEdicao() {
+  return { client: editingClientId, product: editingProductId, cashEntry: editingCashEntryId };
+}
+// #3424: com a recarga adiada pelo pedido em construção, o quadro do Andamento mostra já os pedidos que o
+// servidor trouxe (o estado em memória já os tem). Só o quadro: o rascunho e o diálogo aberto ficam como estão.
+function redesenharEnquantoEspera() {
+  // Menu "Mais ações" aberto num card: redesenhar o fecharia e mudaria o quadro sob o dedo.
+  if (currentScreen !== 'pedidos' || document.querySelector(SELETOR_DIALOGO_ABERTO + ', #kanban details[open]')) return;
+  renderKanban();
+}
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
+  telaOcupada,
+  registrosEmEdicao,
+  redesenharEnquantoEspera,
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },

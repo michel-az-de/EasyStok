@@ -1315,6 +1315,62 @@
     return type === 'client' && payload.apt && !payload.address ? Object.assign({}, payload, { address: 'Apto ' + payload.apt }) : payload;
   }
 
+  // #3424: o registro que veio do servidor entra também na base do diff. Com a recarga adiada, um save da
+  // operadora no meio devolveria ao servidor a venda de outro canal como edição deste aparelho.
+  const _CHAVE_NO_SNAPSHOT = { client: 'clients', order: 'orders', cashEntry: 'cashEntries', batch: 'batches' };
+  function _espelharNoSnapshot(type, registro) {
+    const base = lastSnapshot && lastSnapshot[_CHAVE_NO_SNAPSHOT[type]];
+    if (!Array.isArray(base)) return;
+    const copia = JSON.parse(JSON.stringify(type === 'batch' ? stripBatchPhotoBytes(registro) : registro));
+    const i = base.findIndex(x => x && x.id === registro.id);
+    if (i >= 0) base[i] = copia; else base.push(copia);
+  }
+
+  // #3424: a recarga que mostra a mudança do servidor espera a tela ficar livre (cdbApp.telaOcupada). Recarregar
+  // com modal aberto ou pedido em construção fechava o que a operadora fazia. O dado já está no estado e no
+  // armazenamento; só o redesenho espera, e várias mudanças no meio tempo viram uma recarga.
+  const _ESPERA_TELA_LIVRE_MS = 500;
+  let _recargaPendente = false;
+  let _recargaAgora = false;
+  function _telaOcupada() {
+    try { return !!(window.cdbApp && typeof window.cdbApp.telaOcupada === 'function' && window.cdbApp.telaOcupada()); }
+    catch (_) { return false; }
+  }
+  // Registro que o servidor mudou e que está aberto num formulário de edição: esperar seria pior que recarregar,
+  // porque salvar o formulário devolveria ao servidor o valor antigo dos campos que a operadora não tocou.
+  // Campos que o save do formulário de edição grava (app-nucleo.js: saveNewProduct, saveNewClient e o save do lançamento de caixa).
+  // Só mudança do servidor num deles corre risco de ser desfeita pelo save; o resto (saldo, última compra) o save
+  // conserva, porque grava no próprio objeto ou faz spread dele.
+  const _CAMPOS_DO_FORMULARIO = {
+    product: ['name', 'emoji', 'category', 'unit', 'price', 'cost', 'minStock', 'defaultValidityDays'],
+    client: ['name', 'address', 'phone', 'document', 'documentType'],
+    cashEntry: ['type', 'amount', 'description', 'metodo']
+  };
+  function _mudouCampoDoFormulario(type, local, doServidor) {
+    const servidor = _paraComparar(type, doServidor);
+    return (_CAMPOS_DO_FORMULARIO[type] || []).some(k => Object.prototype.hasOwnProperty.call(servidor, k)
+      && !(local[k] == null && servidor[k] == null) && JSON.stringify(local[k]) !== JSON.stringify(servidor[k]));
+  }
+  function _emEdicao(type, id) {
+    try {
+      const abertos = window.cdbApp && typeof window.cdbApp.registrosEmEdicao === 'function' ? window.cdbApp.registrosEmEdicao() : null;
+      return !!(abertos && abertos[type] != null && abertos[type] === id);
+    } catch (_) { return false; }
+  }
+  function _recarregarQuandoLivre(agora) {
+    if (_recargaPendente) { if (agora) _recargaAgora = true; return; }
+    _recargaPendente = true;
+    _recargaAgora = !!agora;
+    const tentar = async () => {
+      if (_recargaAgora || !_telaOcupada()) {
+        try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
+        if (_recargaAgora || !_telaOcupada()) { _recargaPendente = false; _recargaAgora = false; location.reload(); return; }
+      }
+      setTimeout(tentar, _ESPERA_TELA_LIVRE_MS);
+    };
+    setTimeout(tentar, 100);
+  }
+
   function applyServerMutations(mutations, unresolved = []) {
     _pullDeferred = syncHeldForImport();
     if (_pullDeferred) return false;
@@ -1324,6 +1380,7 @@
     if (!window.cdbApp) return false;
     const state = window.cdbApp.getState();
     let changed = false;
+    let recarregarJa = false;
     let errorsThisBatch = 0;
     mutations.forEach(m => {
       try {
@@ -1364,10 +1421,13 @@
         // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
         // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.
         if (type === 'batch' && op === 'upsert' && idx >= 0) {
+          const baseLote = lastSnapshot && Array.isArray(lastSnapshot.batches) ? lastSnapshot.batches.find(x => x && x.id === m.payload.id) : null;
           _MARCAS_DE_LOTE.forEach(k => {
             const novo = m.payload[k] == null ? undefined : m.payload[k];
             if (coll[idx][k] == novo || (!coll[idx][k] && !novo)) return;
             if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
+            // #3424: a marca do servidor não é edição deste aparelho; o snapshot a recebe também.
+            if (baseLote) { if (novo === undefined) delete baseLote[k]; else baseLote[k] = JSON.parse(JSON.stringify(novo)); }
             changed = true;
           });
           // #2209: o número entra sem recarregar; o servidor antigo, sem o campo, não o apaga.
@@ -1386,6 +1446,8 @@
 
         if (op === 'upsert') {
           if (type === 'product' && idx >= 0 && !Object.prototype.hasOwnProperty.call(m.payload, 'photo') && coll[idx].photo) m.payload = { ...m.payload, photo: coll[idx].photo };
+          // #3424: a contagem de produção em andamento só existe no aparelho; com a recarga adiada ela continua na tela.
+          if (type === 'product' && idx >= 0 && !Object.prototype.hasOwnProperty.call(m.payload, 'count') && coll[idx].count) m.payload = { ...m.payload, count: coll[idx].count };
           // #3325: o aparelho já tem este registro. Não marca mudança, senão a tela recarrega a cada pull enquanto
           // a janela do cursor reenvia a mesma venda. Regrava a coleção porque o registro pode estar só na memória
           // (a gravação da tentativa anterior falhou): se falhar de novo o lote conta erro e o cursor não avança.
@@ -1393,9 +1455,13 @@
             localStorage.setItem(map.storage, JSON.stringify(coll));
             return;
           }
-          if (idx >= 0) coll[idx] = m.payload;
+          // #3424: troca no mesmo objeto. Com a recarga adiada, o modal aberto e o cliente escolhido no pedido
+          // seguem apontando para ele; um objeto novo deixaria a edição da operadora num registro fora da coleção.
+          if (idx >= 0 && _emEdicao(type, m.payload.id) && _mudouCampoDoFormulario(type, coll[idx], m.payload)) recarregarJa = true;
+          if (idx >= 0) { Object.keys(coll[idx]).forEach(k => { delete coll[idx][k]; }); Object.assign(coll[idx], m.payload); }
           else coll.push(m.payload);
           changed = true;
+          if (type !== 'product') _espelharNoSnapshot(type, idx >= 0 ? coll[idx] : m.payload);
           // #1520: saldo que veio do servidor nao e movimento deste aparelho. Sem isto, um
           // save antes do reload devolvia a diferenca ao servidor como "stock.delta".
           if (type === 'product') {
@@ -1406,7 +1472,7 @@
             if (i >= 0) base[i] = copia; else base.push(copia);
           }
         } else if (op === 'delete') {
-          if (idx >= 0) { coll.splice(idx, 1); changed = true; }
+          if (idx >= 0) { coll.splice(idx, 1); changed = true; if (_emEdicao(type, m.payload.id)) recarregarJa = true; }
         }
         localStorage.setItem(map.storage, JSON.stringify(coll));
       } catch (e) {
@@ -1439,11 +1505,12 @@
     if (changed && errorsThisBatch > 0) _telaDesatualizada = true;
     if (errorsThisBatch === 0 && _telaDesatualizada) { changed = true; _telaDesatualizada = false; }
     if (changed && errorsThisBatch === 0) {
-      console.log('Mudanças do servidor aplicadas, recarregando...');
-      (async () => {
-        try { await flush(); } catch (e) { console.warn('flush before reload falhou', e); }
-        setTimeout(() => location.reload(), 100);
-      })();
+      console.log('Mudanças do servidor aplicadas, recarregando quando a tela estiver livre...');
+      _recarregarQuandoLivre(recarregarJa);
+      if (!recarregarJa && mutations.some(m => m && typeof m.type === 'string' && m.type.indexOf('order.') === 0) && _telaOcupada()) {
+        try { if (typeof window.cdbApp.redesenharEnquantoEspera === 'function') window.cdbApp.redesenharEnquantoEspera(); }
+        catch (e) { console.warn('redesenho enquanto espera falhou', e); }
+      }
     }
     return errorsThisBatch === 0 && !_pullDeferred;
   }
