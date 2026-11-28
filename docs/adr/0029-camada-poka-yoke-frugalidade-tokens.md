@@ -91,6 +91,13 @@ Fatias (cada uma commit build-verde em master, fecha com `closes #N`), rastreada
 
 Continua dentro do arcabouço da ADR-0025 (meta-lint estático, sem browser/E2E). Não altera a decisão original; só amplia a cobertura do Pilar 1 (manifesto) e do Pilar 4 (gates) ao segundo frontend.
 
+**2026-11-28 (#3401) — lint logo depois da edição no Console (Classe M, nova: referência inventada pelo agente).** O erro típico de código escrito por IA no `EasyStock.Console` (import de arquivo, pacote ou export que não existe, variável sem uso, hook do React condicional) só caía no `npm run qualidade` ou no CI, várias edições depois. O oxlint 1.85 já instalado pega export inventado (`import/named`, `import/default`, `import/namespace`), variável sem uso e hook fora de ordem, mas não tem `import/no-unresolved`: `import x from './naoExiste'` passava. Entram:
+- regra `local/import-existe` (`EasyStock.Console/ferramentas/oxlint-local.mjs`, jsPlugin do oxlint, alpha): relativo sem arquivo ou com caixa errada no nome, pacote fora do `package.json`;
+- as cinco regras como `error` no `.oxlintrc.json` (o `src` tinha 3 `no-unused-vars`, corrigidos; os 263 avisos antigos ficam);
+- hook `PostToolUse` de `Edit|Write|MultiEdit` (`scripts/poka-yoke/posttooluse-lint-console.{cmd,mjs}`): fast-gate `findstr` no mesmo padrão deste ADR, oxlint só no arquivo tocado e só erros, até 10 linhas em `{"decision":"block"}` com exit 0. Pelo Pilar 5 é aviso contextual: a edição já aconteceu, e o import de um arquivo que o agente cria no passo seguinte é legítimo; o gate continua sendo o `npm run lint`.
+
+Prova em `ferramentas/prova-3401-lint-na-edicao.mjs` (entra no `npm run provas`); o `console.yml` passa a rodar quando o hook muda.
+
 ## Referências
 - #530 (épico), #531 (Fatia 1), #705 (paridade Admin).
 - Fase 0 (2026-06-08): forense de git, auditoria de gates, leitura de `.csproj`/`.husky`/CI.

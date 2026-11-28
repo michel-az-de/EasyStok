@@ -19,6 +19,21 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd",
+            "args": [
+              "/d",
+              "/c",
+              "${CLAUDE_PROJECT_DIR}\\scripts\\poka-yoke\\posttooluse-lint-console.cmd"
+            ],
+            "timeout": 30
+          }
+        ]
+      },
+      {
         "matcher": "Bash|PowerShell",
         "hooks": [
           {

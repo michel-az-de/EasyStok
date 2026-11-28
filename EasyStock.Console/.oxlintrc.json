@@ -8,6 +8,9 @@
     "unicorn",
     "oxc"
   ],
+  "jsPlugins": [
+    "./ferramentas/oxlint-local.mjs"
+  ],
   "env": {
     "browser": true,
     "es2024": true
@@ -34,6 +37,11 @@
     "import/no-cycle": "error",
     "import/no-self-import": "error",
     "import/no-duplicates": "error",
+    "import/named": "error",
+    "import/default": "error",
+    "import/namespace": "error",
+    "local/import-existe": "error",
+    "no-unused-vars": "error",
     "eqeqeq": [
       "error",
       "smart"
