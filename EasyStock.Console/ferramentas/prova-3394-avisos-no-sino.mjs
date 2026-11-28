@@ -444,12 +444,15 @@ try {
   // 9c. Ctrl+clique abre noutra aba: lê, mas o painel fica aberto, esta aba não troca de tela e o foco, com o link fora
   //     da lista, vai para o próximo não lido, não para o body.
   //     #3413: a espera da aba se arma antes do clique, para não perder o evento, mas o prazo só conta depois dele. Antes
-  //     eram 3 s contados antes do clique, que também espera o link ficar clicável; num runner lento o prazo acabava
-  //     com a aba a caminho. Depois do clique a aba chega em menos de 1 s, mesmo com a CPU 60 vezes mais lenta.
+  //     eram 3 s contados antes do clique, que também espera o link ficar clicável; num runner lento o prazo podia acabar
+  //     com a aba a caminho (reproduzido com o link lento). Depois do clique a aba chega em menos de 1 s, mesmo com a CPU
+  //     60 vezes mais lenta.
   const ESPERA_ABA_MS = 10000
   const abaNova = destinos.context.waitForEvent('page', { timeout: 0 }).catch(() => null)
   await linha('e3').getByRole('link', { name: 'Produto Vencido', exact: true }).click({ modifiers: ['Control'] })
-  const outra = await Promise.race([abaNova, new Promise((resolve) => setTimeout(() => resolve(null), ESPERA_ABA_MS))])
+  let prazoDaAba
+  const outra = await Promise.race([abaNova, new Promise((resolve) => { prazoDaAba = setTimeout(() => resolve(null), ESPERA_ABA_MS) })])
+  clearTimeout(prazoDaAba)
   assert.ok(outra, `o Ctrl+clique chegou ao link, mas nenhuma aba abriu em ${ESPERA_ABA_MS / 1000} s: veja se o abrirDestino do SinoDaSessao passou a chamar preventDefault com Ctrl`)
   await outra.close()
   assert.ok(await painel(pd).isVisible(), 'o Ctrl+clique fechou o painel desta aba')
