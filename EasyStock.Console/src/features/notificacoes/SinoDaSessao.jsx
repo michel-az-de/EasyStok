@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
-import { Modal } from '../../componentes/Modal'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
+import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
+import { agruparAvisos, posicaoDoPainel } from '../../dominio/avisosDaSessao'
 import { diaMesHora, idadeDoAviso } from '../../dominio/formato'
+import { useEscape } from '../../hooks/useEscape'
 import css from './notificacoes.module.css'
 
 const gravidade = { Critica: 'Crítica', Alta: 'Alta', Media: 'Média', Informativa: 'Informativa' }
 const tom = { Critica: 'perigo', Alta: 'aviso', Media: 'aviso', Informativa: 'info' }
+const iconeDaGravidade = { Critica: 'alerta', Alta: 'alerta', Media: 'bell', Informativa: 'dica' }
 const textoAparelho = {
   desligado: 'Receba avisos desta conta mesmo com o sistema fechado.',
   ativando: 'Aguarde a confirmação do navegador…',
@@ -17,36 +22,136 @@ const textoAparelho = {
   'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
   indisponivel: 'Este navegador não oferece avisos com o sistema fechado.',
 }
+// #3394: como o MenuDaConta (#1872), o painel sobe para a camada de topo do navegador: nenhum ancestral com
+// transform ou overflow (o trilho rola, o menu do tablet é um <dialog>) o recorta ou desloca. Sem popover, fixed.
+const COM_POPOVER = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype
 
+// #3394: os Avisos abriam num Modal central, com fundo escuro, que tirava a pessoa do que fazia. Agora abrem
+// num painel junto ao sino, como nas redes: abas Não lidas e Todas, grupos por dia, ponto de não lida, leitura
+// na hora (com volta se a API recusar) e Marcar todas com confirmação. O painel é irmão do botão, sem caixa em
+// volta, porque o CSS do topo, do trilho e do hall posiciona os pontos pelo `> button`.
 export function SinoDaSessao({ avisos, aparelho }) {
   const [aberto, setAberto] = useState(false)
-  const { total, recentes, erro, carregando, lendo, carregar, marcarLida } = avisos
-  const atualizarRef = useRef(null)
-  const leituraRef = useRef(null)
+  const [aba, setAba] = useState('naoLidas')
+  const [confirmandoTodas, setConfirmandoTodas] = useState(false)
+  const [balancar, setBalancar] = useState(false)
+  // A idade ("há 3 min") se mede na hora de abrir; o painel aberto é curto e não precisa de relógio próprio.
+  const [agora, setAgora] = useState(() => Date.now())
+  const { total, recentes, erro, carregando, falha, chegaram, todas, carregar, carregarTodas, marcarLida, marcarTodas, aoFecharPainel } = avisos
+  const botaoRef = useRef(null)
+  const painelRef = useRef(null)
+  const focoDepoisRef = useRef(null)
+  const totalAnteriorRef = useRef(total)
+  const idPainel = useId()
+
+  // O sino balança quando chega aviso (o total sobe), não a cada leitura. Movimento reduzido: base.css encurta.
   useEffect(() => {
-    if (!lendo && leituraRef.current && !leituraRef.current.isConnected) {
-      atualizarRef.current?.focus()
-      leituraRef.current = null
+    if (total > (totalAnteriorRef.current ?? total)) setBalancar(true)
+    totalAnteriorRef.current = total
+  }, [total])
+
+  const fechar = useCallback(({ devolverFoco = true } = {}) => {
+    setAberto(false)
+    setConfirmandoTodas(false)
+    aoFecharPainel()
+    if (devolverFoco) botaoRef.current?.focus()
+  }, [aoFecharPainel])
+  const abrir = () => {
+    setAba('naoLidas')
+    setAgora(Date.now())
+    setAberto(true)
+    carregar()
+  }
+  // Esc fecha só o painel: sem o preventDefault o <dialog> do menu do tablet também recebia o cancel (MenuDaConta).
+  useEscape(aberto, useCallback((evento) => { evento.preventDefault(); fechar() }, [fechar]))
+  useEffect(() => {
+    if (!aberto) return undefined
+    const aoTocarFora = (evento) => {
+      if (!botaoRef.current?.contains(evento.target) && !painelRef.current?.contains(evento.target)) fechar({ devolverFoco: false })
     }
-  }, [lendo, recentes])
+    document.addEventListener('pointerdown', aoTocarFora)
+    return () => document.removeEventListener('pointerdown', aoTocarFora)
+  }, [aberto, fechar])
+
+  // Mede o sino e põe o painel no lugar dele (trilho, topo ou folha do celular); refaz quando a janela muda, a
+  // página rola ou o conteúdo do painel cresce.
+  useLayoutEffect(() => {
+    const painel = painelRef.current
+    if (!aberto || !painel) return undefined
+    if (COM_POPOVER && !painel.matches(':popover-open')) painel.showPopover()
+    let quadro = null
+    const medir = () => {
+      quadro = null
+      const ancora = botaoRef.current?.getBoundingClientRect()
+      if (!ancora) return
+      Object.assign(painel.style, { maxHeight: '' })
+      const lugar = posicaoDoPainel({ ancora, janela: { largura: window.innerWidth, altura: window.innerHeight }, alturaDoPainel: painel.offsetHeight })
+      painel.dataset.lado = lugar.lado
+      Object.assign(painel.style, {
+        top: `${lugar.top}px`, maxHeight: `${lugar.maxHeight}px`,
+        left: lugar.left === undefined ? 'auto' : `${lugar.left}px`, right: lugar.right === undefined ? 'auto' : `${lugar.right}px`,
+        width: lugar.width === undefined ? 'auto' : `${lugar.width}px`,
+      })
+    }
+    const agendar = (evento) => {
+      if (evento?.type === 'scroll' && painel.contains(evento.target)) return
+      if (quadro === null) quadro = requestAnimationFrame(medir)
+    }
+    medir()
+    const observador = new ResizeObserver(() => agendar())
+    observador.observe(painel)
+    window.addEventListener('resize', agendar)
+    document.addEventListener('scroll', agendar, true)
+    return () => {
+      observador.disconnect()
+      window.removeEventListener('resize', agendar)
+      document.removeEventListener('scroll', agendar, true)
+      if (quadro !== null) cancelAnimationFrame(quadro)
+    }
+  }, [aberto])
+
+  // Ao abrir, o foco vai para a aba ativa; depois de ler um aviso, para o próximo da lista (o botão lido sumiu).
+  useEffect(() => {
+    if (!aberto) return
+    const painel = painelRef.current
+    const alvo = focoDepoisRef.current
+    focoDepoisRef.current = null
+    const proximo = alvo ? painel?.querySelector(`[data-aviso="${CSS.escape(alvo)}"] button`) : null
+    ;(proximo || (alvo !== null || !painel?.contains(document.activeElement) ? painel?.querySelector('[role="tab"][aria-selected="true"]') : null))?.focus()
+  }, [aberto, recentes, todas.itens])
+
+  const trocarAba = (id) => {
+    setAba(id)
+    setConfirmandoTodas(false)
+    if (id === 'todas') carregarTodas()
+  }
+  const ler = (aviso, lista) => {
+    const indice = lista.findIndex((a) => a.id === aviso.id)
+    const vizinho = lista.slice(indice + 1).find((a) => !a.lida) ?? lista.slice(0, indice).reverse().find((a) => !a.lida)
+    focoDepoisRef.current = vizinho?.id ?? ''
+    marcarLida(aviso.id)
+  }
+
   // #1989: quem ainda não ativou neste aparelho vê um ponto discreto no sino; o caminho fica dentro.
   const semAvisoNoAparelho = ['desligado', 'bloqueado'].includes(aparelho?.estado)
   // #2258 (auditoria A8, H11, A12): o caminho para ligar os avisos do aparelho vem ANTES da lista quando
-  // eles estão desligados, e os dois botões ganham ícone e cara de botão.
+  // eles estão desligados; ligado, vira uma linha discreta no pé do painel.
   const secaoDoAparelho = aparelho && (
-      <section className={css.aparelho} aria-label="Avisos neste aparelho">
-        <div>
-          <h3>Avisos neste aparelho</h3>
-          <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
-        </div>
-        {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao icone="bell" onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
-        {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
-      </section>
+    <section className={`${css.aparelho} ${semAvisoNoAparelho ? css.aparelhoDesligado : ''}`} aria-label="Avisos neste aparelho">
+      <Icone nome={semAvisoNoAparelho ? 'bloqueio' : 'bell'} tamanho={20} className={css.iconeAparelho} />
+      <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
+      {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao icone="bell" onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar neste aparelho</Botao>}
+      {['ativo', 'desativando'].includes(aparelho.estado) && <Botao variante="texto" onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar</Botao>}
+    </section>
   )
+  const naoLidas = total ?? recentes.length
+  const lista = aba === 'naoLidas' ? recentes : todas.itens
   return <>
-    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos desligados neste aparelho' : ''}`}
+    <Botao ref={botaoRef} variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos desligados neste aparelho' : ''}`}
       title={semAvisoNoAparelho ? 'Avisos desligados neste aparelho: abra e toque em Ativar' : undefined}
-      aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
+      className={balancar ? css.balanca : undefined} onAnimationEnd={() => setBalancar(false)}
+      aria-haspopup="dialog" aria-expanded={aberto} aria-controls={aberto ? idPainel : undefined}
+      onClick={() => (aberto ? fechar() : abrir())}>
       {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
       <span>Avisos</span>
       {/* #2762 (VF14): o erro vira ponto sobre o sino; o aria-label já diz "sem atualizar". */}
@@ -54,36 +159,95 @@ export function SinoDaSessao({ avisos, aparelho }) {
       {!erro && total > 0 && <Pilula contagem={total > 99 ? '99+' : total} tom="perigo" aria-hidden="true" data-contador-sino />}
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" title="Avisos desligados neste aparelho" />}
     </Botao>
-    {aberto && <Modal titulo="Avisos" largura="md" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
-      aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
-      {erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
-      {carregando && <p role="status" className={css.resumo}>Atualizando avisos…</p>}
-      {!erro && !carregando && total === 0 && <Vazio titulo="Nenhum aviso pendente" icone="check" role="status">Os novos avisos aparecem aqui.</Vazio>}
-      {total > 0 && <div className={css.resumo}>
-        <strong>{total} {total === 1 ? 'aviso não lido' : 'avisos não lidos'}</strong>
-        <span>Mostrando {recentes.length} de {total}. Os próximos aparecem conforme você marca como lidos.</span>
-      </div>}
-      {semAvisoNoAparelho && secaoDoAparelho}
-      <ul className={css.lista} aria-label="Avisos não lidos" aria-busy={carregando || Boolean(lendo)}>
-        {recentes.map((aviso) => { const idade = idadeDoAviso(aviso.createdAt, Date.now()); return <li key={aviso.id} className={css.aviso}>
-          <div className={css.texto}>
-            <div className={css.cabecaAviso}>
-              <Pilula tom={tom[aviso.severidade] ?? 'neutro'} fina>{gravidade[aviso.severidade] ?? aviso.severidade}</Pilula>
-              {/* #2303: o aviso diz quando nasceu; o de 14 dias não se passa por novo. */}
-              {idade && <time className={css.quando} dateTime={aviso.createdAt} title={diaMesHora(aviso.createdAt)}>{idade}</time>}
+    {aberto && (
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- o Tab que sai do painel o fecha, como no Popover de diálogo (#3300).
+      <section ref={painelRef} id={idPainel} className={css.painel} role="dialog" aria-label="Avisos" data-painel-avisos
+        popover={COM_POPOVER ? 'manual' : undefined}
+        onBlur={(evento) => {
+          if (evento.relatedTarget && !evento.currentTarget.contains(evento.relatedTarget) && evento.relatedTarget !== botaoRef.current) fechar({ devolverFoco: false })
+        }}>
+        <header className={css.cabecalho}>
+          <h2>Avisos</h2>
+          <BotaoIcone icone="refresh-cw" rotulo="Atualizar avisos"
+            onClick={() => { setAgora(Date.now()); if (aba === 'todas') carregarTodas(); else carregar() }} disabled={carregando || todas.carregando} />
+          {aba === 'naoLidas' && naoLidas > 0 && !confirmandoTodas && (
+            <Botao variante="texto" icone="circle-check" onClick={() => setConfirmandoTodas(true)}>Marcar todas como lidas</Botao>
+          )}
+        </header>
+        {confirmandoTodas && (
+          <div className={css.confirmacao}>
+            <p>Marcar {naoLidas === 1 ? 'o aviso' : `os ${naoLidas} avisos`} como {naoLidas === 1 ? 'lido' : 'lidos'}? Os avisos gerais saem da lista da equipe toda.</p>
+            <div>
+              <Botao variante="texto" onClick={() => setConfirmandoTodas(false)}>Cancelar</Botao>
+              <Botao variante="primario" onClick={() => { setConfirmandoTodas(false); focoDepoisRef.current = ''; marcarTodas() }}>Sim, marcar todas</Botao>
             </div>
-            <h3>{aviso.titulo || 'Aviso'}</h3>
-            <p>{aviso.mensagem}</p>
           </div>
-          <Botao icone="check" onClick={(evento) => {
-            leituraRef.current = evento.currentTarget
-            marcarLida(aviso.id)
-          }} disabled={carregando || Boolean(lendo)} aria-label={`Marcar como lido: ${aviso.titulo || 'Aviso'}`}>
-            {lendo === aviso.id ? 'Salvando…' : 'Marcar como lido'}
-          </Botao>
-        </li> })}
-      </ul>
-      {!semAvisoNoAparelho && secaoDoAparelho}
-    </Modal>}
+        )}
+        <BarraDeAbas className={css.abas} rotulo="Quais avisos" prefixoId={`${idPainel}-aba`} idPainel={`${idPainel}-lista`} ativa={aba} aoTrocar={trocarAba}
+          abas={[
+            { id: 'naoLidas', rotulo: 'Não lidas', nome: total === null ? 'Não lidas' : `Não lidas, ${naoLidas}`, contador: naoLidas > 0 ? naoLidas : null, tom: 'alerta' },
+            { id: 'todas', rotulo: 'Todas' },
+          ]} />
+        <div className={css.corpo} id={`${idPainel}-lista`} role="tabpanel" aria-labelledby={`${idPainel}-aba-${aba}`}
+          aria-busy={aba === 'todas' ? todas.carregando : carregando}>
+          {falha && <p role="alert" className={css.erro}>{falha}</p>}
+          {aba === 'naoLidas' && erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
+          {aba === 'todas' && todas.erro && <p role="alert" className={css.erro}>Sem atualizar: {todas.erro}</p>}
+          {semAvisoNoAparelho && secaoDoAparelho}
+          {aba === 'naoLidas' && !erro && !carregando && naoLidas === 0 && recentes.length === 0 && (
+            <Vazio titulo="Tudo em dia" icone="check" role="status">Nenhum aviso para ler. Os novos aparecem aqui e o sino balança.</Vazio>
+          )}
+          {aba === 'todas' && !todas.erro && !todas.carregando && todas.itens.length === 0 && (
+            <Vazio titulo="Nenhum aviso ainda" icone="bell" role="status">Quando a loja tiver um aviso, ele fica guardado aqui.</Vazio>
+          )}
+          {lista.length === 0 && (aba === 'todas' ? todas.carregando : carregando) && <p role="status" className={css.resumo}>Carregando avisos…</p>}
+          <ListaDeAvisos avisos={lista} agora={agora} chegaram={chegaram} aoLer={(aviso) => ler(aviso, lista)} />
+          {aba === 'naoLidas' && naoLidas > recentes.length && recentes.length > 0 && (
+            <p className={css.resumo}>Mostrando {recentes.length} de {naoLidas}. Os próximos aparecem conforme você lê.</p>
+          )}
+          {aba === 'todas' && todas.pagina < todas.paginas && (
+            <Botao variante="texto" largo onClick={() => carregarTodas({ mais: true })} disabled={todas.carregando}>
+              {todas.carregando ? 'Carregando…' : `Ver mais (${todas.total - todas.itens.length})`}
+            </Botao>
+          )}
+        </div>
+        {!semAvisoNoAparelho && secaoDoAparelho}
+      </section>
+    )}
   </>
+}
+
+// Uma linha por aviso, agrupada por dia. Não lido: fundo tingido, título forte, ponto e o botão de ler.
+function ListaDeAvisos({ avisos, agora, chegaram, aoLer }) {
+  return agruparAvisos(avisos, agora).map((grupo) => (
+    <section key={grupo.titulo} className={css.grupo} aria-label={grupo.titulo}>
+      <h3>{grupo.titulo}</h3>
+      <ul className={css.lista}>
+        {grupo.avisos.map((aviso) => {
+          const naoLida = !aviso.lida
+          const idade = idadeDoAviso(aviso.createdAt, agora)
+          return (
+            <li key={aviso.id} data-aviso={aviso.id} data-tom={tom[aviso.severidade] ?? 'neutro'}
+              className={`${css.aviso} ${naoLida ? css.naoLida : ''} ${chegaram.includes(aviso.id) ? css.chegou : ''}`}>
+              <span className={css.selo} aria-hidden="true"><Icone nome={iconeDaGravidade[aviso.severidade] ?? 'bell'} tamanho={20} /></span>
+              <div className={css.texto}>
+                {naoLida && <span className="sr">Não lido.</span>}
+                <h4>{aviso.titulo || 'Aviso'}</h4>
+                {aviso.mensagem && <p>{aviso.mensagem}</p>}
+                <div className={css.meta}>
+                  <Pilula tom={tom[aviso.severidade] ?? 'neutro'} fina>{gravidade[aviso.severidade] ?? aviso.severidade}</Pilula>
+                  {/* #2303: o aviso diz quando nasceu; o de 14 dias não se passa por novo. */}
+                  {idade && <time dateTime={aviso.createdAt} title={diaMesHora(aviso.createdAt)}>{idade}</time>}
+                </div>
+              </div>
+              {naoLida && <span className={css.ponto} data-nao-lida aria-hidden="true" />}
+              {/* #2258 (A8): ler tem cara de botão e ícone; só de ícone, passa pelo BotaoIcone (gramática h). */}
+              {naoLida && <BotaoIcone icone="check" tom="secundario" rotulo={`Marcar como lido: ${aviso.titulo || 'Aviso'}`} dica="Marcar como lido"
+                onClick={() => aoLer(aviso)} />}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  ))
 }
