@@ -127,16 +127,17 @@ export function SinoDaSessao({ avisos, aparelho }) {
     const proximo = alvo ? painel?.querySelector(`[data-aviso="${CSS.escape(alvo)}"] button`) : null
     ;(proximo || painel?.querySelector('[role="tab"][aria-selected="true"]'))?.focus()
   }, [aberto, recentes, todas.itens])
-  // O botão clicado some com a confirmação: o foco vai para Cancelar e, cancelando, volta para Marcar todas.
   // Atualizar e Ver mais ficam desligados enquanto carregam, e o navegador tira o foco de botão desligado: terminada
-  // a carga, o foco volta para quem foi clicado (como o "Atualizar avisos" do Modal antigo fazia).
+  // a carga, o foco volta para quem foi clicado; se ele sumiu (Ver mais da última página), vai para a aba ativa.
   const carregandoAgora = carregando || todas.carregando
   useEffect(() => {
     const botao = voltarDepoisDaCargaRef.current
     if (carregandoAgora || !botao) return
     voltarDepoisDaCargaRef.current = null
-    if (botao.isConnected && (document.activeElement === document.body || document.activeElement === null)) botao.focus()
+    if (document.activeElement !== document.body && document.activeElement !== null) return
+    ;(botao.isConnected ? botao : painelRef.current?.querySelector('[role="tab"][aria-selected="true"]'))?.focus()
   }, [carregandoAgora])
+  // O botão clicado some com a confirmação: o foco vai para Cancelar e, cancelando, volta para Marcar todas.
   useEffect(() => {
     if (confirmandoTodas) cancelarRef.current?.focus()
     else if (voltarParaMarcarTodasRef.current) marcarTodasRef.current?.focus()

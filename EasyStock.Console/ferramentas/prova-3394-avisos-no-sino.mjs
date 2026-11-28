@@ -114,7 +114,8 @@ const novaPagina = async ({ width = 1440, height = 900, escuro = false } = {}) =
       const todas = [...estado.naoLidas, ...estado.lidas].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       // A resposta se monta agora e só sai depois: é a resposta velha que chega depois de uma leitura.
       if (estado.atrasoTodasMs) await new Promise((r) => setTimeout(r, estado.atrasoTodasMs))
-      return ok(todas.slice(0, 20), { total: todas.length, pages: 1, page: 1, limit: 20 })
+      const pg = Number(url.searchParams.get('page') ?? 1), tam = Number(url.searchParams.get('pageSize') ?? 20)
+      return ok(todas.slice((pg - 1) * tam, pg * tam), { total: todas.length, pages: Math.max(1, Math.ceil(todas.length / tam)), page: pg, limit: tam })
     }
     if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
     if (caminho === '/api/atendimento/configuracao') return ok({})
@@ -319,6 +320,19 @@ try {
   await pagina.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Atualizar avisos', null, { timeout: 2000 })
     .catch(async () => assert.fail(`depois de Atualizar, o foco foi para ${await pagina.evaluate(() => document.activeElement?.tagName)}`))
   console.log('ok 8g: foco volta para Atualizar depois da carga')
+
+  // 8h. Ver mais da última página: o botão some, e o foco fica dentro do painel (senão sair com Tab não fecha).
+  for (let i = 1; i <= 12; i++) estado.lidas.push({ id: `v${i}`, tipo: 'Sistema', titulo: `Aviso velho ${i}`, mensagem: 'Lido.', severidade: 'Informativa', createdAt: minutosAtras(60 * 24 * (30 + i)), lida: true })
+  await abaNaoLidas.click()
+  await abaTodas.click()
+  const verMais = painel(pagina).getByRole('button', { name: /^Ver mais/ })
+  await verMais.focus()
+  await pagina.keyboard.press('Enter')
+  await verMais.waitFor({ state: 'detached', timeout: 3000 })
+  await pagina.waitForTimeout(100)
+  assert.ok(await pagina.evaluate(() => Boolean(document.activeElement?.closest('[data-painel-avisos]'))), 'depois do último Ver mais, o foco saiu do painel')
+  console.log('ok 8h: último Ver mais deixa o foco no painel')
+  await abaNaoLidas.click()
 
   // 8f. A consulta sozinha (a de 30 s, aqui pela volta à aba do navegador) não tira o foco de quem está no sino.
   await sinoBanca.focus()
