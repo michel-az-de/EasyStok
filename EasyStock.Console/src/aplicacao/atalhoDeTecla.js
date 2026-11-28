@@ -39,10 +39,15 @@ export function useAtalhosLigados() {
 
 export function atalhoLivre(e) {
   if (!lerAtalhosLigados()) return false
-  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat || e.defaultPrevented || e.isComposing) return false
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat || e.defaultPrevented || e.isComposing || e.keyCode === 229) return false
   if (e.shiftKey && e.key !== '/') return false
   if (e.target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role=group][popover], [role=dialog], [role=menu], [role=listbox], [role=combobox], dialog')) return false
-  return !document.querySelector('dialog[open]')
+  return !dialogoModalAberto()
+}
+
+// Só o diálogo modal tranca a página; a Gaveta da Ficha no tablet é um <dialog> não modal e J, K e "/" seguem com ela aberta.
+function dialogoModalAberto() {
+  try { return Boolean(document.querySelector('dialog:modal')) } catch { return Boolean(document.querySelector('dialog[open]')) }
 }
 
 // #3392: aviso para leitor de tela que sobrevive à lista escondida (aba Conversa no celular): um nó fixo no corpo da página.

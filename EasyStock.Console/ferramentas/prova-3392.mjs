@@ -64,6 +64,24 @@ try {
       await p.close()
     }
     cobrar(LARGURAS.every((w) => lados[w] === 'esquerda'), `Assistente do mesmo lado (esquerdo) em 1024, 1280 e 1440 (${JSON.stringify(lados)})`)
+    // Quem escolhe a direita no computador continua à direita depois de recarregar.
+    const p = await abrir(1280)
+    await abrirConversa(p, 'Marcelo')
+    await p.getByRole('button', { name: /Abrir assistente/i }).first().click()
+    await p.waitForTimeout(700)
+    await p.getByRole('button', { name: 'Encaixar à direita' }).click()
+    await p.reload()
+    await p.locator('button[data-conversa-id]').first().waitFor({ timeout: 30000 })
+    await abrirConversa(p, 'Marcelo')
+    const aberto = await p.locator('section[role=dialog]').filter({ visible: true }).count()
+    if (!aberto) { await p.getByRole('button', { name: /Abrir assistente/i }).first().click() }
+    await p.waitForTimeout(900)
+    const lado = await p.evaluate(() => {
+      const s = [...document.querySelectorAll('section[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0)
+      return s ? (s.getBoundingClientRect().left + s.getBoundingClientRect().width / 2 > innerWidth / 2 ? 'direita' : 'esquerda') : null
+    })
+    cobrar(lado === 'direita', `1280 px: a escolha "Encaixar à direita" sobrevive ao recarregar (${lado})`)
+    await p.close()
   }
 
   if (roda('B')) for (const w of LARGURAS) {
@@ -106,6 +124,37 @@ try {
     await p.waitForTimeout(700)
     const t = await p.evaluate(() => document.body.innerText)
     cobrar(/Próxima conversa/i.test(t) && /Conversa anterior/i.test(t) && /Buscar conversa/i.test(t), 'a Ajuda lista J (próxima), K (anterior) e "/" (buscar conversa)')
+    const declarados = () => p.evaluate(() => ({
+      lista: document.querySelector('[role=list][aria-label=Conversas]')?.getAttribute('aria-keyshortcuts') ?? null,
+      busca: document.getElementById('balcao-busca')?.getAttribute('aria-keyshortcuts') ?? null,
+    }))
+    const ligados = await declarados()
+    cobrar(ligados.lista === 'J K' && ligados.busca === '/', `atalhos declarados na tela (aria-keyshortcuts ${JSON.stringify(ligados)})`)
+    // Desligado na Ajuda: J não troca de conversa e a tela deixa de declarar os atalhos (WCAG 2.1.4).
+    await p.getByRole('checkbox', { name: 'Atalhos de uma tecla' }).uncheck()
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(400)
+    await abrirConversa(p, 'Marcelo')
+    const antes = await atual(p)
+    await soltarFoco(p)
+    await p.keyboard.press('j')
+    await p.waitForTimeout(400)
+    const desligados = await declarados()
+    cobrar((await atual(p)) === antes && desligados.lista === null && desligados.busca === null, `com o interruptor desligado, J não troca de conversa e nada é declarado (${JSON.stringify(desligados)})`)
+    await p.close()
+  }
+  if (roda('B')) {
+    // A 1024 a Ficha é uma gaveta não modal; com ela aberta, J segue trocando de conversa.
+    const p = await abrir(1024)
+    const lista = await ordem(p)
+    await abrirConversa(p, 'Marcelo')
+    await p.getByRole('button', { name: /^Ficha de / }).click()
+    await p.getByRole('button', { name: 'Fechar Ficha' }).waitFor({ timeout: 5000 })
+    const antes = await atual(p)
+    await soltarFoco(p)
+    await p.keyboard.press('j')
+    await p.waitForTimeout(500)
+    cobrar((await atual(p)) === lista[lista.indexOf(antes) + 1], '1024 px: com a Ficha aberta, J abre a próxima conversa')
     await p.close()
   }
 

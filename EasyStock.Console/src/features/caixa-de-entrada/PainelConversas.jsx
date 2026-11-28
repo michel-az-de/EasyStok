@@ -7,7 +7,8 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { useAoAbrirConversa } from '../../aplicacao/aberturaDeConversa'
-import { anunciar, atalhoLivre } from '../../aplicacao/atalhoDeTecla'
+import { anunciar, atalhoLivre, useAtalhosLigados } from '../../aplicacao/atalhoDeTecla'
+import { nomeDaConversa } from '../../dominio/nomeDoContato'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
@@ -104,11 +105,12 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   const abrirPorAtalho = useChamadaEstavel((id, nome) => {
     selecionar(id)
     aoAbrir?.(id)
-    anunciar(`Conversa com ${nome}`)
+    anunciar(nome ? `Conversa com ${nome}` : 'Conversa aberta')
   })
+  const [atalhosLigados] = useAtalhosLigados()
   useEffect(() => {
     const ouvir = (e) => {
-      const tecla = e.key
+      const tecla = e.key?.toLowerCase() // Caps Lock ligado manda "J"; Shift já é barrado em atalhoLivre
       if (tecla !== 'j' && tecla !== 'k' && tecla !== '/') return
       if (!atalhoLivre(e)) return
       if (tecla === '/') {
@@ -121,11 +123,11 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
       const ids = [...document.querySelectorAll('button[data-conversa-id]')].map((b) => b.dataset.conversaId)
       if (ids.length === 0) return
       const i = ids.findIndex((id) => id === String(selecionadaId))
-      const alvo = i < 0 ? (tecla === 'j' ? 0 : -1) : i + (tecla === 'j' ? 1 : -1)
+      const alvo = i < 0 ? (tecla === 'j' ? 0 : ids.length - 1) : i + (tecla === 'j' ? 1 : -1)
       if (alvo < 0 || alvo >= ids.length) return
       const conversa = conversas.find((c) => String(c.id) === ids[alvo])
       e.preventDefault()
-      abrirPorAtalho(conversa?.id ?? ids[alvo], conversa?.nome ?? '')
+      abrirPorAtalho(conversa?.id ?? ids[alvo], conversa ? nomeDaConversa(conversa) : '')
     }
     document.addEventListener('keydown', ouvir)
     return () => document.removeEventListener('keydown', ouvir)
@@ -276,7 +278,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         {/* #3300 (F7): lista para o leitor de tela ("lista, 11 itens"); `display: contents` não muda o layout. */}
         {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- #3363: as setas valem em qualquer cartão; a lista é o único ancestral comum. */}
         <div
-          role="list" aria-label="Conversas" className={css.listaSemCaixa}
+          role="list" aria-label="Conversas" className={css.listaSemCaixa} aria-keyshortcuts={atalhosLigados ? 'J K' : undefined}
           onFocus={(e) => { const id = e.target.dataset?.conversaId; if (id) { setFocoId(id); setFocoNaLista(true) } }}
           onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setFocoNaLista(false) }}
           onKeyDown={aoTeclarNaLista}

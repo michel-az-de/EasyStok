@@ -8,14 +8,17 @@
 // F (revisão do PR): o alerta de restrição tem sempre uma parte essencial curta e inteira, e o title nunca é vazio (390, 1024, 1280).
 // G: a 1280 x 800 o cartão de alerta (tom negativo, foto, dica do CDC) nunca fica recolhido sem dizer o estado em texto.
 // H: reserva de altura da linha de contexto (zero sem linha), filtro de chips repetidos só com texto.
-// Uso: node ferramentas/prova-3386-r9.mjs [A|B|C|D|E|F|G|H ...]  (sem argumento roda tudo)
+// Uso: node ferramentas/prova-3386-r9.mjs [A|B|C|D|E|F|G|H ...]  (sem argumento roda A, B e C)
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 process.env.VITE_FONTE_DADOS = 'demonstracao'
 const { createServer } = await import('vite')
-const itens = new Set(process.argv.slice(2).map((s) => s.toUpperCase()))
-const roda = (i) => itens.size === 0 || itens.has(i)
+// #3392: sem argumento roda só A a C; D a H rodam em prova-3386-r9-parte2.mjs, num processo próprio. Inteira, a prova
+// passava do teto de 180 s do rodar-provas no runner lento do CI (148 s no master, estourou na PR #3407).
+const pedidos = process.argv.slice(2).map((s) => s.toUpperCase())
+const itens = new Set(pedidos.length ? pedidos : ['A', 'B', 'C'])
+const roda = (i) => itens.has(i)
 const raiz = fileURLToPath(new URL('..', import.meta.url))
 const servidor = await createServer({ root: raiz, logLevel: 'error', ssr: { external: ['react', 'react-dom'] }, server: { host: '127.0.0.1', port: 5824, strictPort: false } })
 await servidor.listen()
