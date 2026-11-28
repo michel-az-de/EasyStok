@@ -15122,10 +15122,12 @@ function pairingInvalidMessage() {
 // aberto e apagaria o que só existe na memória: o pedido em construção e a contagem de produção. O rascunho só
 // conta na tela dele; abandonado em outra, não segura a recarga para sempre. Campo focado só conta com
 // texto: no Android o foco fica no campo depois que o teclado fecha.
+const SELETOR_DIALOGO_ABERTO = '[class*="overlay"].show, [class*="overlay"].open, .modal.show, '
+  + '[role="dialog"].show, [role="dialog"].open, .ipr-overlay:not([hidden])';
 function telaOcupada() {
-  if (document.querySelector('[class*="overlay"].show, [class*="overlay"].open, .modal.show, '
-    + '[role="dialog"].show, [role="dialog"].open, .ipr-overlay:not([hidden])')) return true;
-  // Em qualquer aba de Pedidos: conferir o Andamento não descarta o pedido em construção, a recarga sim.
+  if (document.querySelector(SELETOR_DIALOGO_ABERTO)) return true;
+  // Em qualquer aba de Pedidos: conferir o Andamento não descarta o pedido em construção, a recarga sim. O
+  // Andamento se redesenha enquanto espera (redesenharEnquantoEspera), então não fica velho.
   if (currentScreen === 'pedidos' && (currentOrderItems.length > 0 || selectedClient)) return true;
   if (currentScreen === 'producao' && products.some(p => p && p.count > 0)) return true;
   const el = document.activeElement;
@@ -15141,10 +15143,17 @@ function telaOcupada() {
 function registrosEmEdicao() {
   return { client: editingClientId, product: editingProductId, cashEntry: editingCashEntryId };
 }
+// #3424: com a recarga adiada pelo pedido em construção, o quadro do Andamento mostra já os pedidos que o
+// servidor trouxe (o estado em memória já os tem). Só o quadro: o rascunho e o diálogo aberto ficam como estão.
+function redesenharEnquantoEspera() {
+  if (currentScreen !== 'pedidos' || document.querySelector(SELETOR_DIALOGO_ABERTO)) return;
+  renderKanban();
+}
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   telaOcupada,
   registrosEmEdicao,
+  redesenharEnquantoEspera,
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
   bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },

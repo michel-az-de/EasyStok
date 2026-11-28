@@ -30,7 +30,7 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
     sandbox.location.reload = () => { tela.reloads++; };
     sandbox.window.cdbApp = Object.assign({}, original, {
       getState: () => state, setPendingSync() {}, markAllSynced() {}, showToast() {}, getOperator: () => 'Thati',
-      telaOcupada: () => tela.ocupada, registrosEmEdicao: () => tela.emEdicao
+      telaOcupada: () => tela.ocupada, registrosEmEdicao: () => tela.emEdicao, redesenharEnquantoEspera() {}
     });
     sandbox.AbortController = AbortController;
     sandbox.URLSearchParams = URLSearchParams;
@@ -135,7 +135,11 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
       ['outro cliente mudou: o formulário aberto não corre risco', 0, 'client.upsert', [cliente('c-3424-edit'), cliente('c-3424-outro')], cliente('c-3424-outro', { phone: '2222' })],
       ['telefone do cliente aberto mudou: salvar devolveria o antigo', 1, 'client.upsert', [cliente('c-3424-edit')], cliente('c-3424-edit', { phone: '2222' })],
       ['só a última compra do cliente aberto mudou: o formulário não grava esse campo', 0, 'client.upsert', [cliente('c-3424-edit')], cliente('c-3424-edit', { lastOrder: 9, orderCount: 2 })],
+      ['só a última compra mudou num cliente com apto já migrado (address local "Apto 12", servidor null)', 0, 'client.upsert',
+        [cliente('c-3424-edit', { apt: '12', address: 'Apto 12' })], cliente('c-3424-edit', { apt: '12', address: null, lastOrder: 9 })],
       ['só o saldo do produto aberto mudou (venda em outro caixa)', 0, 'product.upsert', [produto({ count: 0, photo: null })], produto({ stock: 1 })],
+      ['primeiro upsert do produto traz campos que só o servidor tem (sku, embalagem)', 0, 'product.upsert', [produto({ count: 0, photo: null })],
+        produto({ sku: 'TAL-1', tipoEmbalagem: 'pote', defaultWeightG: 500, stock: 2 })],
       ['preço do produto aberto mudou', 1, 'product.upsert', [produto({ count: 0, photo: null })], produto({ price: 12 })],
       ['cliente aberto apagado no servidor', 1, 'client.delete', [cliente('c-3424-edit')], { id: 'c-3424-edit' }]
     ];
@@ -150,6 +154,39 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
         await pausa(ESPERA);
         assert.strictEqual(t.tela.reloads, esperado, motivo);
       } finally { await t.desmontar(); }
+    }
+  });
+
+  test('#3424 com a recarga esperando, o app redesenha o que pode sem fechar nada; recarga imediata não redesenha', async () => {
+    const state = estado({ clients: [{ id: 'c-3424-r', name: 'Ana', address: 'Rua A', phone: '1', lastOrder: 1, orderCount: 1 }] });
+    const t = montar(state);
+    let redesenhos = 0;
+    sandbox.window.cdbApp.redesenharEnquantoEspera = () => { redesenhos++; };
+    try {
+      t.tela.ocupada = true;
+      await t.puxar([mutacao('order.upsert', pedido('o-3424-r1'))]);
+      await t.puxar([mutacao('order.upsert', pedido('o-3424-r2'))]);
+      assert.strictEqual(redesenhos, 2, 'cada lote que mudou algo redesenha o quadro');
+      t.tela.emEdicao = { client: 'c-3424-r' };
+      await t.puxar([mutacao('client.upsert', { id: 'c-3424-r', name: 'Ana', address: 'Rua B', phone: '1', lastOrder: 1, orderCount: 1 })]);
+      assert.strictEqual(redesenhos, 2, 'formulário em risco: recarrega, não redesenha');
+    } finally { await t.desmontar(); }
+  });
+
+  test('#3424 redesenharEnquantoEspera do app: só o quadro de Pedidos, e nunca por baixo de um diálogo aberto', () => {
+    const app = appDoBoot, doc = sandbox.document, qs = doc.querySelector;
+    assert.strictEqual(typeof app.redesenharEnquantoEspera, 'function');
+    runInSandbox('globalThis.__antes3424r = { tela: currentScreen, kanban: renderKanban }; globalThis.__kanban3424 = 0; renderKanban = () => { __kanban3424++; }');
+    try {
+      runInSandbox("currentScreen = 'home'"); app.redesenharEnquantoEspera();
+      assert.strictEqual(runInSandbox('__kanban3424'), 0, 'fora de Pedidos não mexe');
+      runInSandbox("currentScreen = 'pedidos'"); app.redesenharEnquantoEspera();
+      assert.strictEqual(runInSandbox('__kanban3424'), 1, 'em Pedidos redesenha o quadro');
+      doc.querySelector = () => ({ id: 'aberto' }); app.redesenharEnquantoEspera();
+      assert.strictEqual(runInSandbox('__kanban3424'), 1, 'diálogo aberto: não redesenha por baixo');
+    } finally {
+      doc.querySelector = qs;
+      runInSandbox('currentScreen = __antes3424r.tela; renderKanban = __antes3424r.kanban');
     }
   });
 

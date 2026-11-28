@@ -1338,17 +1338,18 @@
   }
   // Registro que o servidor mudou e que está aberto num formulário de edição: esperar seria pior que recarregar,
   // porque salvar o formulário devolveria ao servidor o valor antigo dos campos que a operadora não tocou.
-  // Campos que o formulário de edição não grava: o save mantém o valor do objeto, que já é o do servidor
-  // (produto faz spread e conserva o saldo; cliente grava só nome, endereço e telefone no próprio objeto).
-  const _FORA_DO_FORMULARIO = {
-    product: ['stock', 'count', 'photo', 'updatedAt'],
-    client: ['lastOrder', 'orderCount', 'updatedAt'],
-    cashEntry: ['updatedAt']
+  // Campos que o save do formulário de edição grava (app-nucleo.js: saveProduct, saveNewClient, saveCashEntry).
+  // Só mudança do servidor num deles corre risco de ser desfeita pelo save; o resto (saldo, última compra) o save
+  // conserva, porque grava no próprio objeto ou faz spread dele.
+  const _CAMPOS_DO_FORMULARIO = {
+    product: ['name', 'emoji', 'category', 'unit', 'price', 'cost', 'minStock', 'defaultValidityDays'],
+    client: ['name', 'address', 'phone', 'document', 'documentType'],
+    cashEntry: ['type', 'amount', 'description', 'metodo']
   };
   function _mudouCampoDoFormulario(type, local, doServidor) {
-    const ignorar = _FORA_DO_FORMULARIO[type] || [];
-    return Object.keys(doServidor).some(k => ignorar.indexOf(k) < 0 && !(local[k] == null && doServidor[k] == null)
-      && JSON.stringify(local[k]) !== JSON.stringify(doServidor[k]));
+    const servidor = _paraComparar(type, doServidor);
+    return (_CAMPOS_DO_FORMULARIO[type] || []).some(k => Object.prototype.hasOwnProperty.call(servidor, k)
+      && !(local[k] == null && servidor[k] == null) && JSON.stringify(local[k]) !== JSON.stringify(servidor[k]));
   }
   function _emEdicao(type, id) {
     try {
@@ -1506,6 +1507,10 @@
     if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando quando a tela estiver livre...');
       _recarregarQuandoLivre(recarregarJa);
+      if (!recarregarJa && _telaOcupada()) {
+        try { if (typeof window.cdbApp.redesenharEnquantoEspera === 'function') window.cdbApp.redesenharEnquantoEspera(); }
+        catch (e) { console.warn('redesenho enquanto espera falhou', e); }
+      }
     }
     return errorsThisBatch === 0 && !_pullDeferred;
   }
