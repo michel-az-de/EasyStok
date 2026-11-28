@@ -1338,6 +1338,18 @@
   }
   // Registro que o servidor mudou e que está aberto num formulário de edição: esperar seria pior que recarregar,
   // porque salvar o formulário devolveria ao servidor o valor antigo dos campos que a operadora não tocou.
+  // Campos que o formulário de edição não grava: o save mantém o valor do objeto, que já é o do servidor
+  // (produto faz spread e conserva o saldo; cliente grava só nome, endereço e telefone no próprio objeto).
+  const _FORA_DO_FORMULARIO = {
+    product: ['stock', 'count', 'photo', 'updatedAt'],
+    client: ['lastOrder', 'orderCount', 'updatedAt'],
+    cashEntry: ['updatedAt']
+  };
+  function _mudouCampoDoFormulario(type, local, doServidor) {
+    const ignorar = _FORA_DO_FORMULARIO[type] || [];
+    return Object.keys(doServidor).some(k => ignorar.indexOf(k) < 0 && !(local[k] == null && doServidor[k] == null)
+      && JSON.stringify(local[k]) !== JSON.stringify(doServidor[k]));
+  }
   function _emEdicao(type, id) {
     try {
       const abertos = window.cdbApp && typeof window.cdbApp.registrosEmEdicao === 'function' ? window.cdbApp.registrosEmEdicao() : null;
@@ -1444,10 +1456,10 @@
           }
           // #3424: troca no mesmo objeto. Com a recarga adiada, o modal aberto e o cliente escolhido no pedido
           // seguem apontando para ele; um objeto novo deixaria a edição da operadora num registro fora da coleção.
+          if (idx >= 0 && _emEdicao(type, m.payload.id) && _mudouCampoDoFormulario(type, coll[idx], m.payload)) recarregarJa = true;
           if (idx >= 0) { Object.keys(coll[idx]).forEach(k => { delete coll[idx][k]; }); Object.assign(coll[idx], m.payload); }
           else coll.push(m.payload);
           changed = true;
-          if (idx >= 0 && _emEdicao(type, m.payload.id)) recarregarJa = true;
           if (type !== 'product') _espelharNoSnapshot(type, idx >= 0 ? coll[idx] : m.payload);
           // #1520: saldo que veio do servidor nao e movimento deste aparelho. Sem isto, um
           // save antes do reload devolvia a diferenca ao servidor como "stock.delta".

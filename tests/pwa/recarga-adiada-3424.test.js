@@ -128,20 +128,25 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
     } finally { await t.desmontar(); }
   });
 
-  test('#3424 servidor mudou o cliente aberto no formulário de edição: recarrega na hora, como antes', async () => {
-    const aberto = { id: 'c-3424-edit', name: 'Ana', apt: null, address: 'Rua A', phone: '1111', lastOrder: 1, orderCount: 1 };
-    const outro = { id: 'c-3424-outro', name: 'Bia', apt: null, address: 'Rua B', phone: null, lastOrder: 1, orderCount: 1 };
-    const state = estado({ clients: [aberto, outro] });
+  test('#3424 servidor mudou campo do formulário de edição aberto: recarrega na hora, como antes; o resto espera', async () => {
+    const cliente = (id, extra) => Object.assign({ id, name: 'Ana', apt: null, address: 'Rua A', phone: '1111', lastOrder: 1, orderCount: 1 }, extra);
+    const produto = extra => Object.assign({ id: 'p-3424-edit', name: 'Talharim', emoji: null, category: 'massas', unit: 'un', price: 10, stock: 3, isCustom: false }, extra);
     const casos = [
-      [outro, 0, 'outro cliente mudou: o formulário aberto não corre risco, espera'],
-      [aberto, 1, 'salvar o formulário devolveria o telefone antigo ao servidor: recarrega já']
+      ['outro cliente mudou: o formulário aberto não corre risco', 0, 'client.upsert', [cliente('c-3424-edit'), cliente('c-3424-outro')], cliente('c-3424-outro', { phone: '2222' })],
+      ['telefone do cliente aberto mudou: salvar devolveria o antigo', 1, 'client.upsert', [cliente('c-3424-edit')], cliente('c-3424-edit', { phone: '2222' })],
+      ['só a última compra do cliente aberto mudou: o formulário não grava esse campo', 0, 'client.upsert', [cliente('c-3424-edit')], cliente('c-3424-edit', { lastOrder: 9, orderCount: 2 })],
+      ['só o saldo do produto aberto mudou (venda em outro caixa)', 0, 'product.upsert', [produto({ count: 0, photo: null })], produto({ stock: 1 })],
+      ['preço do produto aberto mudou', 1, 'product.upsert', [produto({ count: 0, photo: null })], produto({ price: 12 })],
+      ['cliente aberto apagado no servidor', 1, 'client.delete', [cliente('c-3424-edit')], { id: 'c-3424-edit' }]
     ];
-    for (const [cliente, esperado, motivo] of casos) {
+    for (const [motivo, esperado, tipo, locais, doServidor] of casos) {
+      const [colecao] = tipo.split('.');
+      const state = estado(colecao === 'client' ? { clients: locais } : { products: locais });
       const t = montar(state);
       try {
         t.tela.ocupada = true;
-        t.tela.emEdicao = { client: 'c-3424-edit', product: null, cashEntry: null };
-        await t.puxar([mutacao('client.upsert', Object.assign({}, cliente, { phone: 'novo-' + cliente.id }))]);
+        t.tela.emEdicao = { client: 'c-3424-edit', product: 'p-3424-edit', cashEntry: null };
+        await t.puxar([mutacao(tipo, doServidor)]);
         await pausa(ESPERA);
         assert.strictEqual(t.tela.reloads, esperado, motivo);
       } finally { await t.desmontar(); }
@@ -187,7 +192,7 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
       ['contagem de produção', true, naTela('producao', "products = [{ id: 'p1', count: 2 }]"), sair('')],
       ['campo de texto focado com texto', true, focar({ tagName: 'INPUT', type: 'text', value: 'Ana' }), desfocar],
       ['observação com texto focada', true, focar({ tagName: 'TEXTAREA', value: 'sem cebola' }), desfocar],
-      ['rascunho na aba Andamento de Pedidos não segura a recarga', false, () => { naTela('pedidos', rascunho)(); naAba('andamento')(); }, () => { fecharModal(); sair('currentOrderItems = []')(); }],
+      ['rascunho segura também na aba Andamento: conferir não é abandonar', true, () => { naTela('pedidos', rascunho)(); naAba('andamento')(); }, () => { fecharModal(); sair('currentOrderItems = []')(); }],
       ['rascunho na aba Novo de Pedidos segura', true, () => { naTela('pedidos', rascunho)(); naAba('novo')(); }, () => { fecharModal(); sair('currentOrderItems = []')(); }],
       ['pedido em construção abandonado em outra tela não segura a recarga', false, naTela('home', rascunho), sair('currentOrderItems = []')],
       ['contagem abandonada em outra tela não segura a recarga', false, naTela('pedidos', "products = [{ id: 'p1', count: 2 }]"), sair('')],
