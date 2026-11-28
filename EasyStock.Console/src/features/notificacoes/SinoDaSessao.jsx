@@ -5,7 +5,8 @@ import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
-import { agruparAvisos, posicaoDoPainel } from '../../dominio/avisosDaSessao'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { agruparAvisos, destinoDoAviso, posicaoDoPainel } from '../../dominio/avisosDaSessao'
 import { diaMesHora, idadeDoAviso } from '../../dominio/formato'
 import { useEscape } from '../../hooks/useEscape'
 import css from './notificacoes.module.css'
@@ -38,6 +39,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
   // A idade ("há 3 min") se mede na hora de abrir; o painel aberto é curto e não precisa de relógio próprio.
   const [agora, setAgora] = useState(() => Date.now())
   const { total, recentes, erro, carregando, falha, chegaram, todas, carregar, carregarTodas, marcarLida, marcarTodas, aoFecharPainel } = avisos
+  const { permite, acoes } = useAcessoModulos()
   const botaoRef = useRef(null)
   const painelRef = useRef(null)
   const focoDepoisRef = useRef(null)
@@ -155,6 +157,26 @@ export function SinoDaSessao({ avisos, aparelho }) {
     focoDepoisRef.current = vizinho?.id ?? ''
     marcarLida(aviso.id)
   }
+  // #3402: tocar no aviso abre a tela da coisa avisada, como nas redes. Lê na hora (a leitura do hook volta se a API
+  // recusar) sem passar por `ler`, que guardaria o foco para a próxima abertura, e fecha o painel sem devolver o foco ao
+  // sino: na troca de tela, quem leva o foco é a NavegacaoDoConsole. Ctrl, Cmd, Shift ou Alt deixam o navegador abrir
+  // outra aba, janela ou baixar e esta aba fica onde está. Em Não lidas o link sai da lista: lê como o botão de ler (o
+  // foco vai ao próximo não lido). Em Todas o aviso lido fica, e o foco fica no link. O botão do meio não dispara click:
+  // abre a outra aba sem ler.
+  const destinoDe = (aviso) => destinoDoAviso(aviso, { permite, acoes })
+  const abrirDestino = (evento, aviso, destino, lista) => {
+    if (evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey) {
+      if (aviso.lida) return
+      if (aba === 'naoLidas') ler(aviso, lista)
+      else marcarLida(aviso.id)
+      return
+    }
+    if (!aviso.lida) marcarLida(aviso.id)
+    fechar({ devolverFoco: false })
+    // Mesmo hash não dispara hashchange e o foco cairia no body: vai ao início da tela, o mesmo alvo de
+    // app/focoDaNavegacao.js (features não importa app).
+    if (window.location.hash === destino.hash) document.querySelector('[data-inicio-tela]')?.focus({ preventScroll: true })
+  }
 
   // #1989: quem ainda não ativou neste aparelho vê um ponto discreto no sino; o caminho fica dentro.
   const semAvisoNoAparelho = ['desligado', 'bloqueado'].includes(aparelho?.estado)
@@ -226,7 +248,8 @@ export function SinoDaSessao({ avisos, aparelho }) {
             <Vazio titulo="Nenhum aviso ainda" icone="bell" role="status">Quando a loja tiver um aviso, ele fica guardado aqui.</Vazio>
           )}
           {lista.length === 0 && (aba === 'todas' ? todas.carregando : carregando) && <p role="status" className={css.resumo}>Carregando avisos…</p>}
-          <ListaDeAvisos avisos={lista} agora={agora} chegaram={chegaram} aoLer={(aviso) => ler(aviso, lista)} />
+          <ListaDeAvisos avisos={lista} agora={agora} chegaram={chegaram} aoLer={(aviso) => ler(aviso, lista)} destinoDe={destinoDe}
+            aoAbrir={(evento, aviso, destino) => abrirDestino(evento, aviso, destino, lista)} />
           {aba === 'naoLidas' && naoLidas > recentes.length && recentes.length > 0 && (
             <p className={css.resumo}>Mostrando {recentes.length} de {naoLidas}. Os próximos aparecem conforme você lê.</p>
           )}
@@ -242,8 +265,10 @@ export function SinoDaSessao({ avisos, aparelho }) {
   </>
 }
 
-// Uma linha por aviso, agrupada por dia. Não lido: fundo tingido, título forte, ponto e o botão de ler.
-function ListaDeAvisos({ avisos, agora, chegaram, aoLer }) {
+// Uma linha por aviso, agrupada por dia. Não lido: fundo tingido, título forte, ponto e o botão de ler. Com destino
+// (#3402), o título é o link e cobre a linha toda; o nome do link é o título, e a mensagem e a chamada o descrevem.
+function ListaDeAvisos({ avisos, agora, chegaram, aoLer, destinoDe, aoAbrir }) {
+  const base = useId()
   return agruparAvisos(avisos, agora).map((grupo) => (
     <section key={grupo.titulo} className={css.grupo} aria-label={grupo.titulo}>
       <h3>{grupo.titulo}</h3>
@@ -251,23 +276,30 @@ function ListaDeAvisos({ avisos, agora, chegaram, aoLer }) {
         {grupo.avisos.map((aviso) => {
           const naoLida = !aviso.lida
           const idade = idadeDoAviso(aviso.createdAt, agora)
+          const destino = destinoDe(aviso)
+          const titulo = aviso.titulo || 'Aviso'
+          const [idMensagem, idChamada] = [`${base}-${aviso.id}-mensagem`, `${base}-${aviso.id}-chamada`]
           return (
             <li key={aviso.id} data-aviso={aviso.id} data-tom={tom[aviso.severidade] ?? 'neutro'}
               className={`${css.aviso} ${naoLida ? css.naoLida : ''} ${chegaram.includes(aviso.id) ? css.chegou : ''}`}>
               <span className={css.selo} aria-hidden="true"><Icone nome={iconeDaGravidade[aviso.severidade] ?? 'bell'} tamanho={20} /></span>
               <div className={css.texto}>
                 {naoLida && <span className="sr">Não lido.</span>}
-                <h4>{aviso.titulo || 'Aviso'}</h4>
-                {aviso.mensagem && <p>{aviso.mensagem}</p>}
+                <h4>{destino
+                  ? <a className={css.abrir} href={destino.hash} aria-describedby={`${aviso.mensagem ? idMensagem : ''} ${idChamada}`.trim()}
+                    onClick={(evento) => aoAbrir(evento, aviso, destino)}>{titulo}</a>
+                  : titulo}</h4>
+                {aviso.mensagem && <p id={idMensagem}>{aviso.mensagem}</p>}
                 <div className={css.meta}>
                   <Pilula tom={tom[aviso.severidade] ?? 'neutro'} fina>{gravidade[aviso.severidade] ?? aviso.severidade}</Pilula>
                   {/* #2303: o aviso diz quando nasceu; o de 14 dias não se passa por novo. */}
                   {idade && <time dateTime={aviso.createdAt} title={diaMesHora(aviso.createdAt)}>{idade}</time>}
+                  {destino && <span id={idChamada} className={css.chamada}>{destino.chamada}</span>}
                 </div>
               </div>
               {naoLida && <span className={css.ponto} data-nao-lida aria-hidden="true" />}
               {/* #2258 (A8): ler tem cara de botão e ícone; só de ícone, passa pelo BotaoIcone (gramática h). */}
-              {naoLida && <BotaoIcone icone="check" tom="secundario" rotulo={`Marcar como lido: ${aviso.titulo || 'Aviso'}`} dica="Marcar como lido"
+              {naoLida && <BotaoIcone icone="check" tom="secundario" rotulo={`Marcar como lido: ${titulo}`} dica="Marcar como lido"
                 onClick={() => aoLer(aviso)} />}
             </li>
           )
