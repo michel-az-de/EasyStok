@@ -10,6 +10,33 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#3413): o Ctrl+clique da prova do sino esperava a aba nova por só 3 s
+
+A `prova-3394-avisos-no-sino.mjs` caiu 1 vez no passo 9c (linha 449), com "o Ctrl+clique não abriu outra aba: o clique
+foi barrado". Foi no job `qualidade` da PR #3410, em d016a72e1 (run 46145588861, tentativa 1). A PR só mexia em docs, e
+a suíte levou 853 s. A tentativa 2 do mesmo SHA passou, e o commit anterior da PR (a784f1bfb) também.
+
+- **Por que era flaky:** a espera da aba nova (`context.waitForEvent('page', { timeout: 3000 })`) começa antes do
+  clique, porque tem de estar armada quando a aba abrir. O próprio clique, porém, espera o link ficar clicável, e no
+  runner lento isso pode passar de 3 s. A espera estourava com a aba a caminho, e o `.catch(() => null)` virava a
+  mensagem "o clique foi barrado", que culpa o produto. O `abrirDestino` do `SinoDaSessao` não chama `preventDefault`
+  com Ctrl, Cmd, Shift ou Alt.
+- **Hipótese refutada:** pela documentação, o evento `page` só sairia depois que o documento da aba nova respondesse,
+  o que faria a lentidão do Vite pesar. Medido com o documento segurado 4 s por uma rota, o evento chegou em cerca de
+  100 ms, com `about:blank`. O Vite não entra na conta. Com a CPU da página estrangulada 20 e 60 vezes, a aba chegou em
+  menos de 0,6 s.
+- **Como foi confirmado:** com o link oculto por 3,5 s antes do clique (Red temporário, fora do commit), o clique
+  terminou em 4,0 s, leu o aviso (`PATCH e3`), e a prova caiu com a mensagem do CI. Com a espera de 30 s e o mesmo
+  atraso, a prova inteira passa (35,7 s). Sem o atraso, ela passou 3 de 3 vezes, entre 30 e 35 s.
+- **Correção:** a espera do 9c passa a ser de 30 s, o prazo padrão do Playwright, o mesmo do clique. A mensagem agora
+  diz o prazo e se o aviso foi lido, para separar "a aba não veio" de "o clique não chegou ao link". O assert continua.
+  As esperas de 3 s do 9e (Ctrl+Enter e Shift+clique) ficam como estão: não têm assert sobre a aba, e
+  `destinos.context.close()` fecha a que sobrar.
+- **Quando reabrir:** se o 9c cair com "em 30 s", a aba não abriu de fato. Leia a parte entre parênteses: "o aviso nem
+  foi lido" aponta para o clique fora do link, e "leu o aviso" aponta para o navegador.
+
+---
+
 ## ✅ CORRIGIDO (#3398): provas do Atendimento passavam do teto de 180 s do `rodar-provas` no CI
 
 O job `qualidade` do workflow `console` caiu com código 143 (`[estourou 180s]`) na `prova-3386-r9.mjs` e na

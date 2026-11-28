@@ -443,10 +443,14 @@ try {
 
   // 9c. Ctrl+clique abre noutra aba: lê, mas o painel fica aberto, esta aba não troca de tela e o foco, com o link fora
   //     da lista, vai para o próximo não lido, não para o body.
-  const abaNova = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
+  //     #3413: a espera começa antes do clique, e o próprio clique espera o link ficar clicável. Com 3 s, num runner lento
+  //     a espera podia estourar com a aba a caminho, e a mensagem culpava o clique. 30 s é o prazo padrão do Playwright,
+  //     o mesmo do clique.
+  const ESPERA_ABA_MS = 30000
+  const abaNova = destinos.context.waitForEvent('page', { timeout: ESPERA_ABA_MS }).catch(() => null)
   await linha('e3').getByRole('link', { name: 'Produto Vencido', exact: true }).click({ modifiers: ['Control'] })
   const outra = await abaNova
-  assert.ok(outra, 'o Ctrl+clique não abriu outra aba: o clique foi barrado')
+  assert.ok(outra, `o Ctrl+clique não abriu outra aba em ${ESPERA_ABA_MS / 1000} s (${escritas.includes('PATCH e3') ? 'o clique chegou ao link e leu o aviso' : 'o aviso nem foi lido: o clique não chegou ao link'})`)
   await outra.close()
   assert.ok(await painel(pd).isVisible(), 'o Ctrl+clique fechou o painel desta aba')
   assert.equal(await pd.evaluate(() => location.hash), '#/m/producao/estoque', 'o Ctrl+clique trocou a tela desta aba')
