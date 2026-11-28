@@ -475,7 +475,14 @@ try {
   assert.ok(await linkE4.evaluate((el) => el === document.activeElement), `depois do Ctrl+Enter em Todas, o foco foi para ${await ondeFoco()}, não ficou no link`)
   // O link esticado não tem contorno próprio: quem mostra o foco do teclado é a linha inteira.
   assert.equal(await linha('e4').evaluate((el) => getComputedStyle(el).outlineStyle), 'solid', 'com o foco do teclado no link, a linha do aviso tem de ganhar o contorno')
-  console.log('ok 9e: Ctrl+Enter na aba Todas lê e o foco fica no mesmo link')
+  // Aviso já lido não grava de novo, e o Shift (outra janela) também deixa o painel aberto.
+  const janela = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
+  await linkE4.click({ modifiers: ['Shift'] })
+  await (await janela)?.close()
+  await pd.waitForTimeout(300)
+  assert.equal(escritas.filter((e) => e === 'PATCH e4').length, 1, 'tocar com Shift num aviso já lido gravou a leitura de novo')
+  assert.ok(await painel(pd).isVisible(), 'o Shift+clique fechou o painel desta aba')
+  console.log('ok 9e: Ctrl+Enter na aba Todas lê e o foco fica no mesmo link; aviso lido não grava de novo')
   await destinos.context.close()
 
   // 9d. Perfil sem estoque (GerenciarEstoque, `verDesacertosEstoque`): nenhum aviso vira link; a leitura continua.

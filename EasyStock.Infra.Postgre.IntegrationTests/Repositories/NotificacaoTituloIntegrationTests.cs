@@ -70,6 +70,16 @@ public class NotificacaoTituloIntegrationTests(PostgreSqlDatabaseFixture fixture
             resultado.Items.Select(n => n.Titulo).Should().Equal(esperados.Skip((pagina - 1) * 2).Take(2));
             resultado.Items.Select(n => n.TipoAlerta).Should().Equal(tiposEsperados.Skip((pagina - 1) * 2).Take(2));
         }
+        // O filtro por tipo e o resumo seguem o mesmo tipo da lista: o envio antigo conta como aviso operacional.
+        (await repo.GetByEmpresaAsync(casa.Id, tipo: TipoAlertaEstoque.ValidadeProxima, usuarioId: pessoa)).Items
+            .Select(n => n.Id).Should().Equal(validade.Id);
+        (await repo.GetByEmpresaAsync(casa.Id, tipo: TipoAlertaEstoque.AvisoOperacional, usuarioId: pessoa)).Items
+            .Select(n => n.Id).Should().Equal(avisos.Take(casos.Length).Select(n => n.Id));
+        (await repo.GetResumoAsync(casa.Id, pessoa)).PorTipo.Should().BeEquivalentTo(new Dictionary<string, int>
+        {
+            [TipoAlertaEstoque.AvisoOperacional.ToString()] = casos.Length,
+            [TipoAlertaEstoque.ValidadeProxima.ToString()] = 1,
+        });
         db.ChangeTracker.Entries<Notificacao>().Should().BeEmpty();
         var registro = await db.Notificacoes.SingleAsync(n => n.Id == avisos[0].Id);
         registro.Titulo.Should().Be("Validade Próxima");
