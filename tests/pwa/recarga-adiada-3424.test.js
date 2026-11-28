@@ -166,10 +166,18 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
       t.tela.ocupada = true;
       await t.puxar([mutacao('order.upsert', pedido('o-3424-r1'))]);
       await t.puxar([mutacao('order.upsert', pedido('o-3424-r2'))]);
-      assert.strictEqual(redesenhos, 2, 'cada lote que mudou algo redesenha o quadro');
+      assert.strictEqual(redesenhos, 2, 'cada lote com pedido redesenha o quadro');
+      await t.puxar([mutacao('product.upsert', { id: 'p-3424-r', name: 'Talharim', price: 10, stock: 2 })]);
+      assert.strictEqual(redesenhos, 2, 'lote sem pedido não mexe no quadro');
+      assert.strictEqual(t.tela.reloads, 0, 'e nada recarregou até aqui');
       t.tela.emEdicao = { client: 'c-3424-r' };
-      await t.puxar([mutacao('client.upsert', { id: 'c-3424-r', name: 'Ana', address: 'Rua B', phone: '1', lastOrder: 1, orderCount: 1 })]);
+      await t.puxar([
+        mutacao('order.upsert', pedido('o-3424-r3')),
+        mutacao('client.upsert', { id: 'c-3424-r', name: 'Ana', address: 'Rua B', phone: '1', lastOrder: 1, orderCount: 1 })
+      ]);
       assert.strictEqual(redesenhos, 2, 'formulário em risco: recarrega, não redesenha');
+      await pausa(ESPERA);
+      assert.strictEqual(t.tela.reloads, 1, 'a recarga já pendente sai na hora com o formulário em risco');
     } finally { await t.desmontar(); }
   });
 
@@ -184,6 +192,8 @@ module.exports = function ({ test, sandbox, assert, runInSandbox }) {
       assert.strictEqual(runInSandbox('__kanban3424'), 1, 'em Pedidos redesenha o quadro');
       doc.querySelector = () => ({ id: 'aberto' }); app.redesenharEnquantoEspera();
       assert.strictEqual(runInSandbox('__kanban3424'), 1, 'diálogo aberto: não redesenha por baixo');
+      doc.querySelector = s => String(s).indexOf('#kanban details[open]') >= 0 ? { tagName: 'DETAILS' } : null; app.redesenharEnquantoEspera();
+      assert.strictEqual(runInSandbox('__kanban3424'), 1, 'menu de ações de um card aberto: não redesenha');
     } finally {
       doc.querySelector = qs;
       runInSandbox('currentScreen = __antes3424r.tela; renderKanban = __antes3424r.kanban');

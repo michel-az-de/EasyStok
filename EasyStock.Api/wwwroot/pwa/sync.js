@@ -1338,7 +1338,7 @@
   }
   // Registro que o servidor mudou e que está aberto num formulário de edição: esperar seria pior que recarregar,
   // porque salvar o formulário devolveria ao servidor o valor antigo dos campos que a operadora não tocou.
-  // Campos que o save do formulário de edição grava (app-nucleo.js: saveProduct, saveNewClient, saveCashEntry).
+  // Campos que o save do formulário de edição grava (app-nucleo.js: saveNewProduct, saveNewClient e o save do lançamento de caixa).
   // Só mudança do servidor num deles corre risco de ser desfeita pelo save; o resto (saldo, última compra) o save
   // conserva, porque grava no próprio objeto ou faz spread dele.
   const _CAMPOS_DO_FORMULARIO = {
@@ -1507,7 +1507,7 @@
     if (changed && errorsThisBatch === 0) {
       console.log('Mudanças do servidor aplicadas, recarregando quando a tela estiver livre...');
       _recarregarQuandoLivre(recarregarJa);
-      if (!recarregarJa && _telaOcupada()) {
+      if (!recarregarJa && mutations.some(m => m && typeof m.type === 'string' && m.type.indexOf('order.') === 0) && _telaOcupada()) {
         try { if (typeof window.cdbApp.redesenharEnquantoEspera === 'function') window.cdbApp.redesenharEnquantoEspera(); }
         catch (e) { console.warn('redesenho enquanto espera falhou', e); }
       }

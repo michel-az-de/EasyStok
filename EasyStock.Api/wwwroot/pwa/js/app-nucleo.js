@@ -15146,7 +15146,8 @@ function registrosEmEdicao() {
 // #3424: com a recarga adiada pelo pedido em construção, o quadro do Andamento mostra já os pedidos que o
 // servidor trouxe (o estado em memória já os tem). Só o quadro: o rascunho e o diálogo aberto ficam como estão.
 function redesenharEnquantoEspera() {
-  if (currentScreen !== 'pedidos' || document.querySelector(SELETOR_DIALOGO_ABERTO)) return;
+  // Menu "Mais ações" aberto num card: redesenhar o fecharia e mudaria o quadro sob o dedo.
+  if (currentScreen !== 'pedidos' || document.querySelector(SELETOR_DIALOGO_ABERTO + ', #kanban details[open]')) return;
   renderKanban();
 }
 window.cdbApp = {
