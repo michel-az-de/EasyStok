@@ -147,7 +147,8 @@ await caso('K2: módulo com uma tela só no menu filtrado não tem menu lateral'
 await caso('A8/H11/A12: botões do sino com cara de botão e ícone; aparelho desligado com legenda e "Ativar" antes da lista', () => {
   const sino = ler('features/notificacoes/SinoDaSessao.jsx')
   assert.doesNotMatch(sino, /variante="texto" onClick=\{\(evento\)/, '"Marcar como lido" ainda é botão de texto')
-  assert.match(sino, /<Botao icone="check"/)
+  // #3394: no painel junto ao sino, ler é só ícone e passa pelo BotaoIcone (gramática h), com cara de botão.
+  assert.match(sino, /<BotaoIcone icone="check" tom="secundario"/)
   assert.match(sino, /<Botao icone="bell" onClick=\{aparelho\.ativar\}/)
   assert.match(sino, /data-aparelho-desligado[^>]*title="Avisos desligados neste aparelho"/)
   assert.ok(sino.indexOf('{semAvisoNoAparelho && secaoDoAparelho}') < sino.indexOf('<ul className={css.lista}'))
