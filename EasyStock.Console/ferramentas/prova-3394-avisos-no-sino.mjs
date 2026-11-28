@@ -418,7 +418,7 @@ try {
   await pd.mouse.click(caixaE1.x + 24, caixaE1.y + caixaE1.height / 2)
   await painel(pd).waitFor({ state: 'detached', timeout: 3000 }).catch(() => assert.fail('tocar no aviso não fechou o painel'))
   await pd.waitForFunction(() => location.hash === '#/m/producao/estoque', null, { timeout: 3000 })
-  assert.ok(escritas.includes('PATCH e1'), 'tocar no aviso marca como lido')
+  assert.ok(await gravou('PATCH e1'), 'tocar no aviso marca como lido')
   await esperarContador(pd, 4)
   await pd.waitForFunction(() => document.activeElement?.matches('main[data-inicio-tela][aria-label="Estoque do dia"]'), null, { timeout: 3000 })
     .catch(async () => assert.fail(`depois do toque, o foco foi para ${await pd.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))}`))
@@ -441,14 +441,19 @@ try {
   estado.falharLeituraDe = null
   console.log('ok 9b: mesmo hash leva o foco à tela; leitura que falha com o painel fechado volta e avisa ao reabrir')
 
-  // 9c. Ctrl+clique abre noutra aba: lê, mas o painel fica aberto e esta aba não troca de tela.
+  // 9c. Ctrl+clique abre noutra aba: lê, mas o painel fica aberto, esta aba não troca de tela e o foco, com o link fora
+  //     da lista, vai para o próximo não lido, não para o body.
   const abaNova = destinos.context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
   await linha('e3').getByRole('link', { name: 'Produto Vencido', exact: true }).click({ modifiers: ['Control'] })
-  await (await abaNova)?.close()
+  const outra = await abaNova
+  assert.ok(outra, 'o Ctrl+clique não abriu outra aba: o clique foi barrado')
+  await outra.close()
   assert.ok(await painel(pd).isVisible(), 'o Ctrl+clique fechou o painel desta aba')
   assert.equal(await pd.evaluate(() => location.hash), '#/m/producao/estoque', 'o Ctrl+clique trocou a tela desta aba')
   assert.ok(await gravou('PATCH e3'), 'o Ctrl+clique também lê o aviso')
-  console.log('ok 9c: Ctrl+clique lê sem fechar o painel nem trocar a tela')
+  await pd.waitForFunction(() => document.activeElement?.closest('[data-painel-avisos]') !== null && document.activeElement !== document.body, null, { timeout: 2000 })
+    .catch(async () => assert.fail(`depois do Ctrl+clique, o foco foi para ${await pd.evaluate(() => document.activeElement?.tagName)}`))
+  console.log('ok 9c: Ctrl+clique abre outra aba, lê sem fechar o painel nem trocar a tela, e o foco fica no painel')
   await destinos.context.close()
 
   // 9d. Perfil sem estoque (GerenciarEstoque, `verDesacertosEstoque`): nenhum aviso vira link; a leitura continua.

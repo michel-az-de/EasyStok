@@ -77,12 +77,13 @@
 .meta time { font-size: var(--t-apoio); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
 
 /* #3402: aviso com destino. O título é o link e se estica sobre a linha toda, como no Facebook (o mesmo jeito do
-   cartão do hall); o botão de ler fica por cima dele. O foco do teclado contorna a linha inteira. */
+   cartão do hall); o botão de ler e a hora (o title com a data completa, #2303) ficam por cima dele. O foco do teclado
+   contorna a linha inteira. */
 .abrir { color: inherit; text-decoration: none; outline: none; }
 .abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .aviso:has(.abrir):hover .abrir { text-decoration: underline; }
 .aviso:has(.abrir:focus-visible) { outline: 3px solid var(--marca); outline-offset: -3px; }
-.aviso:has(.abrir) button { position: relative; z-index: 1; }
+.aviso:has(.abrir) :is(button, time) { position: relative; z-index: 1; }
 .chamada { font-size: var(--t-apoio); font-weight: 500; color: var(--marca-forte); }
 
 .ponto { width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--marca); }

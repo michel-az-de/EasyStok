@@ -159,12 +159,16 @@ export function SinoDaSessao({ avisos, aparelho }) {
   }
   // #3402: tocar no aviso abre a tela da coisa avisada, como nas redes. Lê na hora (a leitura do hook volta se a API
   // recusar) sem passar por `ler`, que guardaria o foco para a próxima abertura, e fecha o painel sem devolver o foco ao
-  // sino: na troca de tela, quem leva o foco é a NavegacaoDoConsole. Ctrl, Cmd ou Shift abrem outra aba ou janela: só
-  // lê, e esta aba fica onde está.
+  // sino: na troca de tela, quem leva o foco é a NavegacaoDoConsole. Ctrl, Cmd, Shift ou Alt deixam o navegador abrir
+  // outra aba, janela ou baixar: lê como o botão de ler (o link sai da lista e o foco vai ao próximo não lido) e esta aba
+  // fica onde está. O botão do meio não dispara click: abre a outra aba sem ler.
   const destinoDe = (aviso) => destinoDoAviso(aviso, { permite, acoes })
-  const abrirDestino = (evento, aviso, destino) => {
+  const abrirDestino = (evento, aviso, destino, lista) => {
+    if (evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey) {
+      if (!aviso.lida) ler(aviso, lista)
+      return
+    }
     if (!aviso.lida) marcarLida(aviso.id)
-    if (evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey) return
     fechar({ devolverFoco: false })
     // Mesmo hash não dispara hashchange e o foco cairia no body: vai ao início da tela, o mesmo alvo de
     // app/focoDaNavegacao.js (features não importa app).
@@ -241,7 +245,8 @@ export function SinoDaSessao({ avisos, aparelho }) {
             <Vazio titulo="Nenhum aviso ainda" icone="bell" role="status">Quando a loja tiver um aviso, ele fica guardado aqui.</Vazio>
           )}
           {lista.length === 0 && (aba === 'todas' ? todas.carregando : carregando) && <p role="status" className={css.resumo}>Carregando avisos…</p>}
-          <ListaDeAvisos avisos={lista} agora={agora} chegaram={chegaram} aoLer={(aviso) => ler(aviso, lista)} destinoDe={destinoDe} aoAbrir={abrirDestino} />
+          <ListaDeAvisos avisos={lista} agora={agora} chegaram={chegaram} aoLer={(aviso) => ler(aviso, lista)} destinoDe={destinoDe}
+            aoAbrir={(evento, aviso, destino) => abrirDestino(evento, aviso, destino, lista)} />
           {aba === 'naoLidas' && naoLidas > recentes.length && recentes.length > 0 && (
             <p className={css.resumo}>Mostrando {recentes.length} de {naoLidas}. Os próximos aparecem conforme você lê.</p>
           )}
