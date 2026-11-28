@@ -273,10 +273,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             agora = agora.AddTicks(-(agora.Ticks % 10));
             var doEscopo = dbContext.Notificacoes
                 .Where(n => n.EmpresaId == empresaId && (!usuarioId.HasValue || n.UsuarioId == null || n.UsuarioId == usuarioId));
-            await doEscopo.Where(n => !n.Lida)
+            var marcados = await doEscopo.Where(n => !n.Lida)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(n => n.Lida, true)
                     .SetProperty(n => n.LidaEm, agora));
+            if (marcados == 0) return [];
             return await doEscopo.Where(n => n.Lida && n.LidaEm == agora).Select(n => n.Id).ToListAsync();
         }
 
