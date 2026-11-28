@@ -31,7 +31,9 @@
 .barrasSaldo > div { display: grid; grid-template-columns: 6rem minmax(0, 1fr); align-items: center; gap: var(--e-3); }
 .barrasSaldo dt { color: var(--tinta-2); font-size: var(--t-apoio); }
 .barrasSaldo dd { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; align-items: center; gap: var(--e-3); margin: 0; }
-.barrasSaldo b { text-align: right; font-variant-numeric: tabular-nums; }
+.barrasSaldo b { display: grid; text-align: right; font-variant-numeric: tabular-nums; }
+/* #3393 (r6): a parte vencida de cada lado, logo abaixo do total, para o herói bater com os cartões de 30 dias. */
+.barrasSaldo b > small { color: var(--erro); font-size: var(--t-micro); font-weight: 600; }
 .trilhoBarra { display: block; height: 12px; border-radius: var(--r-pilula); background: var(--preenchimento); overflow: hidden; }
 .trilhoBarra > i, .parBarras > i { display: block; height: 100%; min-width: 0; border-radius: var(--r-pilula); }
 .barraRecebido { background: var(--sucesso); }

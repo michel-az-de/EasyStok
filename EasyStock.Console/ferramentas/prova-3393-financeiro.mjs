@@ -78,6 +78,8 @@ caso('#3393 contas: falta da lista soma só o que ainda falta (sem cancelada nem
 caso('#3393 visão geral: herói do saldo só com os dois lados e diz o que fica de fora', () => {
   assert.match(painel, /verPagar && verReceber && <SaldoPrevisto/)
   assert.match(painel, /Sem o dinheiro em caixa e sem os pedidos sem conta/)
+  assert.match(painel, /\{vencidoPagar > 0 && <small>\{moeda\(vencidoPagar\)\} vencidas<\/small>\}/, 'o herói mostra a parte vencida (r6)')
+  assert.match(painel, /<Indicador nome="Resultado dos movimentos" valor=\{total\('receber'\) - total\('pagar'\)\} sinal \/>/, 'resultado do extrato com sinal (r6)')
   assert.match(painel, /<span>A receber menos a pagar · vencidas e próximos 30 dias<\/span>/, 'o número não é saldo: o nome diz o que ele é (r4)')
   assert.match(painel, /className=\{css\.barrasSaldo\}/)
 })

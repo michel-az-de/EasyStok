@@ -45,19 +45,21 @@ function EstadoFinanceiro({ consulta, children }) {
 }
 // #3393: zero esmaecido; o valor que importa salta sozinho.
 const classeDoValor = (valor, negativoEmErro) => (negativoEmErro && valor < 0 ? css.valorSaida : !valor ? css.zero : undefined)
-function Indicador({ nome, valor, detalhe, negativoEmErro = false, children }) { return <div className={css.indicador}><span>{nome}</span><strong className={classeDoValor(valor, negativoEmErro)}>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
+// #3393 (r6): `sinal` mostra + e − e pinta pelo sinal, como o número principal da Visão geral.
+function Indicador({ nome, valor, detalhe, negativoEmErro = false, sinal = false, children }) { return <div className={css.indicador}><span>{nome}</span><strong className={sinal ? tomDoSaldo(valor) : classeDoValor(valor, negativoEmErro)}>{sinal ? comSinal(valor) : moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
 const comSinal = (valor) => `${valor > 0 ? '+ ' : valor < 0 ? '− ' : ''}${moeda(Math.abs(valor))}`
 const tomDoSaldo = (valor) => (valor > 0 ? css.saldoPositivo : valor < 0 ? css.saldoNegativo : css.zero)
 // #3393: o número principal da Visão geral. Só com os dois lados à vista (#2105, achado 10): com um lado só o sinal mentiria.
 function SaldoPrevisto({ resumo }) {
   const saldo = saldoPrevisto30d(resumo)
   const receber = aReceberAte30d(resumo), pagar = aPagarAte30d(resumo)
+  const vencidoReceber = resumo.totalVencidoReceber ?? 0, vencidoPagar = resumo.totalVencidoPagar ?? 0
   const [largReceber, largPagar] = escalaDasBarras([receber, pagar])
   return <section className={css.saldo} aria-label="A receber menos a pagar até 30 dias, com as vencidas">
     <div className={css.saldoNumero}><span>A receber menos a pagar · vencidas e próximos 30 dias</span><strong className={tomDoSaldo(saldo)}>{comSinal(saldo)}</strong><small>Sem o dinheiro em caixa e sem os pedidos sem conta.</small></div>
     <dl className={css.barrasSaldo}>
-      <div><dt>A receber</dt><dd><span className={css.trilhoBarra}><i className={css.barraRecebido} style={{ width: `${largReceber}%` }} /></span><b>{moeda(receber)}</b></dd></div>
-      <div><dt>A pagar</dt><dd><span className={css.trilhoBarra}><i className={css.barraPago} style={{ width: `${largPagar}%` }} /></span><b>{moeda(pagar)}</b></dd></div>
+      <div><dt>A receber</dt><dd><span className={css.trilhoBarra}><i className={css.barraRecebido} style={{ width: `${largReceber}%` }} /></span><b>{moeda(receber)}{vencidoReceber > 0 && <small>{moeda(vencidoReceber)} vencidas</small>}</b></dd></div>
+      <div><dt>A pagar</dt><dd><span className={css.trilhoBarra}><i className={css.barraPago} style={{ width: `${largPagar}%` }} /></span><b>{moeda(pagar)}{vencidoPagar > 0 && <small>{moeda(vencidoPagar)} vencidas</small>}</b></dd></div>
     </dl>
   </section>
 }
@@ -318,7 +320,7 @@ function ExtratoFinanceiro() {
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}><PeriodoFinanceiro periodo={rascunho} aoMudar={setRascunho} /><Botao tipo="submit" variante="primario">Consultar extrato</Botao></form>
     <EstadoFinanceiro consulta={consulta}><div className={css.painel}>
       <p className={css.aviso}>Tudo que entrou e saiu no período: Caixa, pedidos, vendas e as contas que o seu perfil pode ver. O que veio do Caixa aparece uma vez só, e os estornos continuam no histórico.</p>
-      <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} negativoEmErro /></div>
+      <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} sinal /></div>
       {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro período e toque em Consultar extrato.</Vazio>}
       <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.estornado ? css.estornado : item.lado === 'pagar' ? css.valorSaida : css.valorEntrada}`}>{item.lado === 'pagar' ? '−' : '+'} {moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
