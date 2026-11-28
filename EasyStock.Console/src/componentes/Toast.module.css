@@ -1,6 +1,6 @@
 /* #1807: pilha de avisos no canto de cima, à direita, acima da faixa de atualização (z 80) e
    abaixo de qualquer <dialog> (camada de cima do navegador). Papel com tinta: par já conferido
-   pelo `npm run contraste`; a cor do tom fica só na borda e no ícone, nunca no texto. */
+   pelo `npm run contraste`; a cor do tom fica só no contorno e no ícone, nunca no texto. */
 .pilha {
   /* #2762 (VD4): no desktop a pilha parte abaixo do topo (a mesma medida do celular) e não cobre mais o
      relógio nem as abas. */
@@ -12,11 +12,12 @@
 .aviso {
   pointer-events: auto; width: 100%;
   display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: var(--e-2);
-  padding: var(--e-3) var(--e-2) var(--e-3) calc(var(--e-3) + var(--trilho));
-  border: 0;
+  padding: var(--e-3) var(--e-2) var(--e-3) var(--e-3);
+  border: var(--b-1) solid var(--tom, var(--marca));
   border-radius: var(--r-2); background: var(--papel); color: var(--tinta);
-  /* #2762 (A3): o tom é o filete da esquerda (o mesmo trilho do Bloco destacado), valendo também sem ícone. */
-  box-shadow: inset var(--trilho) 0 0 var(--tom, var(--marca)), var(--sombra-media);
+  /* #3393: o tom é o contorno uniforme de 1px (regra do dono, #2734), valendo também sem ícone; antes (#2762, A3)
+     era um filete só à esquerda. */
+  box-shadow: var(--sombra-media);
   animation: entrarAviso var(--dur-media) var(--ease-saida) both;
 }
 /* #2762 (A5): o aviso dispensado fica mais um instante só para sair; não aceita ponteiro nem foco (inert). */
