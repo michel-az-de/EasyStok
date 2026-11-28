@@ -192,7 +192,8 @@ function ContasFinanceiras({ lado }) {
   const campo = (nome, valor) => setAvancado((atual) => ({ ...atual, [nome]: valor }))
   const selecionar = (conta) => { setSelecionadaId(conta.id); if (telaEstreita()) setDetalheId(conta.id) }
   const comAvancado = Object.values(avancadoAplicado).some(Boolean)
-  const nomeDaCategoria = (conta) => cadastros.dados?.categorias.find((item) => item.id === conta.categoriaFinanceiraId)?.nome
+  const faltaNaLista = faltaDaLista(consulta.dados?.itens ?? [])
+  const nomeDaCategoria = (conta) => cadastros.dados?.categorias?.find((item) => item.id === conta.categoriaFinanceiraId)?.nome
   const nomeDoChip = CHIPS_CONTAS.find((item) => item.id === chip)?.rotulo
   return <div className={css.painel}>
     <div className={css.barra}>
@@ -234,7 +235,7 @@ function ContasFinanceiras({ lado }) {
             </li>
           })}</ul>
           {/* #3393: o rodapé soma o que ainda falta nas contas à vista. */}
-          {consulta.dados?.itens.length > 0 && faltaDaLista(consulta.dados.itens) > 0 && <p className={css.somaLista}><span>Falta {lado} {total > TAMANHO_PAGINA ? 'nesta página' : 'nesta lista'}</span><strong>{moeda(faltaDaLista(consulta.dados.itens))}</strong></p>}
+          {faltaNaLista > 0 && <p className={css.somaLista}><span>Falta {lado} {total > TAMANHO_PAGINA ? 'nesta página' : 'nesta lista'}</span><strong>{moeda(faltaNaLista)}</strong></p>}
           {total > TAMANHO_PAGINA && <div className={css.paginacao}><Botao disabled={paginaAtual === 1 || consulta.carregando} onClick={() => setPagina(paginaAtual - 1)}>Anterior</Botao><span>Página {paginaAtual} de {Math.ceil(total / TAMANHO_PAGINA)}</span><Botao disabled={paginaAtual * TAMANHO_PAGINA >= total || consulta.carregando} onClick={() => setPagina(paginaAtual + 1)}>Próxima</Botao></div>}
         </div>
         {selecionada && <aside className={css.contexto} aria-label="Resumo da conta selecionada">
@@ -278,7 +279,7 @@ function ModalDetalheConta({ lado, id, cadastros, podeGerenciar, aoFechar, aoGra
       <dl className={css.detalhes}>{cancelada
         ? <><div><dt>Valor lançado</dt><dd>{moeda(valorLancado(conta))}</dd></div><div><dt>Situação</dt><dd>Cancelada: nada mais a {lado}</dd></div></>
         : <><div><dt>Valor total</dt><dd>{moeda(conta.valorTotal)}</dd></div><div><dt>Falta {lado}</dt><dd>{moeda(conta.pendente)}</dd></div></>}
-        <div><dt>Categoria</dt><dd>{cadastros.dados?.categorias.find((item) => item.id === conta.categoriaFinanceiraId)?.nome ?? 'Categoria indisponível'}</dd></div><div><dt>Centro de custo</dt><dd>{cadastros.dados?.centros.find((item) => item.id === conta.centroCustoId)?.nome ?? 'Sem centro de custo'}</dd></div></dl>
+        <div><dt>Categoria</dt><dd>{cadastros.dados?.categorias?.find((item) => item.id === conta.categoriaFinanceiraId)?.nome ?? 'Categoria indisponível'}</dd></div><div><dt>Centro de custo</dt><dd>{cadastros.dados?.centros.find((item) => item.id === conta.centroCustoId)?.nome ?? 'Sem centro de custo'}</dd></div></dl>
       {conta.observacoes && <p>{conta.observacoes}</p>}
       {conta.parcelas.map((parcela) => {
         const parcelaCancelada = cancelada || parcela.status === 'Cancelada'
@@ -320,9 +321,9 @@ function ExtratoFinanceiro() {
       <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} negativoEmErro /></div>
       {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro período e toque em Consultar extrato.</Vazio>}
-      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.estornado ? css.zero : item.lado === 'pagar' ? css.valorSaida : css.valorEntrada}`}>{item.lado === 'pagar' ? '−' : '+'} {moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
+      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.estornado ? css.estornado : item.lado === 'pagar' ? css.valorSaida : css.valorEntrada}`}>{item.lado === 'pagar' ? '−' : '+'} {moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
     </div></EstadoFinanceiro>
-    {linha && <Modal titulo="Movimento financeiro" aoFechar={() => setLinha(null)}><dl className={css.detalhes}><div><dt>Descrição</dt><dd>{linha.descricao}</dd></div><div><dt>Data</dt><dd>{dataCurta(linha.em)}</dd></div><div><dt>Valor</dt><dd>{moeda(linha.valor)}</dd></div><div><dt>Situação</dt><dd>{linha.estornado ? 'Estornado' : 'Registrado'}</dd></div></dl>{linha.contaId && <a className={css.atalho} href={hashDoModulo('financeiro', linha.lado)} onClick={() => setLinha(null)}>Consultar conta a {linha.lado}</a>}</Modal>}
+    {linha && <Modal titulo="Movimento financeiro" aoFechar={() => setLinha(null)}><dl className={css.detalhes}><div><dt>Descrição</dt><dd>{linha.descricao}</dd></div><div><dt>Data</dt><dd>{dataCurta(linha.em)}</dd></div><div><dt>Valor</dt><dd>{linha.lado === 'pagar' ? '−' : '+'} {moeda(linha.valor)}</dd></div><div><dt>Situação</dt><dd>{linha.estornado ? 'Estornado' : 'Registrado'}</dd></div></dl>{linha.contaId && <a className={css.atalho} href={hashDoModulo('financeiro', linha.lado)} onClick={() => setLinha(null)}>Consultar conta a {linha.lado}</a>}</Modal>}
   </div>
 }
 

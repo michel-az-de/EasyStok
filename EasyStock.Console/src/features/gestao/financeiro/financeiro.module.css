@@ -44,6 +44,10 @@
 .rotuloGrafico { color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }
 .parBarras { display: grid; gap: 3px; }
 .parBarras > i { height: 10px; }
+/* #3393 (review): o Pago também muda de forma, não só de cor: listrado no gráfico e na legenda. */
+.parBarras > .barraPago, .legendaGrafico .barraPago { background: repeating-linear-gradient(135deg, var(--erro) 0 3px, color-mix(in srgb, var(--erro) 40%, transparent) 3px 6px); }
+/* #3393 (review): estornado não é zero; riscado e esmaecido. */
+.estornado { color: var(--tinta-3); text-decoration: line-through; }
 .legendaGrafico { display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); }
 .legendaGrafico > span { display: inline-flex; align-items: center; gap: var(--e-1); }
 .legendaGrafico i { display: inline-block; width: 10px; height: 10px; border-radius: var(--r-pilula); }

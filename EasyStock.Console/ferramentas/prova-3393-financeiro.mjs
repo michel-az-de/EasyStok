@@ -69,7 +69,7 @@ caso('#3393 barras: escala relativa ao maior valor, sem dividir por zero', () =>
 })
 
 caso('#3393 contas: falta da lista soma só o que ainda falta (sem cancelada nem rascunho)', () => {
-  const contas = [{ status: 'Aberta', pendente: 30.1 }, { status: 'Parcial', pendente: 9.9 }, { status: 'Cancelada', pendente: 50 }, { status: 'Rascunho', pendente: 70 }, { status: 'Paga', pendente: 0 }]
+  const contas = [{ status: 'Aberta', pendente: 30.1 }, { status: 'ParcialmentePaga', pendente: 9.9 }, { status: 'Cancelada', pendente: 50 }, { status: 'Rascunho', pendente: 70 }, { status: 'Paga', pendente: 0 }]
   assert.equal(financeiro.faltaDaLista(contas), 40)
 })
 
@@ -90,11 +90,13 @@ caso('#3393 visão geral: atalhos só no celular (o menu lateral já mostra as t
 caso('#3393 extrato: sinal explícito e entrada em verde, não só cor', () => {
   assert.match(painel, /item\.lado === 'pagar' \? '−' : '\+'/)
   assert.match(regra(estilo, '.valorEntrada'), /color: var\(--sucesso\)/)
+  assert.match(regra(estilo, '.estornado'), /text-decoration: line-through/, 'estornado riscado, não confundido com zero')
 })
 
 caso('#3393 contas: Pagar da linha não é primário e a lista mostra a falta somada', () => {
   assert.doesNotMatch(painel, /podeRegistrarNaConta\(conta, podeGerenciar\) && <Botao variante="primario"/)
-  assert.match(painel, /faltaDaLista\(consulta\.dados\.itens\)/)
+  assert.match(painel, /const faltaNaLista = faltaDaLista\(consulta\.dados\?\.itens \?\? \[\]\)/)
+  assert.match(painel, /\{faltaNaLista > 0 && <p className=\{css\.somaLista\}>/)
   assert.match(painel, /className=\{`\$\{css\.vence\} /)
 })
 
@@ -102,6 +104,7 @@ caso('#3393 relatórios: gráfico Recebido x Pago com texto equivalente', () => 
   assert.match(painel, /<figure className=\{css\.grafico\}/)
   assert.match(painel, /<figcaption/)
   assert.match(regra(estilo, '.barraRecebido'), /background: var\(--sucesso\)/)
+  assert.match(regra(estilo, '.parBarras > .barraPago, .legendaGrafico .barraPago'), /repeating-linear-gradient/, 'Pago se distingue por forma, não só por cor')
 })
 
 caso('#3393 números: indicador e valor com algarismos tabulares; zero esmaecido', () => {
